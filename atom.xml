@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>晚新的博客</title>
+  
+  <subtitle>关注技术：javasctipt、php、python、golang、docker、linux、flutter</subtitle>
+  <link href="/atom.xml" rel="self"/>
+  
+  <link href="https://987763485.github.io/"/>
+  <updated>2019-02-19T11:43:10.026Z</updated>
+  <id>https://987763485.github.io/</id>
+  
+  <author>
+    <name>晚新</name>
+    
+  </author>
+  
+  <generator uri="http://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>JavaScript常见的创建对象的几种方式</title>
+    <link href="https://987763485.github.io/2018/02/25/JavaScript%E5%B8%B8%E8%A7%81%E7%9A%84%E5%88%9B%E5%BB%BA%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%87%A0%E7%A7%8D%E6%96%B9%E5%BC%8F/"/>
+    <id>https://987763485.github.io/2018/02/25/JavaScript常见的创建对象的几种方式/</id>
+    <published>2018-02-25T11:12:32.000Z</published>
+    <updated>2019-02-19T11:43:10.026Z</updated>
+    
+    <content type="html"><![CDATA[<h3 id="通过Object构造函数或对象字面量创建单个对象"><a href="#通过Object构造函数或对象字面量创建单个对象" class="headerlink" title="通过Object构造函数或对象字面量创建单个对象"></a>通过Object构造函数或对象字面量创建单个对象</h3><p>　　这些方式有明显的缺点：使用同一个接口创建很多对象，会产生大量的重复代码。为了解决这个问题，出现了工厂模式。</p><h3 id="工厂模式"><a href="#工厂模式" class="headerlink" title="工厂模式"></a>工厂模式</h3><p>　　考虑在ES中无法创建类（ES6前），开发人员发明了一种函数，用函数来封装以特定接口创建对象的细节。（实现起来是在一个函数内创建好对象，然后把对象返回）。</p><p>function createPerson(name,age,job){<br>    var o=new Object();<br>    o.name=name;<br>    o.age=age;<br>    o.job=job;<br>    o.sayName=function(){<br>        alert(this.name);<br>    };<br>    return 0;<br>}</p><p>var person1=createPerson(“Nicholas”,29,”Software Engineer”);<br>var person2=createPerson(“Greg”,27,”Doctor”);</p><p>　　函数createPerson（）能够根据接受的参数来构建一个包含所有必要信息的Person对象。工厂模式虽然解决了创建多个相似对象的问题，但却没有解决对象识别的问题，即怎么知道一个对象的类型。随着JS发展，又一个模式出现了。</p><h3 id="构造函数模式"><a href="#构造函数模式" class="headerlink" title="构造函数模式"></a>构造函数模式</h3><p>　　像Object和Array这样的原生构造函数，在运行时会自动出现在执行环境。此外，也可以创建自定义的构造函数，从而定义自定义对象类型的属性和方法。</p><p>function Person(name,age,job){<br>    this.name=name;<br>    this.age=age;<br>    this.job=job;<br>    this.sayName=function(){<br>        alert(this.name);<br>    };<br>}</p><p>var person1=new Person(…);<br>var person2=new Person(…);</p><p>　　与工厂模式相比，具有以下特点：<br>没有显式创建对象；<br>直接将属性和方法赋给了this对象；<br>没有return语句；<br>要创建新实例，必须使用new操作符；（否则属性和方法将会被添加到window对象）<br>可以使用instanceof操作符检测对象类型<br>　　构造函数的问题：<br>　　构造函数内部的方法会被重复创建，不同实例内的同名函数是不相等的。可通过将方法移到构造函数外部解决这一问题，但面临新问题：封装性不好。<br>　　这些问题可通过原型模式解决。</p><h3 id="原型模式"><a href="#原型模式" class="headerlink" title="原型模式"></a>原型模式</h3><p>　　我们创建的每个函数都有一个prototype属性，这个属性是一个指针，指向一个对象，而这个对象的用途是包含可以由特定类型的所有实例共享的属性和方法。（prototype就是通过调用构造函数而创建的那个对象实例的原型对象）。<br>　　使用原型对象的好处是可以让所有对象实例共享它所包含的属性和方法。换句话说，不必在构造函数中定义对象实例的信息，而是可以将这些信息直接添加到原型对象中。</p><p>function Person(){<br>}</p><p>Person.prototype.name=”Nicholas”;<br>Person.prototype.age=29;<br>Person.prototype.job=”…”;<br>Person.prototype.sayName=function(){<br>    …<br>};</p><p>var person1=new Person();<br>person1.sayName();//“Nicholas”</p><p>　　更常见的做法是用一个包含所有属性和方法的对象字面量来重写整个原型对象，并重设constructor属性。</p><p>function Person(){<br>}</p><p>Person.prototype={<br>    name:”…”,<br>    age:29,<br>    job:”…”,<br>    sayName:function(){<br>        …<br>    }<br>};</p><p>Object.defineProperty(Person.prototype,”constructor”,{<br>    enumerable:false,<br>    value:Person,<br>});</p><p>　　原型对象的问题：<br>他省略了为构造函数传递初始化参数这一环节，结果所有实例在默认情况下都将取得相同的属性值，虽然这会在一定程度带来一定的不便，但不是最大的问题，最大的问题是由其共享的本性所决定的。<br>对于包含基本值的属性可以通过在实例上添加一个同名属性隐藏原型中的属性。然后，对于包含引用数据类型的值来说，会导致问题。<br>　　这些问题导致很少单独使用原型模式。</p><h3 id="组合使用构造函数模式和原型模式"><a href="#组合使用构造函数模式和原型模式" class="headerlink" title="组合使用构造函数模式和原型模式"></a>组合使用构造函数模式和原型模式</h3><p>　　这是创建自定义类型的最常见的方式。<br>　　构造函数模式用于定义实例属性，而原型模式用于定义方法和共享的属性。所以每个实例都会有自己的一份实例属性的副本，但同时共享着对方法的引用，最大限度的节省了内存。同时支持向构造函数传递参数。</p><p>function Person(name,age,job){<br>    this.name=name;<br>    this.age=age;<br>    this.job=job;<br>    this.friends=[“S”,”C”];<br>}</p><p>Person.prototype={<br>    constructor:Person,<br>    sayName:function(){<br>        alert(this.name);<br>    }<br>};</p><p>var person1=new Person(…);</p><h3 id="动态原型模式"><a href="#动态原型模式" class="headerlink" title="动态原型模式"></a>动态原型模式</h3><p>function Person(name,age,job){<br>    this.name=name;<br>    this.age=age;<br>    this.job=job;</p><pre><code>if(typeof this.sayName!=&quot;function&quot;){    Person.prototype.sayName=function(){        alert(this.name);    };}</code></pre><p>}</p><p>　　这里只有sayName（）不存在的情况下，才会将它添加到原型中，这段代码只会在初次调用构造函数时才执行。这里对原型所做的修改，能够立刻在所有实例中得到反映。</p><h3 id="Object-create"><a href="#Object-create" class="headerlink" title="Object.create()"></a>Object.create()</h3><p>　　ES5定义了一个名为Object.create（）的方法，它创建一个新对象，其中第一个参数是这个对象的原型，第二个参数对对象的属性进行进一步描述。</p><h3 id="另有寄生构造函数模式和稳妥构造函数模式"><a href="#另有寄生构造函数模式和稳妥构造函数模式" class="headerlink" title="另有寄生构造函数模式和稳妥构造函数模式"></a>另有寄生构造函数模式和稳妥构造函数模式</h3><p>原文链接：<a href="https://www.cnblogs.com/zczhangcui/p/6389023.html" target="_blank" rel="noopener">https://www.cnblogs.com/zczhangcui/p/6389023.html</a></p>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;h3 id=&quot;通过Object构造函数或对象字面量创建单个对象&quot;&gt;&lt;a href=&quot;#通过Object构造函数或对象字面量创建单个对象&quot; class=&quot;headerlink&quot; title=&quot;通过Object构造函数或对象字面量创建单个对象&quot;&gt;&lt;/a&gt;通过Object构造函数或对
+      
+    
+    </summary>
+    
+      <category term="计算机编程" scheme="https://987763485.github.io/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BC%96%E7%A8%8B/"/>
+    
+    
+      <category term="javascript" scheme="https://987763485.github.io/tags/javascript/"/>
+    
+      <category term="web前端" scheme="https://987763485.github.io/tags/web%E5%89%8D%E7%AB%AF/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>国内知名前端团队</title>
+    <link href="https://987763485.github.io/2018/02/22/%E5%9B%BD%E5%86%85%E7%9F%A5%E5%90%8D%E5%89%8D%E7%AB%AF%E5%9B%A2%E9%98%9F/"/>
+    <id>https://987763485.github.io/2018/02/22/国内知名前端团队/</id>
+    <published>2018-02-22T11:24:44.000Z</published>
+    <updated>2019-02-19T11:43:25.753Z</updated>
+    
+    <content type="html"><![CDATA[<h2 id="腾讯"><a href="#腾讯" class="headerlink" title="腾讯"></a>腾讯</h2><p> <a href="http://imweb.io/" target="_blank" rel="noopener">腾讯IMWEB</a><br> <a href="http://www.alloyteam.com/" target="_blank" rel="noopener">腾讯AlloyTeam</a><br> <a href="https://cdc.tencent.com/" target="_blank" rel="noopener">腾讯CDC</a></p><h2 id="阿里"><a href="#阿里" class="headerlink" title="阿里"></a>阿里</h2><p> <a href="http://taobaofed.org/" target="_blank" rel="noopener">淘宝前端团队FED</a></p><h2 id="京东"><a href="#京东" class="headerlink" title="京东"></a>京东</h2><p> <a href="https://aotu.io/" target="_blank" rel="noopener">凹凸实验室</a><br> <a href="https://jdc.jd.com/" target="_blank" rel="noopener">京东设计中心JDC</a></p><h2 id="百度"><a href="#百度" class="headerlink" title="百度"></a>百度</h2><p> <a href="http://fex.baidu.com/" target="_blank" rel="noopener">百度Fex</a><br> <a href="https://efe.baidu.com/" target="_blank" rel="noopener">百度efe</a><br> <a href="http://eux.baidu.com/" target="_blank" rel="noopener">百度eux</a></p><h2 id="360奇舞团"><a href="#360奇舞团" class="headerlink" title="360奇舞团"></a>360奇舞团</h2><p> <a href="https://75team.com/" target="_blank" rel="noopener">奇虎360</a></p><h2 id="去哪儿"><a href="#去哪儿" class="headerlink" title="去哪儿"></a>去哪儿</h2><p> <a href="https://ymfe.org/" target="_blank" rel="noopener">去哪大前端YMFE</a></p><h2 id="携程"><a href="#携程" class="headerlink" title="携程"></a>携程</h2><p> <a href="http://ued.ctrip.com/" target="_blank" rel="noopener">携程UED</a></p><h2 id="美团"><a href="#美团" class="headerlink" title="美团"></a>美团</h2><p> <a href="https://tech.meituan.com/" target="_blank" rel="noopener">美团前端</a></p><h2 id="有赞"><a href="#有赞" class="headerlink" title="有赞"></a>有赞</h2><p> <a href="https://tech.youzan.com/" target="_blank" rel="noopener">有赞技术团队</a></p><h2 id="人人网"><a href="#人人网" class="headerlink" title="人人网"></a>人人网</h2><p> <a href="https://fed.renren.com/" target="_blank" rel="noopener">人人Fed</a></p><h2 id="滴滴出行"><a href="#滴滴出行" class="headerlink" title="滴滴出行"></a>滴滴出行</h2><p> <a href="https://didi.github.io/" target="_blank" rel="noopener">滴滴开源平台</a></p><h2 id="字节跳动"><a href="#字节跳动" class="headerlink" title="字节跳动"></a>字节跳动</h2><p> <a href="https://techblog.toutiao.com/" target="_blank" rel="noopener">字节跳动技术博客</a></p><h2 id="其他"><a href="#其他" class="headerlink" title="其他"></a>其他</h2><p> <a href="https://www.docschina.org/" target="_blank" rel="noopener">印记中文</a><br> <a href="http://dopro.io/" target="_blank" rel="noopener">deepOcean</a><br> <a href="https://uiiiuiii.com/" target="_blank" rel="noopener">优优设计网</a><br> <a href="https://github.com/niezhiyang/open_source_team#1%E9%98%BF%E9%87%8C%E5%B7%B4%E5%B7%B4" target="_blank" rel="noopener">国内顶尖团队的开源地址</a><br> <a href="https://github.com/webproblem/learning-article" target="_blank" rel="noopener">前端资源整合</a></p>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;h2 id=&quot;腾讯&quot;&gt;&lt;a href=&quot;#腾讯&quot; class=&quot;headerlink&quot; title=&quot;腾讯&quot;&gt;&lt;/a&gt;腾讯&lt;/h2&gt;&lt;p&gt; &lt;a href=&quot;http://imweb.io/&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;&gt;腾讯IMWEB&lt;/a&gt;
+      
+    
+    </summary>
+    
+      <category term="计算机编程" scheme="https://987763485.github.io/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BC%96%E7%A8%8B/"/>
+    
+    
+      <category term="web前端" scheme="https://987763485.github.io/tags/web%E5%89%8D%E7%AB%AF/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>开篇</title>
+    <link href="https://987763485.github.io/2018/02/19/%E5%BC%80%E7%AF%87/"/>
+    <id>https://987763485.github.io/2018/02/19/开篇/</id>
+    <published>2018-02-19T11:04:57.000Z</published>
+    <updated>2019-02-19T11:12:35.252Z</updated>
+    
+    <content type="html"><![CDATA[<p>今天开通了GitHub博客，希望在以后的日子里能记录在编程中遇到的问题，以便学习！</p>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;p&gt;今天开通了GitHub博客，希望在以后的日子里能记录在编程中遇到的问题，以便学习！&lt;/p&gt;
+
+      
+    
+    </summary>
+    
+    
+  </entry>
+  
+</feed>

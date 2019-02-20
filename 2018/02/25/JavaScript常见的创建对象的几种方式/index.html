@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html>
+<head><meta name="generator" content="Hexo 3.8.0">
+    
+
+    
+
+    
+
+
+
+    <meta charset="utf-8">
+    
+    
+    
+    
+    <title>JavaScript常见的创建对象的几种方式 | 晚新的博客 | 关注技术：javasctipt、php、python、golang、docker、linux、flutter</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    
+    <meta name="theme-color" content="#3F51B5">
+    
+    
+    <meta name="keywords" content="javascript,web前端">
+    <meta name="description" content="通过Object构造函数或对象字面量创建单个对象　　这些方式有明显的缺点：使用同一个接口创建很多对象，会产生大量的重复代码。为了解决这个问题，出现了工厂模式。 工厂模式　　考虑在ES中无法创建类（ES6前），开发人员发明了一种函数，用函数来封装以特定接口创建对象的细节。（实现起来是在一个函数内创建好对象，然后把对象返回）。 function createPerson(name,age,job){">
+<meta name="keywords" content="javascript,web前端">
+<meta property="og:type" content="article">
+<meta property="og:title" content="JavaScript常见的创建对象的几种方式">
+<meta property="og:url" content="https://987763485.github.io/2018/02/25/JavaScript常见的创建对象的几种方式/index.html">
+<meta property="og:site_name" content="晚新的博客">
+<meta property="og:description" content="通过Object构造函数或对象字面量创建单个对象　　这些方式有明显的缺点：使用同一个接口创建很多对象，会产生大量的重复代码。为了解决这个问题，出现了工厂模式。 工厂模式　　考虑在ES中无法创建类（ES6前），开发人员发明了一种函数，用函数来封装以特定接口创建对象的细节。（实现起来是在一个函数内创建好对象，然后把对象返回）。 function createPerson(name,age,job){">
+<meta property="og:locale" content="zh-CN">
+<meta property="og:updated_time" content="2019-02-19T11:43:10.026Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="JavaScript常见的创建对象的几种方式">
+<meta name="twitter:description" content="通过Object构造函数或对象字面量创建单个对象　　这些方式有明显的缺点：使用同一个接口创建很多对象，会产生大量的重复代码。为了解决这个问题，出现了工厂模式。 工厂模式　　考虑在ES中无法创建类（ES6前），开发人员发明了一种函数，用函数来封装以特定接口创建对象的细节。（实现起来是在一个函数内创建好对象，然后把对象返回）。 function createPerson(name,age,job){">
+    
+        <link rel="alternate" type="application/atom+xml" title="晚新的博客" href="/atom.xml">
+    
+    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="stylesheet" href="//unpkg.com/hexo-theme-material-indigo@latest/css/style.css">
+    <script>window.lazyScripts=[]</script>
+
+    <!-- custom head -->
+    
+
+</head>
+
+<body>
+    <div id="loading" class="active"></div>
+
+    <aside id="menu" class="hide">
+  <div class="inner flex-row-vertical">
+    <a href="javascript:;" class="header-icon waves-effect waves-circle waves-light" id="menu-off">
+        <i class="icon icon-lg icon-close"></i>
+    </a>
+    <div class="brand-wrap" style="background-image:url(/img/brand.jpg)">
+      <div class="brand">
+        <a href="/" class="avatar waves-effect waves-circle waves-light">
+          <img src="/img/avatar.jpg">
+        </a>
+        <hgroup class="introduce">
+          <h5 class="nickname">晚新</h5>
+          <a href="mailto:987763485@qq.com" title="987763485@qq.com" class="mail">987763485@qq.com</a>
+        </hgroup>
+      </div>
+    </div>
+    <div class="scroll-wrap flex-col">
+      <ul class="nav">
+        
+            <li class="waves-block waves-effect">
+              <a href="/">
+                <i class="icon icon-lg icon-home"></i>
+                Home
+              </a>
+            </li>
+        
+            <li class="waves-block waves-effect">
+              <a href="/archives">
+                <i class="icon icon-lg icon-archives"></i>
+                Archives
+              </a>
+            </li>
+        
+            <li class="waves-block waves-effect">
+              <a href="/tags">
+                <i class="icon icon-lg icon-tags"></i>
+                Tags
+              </a>
+            </li>
+        
+            <li class="waves-block waves-effect">
+              <a href="/categories">
+                <i class="icon icon-lg icon-th-list"></i>
+                Categories
+              </a>
+            </li>
+        
+            <li class="waves-block waves-effect">
+              <a href="https://github.com/987763485" target="_blank">
+                <i class="icon icon-lg icon-github"></i>
+                Github
+              </a>
+            </li>
+        
+            <li class="waves-block waves-effect">
+              <a href="/about">
+                <i class="icon icon-lg icon-adn"></i>
+                About
+              </a>
+            </li>
+        
+      </ul>
+    </div>
+  </div>
+</aside>
+
+    <main id="main">
+        <header class="top-header" id="header">
+    <div class="flex-row">
+        <a href="javascript:;" class="header-icon waves-effect waves-circle waves-light on" id="menu-toggle">
+          <i class="icon icon-lg icon-navicon"></i>
+        </a>
+        <div class="flex-col header-title ellipsis">JavaScript常见的创建对象的几种方式</div>
+        
+        <div class="search-wrap" id="search-wrap">
+            <a href="javascript:;" class="header-icon waves-effect waves-circle waves-light" id="back">
+                <i class="icon icon-lg icon-chevron-left"></i>
+            </a>
+            <input type="text" id="key" class="search-input" autocomplete="off" placeholder="输入感兴趣的关键字">
+            <a href="javascript:;" class="header-icon waves-effect waves-circle waves-light" id="search">
+                <i class="icon icon-lg icon-search"></i>
+            </a>
+        </div>
+        
+        
+        <a href="javascript:;" class="header-icon waves-effect waves-circle waves-light" id="menuShare">
+            <i class="icon icon-lg icon-share-alt"></i>
+        </a>
+        
+    </div>
+</header>
+<header class="content-header post-header">
+
+    <div class="container fade-scale">
+        <h1 class="title">JavaScript常见的创建对象的几种方式</h1>
+        <h5 class="subtitle">
+            
+                <time datetime="2018-02-25T11:12:32.000Z" itemprop="datePublished" class="page-time">
+  2018-02-25
+</time>
+
+
+	<ul class="article-category-list"><li class="article-category-list-item"><a class="article-category-list-link" href="/categories/计算机编程/">计算机编程</a></li></ul>
+
+            
+        </h5>
+    </div>
+
+    
+
+
+</header>
+
+
+<div class="container body-wrap">
+    
+    <aside class="post-widget">
+        <nav class="post-toc-wrap post-toc-shrink" id="post-toc">
+            <h4>TOC</h4>
+            <ol class="post-toc"><li class="post-toc-item post-toc-level-3"><a class="post-toc-link" href="#通过Object构造函数或对象字面量创建单个对象"><span class="post-toc-number">1.</span> <span class="post-toc-text">通过Object构造函数或对象字面量创建单个对象</span></a></li><li class="post-toc-item post-toc-level-3"><a class="post-toc-link" href="#工厂模式"><span class="post-toc-number">2.</span> <span class="post-toc-text">工厂模式</span></a></li><li class="post-toc-item post-toc-level-3"><a class="post-toc-link" href="#构造函数模式"><span class="post-toc-number">3.</span> <span class="post-toc-text">构造函数模式</span></a></li><li class="post-toc-item post-toc-level-3"><a class="post-toc-link" href="#原型模式"><span class="post-toc-number">4.</span> <span class="post-toc-text">原型模式</span></a></li><li class="post-toc-item post-toc-level-3"><a class="post-toc-link" href="#组合使用构造函数模式和原型模式"><span class="post-toc-number">5.</span> <span class="post-toc-text">组合使用构造函数模式和原型模式</span></a></li><li class="post-toc-item post-toc-level-3"><a class="post-toc-link" href="#动态原型模式"><span class="post-toc-number">6.</span> <span class="post-toc-text">动态原型模式</span></a></li><li class="post-toc-item post-toc-level-3"><a class="post-toc-link" href="#Object-create"><span class="post-toc-number">7.</span> <span class="post-toc-text">Object.create()</span></a></li><li class="post-toc-item post-toc-level-3"><a class="post-toc-link" href="#另有寄生构造函数模式和稳妥构造函数模式"><span class="post-toc-number">8.</span> <span class="post-toc-text">另有寄生构造函数模式和稳妥构造函数模式</span></a></li></ol>
+        </nav>
+    </aside>
+
+
+<article id="post-JavaScript常见的创建对象的几种方式" class="post-article article-type-post fade" itemprop="blogPost">
+
+    <div class="post-card">
+        <h1 class="post-card-title">JavaScript常见的创建对象的几种方式</h1>
+        <div class="post-meta">
+            <time class="post-time" title="2018-02-25 19:12:32" datetime="2018-02-25T11:12:32.000Z" itemprop="datePublished">2018-02-25</time>
+
+            
+	<ul class="article-category-list"><li class="article-category-list-item"><a class="article-category-list-link" href="/categories/计算机编程/">计算机编程</a></li></ul>
+
+
+
+            
+
+        </div>
+        <div class="post-content" id="post-content" itemprop="postContent">
+            <h3 id="通过Object构造函数或对象字面量创建单个对象"><a href="#通过Object构造函数或对象字面量创建单个对象" class="headerlink" title="通过Object构造函数或对象字面量创建单个对象"></a>通过Object构造函数或对象字面量创建单个对象</h3><p>　　这些方式有明显的缺点：使用同一个接口创建很多对象，会产生大量的重复代码。为了解决这个问题，出现了工厂模式。</p>
+<h3 id="工厂模式"><a href="#工厂模式" class="headerlink" title="工厂模式"></a>工厂模式</h3><p>　　考虑在ES中无法创建类（ES6前），开发人员发明了一种函数，用函数来封装以特定接口创建对象的细节。（实现起来是在一个函数内创建好对象，然后把对象返回）。</p>
+<p>function createPerson(name,age,job){<br>    var o=new Object();<br>    o.name=name;<br>    o.age=age;<br>    o.job=job;<br>    o.sayName=function(){<br>        alert(this.name);<br>    };<br>    return 0;<br>}</p>
+<p>var person1=createPerson(“Nicholas”,29,”Software Engineer”);<br>var person2=createPerson(“Greg”,27,”Doctor”);</p>
+<p>　　函数createPerson（）能够根据接受的参数来构建一个包含所有必要信息的Person对象。工厂模式虽然解决了创建多个相似对象的问题，但却没有解决对象识别的问题，即怎么知道一个对象的类型。随着JS发展，又一个模式出现了。</p>
+<h3 id="构造函数模式"><a href="#构造函数模式" class="headerlink" title="构造函数模式"></a>构造函数模式</h3><p>　　像Object和Array这样的原生构造函数，在运行时会自动出现在执行环境。此外，也可以创建自定义的构造函数，从而定义自定义对象类型的属性和方法。</p>
+<p>function Person(name,age,job){<br>    this.name=name;<br>    this.age=age;<br>    this.job=job;<br>    this.sayName=function(){<br>        alert(this.name);<br>    };<br>}</p>
+<p>var person1=new Person(…);<br>var person2=new Person(…);</p>
+<p>　　与工厂模式相比，具有以下特点：<br>没有显式创建对象；<br>直接将属性和方法赋给了this对象；<br>没有return语句；<br>要创建新实例，必须使用new操作符；（否则属性和方法将会被添加到window对象）<br>可以使用instanceof操作符检测对象类型<br>　　构造函数的问题：<br>　　构造函数内部的方法会被重复创建，不同实例内的同名函数是不相等的。可通过将方法移到构造函数外部解决这一问题，但面临新问题：封装性不好。<br>　　这些问题可通过原型模式解决。</p>
+<h3 id="原型模式"><a href="#原型模式" class="headerlink" title="原型模式"></a>原型模式</h3><p>　　我们创建的每个函数都有一个prototype属性，这个属性是一个指针，指向一个对象，而这个对象的用途是包含可以由特定类型的所有实例共享的属性和方法。（prototype就是通过调用构造函数而创建的那个对象实例的原型对象）。<br>　　使用原型对象的好处是可以让所有对象实例共享它所包含的属性和方法。换句话说，不必在构造函数中定义对象实例的信息，而是可以将这些信息直接添加到原型对象中。</p>
+<p>function Person(){<br>}</p>
+<p>Person.prototype.name=”Nicholas”;<br>Person.prototype.age=29;<br>Person.prototype.job=”…”;<br>Person.prototype.sayName=function(){<br>    …<br>};</p>
+<p>var person1=new Person();<br>person1.sayName();//“Nicholas”</p>
+<p>　　更常见的做法是用一个包含所有属性和方法的对象字面量来重写整个原型对象，并重设constructor属性。</p>
+<p>function Person(){<br>}</p>
+<p>Person.prototype={<br>    name:”…”,<br>    age:29,<br>    job:”…”,<br>    sayName:function(){<br>        …<br>    }<br>};</p>
+<p>Object.defineProperty(Person.prototype,”constructor”,{<br>    enumerable:false,<br>    value:Person,<br>});</p>
+<p>　　原型对象的问题：<br>他省略了为构造函数传递初始化参数这一环节，结果所有实例在默认情况下都将取得相同的属性值，虽然这会在一定程度带来一定的不便，但不是最大的问题，最大的问题是由其共享的本性所决定的。<br>对于包含基本值的属性可以通过在实例上添加一个同名属性隐藏原型中的属性。然后，对于包含引用数据类型的值来说，会导致问题。<br>　　这些问题导致很少单独使用原型模式。</p>
+<h3 id="组合使用构造函数模式和原型模式"><a href="#组合使用构造函数模式和原型模式" class="headerlink" title="组合使用构造函数模式和原型模式"></a>组合使用构造函数模式和原型模式</h3><p>　　这是创建自定义类型的最常见的方式。<br>　　构造函数模式用于定义实例属性，而原型模式用于定义方法和共享的属性。所以每个实例都会有自己的一份实例属性的副本，但同时共享着对方法的引用，最大限度的节省了内存。同时支持向构造函数传递参数。</p>
+<p>function Person(name,age,job){<br>    this.name=name;<br>    this.age=age;<br>    this.job=job;<br>    this.friends=[“S”,”C”];<br>}</p>
+<p>Person.prototype={<br>    constructor:Person,<br>    sayName:function(){<br>        alert(this.name);<br>    }<br>};</p>
+<p>var person1=new Person(…);</p>
+<h3 id="动态原型模式"><a href="#动态原型模式" class="headerlink" title="动态原型模式"></a>动态原型模式</h3><p>function Person(name,age,job){<br>    this.name=name;<br>    this.age=age;<br>    this.job=job;</p>
+<pre><code>if(typeof this.sayName!=&quot;function&quot;){
+    Person.prototype.sayName=function(){
+        alert(this.name);
+    };
+}
+</code></pre><p>}</p>
+<p>　　这里只有sayName（）不存在的情况下，才会将它添加到原型中，这段代码只会在初次调用构造函数时才执行。这里对原型所做的修改，能够立刻在所有实例中得到反映。</p>
+<h3 id="Object-create"><a href="#Object-create" class="headerlink" title="Object.create()"></a>Object.create()</h3><p>　　ES5定义了一个名为Object.create（）的方法，它创建一个新对象，其中第一个参数是这个对象的原型，第二个参数对对象的属性进行进一步描述。</p>
+<h3 id="另有寄生构造函数模式和稳妥构造函数模式"><a href="#另有寄生构造函数模式和稳妥构造函数模式" class="headerlink" title="另有寄生构造函数模式和稳妥构造函数模式"></a>另有寄生构造函数模式和稳妥构造函数模式</h3><p>原文链接：<a href="https://www.cnblogs.com/zczhangcui/p/6389023.html" target="_blank" rel="noopener">https://www.cnblogs.com/zczhangcui/p/6389023.html</a></p>
+
+        </div>
+
+        <blockquote class="post-copyright">
+    
+    <div class="content">
+        
+<span class="post-time">
+    最后更新时间：<time datetime="2019-02-19T11:43:10.026Z" itemprop="dateUpdated">2019-02-19 19:43:10</time>
+</span><br>
+
+
+        
+    </div>
+    
+    <footer>
+        <a href="https://987763485.github.io">
+            <img src="/img/avatar.jpg" alt="晚新">
+            晚新
+        </a>
+    </footer>
+</blockquote>
+
+        
+<div class="page-reward">
+    <a id="rewardBtn" href="javascript:;" class="page-reward-btn waves-effect waves-circle waves-light">赏</a>
+</div>
+
+
+
+        <div class="post-footer">
+            
+	<ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/javascript/">javascript</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/web前端/">web前端</a></li></ul>
+
+
+            
+<div class="page-share-wrap">
+    
+
+<div class="page-share" id="pageShare">
+    <ul class="reset share-icons">
+      <li>
+        <a class="weibo share-sns" target="_blank" href="http://service.weibo.com/share/share.php?url=https://987763485.github.io/2018/02/25/JavaScript常见的创建对象的几种方式/&title=《JavaScript常见的创建对象的几种方式》 — 晚新的博客&pic=https://987763485.github.io/img/avatar.jpg" data-title="微博">
+          <i class="icon icon-weibo"></i>
+        </a>
+      </li>
+      <li>
+        <a class="weixin share-sns wxFab" href="javascript:;" data-title="微信">
+          <i class="icon icon-weixin"></i>
+        </a>
+      </li>
+      <li>
+        <a class="qq share-sns" target="_blank" href="http://connect.qq.com/widget/shareqq/index.html?url=https://987763485.github.io/2018/02/25/JavaScript常见的创建对象的几种方式/&title=《JavaScript常见的创建对象的几种方式》 — 晚新的博客&source=WEB前端工程师" data-title=" QQ">
+          <i class="icon icon-qq"></i>
+        </a>
+      </li>
+      <li>
+        <a class="facebook share-sns" target="_blank" href="https://www.facebook.com/sharer/sharer.php?u=https://987763485.github.io/2018/02/25/JavaScript常见的创建对象的几种方式/" data-title=" Facebook">
+          <i class="icon icon-facebook"></i>
+        </a>
+      </li>
+      <li>
+        <a class="twitter share-sns" target="_blank" href="https://twitter.com/intent/tweet?text=《JavaScript常见的创建对象的几种方式》 — 晚新的博客&url=https://987763485.github.io/2018/02/25/JavaScript常见的创建对象的几种方式/&via=https://987763485.github.io" data-title=" Twitter">
+          <i class="icon icon-twitter"></i>
+        </a>
+      </li>
+      <li>
+        <a class="google share-sns" target="_blank" href="https://plus.google.com/share?url=https://987763485.github.io/2018/02/25/JavaScript常见的创建对象的几种方式/" data-title=" Google+">
+          <i class="icon icon-google-plus"></i>
+        </a>
+      </li>
+    </ul>
+ </div>
+
+
+
+    <a href="javascript:;" id="shareFab" class="page-share-fab waves-effect waves-circle">
+        <i class="icon icon-share-alt icon-lg"></i>
+    </a>
+</div>
+
+
+
+        </div>
+    </div>
+
+    
+<nav class="post-nav flex-row flex-justify-between flex-row-reverse">
+  
+
+  
+    <div class="waves-block waves-effect next">
+      <a href="/2018/02/22/国内知名前端团队/" id="post-next" class="post-nav-link">
+        <div class="tips">Next <i class="icon icon-angle-right icon-lg icon-pl"></i></div>
+        <h4 class="title">国内知名前端团队</h4>
+      </a>
+    </div>
+  
+</nav>
+
+
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+<div id="reward" class="page-modal reward-lay">
+    <a class="close" href="javascript:;"><i class="icon icon-close"></i></a>
+    <h3 class="reward-title">
+        <i class="icon icon-quote-left"></i>
+        谢谢~
+        <i class="icon icon-quote-right"></i>
+    </h3>
+    <div class="reward-content">
+        
+        <div class="reward-code">
+            <img id="rewardCode" src="/img/wechat.jpg" alt="打赏二维码">
+        </div>
+        
+        <label class="reward-toggle">
+            <input id="rewardToggle" type="checkbox" class="reward-toggle-check" data-wechat="/img/wechat.jpg" data-alipay="/img/alipay.jpg">
+            <div class="reward-toggle-ctrol">
+                <span class="reward-toggle-item wechat">微信</span>
+                <span class="reward-toggle-label"></span>
+                <span class="reward-toggle-item alipay">支付宝</span>
+            </div>
+        </label>
+        
+    </div>
+</div>
+
+
+
+</div>
+
+        <footer class="footer">
+    <div class="top">
+        
+
+        <p>
+            
+                <span><a href="/atom.xml" target="_blank" class="rss" title="rss"><i class="icon icon-lg icon-rss"></i></a></span>
+            
+            <span>博客内容遵循 <a rel="license" href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh">知识共享 署名 - 非商业性 - 相同方式共享 4.0 国际协议</a></span>
+        </p>
+    </div>
+    <div class="bottom">
+        <p><span>晚新 &copy; 2018 - 2019</span>
+            <span>
+                
+                Power by <a href="http://hexo.io/" target="_blank">Hexo</a> Theme <a href="https://github.com/yscoder/hexo-theme-indigo" target="_blank">indigo</a>
+            </span>
+        </p>
+    </div>
+</footer>
+
+    </main>
+    <div class="mask" id="mask"></div>
+<a href="javascript:;" id="gotop" class="waves-effect waves-circle waves-light"><span class="icon icon-lg icon-chevron-up"></span></a>
+
+
+
+<div class="global-share" id="globalShare">
+    <ul class="reset share-icons">
+      <li>
+        <a class="weibo share-sns" target="_blank" href="http://service.weibo.com/share/share.php?url=https://987763485.github.io/2018/02/25/JavaScript常见的创建对象的几种方式/&title=《JavaScript常见的创建对象的几种方式》 — 晚新的博客&pic=https://987763485.github.io/img/avatar.jpg" data-title="微博">
+          <i class="icon icon-weibo"></i>
+        </a>
+      </li>
+      <li>
+        <a class="weixin share-sns wxFab" href="javascript:;" data-title="微信">
+          <i class="icon icon-weixin"></i>
+        </a>
+      </li>
+      <li>
+        <a class="qq share-sns" target="_blank" href="http://connect.qq.com/widget/shareqq/index.html?url=https://987763485.github.io/2018/02/25/JavaScript常见的创建对象的几种方式/&title=《JavaScript常见的创建对象的几种方式》 — 晚新的博客&source=WEB前端工程师" data-title=" QQ">
+          <i class="icon icon-qq"></i>
+        </a>
+      </li>
+      <li>
+        <a class="facebook share-sns" target="_blank" href="https://www.facebook.com/sharer/sharer.php?u=https://987763485.github.io/2018/02/25/JavaScript常见的创建对象的几种方式/" data-title=" Facebook">
+          <i class="icon icon-facebook"></i>
+        </a>
+      </li>
+      <li>
+        <a class="twitter share-sns" target="_blank" href="https://twitter.com/intent/tweet?text=《JavaScript常见的创建对象的几种方式》 — 晚新的博客&url=https://987763485.github.io/2018/02/25/JavaScript常见的创建对象的几种方式/&via=https://987763485.github.io" data-title=" Twitter">
+          <i class="icon icon-twitter"></i>
+        </a>
+      </li>
+      <li>
+        <a class="google share-sns" target="_blank" href="https://plus.google.com/share?url=https://987763485.github.io/2018/02/25/JavaScript常见的创建对象的几种方式/" data-title=" Google+">
+          <i class="icon icon-google-plus"></i>
+        </a>
+      </li>
+    </ul>
+ </div>
+
+
+<div class="page-modal wx-share" id="wxShare">
+    <a class="close" href="javascript:;"><i class="icon icon-close"></i></a>
+    <p>扫一扫，分享到微信</p>
+    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPYAAAD2CAAAAADAeSUUAAADKklEQVR42u3a0U7kQAwEQP7/p/deT0JZuu0gbYbKEwI2SQ0Slt3++oqv13/X9+98v97f5/vXyXOvnpLcZ3hhY2NjP4Q9u/UVcv9a74/v6on1HwMbGxv7OHZbbN7f9OpV8oNrqbkFGxsbGztpS9oGJi9d7wskNjY2NnZbhGbNQHug7agLGxsb+2+y29Iyaz/28UNeMm+bpWFjY2N/PDt/rc//+lfybWxsbOwPZr/KKyk2syNLwoC2XF0qsLGxsQ9i78dAd8XDeQycHFn0KWxsbOwj2PlizT7izZd1WnD7VtjY2NinsmdFYhMq7D/VxsZfbQXGxsbG/nh2O7hpW452DWhW9toIGRsbG/s8dv7SNwzlR4UwL071phI2Njb2QexNw3DXHWahbx4eX6Yi2NjY2I9l54yk1LXjnruKWb2CiY2NjX0QexblJm3AbJVn9obJoV9uKmFjY2M/nN22E22w2r7iJirICyQ2Njb2Sew8It2/aB4tb35z/ylsbGzsJ7LzaDYpFbM7z4ZKm/YGGxsb+yR2Pjz67aLVthPtHwwbGxv7PPZsgaY90dlRbtqVHw4RGxsb+zh2G9zmDUAb+raHkrcxP6Qi2NjY2I9l3xUGzHizwdNmkQgbGxv7PHY+ppnFBu1iTVs425WdejqFjY2N/UB2HpG2BSkvfpuhUnSI2NjY2Aex2+F+G9/WD4vHRu0R1++DjY2N/RB2GwzMFmX2w6l9+Sx6HWxsbOxHsfdh7V2Dobsi5+IO2NjY2Eez25g2H+60h7spY9jY2Nh/k90u7mwePwuY82Ym6sOwsbGxj2C35eeu0c8sftgUzmLAhI2Njf0o9uxf/2wRJ7nnLGauowJsbGzso9n5GKgtJPlazw3bRrNdJGxsbOxHsV/llZeZzSJOC6vLLTY2NvZB7P3//PynbeORL9/sF4ywsbGxn86exatJ+5F/dsZomxxsbGzss9n5rdsR0r0Do7wCY2NjY2Nv1i7vajzyoVW+HoSNjY2NnZeivKXZHMEwPMDGxsY+jj0bKrWj+bbMtIWqCJuxsbGxD2LnZSB/WHKg+X1mazq35dvY2NjYn8v+BxVIkc3zUQbmAAAAAElFTkSuQmCC" alt="微信分享二维码">
+</div>
+
+
+
+
+    <script src="//cdn.bootcss.com/node-waves/0.7.4/waves.min.js"></script>
+<script>
+var BLOG = { ROOT: '/', SHARE: true, REWARD: true };
+
+
+</script>
+
+<script src="//unpkg.com/hexo-theme-material-indigo@latest/js/main.min.js"></script>
+
+
+<div class="search-panel" id="search-panel">
+    <ul class="search-result" id="search-result"></ul>
+</div>
+<template id="search-tpl">
+<li class="item">
+    <a href="{path}" class="waves-block waves-effect">
+        <div class="title ellipsis" title="{title}">{title}</div>
+        <div class="flex-row flex-middle">
+            <div class="tags ellipsis">
+                {tags}
+            </div>
+            <time class="flex-col time">{date}</time>
+        </div>
+    </a>
+</li>
+</template>
+
+<script src="//unpkg.com/hexo-theme-material-indigo@latest/js/search.min.js" async></script>
+
+
+
+
+
+
+
+
+<script>
+(function() {
+    var OriginTitile = document.title, titleTime;
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden) {
+            document.title = '晚新的博客';
+            clearTimeout(titleTime);
+        } else {
+            document.title = '晚新的博客';
+            titleTime = setTimeout(function() {
+                document.title = OriginTitile;
+            },2000);
+        }
+    });
+})();
+</script>
+
+
+
+</body>
+</html>
