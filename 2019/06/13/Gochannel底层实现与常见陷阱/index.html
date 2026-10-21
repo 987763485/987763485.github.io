@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Go channel 底层实现与常见陷阱 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="几乎每个 Go 程序都会用到 channel，但真正理解它的人并不多。本文从 runtime 中的 hchan 结构出发，沿着发送、接收、select 与 close 四条主线，把 channel 的运行时行为拆开来看，再落到工程中最常见的泄漏、死锁与关闭时机问题。它适合已经会写 go func() 与 chan、却在排查卡死或泄漏时缺少抓手的中级开发者。读完之后，你应当能对着一段 channel"><meta property="og:type" content="blog"><meta property="og:title" content="Go channel 底层实现与常见陷阱"><meta property="og:url" content="https://987763485.github.io/2019/06/13/Gochannel%E5%BA%95%E5%B1%82%E5%AE%9E%E7%8E%B0%E4%B8%8E%E5%B8%B8%E8%A7%81%E9%99%B7%E9%98%B1/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="几乎每个 Go 程序都会用到 channel，但真正理解它的人并不多。本文从 runtime 中的 hchan 结构出发，沿着发送、接收、select 与 close 四条主线，把 channel 的运行时行为拆开来看，再落到工程中最常见的泄漏、死锁与关闭时机问题。它适合已经会写 go func() 与 chan、却在排查卡死或泄漏时缺少抓手的中级开发者。读完之后，你应当能对着一段 channel"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2019-06-13T11:03:42.000Z"><meta property="article:modified_time" content="2026-10-18T13:17:50.392Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="golang"><meta property="article:tag" content="后端开发"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2019/06/13/Gochannel%E5%BA%95%E5%B1%82%E5%AE%9E%E7%8E%B0%E4%B8%8E%E5%B8%B8%E8%A7%81%E9%99%B7%E9%98%B1/"},"headline":"Go channel 底层实现与常见陷阱","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2019-06-13T11:03:42.000Z","dateModified":"2026-10-18T13:17:50.392Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"几乎每个 Go 程序都会用到 channel，但真正理解它的人并不多。本文从 runtime 中的 hchan 结构出发，沿着发送、接收、select 与 close 四条主线，把 channel 的运行时行为拆开来看，再落到工程中最常见的泄漏、死锁与关闭时机问题。它适合已经会写 go func() 与 chan、却在排查卡死或泄漏时缺少抓手的中级开发者。读完之后，你应当能对着一段 channel"}</script><link rel="canonical" href="https://987763485.github.io/2019/06/13/Gochannel%E5%BA%95%E5%B1%82%E5%AE%9E%E7%8E%B0%E4%B8%8E%E5%B8%B8%E8%A7%81%E9%99%B7%E9%98%B1/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2019-06-13T11:03:42.000Z" title="6/13/2019, 7:03:42 PM">2019-06-13</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></span><span class="level-item">1 小时读完 (大约8332个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Go channel 底层实现与常见陷阱</h1><nav class="series-nav" aria-label="系列文章导航"><div class="series-nav-meta"><i class="fas fa-book-open" aria-hidden="true"></i><span>本文属于《<a class="series-nav-title" href="/series/go/">Go 语言与工程</a>》第 38/78 篇</span></div><div class="series-nav-links"><a class="series-nav-link series-nav-prev" href="/2018/08/25/Gomap%E5%BA%95%E5%B1%82%E5%AE%9E%E7%8E%B0/"><i class="fas fa-chevron-left" aria-hidden="true"></i><span>上一篇</span></a><a class="series-nav-link series-nav-index" href="/series/go/">系列目录</a><a class="series-nav-link series-nav-next" href="/2019/06/22/Go%E5%88%87%E7%89%87%E5%BA%95%E5%B1%82%E4%B8%8E%E6%89%A9%E5%AE%B9%E6%9C%BA%E5%88%B6/"><span>下一篇</span><i class="fas fa-chevron-right" aria-hidden="true"></i></a></div></nav><div class="content"><p>几乎每个 Go 程序都会用到 channel，但真正理解它的人并不多。本文从 <code>runtime</code> 中的 <code>hchan</code> 结构出发，沿着发送、接收、<code>select</code> 与 <code>close</code> 四条主线，把 channel 的运行时行为拆开来看，再落到工程中最常见的泄漏、死锁与关闭时机问题。它适合已经会写 <code>go func()</code> 与 <code>chan</code>、却在排查卡死或泄漏时缺少抓手的中级开发者。读完之后，你应当能对着一段 channel 代码说出它会在哪里阻塞、为什么会泄漏，以及该怎样改。</p>
+<h2 id="channel-在运行时是什么"><a href="#channel-在运行时是什么" class="headerlink" title="channel 在运行时是什么"></a>channel 在运行时是什么</h2><p>以下讨论以 Go 1.12 的运行时源码为准。在语言层面，<code>chan</code> 是一个引用类型，<code>make(chan T, n)</code> 返回的值可以复制、可以传参。但在 <code>runtime</code> 眼里，它就是一个指向 <code>hchan</code> 结构体的指针。<code>make</code> 被编译器翻译成对 <code>runtime.makechan</code> 的调用，返回值被塞进一个 <code>chan T</code> 类型的变量里。理解这一点很重要：你手里的 channel 变量只是句柄，真正的状态全部在堆上的那个 <code>hchan</code> 里，多个 goroutine 通过同一个指针共享它。</p>
+<p><code>hchan</code> 的字段不多，但每一个都对应一条语义：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>qcount</code></td>
+<td><code>uint</code></td>
+<td>缓冲区中当前的元素个数</td>
+</tr>
+<tr>
+<td><code>dataqsiz</code></td>
+<td><code>uint</code></td>
+<td>环形缓冲区的容量，即 <code>cap(ch)</code></td>
+</tr>
+<tr>
+<td><code>buf</code></td>
+<td><code>unsafe.Pointer</code></td>
+<td>指向环形缓冲区首地址，无缓冲时为 nil</td>
+</tr>
+<tr>
+<td><code>sendx</code></td>
+<td><code>uint</code></td>
+<td>下一个写入位置的下标</td>
+</tr>
+<tr>
+<td><code>recvx</code></td>
+<td><code>uint</code></td>
+<td>下一个读取位置的下标</td>
+</tr>
+<tr>
+<td><code>recvq</code></td>
+<td><code>waitq</code></td>
+<td>因接收而阻塞的 goroutine 队列</td>
+</tr>
+<tr>
+<td><code>sendq</code></td>
+<td><code>waitq</code></td>
+<td>因发送而阻塞的 goroutine 队列</td>
+</tr>
+<tr>
+<td><code>lock</code></td>
+<td><code>mutex</code></td>
+<td>保护以上所有字段的互斥锁</td>
+</tr>
+</tbody></table>
+<p>除了这些，还有 <code>elemsize</code>、<code>elemtype</code> 记录元素大小与类型，供运行时的内存拷贝使用；<code>closed</code> 是一个 <code>uint32</code> 标志，关闭之后置 1。源码里在 <code>lock</code> 字段上方有一段注释，大意是：持有这把锁时不要改变其他 goroutine 的状态，尤其不要唤醒别人，否则可能与栈收缩互相等待。</p>
+<p><code>makechan</code> 在分配时还有一个优化：元素类型不含指针时，<code>hchan</code> 与缓冲区在同一块内存里一次分配；含指针时则分开分配，让 GC 能单独扫描缓冲区。</p>
+<p><code>qcount</code> 和 <code>dataqsiz</code> 是一对容易混淆的字段。前者是“现在有几个”，会随收发变化；后者是“最多能放几个”，<code>make</code> 之后不再改变。判断缓冲区满不满，看的是 <code>qcount == dataqsiz</code>；判断空不空，看的是 <code>qcount == 0</code>。<code>sendx</code> 与 <code>recvx</code> 只是游标，它们相等并不代表空或满，必须配合 <code>qcount</code> 才能确定状态。</p>
+<p>无缓冲与有缓冲的差别，在结构体里就是 <code>dataqsiz</code> 是否为零。<code>make(chan int)</code> 得到的 <code>dataqsiz</code> 为 0，<code>buf</code> 是空指针，此时的 channel 没有“存放”能力，发送与接收必须当场配对：发送方把值直接交给接收方，或者把自己挂起等接收方出现。<code>make(chan int, 4)</code> 则多了一块可以放 4 个元素的缓冲区，发送方可以先把值放进缓冲区就返回，不必等接收方。换句话说，无缓冲 channel 传递的是“交接时刻”，有缓冲 channel 传递的是“队列位置”。</p>
+<h2 id="环形缓冲区如何转动"><a href="#环形缓冲区如何转动" class="headerlink" title="环形缓冲区如何转动"></a>环形缓冲区如何转动</h2><p>有缓冲 channel 的 <code>buf</code> 是一段连续内存，按 <code>elemsize</code> 切成 <code>dataqsiz</code> 个槽位。运行时的 <code>chanbuf</code> 用一句指针运算定位槽位：首地址加上下标乘以元素大小。所谓“环形”，并不是内存真的首尾相连，而是下标走到末尾后回到 0，让有限的槽位被反复使用。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 简化后的槽位定位，实际代码在 runtime/chan.go</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">chanbuf</span><span class="params">(c *hchan, i <span class="type">uint</span>)</span></span> unsafe.Pointer &#123;</span><br><span class="line">    <span class="keyword">return</span> add(c.buf, <span class="type">uintptr</span>(i)*<span class="type">uintptr</span>(c.elemsize))</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>发送时，运行时做四件事：把值拷贝到 <code>sendx</code> 指向的槽位；<code>sendx</code> 加一，若等于 <code>dataqsiz</code> 则归零；<code>qcount</code> 加一；解锁返回。接收是对称的：从 <code>recvx</code> 指向的槽位把值拷贝到目标变量；把该槽位清零；<code>recvx</code> 加一并在越界时归零；<code>qcount</code> 减一。清零这一步容易被忽略，它不是为了“讲卫生”，而是为了让槽位里不再持有指向堆对象的指针，避免已经出队的数据还被 GC 视为存活。</p>
+<p>用容量为 4 的缓冲区走一遍，注意两个游标的相对位置：</p>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>sendx</th>
+<th>recvx</th>
+<th>qcount</th>
+<th>缓冲区内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>初始</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>空</td>
+</tr>
+<tr>
+<td>发送 a</td>
+<td>1</td>
+<td>0</td>
+<td>1</td>
+<td>a</td>
+</tr>
+<tr>
+<td>发送 b、c</td>
+<td>3</td>
+<td>0</td>
+<td>3</td>
+<td>a b c</td>
+</tr>
+<tr>
+<td>发送 d</td>
+<td>0</td>
+<td>0</td>
+<td>4</td>
+<td>a b c d，已满</td>
+</tr>
+<tr>
+<td>接收</td>
+<td>0</td>
+<td>1</td>
+<td>3</td>
+<td>b c d</td>
+</tr>
+<tr>
+<td>接收</td>
+<td>0</td>
+<td>2</td>
+<td>2</td>
+<td>c d</td>
+</tr>
+<tr>
+<td>发送 e</td>
+<td>1</td>
+<td>2</td>
+<td>3</td>
+<td>c d e</td>
+</tr>
+</tbody></table>
+<p>可以看到 <code>sendx</code> 在写满一圈之后回到了 0，而 <code>recvx</code> 紧跟在后面。缓冲区满时 <code>qcount</code> 等于 <code>dataqsiz</code>，此时发送方不能覆盖最老的元素，只能阻塞，进入 <code>sendq</code> 等待；缓冲区空时 <code>qcount</code> 为 0，接收方同样只能阻塞。这两个“只能”是有缓冲 channel 与“自带丢弃”的队列最本质的区别：channel 从不静默丢数据，它用阻塞把压力传回上游。</p>
+<p>环形设计的好处是常数时间。如果每次出队都把后面的元素往前搬，容量为 n 的缓冲区在频繁收发下就会退化成 O(n) 的拷贝。环形结构只移动两个下标，代价与容量无关。代价是缓冲区的内容不再是一段“从头到尾都有意义”的序列，任何遍历都必须从 <code>recvx</code> 开始、绕回 0、走到 <code>sendx</code> 之前。这也是为什么运行时只暴露 <code>len</code> 与 <code>cap</code> 两个快照，而快照在并发下随时会过期。</p>
+<h2 id="sudog：一次等待的代表"><a href="#sudog：一次等待的代表" class="headerlink" title="sudog：一次等待的代表"></a>sudog：一次等待的代表</h2><p>当发送或接收无法立刻完成时，goroutine 不会原地自旋，那样会白白占着 CPU 和 P。运行时的做法是：为这次等待操作申请一个 <code>sudog</code>，把它挂到 channel 的等待队列上，然后调用 <code>gopark</code> 让当前 goroutine 睡去，把 P 让给别人。可以把 <code>sudog</code> 理解成“一张排队号”，它代表的不是 goroutine 本身，而是“某个 goroutine 想在这个 channel 上做一次发送或接收”这件事。</p>
+<p><code>sudog</code> 的关键字段有这些：<code>g</code> 指向等待的 goroutine；<code>elem</code> 指向数据要拷入或拷出的地址，通常指向该 goroutine 栈上的变量；<code>c</code> 记录它挂在哪个 channel 上；<code>next</code> 与 <code>prev</code> 把同一队列里的等待者串成双向链表；<code>isSelect</code> 标记这次等待是否来自 <code>select</code>；<code>releasetime</code> 记录开始阻塞的时间，供 block profiling 统计。channel 里的 <code>sendq</code> 与 <code>recvq</code> 各是一个 <code>waitq</code>，内部只保存 <code>first</code> 与 <code>last</code> 两个指针，入队和出队都是 O(1)。</p>
+<p><code>gopark</code> 做的是状态切换：把当前 goroutine 标成 waiting，解除它与 M 的绑定，然后进入调度循环。这里有一个容易忽略的配合：挂起之前 channel 的锁还握在手里，如果就这样睡过去，别的 goroutine 连队列都碰不到。所以 <code>gopark</code> 接受一个 commit 函数，在真正切换出去之前调用它，把 channel 的锁释放掉。发送路径传的是 <code>chanparkcommit</code>，接收路径也一样。这个设计保证了“检查队列”和“挂入队列”是一个原子动作，中间不会漏掉唤醒。</p>
+<p>唤醒由 <code>goready</code> 完成：把目标 goroutine 的状态改成 runnable，放进某个 P 的运行队列，等调度器安排它上 CPU。要注意，被唤醒不等于立刻运行，中间可能隔了一段时间；但由于数据在唤醒之前就已经交接完毕，接收方晚一点跑也不影响正确性。这也解释了为什么 channel 的语义是“同步交接”而不是“唤醒即执行”。</p>
+<h2 id="四条发送路径"><a href="#四条发送路径" class="headerlink" title="四条发送路径"></a>四条发送路径</h2><p>把 <code>chansend</code> 从头读到尾，会发现发送的去向可以归为四条，接收是它的镜像。先看发送。</p>
+<pre class="mermaid">flowchart TD
+    A[chansend 入口] --> B{channel 为 nil}
+    B -- 是 --> C[永久阻塞]
+    B -- 否 --> D[加锁]
+    D --> E{已关闭}
+    E -- 是 --> F[panic]
+    E -- 否 --> G{recvq 有等待者}
+    G -- 有 --> H[直接拷贝给接收者并唤醒]
+    G -- 无 --> I{缓冲区有空位}
+    I -- 有 --> J[写入环形缓冲区并返回]
+    I -- 无 --> K{是否允许阻塞}
+    K -- 否 --> L[解锁并返回 false]
+    K -- 是 --> M[挂入 sendq 并 gopark]
+    M --> N[被唤醒后检查结果]</pre>
+
+<p>第一条是“有人等着收”。加锁之后先看 <code>recvq</code>，只要队列非空，就把值直接拷贝到那个接收者的 <code>sudog.elem</code> 指向的栈变量里，然后唤醒它。这条路径完全绕过缓冲区，只发生一次拷贝。有人会问：缓冲区里可能还有数据，直接交接会不会插队？不会。因为接收者只有在缓冲区为空时才会挂起，<code>recvq</code> 非空意味着缓冲区必然是空的，直接交接正好符合先进先出。</p>
+<p>第二条是“缓冲区有空位”。把值写进 <code>sendx</code> 指向的槽位，推进游标与计数，解锁返回。发送方不需要挂起等待接收者，这是有缓冲 channel 在生产者快于消费者时的主要收益。</p>
+<p>第三条是“缓冲区满了，或者根本没有缓冲区，而且没人在等”。此时当前 goroutine 构造 <code>sudog</code>，<code>elem</code> 指向要发送的变量，把它挂到 <code>sendq</code> 尾部，然后 <code>gopark</code>。等某个接收者到来，会在取走数据的同时把它唤醒。醒来之后它还要检查 <code>sudog.success</code>：如果 channel 在等待期间被关闭，这次发送要以 panic 收场。</p>
+<p>第四条是“不允许阻塞”，典型来源是带 <code>default</code> 的 <code>select</code>。编译后调用的是非阻塞版本的发送：先做一次无锁的粗略检查，条件明显不满足就直接返回 false，连锁都不抢；条件可能满足才加锁确认。这也是 <code>select</code> 加 <code>default</code> 比“先 <code>len</code> 再发送”更可靠的原因，后者在并发下必然有竞态。</p>
+<p>接收侧的顺序完全对称：先看 <code>sendq</code>，有等待的发送者就直接从它那里取；否则看 <code>qcount</code>，非零就从 <code>recvx</code> 处取；再否则挂起自己。这里有一个精巧的处理：当缓冲区已满且有发送者在等时，接收者先从队头取出一个元素，再把发送者的值填到队尾。由于队列是满的，队头与队尾恰好是同一个槽位，一次搬移就同时完成了“出队”和“让发送者入队”，并且保持了顺序。</p>
+<h2 id="select-是怎么选中的"><a href="#select-是怎么选中的" class="headerlink" title="select 是怎么选中的"></a>select 是怎么选中的</h2><p><code>select</code> 看起来像语法糖，实际上是一段相当复杂的运行时逻辑。编译器会为每个 case 生成一个 <code>scase</code>，记录 channel 指针、操作类型（发送、接收还是 default）以及数据地址，再额外生成两个下标数组：<code>pollorder</code> 决定扫描顺序，<code>lockorder</code> 决定加锁顺序。当 <code>select</code> 只有一个发送或接收 case、再加一个 <code>default</code> 时，编译器会直接改写成 <code>selectnbsend</code> 或 <code>selectnbrecv</code>，根本不进 <code>selectgo</code>，这是常见的快路径。</p>
+<p>先讲随机。<code>selectgo</code> 进入后第一件事是用 <code>fastrandn</code> 把 <code>pollorder</code> 洗成随机排列。这样做的目的不是好玩，而是防止饥饿：如果总按源码顺序扫描，排在前面的 case 在长期运行中会占尽便宜，后面的 case 永远轮不到。随机化之后，每个就绪的 case 被选中的概率相同，这是一种概率意义上的公平。注意它只保证“就绪者之间等概率”，并不保证“每个 case 最终都会被执行”，如果某个 case 长期不就绪，它依然可能一直落空。</p>
+<p>再讲加锁。一个 <code>select</code> 可能同时涉及多个 channel，如果两个 goroutine 各自以相反的顺序锁住同一组 channel，就会死锁。运行时的对策是按 channel 的地址排序，得到 <code>lockorder</code>，然后严格按这个顺序依次加锁，解锁时再逆序释放。地址排序是任意的，但所有 goroutine 看到的顺序一致，环就不会形成。这个技巧在工程代码里同样适用：同时持有多把锁时，先约定一个全局顺序。</p>
+<p>加完锁进入第一轮扫描，按 <code>pollorder</code> 逐个检查：接收 case 看 <code>sendq</code> 有没有等待者、<code>qcount</code> 是否大于零、channel 是否已关闭；发送 case 先看 channel 是否已关闭，再看 <code>recvq</code> 有没有等待者、缓冲区是否有空位。只要命中一个，就执行它并返回。这里没有“先来后到”，只有随机顺序，所以同一个 goroutine 面对多个同时就绪的 case 时，选哪个是不确定的。</p>
+<p>如果第一轮什么都没找到，就轮到 <code>default</code>。<code>default</code> 不是“优先执行”，而是“实在没得选才执行”。运行时在扫描过程中只是记下它的下标，扫描结束后仍无就绪 case，才走 default 并立刻返回。所以带 <code>default</code> 的 <code>select</code> 不会阻塞，只是没得选时走默认分支。</p>
+<p>没有 default 且没有任何 case 就绪时，进入第二轮：为每个 case 申请一个 <code>sudog</code>，接收 case 挂到对应 channel 的 <code>recvq</code>，发送 case 挂到 <code>sendq</code>，然后 <code>gopark</code>。此时这个 goroutine 同时出现在多个等待队列里，任何一个 channel 先就绪，都能把它唤醒。醒来之后它要重新加锁，扫描所有 case 找出成功的那一个，再把其余 channel 上的自己摘掉。这一步“去注册”不能省，否则队列里会留下指向已结束等待的 <code>sudog</code>，后续的发送者可能对着一个空壳做交接。</p>
+<p>关于惊群，需要区分两种情形。一次普通发送只会从 <code>recvq</code> 里摘下第一个等待者，不会把所有人都唤醒，所以多个接收者等同一个 channel 并不会因为一次发送而集体苏醒。而 <code>close</code> 会唤醒 <code>recvq</code> 上的全部等待者，因为关闭之后每个接收者都应该拿到零值，这是语义要求，不是浪费。真正需要警惕的是另一种模式：大量 goroutine 各自 <code>select</code> 同一个“完成信号”，信号一到全体醒来去抢同一把锁或同一个下游资源，这时应该改用只唤醒一个的队列，或者用 <code>sync.Once</code> 把后续动作收敛成一次。</p>
+<h2 id="close-的四条红线"><a href="#close-的四条红线" class="headerlink" title="close 的四条红线"></a>close 的四条红线</h2><p><code>close</code> 是 channel 上唯一会改变“生命周期”的操作，语义可以概括为四条：关闭后继续发送会 panic；关闭后接收不再阻塞，缓冲读完后返回零值与 <code>ok</code> 为 false；重复关闭会 panic；关闭 nil channel 也会 panic。这些不是约定，而是运行时的硬性行为，只能靠 <code>recover</code> 兜底。</p>
+<p><code>close</code> 在运行时走 <code>closechan</code>。它先加锁，检查 <code>closed</code> 是否已经为 1，是则直接 panic；否则置 1，然后把 <code>recvq</code> 上的等待者逐个摘下，把它们指向的接收变量清零，让这些接收者醒来后拿到零值；再把 <code>sendq</code> 上的等待者逐个摘下，它们醒来后会发现自己等待的发送失败，从而 panic。注意顺序：先处理接收者，再处理发送者。摘下所有 goroutine 之后，<code>closechan</code> 先解锁，再统一调用 <code>goready</code>。原因就是前面提到的那条约束：持有 channel 锁时不能唤醒别人，否则可能与栈收缩互相等待。</p>
+<p>还有一个常被误解的点：关闭不会清空缓冲区。接收方只有在 <code>closed</code> 为 1 且 <code>qcount</code> 为 0 时才返回零值与 false；只要缓冲区里还有数据，就照常返回数据且 <code>ok</code> 为 true。所以“关闭之后还能不能读到剩下的数据”的答案是能，而且必须读完才算消费干净。所谓“关了就丢消息”，问题往往出在消费方提前退出、没有读完缓冲区，而不是 close 本身。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">ch := <span class="built_in">make</span>(<span class="keyword">chan</span> <span class="type">int</span>, <span class="number">3</span>)</span><br><span class="line">ch &lt;- <span class="number">1</span></span><br><span class="line">ch &lt;- <span class="number">2</span></span><br><span class="line"><span class="built_in">close</span>(ch)</span><br><span class="line"></span><br><span class="line"><span class="keyword">for</span> v := <span class="keyword">range</span> ch &#123;</span><br><span class="line">    fmt.Println(v) <span class="comment">// 依次输出 1、2，然后循环结束</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>range</code> 会自动处理 <code>ok</code>，读到关闭且缓冲为空时退出，这是消费端最常用的写法。但前提是有人负责关闭，否则循环永远不会结束。</p>
+<p>关闭与 <code>select</code> 的交互有一个陷阱。一个已经关闭的 channel，其接收 case 在 <code>select</code> 中永远就绪，如果它和别的 case 放在一个 <code>for</code> 循环里，这个 case 会被反复选中，其他分支几乎得不到执行机会，形成事实上的忙循环。正确做法是读到关闭后把该 channel 变量置为 nil：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> &#123;</span><br><span class="line">    <span class="keyword">select</span> &#123;</span><br><span class="line">    <span class="keyword">case</span> v, ok := &lt;-ch:</span><br><span class="line">        <span class="keyword">if</span> !ok &#123;</span><br><span class="line">            ch = <span class="literal">nil</span> <span class="comment">// 置 nil 后这个分支在 select 中被忽略</span></span><br><span class="line">            <span class="keyword">continue</span></span><br><span class="line">        &#125;</span><br><span class="line">        handle(v)</span><br><span class="line">    <span class="keyword">case</span> &lt;-done:</span><br><span class="line">        <span class="keyword">return</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>至于“谁该关闭”，工程上的原则是：由发送方关闭，而且最好只有一个发送方。接收方不知道还有没有别的发送者在途，它一关，其他发送者就会 panic。如果有多个发送者，就让它们各自往一个 <code>done</code> channel 发退出信号，再用 <code>sync.WaitGroup</code> 等全部结束后，由一个协调者关闭结果 channel。关闭的本质是“不会再有新数据”的广播，而不是“我要走了”的通知，把这两件事混为一谈，是大多数关闭相关 panic 的根源。</p>
+<h2 id="nil-channel：最安静的-channel"><a href="#nil-channel：最安静的-channel" class="headerlink" title="nil channel：最安静的 channel"></a>nil channel：最安静的 channel</h2><p>声明但未 make 的 channel 是 nil。对 nil channel 发送或接收不会 panic，而是永久阻塞：运行时入口的第一件事就是判断 <code>c == nil</code>，然后调用 <code>gopark</code> 睡过去。由于根本没有 <code>hchan</code>，也就没有任何队列能挂住它，没有任何发送者或接收者能唤醒它。这个 goroutine 会一直停在 waiting 状态，直到进程结束。</p>
+<p><code>close</code> 是例外，关闭 nil channel 直接 panic。<code>len</code> 与 <code>cap</code> 返回 0。把这些行为放在一张表里对比更清楚：</p>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>nil channel</th>
+<th>已关闭 channel</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>发送</td>
+<td>永久阻塞</td>
+<td>panic</td>
+</tr>
+<tr>
+<td>接收</td>
+<td>永久阻塞</td>
+<td>立即返回零值，ok 为 false</td>
+</tr>
+<tr>
+<td>关闭</td>
+<td>panic</td>
+<td>panic</td>
+</tr>
+<tr>
+<td>len&#x2F;cap</td>
+<td>0</td>
+<td>缓冲区剩余数&#x2F;容量</td>
+</tr>
+<tr>
+<td>select 中</td>
+<td>该分支被忽略</td>
+<td>接收分支永远就绪</td>
+</tr>
+</tbody></table>
+<p>“在 <code>select</code> 中被忽略”是 nil channel 最有价值的特性。运行时在第一轮扫描时会把 nil 的 case 直接跳过，于是我们可以用把变量置 nil 的方式动态关掉一个分支，而不必写两个几乎相同的 <code>select</code>。上一节关闭 channel 后把 <code>ch = nil</code> 的写法，利用的正是这一点。</p>
+<p>它也是陷阱的来源。把 nil channel 当作“空的实现”传进函数，调用方一发送就会永久卡住；结构体里忘了初始化 channel 字段，方法里一读就挂起。这类 bug 不会报错，只会表现为 goroutine 数缓慢上涨或者请求永远不返回，排查时应当把“零值 channel”列为可疑项。</p>
+<h2 id="几个反复出现的陷阱"><a href="#几个反复出现的陷阱" class="headerlink" title="几个反复出现的陷阱"></a>几个反复出现的陷阱</h2><h3 id="泄漏：没人收，也没人关"><a href="#泄漏：没人收，也没人关" class="headerlink" title="泄漏：没人收，也没人关"></a>泄漏：没人收，也没人关</h3><p>最典型的泄漏是“发送方在等一个永远不会来的接收者”。无缓冲 channel 的发送必须有人接手，一旦消费者因为错误分支提前返回、或者根本没启动，发送方就会永远挂在 <code>sendq</code> 上。它占用的栈、闭包捕获的变量、以及这些变量引用的对象都不会被回收。goroutine 泄漏比内存泄漏更隐蔽，因为它在监控上首先表现为 goroutine 数只涨不跌，内存要过很久才看得出来。</p>
+<p>第二种是“接收方在等一个永远不会来的关闭”。<code>for v := range ch</code> 的退出条件只有一个：channel 被关闭且缓冲区读空。如果生产路径有多个分支，其中一个分支忘了 close，消费循环就会一直等下去。第三种是“生产者退出路径不完整”，例如向结果 channel 发送时没有配合 <code>done</code>，主流程超时返回后，工作 goroutine 仍卡在发送上。</p>
+<p>判断一段代码会不会泄漏，可以用一个简单的提问法：这个 goroutine 里的每一次发送和接收，是否存在一条确定的路径能把它解开？如果答案依赖“对方总是会来”，那它迟早会泄漏。</p>
+<h3 id="死锁：同一-goroutine-自锁"><a href="#死锁：同一-goroutine-自锁" class="headerlink" title="死锁：同一 goroutine 自锁"></a>死锁：同一 goroutine 自锁</h3><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">ch := <span class="built_in">make</span>(<span class="keyword">chan</span> <span class="type">int</span>)</span><br><span class="line">ch &lt;- <span class="number">1</span>      <span class="comment">// 无缓冲，没人接收，永久阻塞</span></span><br><span class="line">fmt.Println(&lt;-ch) <span class="comment">// 永远到不了这里</span></span><br></pre></td></tr></table></figure>
+
+<p>这段代码会得到运行时的 <code>fatal error: all goroutines are asleep - deadlock!</code>，因为主 goroutine 一阻塞，整个程序就没有可运行的 goroutine 了。但把同样的逻辑放进一个还有别的 goroutine 在跑的程序里，运行时就不会报死锁，它只会安静地卡住，这比直接崩溃更难查。另一种是循环等待：两个 goroutine 各自向对方的无缓冲 channel 发送，双方都在等对方接收，谁也不肯先收，于是僵住。</p>
+<p><code>sync.WaitGroup</code> 也会制造类似问题：在同一个 goroutine 里先 <code>wg.Add(1)</code>、再向无缓冲 channel 发送、最后 <code>wg.Wait()</code>，而接收者要等 <code>Wait</code> 返回之后才启动，顺序上就永远错开了。遇到这类代码，先把“谁在等谁”画成有向图，环一出现就是死锁。</p>
+<h3 id="关闭：发送方与关闭者的错位"><a href="#关闭：发送方与关闭者的错位" class="headerlink" title="关闭：发送方与关闭者的错位"></a>关闭：发送方与关闭者的错位</h3><p>“谁接收谁关闭”这句话流传很广，它在单发送者场景下确实能用，但一旦有多个发送者就会出事。接收方关闭 channel 后，尚未完成的发送者会立刻 panic；发送前的 <code>closed</code> 检查与真正入队都在同一把锁内完成，所以关闭一旦发生，后续发送必然 panic，不存在侥幸。多个发送者时应当引入一个独立的关闭者：所有发送者通过 <code>done</code> 退出，<code>WaitGroup</code> 计数归零后，由协调者关闭结果 channel。</p>
+<p>重复关闭同样常见于“防御式”代码：两个清理函数都觉得自己有责任 close。解决办法是把关闭责任收敛到一处，或者用 <code>sync.Once</code> 包一层。向已关闭 channel 发送则往往发生在“重启 worker”这类逻辑里，旧的生产者还没退出，新的消费者已经把 channel 关了。</p>
+<h3 id="把-channel-当锁"><a href="#把-channel-当锁" class="headerlink" title="把 channel 当锁"></a>把 channel 当锁</h3><p>用容量为 1 的 channel 做互斥是可行的：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">sem := <span class="built_in">make</span>(<span class="keyword">chan</span> <span class="keyword">struct</span>&#123;&#125;, <span class="number">1</span>)</span><br><span class="line">sem &lt;- <span class="keyword">struct</span>&#123;&#125;&#123;&#125;</span><br><span class="line"><span class="comment">// 临界区</span></span><br><span class="line">&lt;-sem</span><br></pre></td></tr></table></figure>
+
+<p>但它的成本比 <code>sync.Mutex</code> 高得多：每次进出都是一次完整的 channel 操作，要抢 <code>hchan.lock</code>，竞争激烈时还要分配 <code>sudog</code>、走 <code>gopark</code> 与 <code>goready</code>。更麻烦的是语义，channel 表达的是“传递”，不是“占有”，临界区一旦中途 return 或 panic，忘记释放的锁就没人能接手。保护共享状态用 <code>sync.Mutex</code> 或 <code>sync.RWMutex</code>，传递数据所有权或发送事件才用 channel。</p>
+<h3 id="缓冲区大小靠感觉"><a href="#缓冲区大小靠感觉" class="headerlink" title="缓冲区大小靠感觉"></a>缓冲区大小靠感觉</h3><p>“怕阻塞就加个 1000 的缓冲”是很常见的直觉，但缓冲区不是免费的。它会把背压推迟：上游以为写成功了，实际上数据只是堆在内存里，积压到极限时阻塞会以更猛烈的方式出现。它还会让关闭变复杂：关闭时缓冲区里可能还剩一批数据，消费方是否要读完、读完之后做什么，都得有明确约定。缓冲为 0 表示“交接”，为 1 表示“允许一个在途”，这两个值有清晰语义；大于 1 的容量应当由压测数据或明确的批量模型推出来，而不是随手写。</p>
+<p>另外两个小坑：用 <code>len(ch)</code> 判断“有没有数据”再决定收不发，在并发下毫无意义，快照随时会过期；在 <code>for</code> 循环里写 <code>select</code> 加 <code>default</code> 做“非阻塞轮询”，没有退避就会把 CPU 打满，这实际上是把 channel 当成了自旋锁。</p>
+<h2 id="泄漏怎么查"><a href="#泄漏怎么查" class="headerlink" title="泄漏怎么查"></a>泄漏怎么查</h2><p>怀疑泄漏时，第一步是确认它真的存在。<code>runtime.NumGoroutine()</code> 返回当前 goroutine 总数，在健康检查或定时任务里打点，观察趋势即可。绝对值不必太在意，运行时自己也有若干常驻 goroutine，不同版本数量还会变；有意义的是“请求量平稳时它是否持续上涨”，以及“压测结束后它是否回落到基线”。</p>
+<p>第二步是拿到现场。引入 <code>net/http/pprof</code> 之后，<code>/debug/pprof/goroutine?debug=2</code> 会输出所有 goroutine 的调用栈，直接 <code>curl</code> 下来就能看。要找的是大量停在同一个位置的栈，尤其是停在 <code>chan send</code> 或 <code>chan receive</code> 上的。用 <code>go tool pprof</code> 连上去，<code>top</code> 看聚合、<code>traces</code> 看完整调用链，比肉眼翻输出高效得多。没有 HTTP 服务时，可以用 <code>runtime.Stack(buf, true)</code> 主动把全部栈 dump 到日志或文件里，再由信号或管理端口触发。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 假设服务在 6060 上注册了 net/http/pprof</span></span><br><span class="line">go tool pprof http://127.0.0.1:6060/debug/pprof/goroutine</span><br><span class="line"><span class="comment"># 交互模式里常用 top、list、traces</span></span><br><span class="line">curl <span class="string">&#x27;http://127.0.0.1:6060/debug/pprof/goroutine?debug=2&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p><code>GODEBUG</code> 也能帮上忙，但它不是泄漏检测器。<code>GODEBUG=schedtrace=1000</code> 每秒打印一行调度器状态，里面有 goroutine 总数、各 P 的运行队列长度，数字持续上涨就说明有东西没退出；<code>GODEBUG=gctrace=1</code> 打印每次 GC 的摘要，如果堆持续上涨，可能是泄漏的 goroutine 抓着引用不放。这两个开关只告诉你“有事”，定位仍然要靠栈。</p>
+<p>下面是一个真实形态的泄漏。调用方设置了超时，超时后直接返回，但工作 goroutine 还在往一个无缓冲 channel 发送：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">queryWithTimeout</span><span class="params">(ctx context.Context, id <span class="type">int</span>)</span></span> (<span class="type">string</span>, <span class="type">error</span>) &#123;</span><br><span class="line">    ch := <span class="built_in">make</span>(<span class="keyword">chan</span> <span class="type">string</span>) <span class="comment">// 无缓冲</span></span><br><span class="line">    <span class="keyword">go</span> <span class="function"><span class="keyword">func</span><span class="params">()</span></span> &#123;</span><br><span class="line">        ch &lt;- slowQuery(id) <span class="comment">// 调用方超时离开后，这里永远阻塞</span></span><br><span class="line">    &#125;()</span><br><span class="line">    <span class="keyword">select</span> &#123;</span><br><span class="line">    <span class="keyword">case</span> v := &lt;-ch:</span><br><span class="line">        <span class="keyword">return</span> v, <span class="literal">nil</span></span><br><span class="line">    <span class="keyword">case</span> &lt;-ctx.Done():</span><br><span class="line">        <span class="keyword">return</span> <span class="string">&quot;&quot;</span>, ctx.Err()</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>修复方式有两种，取决于语义。如果这次查询只会产生一个结果，把 channel 改成带一个缓冲的 <code>make(chan string, 1)</code> 就够了：即使没人接收，发送也能完成，goroutine 正常退出，结果随 channel 一起被回收。如果查询可能分多次发送，或者需要在超时后真正取消下游，就应该把 <code>ctx</code> 传进 goroutine，在发送处也做一次 <code>select</code>：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">go</span> <span class="function"><span class="keyword">func</span><span class="params">()</span></span> &#123;</span><br><span class="line">    <span class="keyword">select</span> &#123;</span><br><span class="line">    <span class="keyword">case</span> ch &lt;- slowQuery(id):</span><br><span class="line">    <span class="keyword">case</span> &lt;-ctx.Done():</span><br><span class="line">    &#125;</span><br><span class="line">&#125;()</span><br></pre></td></tr></table></figure>
+
+<p>注意缓冲为 1 只能解决“发送方退出”，不能解决“查询本身卡住”。如果 <code>slowQuery</code> 内部也在等网络，仍然要把 <code>ctx</code> 一路传下去，让最底层的 IO 能被打断。这也是排查泄漏时容易走偏的地方：修掉了 channel 上的阻塞，却留下一个卡在系统调用里的 goroutine。</p>
+<h2 id="几种值得背下来的写法"><a href="#几种值得背下来的写法" class="headerlink" title="几种值得背下来的写法"></a>几种值得背下来的写法</h2><p><strong>worker pool</strong>。固定数量的 worker 从同一个任务 channel 取活，结果写到另一个 channel。任务 channel 由生产者关闭，worker 用 <code>range</code> 消费，关闭即退出；结果 channel 由一个专门的协调者关闭，条件是 <code>WaitGroup</code> 归零。这个“谁关闭结果”的结构值得记住，它避免了接收方关闭的老问题：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line">jobs := <span class="built_in">make</span>(<span class="keyword">chan</span> <span class="type">int</span>, <span class="number">100</span>)</span><br><span class="line">results := <span class="built_in">make</span>(<span class="keyword">chan</span> <span class="type">int</span>, <span class="number">100</span>)</span><br><span class="line"><span class="keyword">var</span> wg sync.WaitGroup</span><br><span class="line"></span><br><span class="line"><span class="keyword">for</span> i := <span class="number">0</span>; i &lt; <span class="number">4</span>; i++ &#123;</span><br><span class="line">    wg.Add(<span class="number">1</span>)</span><br><span class="line">    <span class="keyword">go</span> <span class="function"><span class="keyword">func</span><span class="params">()</span></span> &#123;</span><br><span class="line">        <span class="keyword">defer</span> wg.Done()</span><br><span class="line">        <span class="keyword">for</span> j := <span class="keyword">range</span> jobs &#123; <span class="comment">// jobs 关闭后循环结束</span></span><br><span class="line">            results &lt;- j * <span class="number">2</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;()</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">go</span> <span class="function"><span class="keyword">func</span><span class="params">()</span></span> &#123;</span><br><span class="line">    wg.Wait()</span><br><span class="line">    <span class="built_in">close</span>(results) <span class="comment">// 所有发送者退出后，由协调者关闭</span></span><br><span class="line">&#125;()</span><br><span class="line"></span><br><span class="line"><span class="keyword">for</span> i := <span class="number">1</span>; i &lt;= <span class="number">20</span>; i++ &#123;</span><br><span class="line">    jobs &lt;- i</span><br><span class="line">&#125;</span><br><span class="line"><span class="built_in">close</span>(jobs) <span class="comment">// 任务发送完毕，通知 worker 退出</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">for</span> r := <span class="keyword">range</span> results &#123;</span><br><span class="line">    fmt.Println(r)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>扇出与扇入</strong>是它的变体：扇出是把任务分给多个 worker，扇入是把多个来源合并到一个 channel。合并时同样需要“等所有来源结束再关闭输出”，否则下游会提前收到关闭信号而丢掉后到的数据。实现上仍然是 <code>WaitGroup</code> 加一个关闭协调者，模式不变。</p>
+<p><strong>超时控制</strong>。<code>select</code> 加 <code>time.After</code> 是最短写法，但在循环里要小心：<code>time.After</code> 每次都新建一个定时器，定时器在触发前不会被回收，循环次数多、超时时间又长时，堆里会堆积大量待触发的定时器。循环内的正确写法是复用一个 <code>time.NewTimer</code>，用完 <code>Stop</code> 并处理已被触发的情况。</p>
+<p><strong>取消与优雅关闭</strong>。<code>context</code> 的 <code>Done()</code> 本质上就是一个只读的关闭信号 channel，取消时被 close，所有监听者同时被唤醒，这正好利用了 close 的广播语义。<code>done := make(chan struct{})</code> 是同一手法的手写版本，<code>struct{}</code> 不占空间，close 之后所有 <code>&lt;-done</code> 立刻返回。优雅关闭的顺序是：先停止接收新任务（关闭任务 channel 或停止监听），再等在途任务结束（<code>WaitGroup</code> 配合超时），最后释放资源。不要在还有发送者的时候关闭任务 channel，也不要用一个没有超时的 <code>Wait</code> 把退出流程挂死。</p>
+<p>最后要说清楚 channel 的边界。它不是并发的万能钥匙：单纯计数用 <code>sync/atomic</code>，保护一段临界区用 <code>sync.Mutex</code>，读多写少的缓存用 <code>sync.RWMutex</code>，一次性初始化用 <code>sync.Once</code>。channel 擅长的是“传递数据所有权”和“广播事件”，把这两类问题交给它，代码会清晰；把互斥、计数、状态查询也塞给它，得到的往往是更慢、更难读、更容易泄漏的实现。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>channel 的所有行为都可以从 <code>hchan</code> 推出来：<code>qcount</code> 决定空满，<code>sendx</code> 与 <code>recvx</code> 驱动环形缓冲区，<code>sendq</code> 与 <code>recvq</code> 保存被挂起的 <code>sudog</code>，<code>lock</code> 保护这一切。发送与接收都只有几条固定路径，先看对方队列，再看缓冲区，最后才挂起自己；<code>select</code> 用随机顺序扫描、按地址顺序加锁，<code>close</code> 则是一次带唤醒的广播。真正难的不是记住这些字段，而是在写代码时始终清楚“谁会关闭”“谁会退出”“阻塞的那一端有没有人来解”。把这三问答清楚，绝大多数死锁与泄漏都不会发生。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://golang.org/ref/spec">The Go Programming Language Specification</a></li>
+<li><a href="https://golang.org/doc/effective_go.html">Effective Go</a></li>
+<li><a href="https://blog.golang.org/share-memory-by-communicating">Share Memory By Communicating</a></li>
+<li><a href="https://blog.golang.org/concurrency-patterns">Go Concurrency Patterns</a></li>
+<li><a href="https://github.com/golang/go/blob/release-branch.go1.12/src/runtime/chan.go">runtime&#x2F;chan.go（Go 1.12 分支）</a></li>
+<li><a href="https://golang.org/pkg/net/http/pprof/">net&#x2F;http&#x2F;pprof</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Go channel 底层实现与常见陷阱</p><p><a href="https://987763485.github.io/2019/06/13/Gochannel底层实现与常见陷阱/">https://987763485.github.io/2019/06/13/Gochannel底层实现与常见陷阱/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2019-06-13</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/golang/">golang</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2019/06/20/Python%E6%A8%A1%E5%9D%97%E4%B8%8E%E5%8C%85%E7%AE%A1%E7%90%86/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Python 模块与包管理</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2019/06/06/Go%E9%94%99%E8%AF%AF%E7%A0%81%E8%AE%BE%E8%AE%A1%E8%A7%84%E8%8C%83/"><span class="level-item">Go 错误码设计规范</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

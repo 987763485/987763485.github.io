@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>网络抓包：Wireshark 实战 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="线上接口变慢时，应用日志往往只留下一行耗时数字，看不出时间花在了 DNS、握手还是服务端处理上。把流量抓下来逐包观察，是少数能直接看到协议行为的手段。本文从抓包点的选择讲起，介绍 Wireshark 3.2 的过滤器、流跟踪、统计与导出，最后给出一份可复用的排障清单。读者需要了解 TCP 与 HTTP 的基本概念，读完后应能独立完成一次受控的抓包分析。"><meta property="og:type" content="blog"><meta property="og:title" content="网络抓包：Wireshark 实战"><meta property="og:url" content="https://987763485.github.io/2020/08/22/%E7%BD%91%E7%BB%9C%E6%8A%93%E5%8C%85Wireshark%E5%AE%9E%E6%88%98/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="线上接口变慢时，应用日志往往只留下一行耗时数字，看不出时间花在了 DNS、握手还是服务端处理上。把流量抓下来逐包观察，是少数能直接看到协议行为的手段。本文从抓包点的选择讲起，介绍 Wireshark 3.2 的过滤器、流跟踪、统计与导出，最后给出一份可复用的排障清单。读者需要了解 TCP 与 HTTP 的基本概念，读完后应能独立完成一次受控的抓包分析。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2020-08-22T03:23:01.000Z"><meta property="article:modified_time" content="2026-10-18T14:54:46.373Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="网络安全"><meta property="article:tag" content="计算机网络"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2020/08/22/%E7%BD%91%E7%BB%9C%E6%8A%93%E5%8C%85Wireshark%E5%AE%9E%E6%88%98/"},"headline":"网络抓包：Wireshark 实战","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2020-08-22T03:23:01.000Z","dateModified":"2026-10-18T14:54:46.373Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"线上接口变慢时，应用日志往往只留下一行耗时数字，看不出时间花在了 DNS、握手还是服务端处理上。把流量抓下来逐包观察，是少数能直接看到协议行为的手段。本文从抓包点的选择讲起，介绍 Wireshark 3.2 的过滤器、流跟踪、统计与导出，最后给出一份可复用的排障清单。读者需要了解 TCP 与 HTTP 的基本概念，读完后应能独立完成一次受控的抓包分析。"}</script><link rel="canonical" href="https://987763485.github.io/2020/08/22/%E7%BD%91%E7%BB%9C%E6%8A%93%E5%8C%85Wireshark%E5%AE%9E%E6%88%98/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2020-08-22T03:23:01.000Z" title="8/22/2020, 11:23:01 AM">2020-08-22</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a></span><span class="level-item">27 分钟读完 (大约4118个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">网络抓包：Wireshark 实战</h1><div class="content"><p>线上接口变慢时，应用日志往往只留下一行耗时数字，看不出时间花在了 DNS、握手还是服务端处理上。把流量抓下来逐包观察，是少数能直接看到协议行为的手段。本文从抓包点的选择讲起，介绍 Wireshark 3.2 的过滤器、流跟踪、统计与导出，最后给出一份可复用的排障清单。读者需要了解 TCP 与 HTTP 的基本概念，读完后应能独立完成一次受控的抓包分析。</p>
+<h2 id="抓包点：先想清楚能看见什么"><a href="#抓包点：先想清楚能看见什么" class="headerlink" title="抓包点：先想清楚能看见什么"></a>抓包点：先想清楚能看见什么</h2><p>抓包的第一件事不是打开软件，而是确定观察点。观察点决定了你能看到哪些包、看不到哪些包，也决定了结论的边界。</p>
+<p>常见的抓包位置有以下几类：</p>
+<ul>
+<li>本机网卡：最方便，Wireshark 启动后直接列出接口。它只能看到本机进出的流量，适合排查客户端或服务端自身的连接问题。</li>
+<li>交换机端口镜像（SPAN）：在交换机上把目标端口或 VLAN 的流量复制到观察口。适合分析两台服务器之间的通信，但镜像口带宽容易过载，且镜像策略通常只覆盖单播，广播与组播要看具体配置。</li>
+<li>网络 TAP：分光或聚合设备串在链路中间，不改变转发行为，是最可靠的旁路方式，代价是需要停机接线。</li>
+<li>容器网络命名空间：容器有独立的 netns，宿主机默认抓不到 Pod 内部的回环流量。可以进入对应命名空间执行抓包，或让临时容器共享目标容器的网络栈。</li>
+<li>远程抓包：服务器上没有图形界面，先在远端用 tcpdump 落盘再取回，或者用 Wireshark 的 sshdump 通过 SSH 调用远端 dumpcap 实时回传。后者省去搬运文件，但受限于 SSH 带宽。</li>
+</ul>
+<p>需要提前接受两个可见性限制。其一，交换网络中你不在转发路径上，就抓不到别人的流量，端口镜像和 TAP 解决的是“位置”问题，不是“权限”问题。其二，TLS 1.3 的应用数据只有密文，没有会话密钥时，能读到的只有握手字段、SNI、证书和包长时序。看到加密流量时，应把分析目标调整为连接行为，而不是猜测明文内容。</p>
+<h2 id="捕获过滤器与显示过滤器"><a href="#捕获过滤器与显示过滤器" class="headerlink" title="捕获过滤器与显示过滤器"></a>捕获过滤器与显示过滤器</h2><p>Wireshark 有两套过滤语法，初学者最容易混淆。捕获过滤器使用 BPF 语法，在抓包开始前生效，由 libpcap 编译后交给内核或驱动执行，不匹配的包根本不会进入缓冲区。显示过滤器在抓包之后对已记录的数据做筛选，语法更丰富，可以引用任意协议字段。</p>
+<p>两者的差别可以概括为：</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>捕获过滤器</th>
+<th>显示过滤器</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>生效时机</td>
+<td>抓包前，丢包在驱动层</td>
+<td>抓包后，只影响展示</td>
+</tr>
+<tr>
+<td>语法来源</td>
+<td>BPF（tcpdump 同款）</td>
+<td>Wireshark 自有语法</td>
+</tr>
+<tr>
+<td>能力</td>
+<td>地址、端口、协议、长度</td>
+<td>任意字段、比较、正则</td>
+</tr>
+<tr>
+<td>代价</td>
+<td>写错会漏掉关键包</td>
+<td>写错只是看不到，数据还在</td>
+</tr>
+</tbody></table>
+<p>捕获过滤器的常用写法如下：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">host 10.0.0.5                  <span class="comment"># 与某地址通信，双向</span></span><br><span class="line">net 192.168.10.0/24            <span class="comment"># 整个网段</span></span><br><span class="line">port 53                        <span class="comment"># 源或目的端口为 53</span></span><br><span class="line">tcp port 443                   <span class="comment"># 仅 TCP 的 443</span></span><br><span class="line">src host 10.0.0.5 and not port 22</span><br></pre></td></tr></table></figure>
+
+<p>显示过滤器则长得像表达式，字段名取自协议树：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">ip.addr == 10.0.0.5</span><br><span class="line">tcp.port == 443</span><br><span class="line">http.request</span><br><span class="line">tcp.flags.syn == 1 &amp;&amp; tcp.flags.ack == 0</span><br><span class="line">tcp.analysis.retransmission</span><br><span class="line">tcp.stream eq 3</span><br></pre></td></tr></table></figure>
+
+<p><code>ip.addr</code> 与 <code>tcp.port</code> 都匹配源和目的两个方向，要限定方向得写 <code>ip.src</code>、<code>tcp.dstport</code>。判断“只有 SYN”的握手首包，必须同时约束 SYN 为 1、ACK 为 0，否则会把 SYN&#x2F;ACK 也算进去。<code>tcp.analysis.*</code> 是 Wireshark 的分析字段，它根据前后包推断出重传、乱序、零窗口等事件，是排查传输问题的入口。</p>
+<p>还有一个常见错误：在捕获过滤器里写 <code>tcp.port == 443</code>。BPF 不认识 <code>==</code> 和点号字段，正确写法是 <code>tcp port 443</code>。反过来，把 <code>host 10.0.0.5</code> 填进显示过滤器也会报语法错误。记住一条经验：捕获过滤器只认地址、端口和协议，显示过滤器才认字段。</p>
+<h2 id="复盘一个慢-HTTP-请求"><a href="#复盘一个慢-HTTP-请求" class="headerlink" title="复盘一个慢 HTTP 请求"></a>复盘一个慢 HTTP 请求</h2><p>假设用户反馈某个页面偶尔要等三秒，我们已经在客户端和 Web 服务器两侧各抓了一份包。下面按时间顺序走一遍。</p>
+<p>第一步，定位会话。用 <code>http.request</code> 过滤出所有请求，按时间找到耗时异常的那一条。选中它，右键选择 Follow → TCP Stream，先看应用层全貌：请求行、Host、状态码、响应体大小。</p>
+<p>第二步，固定这条流。关闭流窗口，在包列表里用 <code>tcp.stream eq N</code> 过滤，之后所有观察都基于这一条连接。先确认前面有没有 DNS 交互，查询与响应之间隔了多久、有没有重试；然后看 TCP 三次握手，SYN、SYN&#x2F;ACK、ACK 三个包的时间差就是建连 RTT。</p>
+<p>第三步，看 TLS 握手。Client Hello、Server Hello、证书、Finished 依次出现，可以读到 SNI、ALPN 和证书链。TLS 1.3 把证书也加密了，能看到的字段更少，此时只需记录握手总耗时，不必纠结内容。</p>
+<p>第四步，看请求与响应。从发出 HTTP 请求到收到第一个响应字节的间隔，是服务端处理时间加上网络单程延迟。如果响应体很大，还要看它被分成多少个段、段之间是否出现停顿。</p>
+<p>第五步，看连接如何结束。正常的四次挥手是 FIN、ACK、FIN、ACK；如果看到 RST，通常是某一端异常关闭、超时后被中间设备重置，或者应用层直接断连。</p>
+<p>把这几段时间摆在一起，问题大致能归位：</p>
+<ul>
+<li>SYN 发出后 SYN&#x2F;ACK 迟迟不来，说明服务端不可达、SYN 队列满或被安全设备拦截。</li>
+<li>握手很快但首字节很慢，瓶颈在服务端处理或后端依赖，不在网络。</li>
+<li>出现大量 <code>tcp.analysis.retransmission</code>，说明路径丢包；如果同时 RTT 陡增，多半是拥塞。</li>
+<li>出现 <code>tcp.analysis.zero_window</code>，说明接收端应用来不及读数据，窗口被填满，发送方被迫停等。</li>
+<li>出现 <code>tcp.analysis.out_of_order</code>，多为多路径转发导致，少量可以忽略。</li>
+</ul>
+<p>所有这些时间都来自抓包机的本地时钟。跨主机比较之前，先确认两台机器都同步了 NTP，否则几秒的时钟偏差足以让结论完全反过来。</p>
+<h2 id="统计视图与导出证据"><a href="#统计视图与导出证据" class="headerlink" title="统计视图与导出证据"></a>统计视图与导出证据</h2><p>单条流看完了，还需要回答“整体哪里不对”。Wireshark 的统计菜单提供了几个互补的视角。</p>
+<p>Conversations 按地址对汇总字节数、包数和持续时间，勾选 Limit to display filter 可以先圈定范围再排序。它最适合回答“谁在占带宽”，比如某台主机在对外传输大文件，或者某个地址对之间有大量短连接。</p>
+<p>Protocol Hierarchy 用百分比展示协议构成。DNS 占比异常高，可能是解析失败后的重试风暴；TCP 里重传比例高，则指向链路质量。这个视图不定位具体连接，但能快速排除方向。</p>
+<p>IO Graph 把吞吐画成曲线，每个图可以绑定一个显示过滤器。把故障前后的两个时间段画在一起，尖刺和凹陷往往对应重传、超时或应用的批量请求。</p>
+<p>TCP Stream Graphs 针对单条流，包含 Time Sequence（Stevens）、Throughput、Round Trip Time 和 Window Scaling 四种。RTT 图突然抬升，说明路径拥塞或发生了线路切换；窗口图长期贴近零，说明接收端处理不过来；吞吐图的阶梯形状，通常对应拥塞窗口的增长与回退。</p>
+<p>Expert Information 把重传、零窗口、乱序、校验和错误按严重程度汇总。它是排查的起点而不是终点：校验和错误在开启了网卡卸载的机器上非常常见，出站包的校验和根本还没计算，这类告警可以直接忽略。</p>
+<p>需要把证据交给别人时，优先导出最小集合。File → Export Objects → HTTP 可以把响应体单独落盘；Follow Stream 窗口里的 Save as 能保存原始字节；File → Export Specified Packets 选择 Displayed，只写出当前过滤结果，得到几十 KB 的小文件，比几百 MB 的全量包好用得多。分享前必须脱敏：用 <code>editcap -s 96</code> 截断载荷，去掉 Cookie、Authorization 头，替换内网地址与主机名。即便流量是加密的，SNI、IP 和时间戳同样可能暴露业务结构，不能直接外发。</p>
+<h2 id="生产环境抓包：性能、权限与合规"><a href="#生产环境抓包：性能、权限与合规" class="headerlink" title="生产环境抓包：性能、权限与合规"></a>生产环境抓包：性能、权限与合规</h2><p>在办公机上抓包和在产线服务器上抓包是两件事。前者写错过滤器大不了重来，后者可能影响业务。</p>
+<p>先估算数据量。千兆链路满负荷约 125 MB&#x2F;s，几分钟就能写出几十 GB，磁盘和 inode 都会吃不消。所以第一步永远是缩小范围：用捕获过滤器限定主机和端口，把无关流量挡在驱动层。</p>
+<p>其次是截断长度。只关心协议头时，把 snaplen 设为 96 字节，<code>dumpcap -s 96</code> 或 Wireshark 捕获选项里的 Snapshot length 都可以。载荷被截断后，统计、握手、重传分析仍然可用，写盘量却下降一个数量级。</p>
+<p>第三是用环形缓冲兜底：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">dumpcap -i eth0 -s 96 -b filesize:102400 -b files:20 -w /data/cap/eth0.pcap</span><br></pre></td></tr></table></figure>
+
+<p>这组参数让文件按 100 MB 滚动，最多保留 20 个，总占用不超过 2 GB。即使忘了停止抓包，也不会把根分区写满。</p>
+<p>第四是盯住丢包。dumpcap 退出时会打印 dropped 计数，抓包过程中也可以用 <code>-q</code> 查看实时统计。一旦出现丢包，说明缓冲区或磁盘跟不上，“没有看到重传”就不能作为结论，因为丢包可能发生在抓包程序自己身上。</p>
+<p>第五是不要在产线机上开图形界面。Wireshark 的解析和重组很吃 CPU 与内存，几百 MB 的包足以让一台繁忙的服务器卡顿。正确做法是用 dumpcap 或 tshark 落盘，取回办公机再分析。</p>
+<p>权限方面，Linux 上不必用 root 长期运行。给 dumpcap 授予 <code>cap_net_raw</code> 与 <code>cap_net_admin</code> 能力，再把分析账号加入 wireshark 组即可；macOS 安装时勾选 ChmodBPF，把 <code>/dev/bpf*</code> 的权限交给专用组。Windows 依赖 Npcap，安装时同样可以选择限制普通用户抓包。</p>
+<p>最后是合规。抓包会完整记录通信内容，属于敏感操作。只抓自己有管理权限的资产，事先取得书面授权，明确范围、目的与保留期限，抓完及时删除。涉及用户数据的包，应按最小必要原则处理，不能因为“技术上抓得到”就默认可以抓。</p>
+<h2 id="命令行搭档与常见误区"><a href="#命令行搭档与常见误区" class="headerlink" title="命令行搭档与常见误区"></a>命令行搭档与常见误区</h2><p>服务器上更常见的组合是 tcpdump 加 tshark。tcpdump 负责采集，参数值得背下来：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">tcpdump -i any -nn -s0 -w /tmp/cap.pcap <span class="string">&#x27;tcp port 443&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p><code>-i any</code> 抓所有接口，<code>-nn</code> 不做名字解析以避免额外的 DNS 查询，<code>-s0</code> 保留完整包，最后的表达式就是 BPF 捕获过滤器。</p>
+<p>tshark 适合批量提取字段，把几十万条包变成可以排序的表格：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">tshark -r cap.pcap -Y <span class="string">&#x27;http.request&#x27;</span> -T fields \</span><br><span class="line">  -e frame.time -e ip.src -e tcp.srcport -e http.host -e http.request.uri</span><br></pre></td></tr></table></figure>
+
+<p><code>-Y</code> 是显示过滤器，<code>-e</code> 指定字段，输出可以直接交给 awk 或表格软件。排查“哪些 URI 最慢”这类问题时，比在 GUI 里逐条点开高效得多。</p>
+<p>处理已有文件时，editcap 与 mergecap 是两把剪刀。<code>editcap -A</code> 与 <code>-B</code> 按时间裁剪，<code>editcap -c 10000</code> 按包数切分，<code>mergecap -a</code> 把客户端和服务端的抓包按时间合并成一份。两端抓包合并后，同一段交互会以两个方向的时间线并列呈现，判断丢包发生在哪一侧会容易很多。</p>
+<p>实践中最容易踩的坑有这几个：</p>
+<ul>
+<li>抓错接口。容器、VPN、bond 和 loopback 都可能承载真正的流量，<code>ip addr</code> 与 <code>ip route</code> 能帮你确认出口。</li>
+<li>被校验和告警误导。网卡校验和卸载会让出站包显示 bad checksum，这并不代表包坏了。</li>
+<li>忽略时钟。两台机器没有对时，时间线无法直接比较。</li>
+<li>把密文当明文分析。没有密钥就是读不懂，不要根据包长臆测内容。</li>
+<li>被重组掩盖问题。Follow Stream 展示的是拼接后的应用数据，重传和乱序在视图里被抹平了；查传输问题要回到包列表，必要时关掉 TCP 重组。</li>
+<li>只抓一端。单侧看到的“重传”可能只是抓包点丢了包，两端对比才能确定方向。</li>
+</ul>
+<h2 id="排障清单"><a href="#排障清单" class="headerlink" title="排障清单"></a>排障清单</h2><p>把上面的内容压缩成一张检查表，遇到慢请求时可以按顺序过一遍：</p>
+<ol>
+<li>最近改了什么。发布、证书更换、DNS 变更、负载均衡调整、安全组收紧，逐项确认时间点是否吻合。</li>
+<li>影响范围。一个客户端、一个服务端还是全体用户。全体更像基础设施问题，单点更像客户端环境或单个实例。</li>
+<li>分层定位。DNS 解析、TCP 建连、TLS 握手、首字节、数据传输，分别记下耗时，找出最大的那一段。</li>
+<li>两端对比。在客户端和服务端同时抓包，比较同一请求在各阶段的时间差，差值就是网络段的成本。</li>
+<li>看传输指标。重传率、RTT 变化、零窗口、乱序，重传超过 1% 就值得继续追。</li>
+<li>复核结论。每条结论都要有包级别的证据支撑，不能只凭一条吞吐曲线下判断。</li>
+</ol>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>抓包不是打开软件就开始录，而是先确定观察点，再用捕获过滤器缩小范围，用显示过滤器与流跟踪还原会话，用统计与专家信息定位异常，最后只导出必要证据并脱敏。生产环境优先使用 dumpcap 与 tshark，控制 snaplen 和环形缓冲，注意权限与授权边界。加密流量只能看元数据，传输层的问题要回到包级别判断，别被重组后的流视图迷惑。把抓包点、时间线和两端对比固定成习惯，多数“偶发变慢”都能在一次抓包里找到答案。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>网络抓包：Wireshark 实战</p><p><a href="https://987763485.github.io/2020/08/22/网络抓包Wireshark实战/">https://987763485.github.io/2020/08/22/网络抓包Wireshark实战/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2020-08-22</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a><a class="link-muted mr-2" rel="tag" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/">计算机网络</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2020/08/24/PostgreSQL%E5%AE%89%E8%A3%85%E4%B8%8E%E5%9F%BA%E7%A1%80%E5%AE%9E%E8%B7%B5/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">PostgreSQL 安装与基础实践</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2020/08/17/Redis%E6%8C%81%E4%B9%85%E5%8C%96%E4%B8%8E%E9%AB%98%E5%8F%AF%E7%94%A8%E6%96%B9%E6%A1%88/"><span class="level-item">Redis 持久化与高可用方案</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

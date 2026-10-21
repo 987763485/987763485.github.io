@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Agent 生产部署架构 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="从能跑通的 demo 到一上线就出的事故"><meta property="og:type" content="blog"><meta property="og:title" content="Agent 生产部署架构"><meta property="og:url" content="https://987763485.github.io/2026/03/13/Agent%E7%94%9F%E4%BA%A7%E9%83%A8%E7%BD%B2%E6%9E%B6%E6%9E%84/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="从能跑通的 demo 到一上线就出的事故"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2026-03-12T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-20T16:30:16.492Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="大模型"><meta property="article:tag" content="python"><meta property="article:tag" content="agent"><meta property="article:tag" content="typescript"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2026/03/13/Agent%E7%94%9F%E4%BA%A7%E9%83%A8%E7%BD%B2%E6%9E%B6%E6%9E%84/"},"headline":"Agent 生产部署架构","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2026-03-12T16:00:00.000Z","dateModified":"2026-10-20T16:30:16.492Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"从能跑通的 demo 到一上线就出的事故"}</script><link rel="canonical" href="https://987763485.github.io/2026/03/13/Agent%E7%94%9F%E4%BA%A7%E9%83%A8%E7%BD%B2%E6%9E%B6%E6%9E%84/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2026-03-12T16:00:00.000Z" title="3/13/2026, 12:00:00 AM">2026-03-13</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></span><span class="level-item">1 小时读完 (大约8339个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Agent 生产部署架构</h1><nav class="series-nav" aria-label="系列文章导航"><div class="series-nav-meta"><i class="fas fa-book-open" aria-hidden="true"></i><span>本文属于《<a class="series-nav-title" href="/series/agent/">Agent 智能体开发</a>》第 47/55 篇</span></div><div class="series-nav-links"><a class="series-nav-link series-nav-prev" href="/2026/02/16/Agent%E5%95%86%E4%B8%9A%E5%8C%96%E8%90%BD%E5%9C%B0%E6%80%9D%E8%80%83/"><i class="fas fa-chevron-left" aria-hidden="true"></i><span>上一篇</span></a><a class="series-nav-link series-nav-index" href="/series/agent/">系列目录</a><a class="series-nav-link series-nav-next" href="/2026/03/18/ClaudeCode%E6%BA%90%E7%A0%81%E6%9E%B6%E6%9E%84%E8%A7%A3%E6%9E%90/"><span>下一篇</span><i class="fas fa-chevron-right" aria-hidden="true"></i></a></div></nav><div class="content"><h2 id="从能跑通的-demo-到一上线就出的事故"><a href="#从能跑通的-demo-到一上线就出的事故" class="headerlink" title="从能跑通的 demo 到一上线就出的事故"></a>从能跑通的 demo 到一上线就出的事故</h2><p>先讲一个示意场景，它是把多类常见故障合并之后的虚构案例，涉及的数字都是示意值。一支团队用 LangGraph 1.0 搭了个客服 Agent：接一个对话模型，读工单系统，再挂几个内部工具。demo 阶段跑得很顺，在笔记本上连续完成三十轮多步推理，演示会上管理者亲眼看到它自己把一张退款工单处理完了。上线之后一周内出了三件事。第一，一次例行的滚动重启把进行中的会话清零——会话状态存在进程内存里，实例一重建，上下文就没了，用户只能从”我刚才说到哪了”重新讲起。第二，一个查询类工具 hang 住将近九十秒，调用方没有超时约束，工作线程被逐个拖死，整个服务在半小时里雪崩成 503。第三，消息队列把一批待办任务重投了一次，Agent 毫不知情地给同一位客户发了五封内容相同的邮件。</p>
+<p>这三件事的共性在于：demo 验证的是推理循环能不能转起来，生产验证的是这个循环在一万个并发、随时可能重启、处处会超时的环境里还能不能正确地转起来。智能体负载从演示环境走向线上，中间至少隔着八条差距，本文后面每一节都会对应到其中之一：</p>
+<ul>
+<li>状态：会话与任务状态放在哪里，进程重启后能不能续跑；</li>
+<li>超时：单步推理、单次工具调用、整棵任务树，各自的预算由谁执行；</li>
+<li>并发：长耗时循环占住连接与线程的方式，会不会把宿主拖垮；</li>
+<li>凭据：模型密钥与第三方工具的访问凭据如何下发、如何轮换、如何避免泄漏进日志；</li>
+<li>出口：模型调用与工具调用是否可以被审计、被限流、被切断；</li>
+<li>观测：一次跨分钟甚至跨小时的多步交互，能不能被一条链路串起来回溯；</li>
+<li>回滚：提示词、路由表、模型版本这些”软发布物”出了问题是能不能一键退回；</li>
+<li>成本：token 与工具调用开销能不能归因到具体业务线，而不是月底一张总账单。</li>
+</ul>
+<p>需要划清的是：本文不讲智能体作为编程模型内部的推理循环如何组织，那部分另一篇《Agent 架构设计总览》已经展开；我们只关心这些负载落到机房与集群里之后，需要什么样的部署结构。</p>
+<h2 id="把负载切成五层：部署拓扑的骨架"><a href="#把负载切成五层：部署拓扑的骨架" class="headerlink" title="把负载切成五层：部署拓扑的骨架"></a>把负载切成五层：部署拓扑的骨架</h2><p>对付上面八条差距，最可靠的起手式是按”有没有状态””失败归谁负责”把智能体应用切成五层。</p>
+<p>接入层是无状态的。它承担终端或业务系统的连接、身份认证、配额检查与幂等键登记，不保存任何会话内容。因为无状态，它可以躲在常规负载均衡后面按连接数和请求速率横向扩容，实例随时可杀可补——前提是把上文第一条差距里的教训听进去了：任何”杀掉实例会丢东西”的组件都不能被归进这一层。</p>
+<p>编排层是回合推进与工具选择的所在，形态上可以是一个 Python 进程里的图执行器，也可以是按会话片段拉起的一次性 worker。关键在于它的部署属性：编排层进程本身不持有会话数据，每一步从外部状态存储按会话标识读入、算完写回。这样编排层同样具备了”可随意重启”的性质，版本发布时不需要等长会话自然结束。</p>
+<p>执行层是工具调用与代码运行的实体，包括直接外呼第三方 API 的短任务，也包括要跑用户提交代码的沙箱。它是安全边界最紧、故障模式最杂的一层，伸缩特性由队列而非请求速率决定——积压深度才是该加机器的信号。</p>
+<p>模型与工具出口是所有对外调用的汇聚点。在这个架构里我们不让业务代码直连模型供应商或外部工具，而是全部收敛到统一出口网关，由它执行白名单、超时、重试、去重和审计。后面「出口治理」一节会展开。</p>
+<p>状态存储是恢复语义的裁决者。会话、任务、中间产物分别放什么介质，直接决定了重启后哪些能续跑、哪些只能重做。</p>
+<pre class="mermaid">flowchart TD
+    U[客户端或业务系统] --> GW[接入层: 认证 + 配额 + 幂等键]
+    GW --> ORCH[编排层: 回合推进与工具选择]
+    ORCH --> STORE[(状态存储: 缓存 / 数据库 / 对象存储)]
+    ORCH --> Q[任务队列]
+    Q --> WORKER[执行层: 工具 worker 与沙箱]
+    ORCH --> EGRESS[出口网关]
+    WORKER --> EGRESS
+    EGRESS --> LLM[模型服务]
+    EGRESS --> EXT[外部工具 API]
+    ORCH --> OTEL[观测管道]
+    WORKER --> OTEL
+    STORE --> BAK[备份与归档]</pre>
+
+<p>这五层与经典微服务分层并不陌生，关于智能体应用整体架构如何一步步演进成这个样子，《AI 应用架构演进》一篇已有论述；本文只锁定每层在生产部署里的职责与伸缩特性。一个实用的检查方法是：对每一层问一句”这一层的实例现在全部杀掉，用户会感知到什么”，答不上来的层，就是架构里最薄弱的一层。</p>
+<h2 id="会话状态放哪：四种介质的取舍"><a href="#会话状态放哪：四种介质的取舍" class="headerlink" title="会话状态放哪：四种介质的取舍"></a>会话状态放哪：四种介质的取舍</h2><p>上一节把状态存储称为”恢复语义的裁决者”，这里把裁决做细。智能体的可持久化数据大致分三类：会话状态（对话历史、图执行的检查点、待办中间变量）、任务状态（队列里每个作业的生命周期记录）、产物（工具生成的文件、报表、截图）。三类数据的访问频率与体量差好几个数量级，硬塞进同一种介质一定会别扭。</p>
+<p>先看四种候选介质的取舍：</p>
+<table>
+<thead>
+<tr>
+<th>介质</th>
+<th>延迟</th>
+<th>持久性</th>
+<th>容量上限</th>
+<th>重启后能否续跑</th>
+<th>典型用途</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>进程内存</td>
+<td>最低</td>
+<td>无</td>
+<td>受单实例内存约束</td>
+<td>不能</td>
+<td>demo、单测、秒级临时变量</td>
+</tr>
+<tr>
+<td>Redis 类缓存</td>
+<td>低</td>
+<td>弱（配置得当可近似）</td>
+<td>受集群内存约束</td>
+<td>多数能</td>
+<td>会话检查点、锁、幂等键</td>
+</tr>
+<tr>
+<td>数据库</td>
+<td>中</td>
+<td>强</td>
+<td>高</td>
+<td>能</td>
+<td>任务状态、审计记录、长期档案</td>
+</tr>
+<tr>
+<td>对象存储</td>
+<td>高</td>
+<td>很强</td>
+<td>几乎无限</td>
+<td>能</td>
+<td>产物、大附件、脱敏归档</td>
+</tr>
+</tbody></table>
+<p>开篇事故里”重启丢会话”的直接修法，就是把图执行器的检查点从内存挪进外部存储。以 LangGraph 1.0 这类带检查点能力的编排框架为例，正确的部署姿势是检查点后端指向 Redis 或数据库，编排进程保持无状态，任何实例拿到会话标识都能接着执行。要警惕的是把缓存当数据库用：Redis 的内存成本决定了它只适合放”最近活跃”的会话窗口，过期策略一旦激进，长周期任务会在最贵的时刻发现状态已经蒸发。我们的经验是给会话状态定义明确的存活期，超期的会话降级到数据库，只保留摘要与索引。</p>
+<p>还有一条容易忘的约束，与介质选择同级重要：<strong>对话原文不要进缓存键，也不要长期明文留存</strong>。缓存键会出现在慢查询日志、监控面板与各类调试输出里，把用户标识甚至会话片段编进键名，等于把敏感数据复制到了所有能看见键的地方。键里只放不透明标识符，这是接入层鉴权之后生成、与内容无关的 ID。留存周期要在设计期就定下来并写进配置：谁定义、多长、到期做什么（删除还是脱敏归档），不能等法务找上门才补。敏感字段的脱敏应发生在写入存储之前，而不是查询时再遮。《Agent 安全与权限控制》对凭据类数据的落点已有更细的规定，本文不重复。</p>
+<h2 id="长任务的部署形态：队列、看门狗与超时预算"><a href="#长任务的部署形态：队列、看门狗与超时预算" class="headerlink" title="长任务的部署形态：队列、看门狗与超时预算"></a>长任务的部署形态：队列、看门狗与超时预算</h2><p>会话型负载尚可同步应答，一旦单任务耗时以分钟计——多轮调研、批量处理工单、跨系统对账——同步 HTTP 就成了灾难的温床：连接被长期占用、网关按秒级超时机械切断、客户端重连造成重复提交。生产形态应当改为”提交即返回，结果走通知”：接入层收到请求写入任务队列就回作业凭据，编排 worker 从队列领取任务异步执行，进度与终态通过回调或轮询交付。</p>
+<p>这套形态里有三个部件。任务队列本身不必发明新东西，成熟的中间件皆可，选型时看的是优先级、延时投递与死信能力这三项是否齐备。心跳与看门狗解决”僵尸任务”：worker 领任务后周期上报心跳，看门狗服务扫描超过约定时间没有心跳的作业，将其判定失效并决定重投还是放弃。这个部件的完整失败语义——重投几次、幂等如何兜底、毒任务如何隔离——属于机制细节，《Agent 失败恢复与重试》一篇已经系统展开，本文只强调它的部署位置：看门狗必须独立于 worker 进程组，否则 worker 群灭时看门狗陪葬，恢复机制形同虚设。</p>
+<p>超时预算要分层。单次模型调用有单步预算，单次工具调用有出口预算，整棵任务树有整体预算，三层数字必须递减——整体预算大于各步预算之和是常态，但任何一步的预算都不得超过它所在层的配额，且最内层的超时必须真实传给发起调用的客户端库，而不是只写在文档里。示意值如此设置：单步模型调用六十秒，单个工具调用三十秒，整任务十五分钟，均为团队约定示例，应随业务调整。编排层负责在预算耗尽时走降级路径，而不是让请求在层层等待中自然腐烂。</p>
+<h2 id="出口治理：让所有外呼只有一条门缝"><a href="#出口治理：让所有外呼只有一条门缝" class="headerlink" title="出口治理：让所有外呼只有一条门缝"></a>出口治理：让所有外呼只有一条门缝</h2><p>智能体应用与常规后端服务在流量形态上最大的差别，是它的出向调用有一半是”运行时才知道要调什么”的：模型决定了这一轮要访问哪个工具的哪个接口。放任这种自由度直接上线，等于把公司的网络出口交给一个不确定行为者。出口治理的第一原则是把出站调用收敛为唯一路径——编排层与执行层所在的工作负载在集群层面禁止直连公网，只允许访问出口网关；模型供应商地址与外部工具域名登记在网关白名单里，白名单之外一律拒绝并留审计记录。这条约束在 Kubernetes 1.35 的网络策略与既有服务网格能力下是常规操作，不展开。</p>
+<p>网关收敛之后，三件事才有了统一的落点。其一是超时与重试的归属：<strong>重试策略只写在出口网关这一层</strong>，编排层与执行层禁止各自藏着退避逻辑——两处都重试会相乘成重试风暴，这个教训在开篇事故的雪崩段落里已经付过学费。各层只保留超时，超时到了把失败如实上抛，由编排层决定业务级降级。其二是请求指纹与去重：网关对每次外呼计算规范化指纹（目标端点、参数摘要、会话标识、时间窗），在短窗口内对指纹重复的请求直接返回上次结果或拒发，挡住编排 bug 造成的同参数死循环轰击供应商接口。指纹计算必须剔除时间戳等易变字段、且不得把凭据纳入摘要输入，否则去重失效或反向泄漏。其三是配额与审计：按业务线维度统计 token 消耗与外呼次数，既是成本归因的数据源，也是异常行为（比如某个会话在十七秒内发起上百次搜索）的告警依据。</p>
+<p>模型调用入口的流量整形、路由与降级策略本身是一整套网关设计，那部分《模型服务网关设计》已有专文；本文的边界是：智能体应用必须站在网关后面，且网关的策略由平台团队而不是各业务团队分头维护。</p>
+<h2 id="凭据管理：下发、短时化与四条禁区"><a href="#凭据管理：下发、短时化与四条禁区" class="headerlink" title="凭据管理：下发、短时化与四条禁区"></a>凭据管理：下发、短时化与四条禁区</h2><p>出口有了门，还得管钥匙。智能体应用的凭据池比常规服务更杂：模型供应商密钥、MCP 服务器的连接凭据、各内部系统的服务账号、沙箱内代码可能需要的临时授权。如果这些凭据以环境变量或明文配置文件的形式预置在每个 worker 里，那么任何一次日志打印、任何一份镜像导出、任何一个被攻破的沙箱都是泄漏面。</p>
+<p>生产做法是由平台密钥服务统一下发，随取随用。工作负载启动时不携带长期密钥，只持有一个由集群身份背书的工作负载标识；需要调用某出口时，向密钥服务申请该用途的短时凭据，凭据带使用范围与存活期约束，到期自动作废，轮换因此不需要重启任何进程。密钥服务自身按标准的高可用加密存储形态部署即可，重点在于把它当作出口网关的同级基础设施来对待——它挂了，所有外呼都应显式失败，而不是悄悄回退到镜像里藏的旧密钥，这类回退配置恰恰是审计中最常见的”化石凭据”来源。</p>
+<p>有四条禁区要在编码规范里写死并用静态检查兜底。凭据不得进入提示词上下文：Agent 的推理内容会被日志、评测集、缓存各复制一份，路径不可控；凭据不得出现在日志与链路属性中；凭据不得参与缓存键与请求指纹的构成；凭据不得写入明文配置或代码仓库，示例代码里一律使用占位符。下面的注册表片段只用占位符示意形态：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">REGISTRY = &#123;</span><br><span class="line">    <span class="string">&quot;crm-system&quot;</span>: &#123;</span><br><span class="line">        <span class="string">&quot;audience&quot;</span>: <span class="string">&quot;internal-crm&quot;</span>,</span><br><span class="line">        <span class="string">&quot;scopes&quot;</span>: [<span class="string">&quot;ticket:read&quot;</span>, <span class="string">&quot;contact:read&quot;</span>],</span><br><span class="line">        <span class="string">&quot;cred_ref&quot;</span>: <span class="string">&quot;vault://agents/prod/crm&quot;</span>,</span><br><span class="line">        <span class="string">&quot;ttl_seconds&quot;</span>: <span class="number">900</span>,</span><br><span class="line">    &#125;,</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>需要强调的是，凭据为何危险的完整清单——尤其是上下文窗口、日志、缓存键三处的泄漏机理——《Agent 安全与权限控制》一篇已有系统表述；本节讲的是与之配套的部署侧机制：怎么发、怎么换、怎么让”没有凭据”成为默认状态。</p>
+<h2 id="幂等与去重：把”至少一次”的世界掰回”恰好一次”"><a href="#幂等与去重：把”至少一次”的世界掰回”恰好一次”" class="headerlink" title="幂等与去重：把”至少一次”的世界掰回”恰好一次”"></a>幂等与去重：把”至少一次”的世界掰回”恰好一次”</h2><p>开篇事故里那五封重复邮件值得单独一节。生产消息通道给出的投递语义通常是”至少一次”：队列重投、消费端超时重领、用户看到没反应又点一次提交——每一条路径都可能把同一个意图变成两次执行。对普通 CRUD 服务，重复执行往往被数据库唯一键挡下；对智能体，重复执行意味着重复的模型消费、重复的外呼副作用，以及用户视角下”这个助手疯了”。</p>
+<p>防线要设在最外层。接入层对每次写操作要求幂等键：客户端生成、或由网关基于请求要素代生成，键与会话或任务标识绑定，落进缓存与数据库双份存储。同一个幂等键的第二次到达，不再触达编排层，直接返回第一次的受理结果。编排层的检查点进度记录、出口网关的请求指纹，则分别作为第二、第三道防线，作用是把上游漏网的重复在真正花钱之前拦下。</p>
+<p>对账解决”两个副本都执行了一半”的疑难：任务终态必须带明确的执行回执（做成了什么、副作用清单），对账作业定期比对回执与下游系统的真实状态，不一致的进入人工队列。下面的伪码给出可复用骨架：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">submit_with_idempotency</span>(<span class="params">key: <span class="built_in">str</span>, payload: <span class="built_in">dict</span></span>):</span><br><span class="line">    existing = store.get(key)          <span class="comment"># 缓存未命中则回源数据库</span></span><br><span class="line">    <span class="keyword">if</span> existing <span class="keyword">and</span> existing.done:</span><br><span class="line">        <span class="keyword">return</span> existing.receipt         <span class="comment"># 重复提交：直接返回首次回执</span></span><br><span class="line">    <span class="keyword">if</span> existing <span class="keyword">and</span> existing.running:</span><br><span class="line">        <span class="keyword">return</span> existing.receipt_pending <span class="comment"># 并发重复：返回受理中，不重复执行</span></span><br><span class="line">    token = store.acquire_lock(key)     <span class="comment"># 抢不到锁者稍后重查</span></span><br><span class="line">    <span class="keyword">if</span> token:</span><br><span class="line">        task = enqueue(payload, idem_key=key)</span><br><span class="line">        store.record(key, running=task.<span class="built_in">id</span>)</span><br><span class="line">        <span class="keyword">return</span> accept_receipt(task.<span class="built_in">id</span>)</span><br><span class="line">    <span class="keyword">return</span> retry_later()</span><br></pre></td></tr></table></figure>
+
+<p>三个易错点写在这里：幂等键的存活期必须覆盖队列最大重投窗口加人工重试窗口；锁的持有者崩溃后锁必须能自动过期，否则任务永久卡死；回执本身要可查询，否则客户端拿不到首次结果，还是会退化成重复提交。</p>
+<h2 id="灰度与回滚：模型版本也是一种发布物"><a href="#灰度与回滚：模型版本也是一种发布物" class="headerlink" title="灰度与回滚：模型版本也是一种发布物"></a>灰度与回滚：模型版本也是一种发布物</h2><p>智能体应用的发布物清单比常规服务长一倍：容器镜像、提示词模板、工具注册表、路由表、评测集，以及最特殊的——模型版本。把模型版本当作配置字符串里可随手改写的字段，是灰度能力缺失的根源。生产做法是把它纳入与镜像同级的发布管理：每个模型版本有登记条目、有变更记录、有对应的评测通过记录，改路由就是改发布物，走同一套审批与回滚流程。Anthropic 工程栏目那篇《agent evals》讲的就是这类发布前评测怎么搭，此处不展开评测本身。</p>
+<p>分桶单位决定灰度粒度。按租户分桶适合 B 端场景——先放三个内部租户，观察一周再扩；按会话分桶适合 C 端场景——新用户的新会话才进实验桶，进行中的会话绝不跨桶迁移，否则同一个对话上下文中途换模型，行为漂移会污染两边的观测数据。实现上就是接入层查一次路由表：桶号由不透明会话标识哈希得出，路由表存放在配置中心并带版本号，路由表本身的回滚因此只是一次配置版本切换，秒级生效。</p>
+<p>发布卡点建议至少设三条。其一，评测门禁：候选模型版本或新版提示词必须先通过固定评测集，阈值数值由团队约定、属于团队约定示例，重要的是”不过门禁不进灰度桶”这条流程约束；其二，双桶对照：灰度期间保留一个同规模对照桶，成本与质量指标并列观察，防止”新版本看起来没问题”其实是样本不足；其三，一键退回路径演练：回滚动作本身要在演练里被真实执行过——路由表切回、镜像退版、凭据不受回滚牵连这三件事各验证一遍。回滚最容易踩的坑是”配置退回了旧版，但旧版引用的模型端点已下线”，这正是把模型版本纳入发布物登记的价值：登记表里能看见每个版本的服务期限。镜像层的滚动与版本管理属于通用发布工程，与《Agent 原生应用架构》讨论的应用结构问题交集不大，本文按下不表。</p>
+<h2 id="可观测与告警：让一次跨小时的多步交互可以被回溯"><a href="#可观测与告警：让一次跨小时的多步交互可以被回溯" class="headerlink" title="可观测与告警：让一次跨小时的多步交互可以被回溯"></a>可观测与告警：让一次跨小时的多步交互可以被回溯</h2><p>传统服务的观测以”一次请求”为单位，智能体负载的天然单位却是”一次会话”或”一个任务”，它扇出成几十次模型调用与工具调用，横跨分钟甚至小时。trace 关联键的设计必须围绕这个天然单位：在接入层为每个会话或任务生成一个贯穿标识，此后每一次模型外呼、每一次工具执行、每一条队列消息都携带它；编排层的检查点记录用同一个标识串起每一步的输入输出摘要。排查时先按会话标识拉出整棵调用树，再下钻到单步，而不是从一堆孤立日志里猜因果。属性命名只讲原则：业务归属、模型版本、桶号、出口端点类别这几类维度必须挂在链路属性上，字段的具体拼写由团队约定示例统一定义即可；本文关心的是”哪些维度缺了就没法做下文两件事”，采集与存储管道的选型属于《AI 应用的可观测性》的范畴，一句划界。</p>
+<p>第一件事是成本归因。token 与工具调用开销要能落到业务线而不是月底一张总账单，靠的正是链路与出口审计上的归属维度：每笔消耗都能回答”哪个租户、哪条业务线、哪类任务”烧的。归因粒度到”任务类型 × 模型版本”通常够用，更细的收益递减。推理侧的成本与容量话题另有《大模型推理服务架构》专文处理，本文只认领”归属维度必须在应用侧就打进属性里”这条部署要求。</p>
+<p>第二件事是 SLI&#x2F;SLO 与告警分层。智能体应用的 SLI 至少四类：可用性（会话应答成功率）、时延（首响时间与整任务完成时间，建议分开看）、质量代理（用户追问率、人工接管率、评测门禁通过率）、经济性（单会话平均 token 成本、异常外呼率）。告警按影响面分层：秒级窗口的基础设施告警（队列积压深度、出口错误率）唤值班；小时窗口的质量漂移告警（追问率抬升）唤负责该 Agent 的产品与工程双人组；天窗口的成本告警（单会话成本环比抬升超过团队约定示例阈值）唤预算责任人。三层各配各的升级路径，避免把质量漂移用基础设施的寻呼强度去喊——那是团队疲劳的头号来源。</p>
+<h2 id="容量与弹性：按队列与槽位伸缩，而不是按-CPU"><a href="#容量与弹性：按队列与槽位伸缩，而不是按-CPU" class="headerlink" title="容量与弹性：按队列与槽位伸缩，而不是按 CPU"></a>容量与弹性：按队列与槽位伸缩，而不是按 CPU</h2><p>智能体 worker 的 CPU 曲线极不可信：一个领到任务的实例可能整分钟挂着网络等待，CPU 低得像闲死，实际并发槽位已满。伸缩信号应当取两类：队列积压深度（滞后指标，触发扩容）与并发槽位占用率（领先指标，逼近满位即扩）。并发槽位在实现上就是 worker 声明的”我能同时养几个进行中任务”，调度器按全局槽位水位做决策，这个水位阈值同样是团队约定示例。</p>
+<p>背压必须与伸缩配套，否则积压只是换了个地方堆。位置有三个：接入层按队列深度与槽位水位对新请求排队或快速拒绝，绝不无底线接收；编排层对单会话的在途外呼数设上限；出口网关对各业务线配额设上限。三级数字从外到内递减收敛，任何一级触顶都返回明确的”稍后再试”语义而非静默超时。</p>
+<p>冷启动从哪来？按 Kubernetes 1.35 的常规口径审视，智能体 worker 的启动路径上有四段开销：镜像拉取与解包、运行时初始化（Python 依赖装载或 Node.js 24 LTS 运行时的模块解析）、模型与工具的连通性预热（首次 TLS 握手、工具注册表拉取）、以及凭据获取。伸缩响应慢往往不是调度器慢，而是这四段串行且每段都按”新实例”重来。缓解思路是依据可预见的流量曲线提前拉起容量，而不是等积压告警被动追火；这部分属于集群层通用手段，具体规模不在此讨论。GPU 推理侧的容量与调度是模型服务的问题，本文的弹性只覆盖应用层——推理集群的规划细节在《大模型服务化实践》已有论述。</p>
+<h2 id="故障演练清单：上线前先把六种坏消息演一遍"><a href="#故障演练清单：上线前先把六种坏消息演一遍" class="headerlink" title="故障演练清单：上线前先把六种坏消息演一遍"></a>故障演练清单：上线前先把六种坏消息演一遍</h2><p>前十节的结构是否真的成立，靠读架构图读不出来，只能注入故障验一次。以下六项是我们建议的最小演练集，每项按”注入什么、观察什么、期望表现”三栏执行，演练频率由团队约定示例（可按季度）。</p>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>注入什么</th>
+<th>观察什么</th>
+<th>期望表现</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>模型超时</td>
+<td>出口网关对指定模型端点注入长延迟直至超时</td>
+<td>编排层预算消耗路径、会话失败率</td>
+<td>预算内快速失败并走降级，连接与槽位按时释放</td>
+</tr>
+<tr>
+<td>工具 500</td>
+<td>对某外部工具端点返回持续 5xx</td>
+<td>网关重试次数、错误是否上抛</td>
+<td>仅网关层按策略重试，编排层拿到明确失败并降级，无重试风暴</td>
+</tr>
+<tr>
+<td>队列积压</td>
+<td>暂停部分 worker 制造积压</td>
+<td>积压深度指标、接入层行为</td>
+<td>背压触发新请求排队或快速拒绝，恢复后按序消化无丢失</td>
+</tr>
+<tr>
+<td>缓存失效</td>
+<td>清空会话状态缓存集群</td>
+<td>进行中的会话、数据库回源</td>
+<td>活跃会话按恢复语义续跑或优雅重开，回源风暴被限流挡住</td>
+</tr>
+<tr>
+<td>出口权限收紧</td>
+<td>收紧网络策略切断某域名</td>
+<td>报错形态、审计日志</td>
+<td>白名单拒绝有审计记录，业务收到明确错误码而非静默挂起</td>
+</tr>
+<tr>
+<td>凭据轮换</td>
+<td>强制吊销在役短时凭据</td>
+<td>外呼成功率、密钥服务负载</td>
+<td>各层按需重新申请，分钟级自愈，无人工介入</td>
+</tr>
+</tbody></table>
+<p>演练的判据要提前写死：每一项的”期望表现”若在演练中不成立，就回改对应节的架构决策，而不是给演练报告打圆场。尤其注意缓存失效一项——它是对本文第三层与第四层接缝（编排层无状态假设）最直接的攻击，跳过这条演练等于没验证过整个状态设计的核心承诺。</p>
+<h2 id="一张对照表收尾"><a href="#一张对照表收尾" class="headerlink" title="一张对照表收尾"></a>一张对照表收尾</h2><p>把全文的部署对象放进同一张表，作为评审会上的速查页：</p>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>是否有状态</th>
+<th>失败影响面</th>
+<th>缓解手段</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>接入层</td>
+<td>无</td>
+<td>入口不可用，新用户全断</td>
+<td>多实例负载均衡、健康摘除</td>
+</tr>
+<tr>
+<td>编排层</td>
+<td>无（外置状态）</td>
+<td>新回合停摆，存量可续</td>
+<td>检查点外置、随意重启的发布方式</td>
+</tr>
+<tr>
+<td>任务队列</td>
+<td>有</td>
+<td>长任务无法受理</td>
+<td>中间件自身高可用、积压告警</td>
+</tr>
+<tr>
+<td>执行层 worker</td>
+<td>执行中有</td>
+<td>单批任务失败</td>
+<td>心跳看门狗、重投与死信队列</td>
+</tr>
+<tr>
+<td>出口网关</td>
+<td>有（指纹窗口）</td>
+<td>全部外呼中断</td>
+<td>网关多活、降级到备用供应商路由</td>
+</tr>
+<tr>
+<td>密钥服务</td>
+<td>有</td>
+<td>新凭据不可发放</td>
+<td>短时凭据缓冲存量会话、显式失败不回退</td>
+</tr>
+<tr>
+<td>会话缓存</td>
+<td>有</td>
+<td>活跃会话需重开</td>
+<td>数据库降级回源、恢复语义约定</td>
+</tr>
+<tr>
+<td>数据库</td>
+<td>有</td>
+<td>状态全面不可写</td>
+<td>主从与备份、写失败快速拒绝</td>
+</tr>
+<tr>
+<td>对象存储</td>
+<td>有</td>
+<td>产物读写中断</td>
+<td>重试与幂等上传、跨区冗余</td>
+</tr>
+<tr>
+<td>观测管道</td>
+<td>旁路</td>
+<td>盲区而非停机</td>
+<td>独立于业务集群部署、降级本地日志</td>
+</tr>
+</tbody></table>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>本文用一次编造的上线事故开场，把”demo 能跑、线上一触即溃”拆成状态、超时、并发、凭据、出口、观测、回滚、成本八条差距，再用五层拓扑逐一认领：无状态的接入与编排层负责可杀可补，队列与看门狗负责长任务，出口网关统一白名单、重试与指纹去重，密钥服务以短时凭据换掉预置密钥，幂等键加对账把”至少一次”掰回用户期待的”恰好一次”，模型版本升格为发布物使灰度与回滚成立，trace 关联键让成本归因与分层告警有了地基，队列深度与槽位水位取代 CPU 成为伸缩信号。最后一章的故障演练清单与组件对照表是给评审会准备的：架构的说法要能被故障注入证伪，才算数。所有阈值与数字在文中均为团队约定示例或示意值，落地时请按自己的业务重新约定。智能体应用的部署结构没有神秘之处，神秘的部分在循环内部，那不是本文的领地。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li>Anthropic 工程栏目，《agent evals》一文（标题引用，评测方法论另文讨论）</li>
+<li>Model Context Protocol 规范 2025-11-25 修订（含异步 Tasks 与 Extensions），及 MCP 项目捐给 Linux Foundation 旗下 Agentic AI Foundation 的公告（2025-12）</li>
+<li>MCP Registry 官方文档（预览状态，仍在演进）</li>
+<li>Kubernetes 1.35 官方文档（网络策略与工作负载管理相关章节）</li>
+<li>LangChain 1.2 &#x2F; LangGraph 1.0 官方文档（检查点与持久化执行章节）</li>
+<li>OpenAI Agents SDK 0.x 文档（追踪与护栏能力概览）</li>
+<li>本系列相关文章：《Agent 架构设计总览》《Agent 失败恢复与重试》《模型服务网关设计》《AI 应用的可观测性》《Agent 安全与权限控制》</li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Agent 生产部署架构</p><p><a href="https://987763485.github.io/2026/03/13/Agent生产部署架构/">https://987763485.github.io/2026/03/13/Agent生产部署架构/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2026-03-13</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-21</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="link-muted mr-2" rel="tag" href="/tags/python/">python</a><a class="link-muted mr-2" rel="tag" href="/tags/agent/">agent</a><a class="link-muted mr-2" rel="tag" href="/tags/typescript/">typescript</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2026/03/18/ClaudeCode%E6%BA%90%E7%A0%81%E6%9E%B6%E6%9E%84%E8%A7%A3%E6%9E%90/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Claude Code 源码架构解析</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2026/03/06/Agent%E8%A7%84%E5%88%92%E8%83%BD%E5%8A%9B%E6%8F%90%E5%8D%87%E5%AE%9E%E8%B7%B5/"><span class="level-item">Agent 规划能力提升实践</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

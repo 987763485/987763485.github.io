@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>分布式消息队列选型 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="消息队列选型通常被简化成一张吞吐量对比表，但真正决定项目成败的，往往是数据模型是否匹配业务语义、积压时系统是否还站得住、以及团队半夜能不能把它修好。本文把 Kafka、RocketMQ、RabbitMQ、Pulsar 放在同一套维度下比较，先讲清“日志型”与“队列型”的根源差异，再逐项落到投递语义、顺序、延迟与事务、积压回放、运维与生态，最后给出一张可调整权重的打分表和一套决策顺序。本文假设读者已"><meta property="og:type" content="blog"><meta property="og:title" content="分布式消息队列选型"><meta property="og:url" content="https://987763485.github.io/2022/08/06/%E5%88%86%E5%B8%83%E5%BC%8F%E6%B6%88%E6%81%AF%E9%98%9F%E5%88%97%E9%80%89%E5%9E%8B/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="消息队列选型通常被简化成一张吞吐量对比表，但真正决定项目成败的，往往是数据模型是否匹配业务语义、积压时系统是否还站得住、以及团队半夜能不能把它修好。本文把 Kafka、RocketMQ、RabbitMQ、Pulsar 放在同一套维度下比较，先讲清“日志型”与“队列型”的根源差异，再逐项落到投递语义、顺序、延迟与事务、积压回放、运维与生态，最后给出一张可调整权重的打分表和一套决策顺序。本文假设读者已"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2022-08-06T06:19:44.000Z"><meta property="article:modified_time" content="2026-10-18T16:49:55.939Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="golang"><meta property="article:tag" content="微服务"><meta property="article:tag" content="后端开发"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2022/08/06/%E5%88%86%E5%B8%83%E5%BC%8F%E6%B6%88%E6%81%AF%E9%98%9F%E5%88%97%E9%80%89%E5%9E%8B/"},"headline":"分布式消息队列选型","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2022-08-06T06:19:44.000Z","dateModified":"2026-10-18T16:49:55.939Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"消息队列选型通常被简化成一张吞吐量对比表，但真正决定项目成败的，往往是数据模型是否匹配业务语义、积压时系统是否还站得住、以及团队半夜能不能把它修好。本文把 Kafka、RocketMQ、RabbitMQ、Pulsar 放在同一套维度下比较，先讲清“日志型”与“队列型”的根源差异，再逐项落到投递语义、顺序、延迟与事务、积压回放、运维与生态，最后给出一张可调整权重的打分表和一套决策顺序。本文假设读者已"}</script><link rel="canonical" href="https://987763485.github.io/2022/08/06/%E5%88%86%E5%B8%83%E5%BC%8F%E6%B6%88%E6%81%AF%E9%98%9F%E5%88%97%E9%80%89%E5%9E%8B/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-08-06T06:19:44.000Z" title="8/6/2022, 2:19:44 PM">2022-08-06</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></span><span class="level-item">27 分钟读完 (大约4006个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">分布式消息队列选型</h1><nav class="series-nav" aria-label="系列文章导航"><div class="series-nav-meta"><i class="fas fa-book-open" aria-hidden="true"></i><span>本文属于《<a class="series-nav-title" href="/series/go-arch/">Go 微服务架构</a>》第 31/35 篇</span></div><div class="series-nav-links"><a class="series-nav-link series-nav-prev" href="/2022/11/07/%E5%88%86%E5%B8%83%E5%BC%8FID%E7%94%9F%E6%88%90%E6%96%B9%E6%A1%88/"><i class="fas fa-chevron-left" aria-hidden="true"></i><span>上一篇</span></a><a class="series-nav-link series-nav-index" href="/series/go-arch/">系列目录</a><a class="series-nav-link series-nav-next" href="/2021/02/09/%E5%BE%AE%E6%9C%8D%E5%8A%A1%E6%97%A5%E5%BF%97%E8%81%9A%E5%90%88%E6%96%B9%E6%A1%88/"><span>下一篇</span><i class="fas fa-chevron-right" aria-hidden="true"></i></a></div></nav><div class="content"><p>消息队列选型通常被简化成一张吞吐量对比表，但真正决定项目成败的，往往是数据模型是否匹配业务语义、积压时系统是否还站得住、以及团队半夜能不能把它修好。本文把 Kafka、RocketMQ、RabbitMQ、Pulsar 放在同一套维度下比较，先讲清“日志型”与“队列型”的根源差异，再逐项落到投递语义、顺序、延迟与事务、积压回放、运维与生态，最后给出一张可调整权重的打分表和一套决策顺序。本文假设读者已经用过至少一种消息队列，不重复安装与收发的基础操作。</p>
+<h2 id="先分清两种模型：日志与队列"><a href="#先分清两种模型：日志与队列" class="headerlink" title="先分清两种模型：日志与队列"></a>先分清两种模型：日志与队列</h2><p>“消息队列”这个词把两类结构完全不同的系统装进了同一个篮子。日志型系统把消息追加到分区日志的末尾，消费的本质是移动一个位点，消息不会因为被读过而消失；队列型系统把消息放进队列，投递给消费者，收到确认后删除。前者的代表是 Kafka 与 Pulsar，后者的典型是 RabbitMQ，而 RocketMQ 处在中间：存储层是一份只追加的 CommitLog，消费层却用消费组加队列位点，行为更像队列，同时保留了按位点回放的能力。</p>
+<p>可以用三个问题快速判断一个系统偏哪边：消息被消费之后还在不在；能不能从某个历史位置重新读一遍；多个消费者是各读一份，还是分摊同一份。三个答案基本决定后续所有语义。</p>
+<pre class="mermaid">flowchart TB
+    subgraph 日志型
+        P1[生产者] --> L[分区日志只追加]
+        L --> C1[消费者A按位点读]
+        L --> C2[消费者B按位点读]
+        L --> R[保留期内可重放]
+    end
+    subgraph 队列型
+        P2[生产者] --> Q[队列]
+        Q --> C3[消费者取走]
+        C3 -->|确认后删除| Q
+    end</pre>
+
+<p>图中最容易被忽视的是那条确认回路。队列型的删除是一次协作：消费者确认处理完，Broker 才敢丢；日志型没有这条回路，删除由保留策略统一裁决，与消费进度无关。于是日志型天然支持多订阅与回放，代价是预留存储、顺序只在分区内成立；队列型天然支持逐条确认与灵活路由，代价是堆积受内存与分页掣肘，重放要另做设计。</p>
+<p>理解了这一层，再看“哪个吞吐高”“哪个延迟低”才有意义，因为那些数字多半是在各自最擅长的模型下测出来的。选型的第一步不是比性能，而是确认业务要的是“一份可反复读的流水”，还是“一件必须被处理掉的任务”。</p>
+<h2 id="四套系统的数据模型"><a href="#四套系统的数据模型" class="headerlink" title="四套系统的数据模型"></a>四套系统的数据模型</h2><p>四套系统都能叫“主题”，但主题下面的结构差别很大，这决定了并行度、顺序边界和扩容方式。</p>
+<p>Kafka 的主题被切成若干分区，每个分区是一串按 offset 编号的日志段文件。消费组把分区分配给组内消费者，一个分区在同一时刻只由一个消费者读取，所以分区数就是并行度的上限。消息写到哪个分区，由 key 的哈希或轮询决定，这也正是顺序性的边界。</p>
+<p>RocketMQ 的主题在逻辑上切成若干 Message Queue，默认每个主题四个。所有主题的消息统一顺序追加到 CommitLog，单个文件默认 1 GB；ConsumeQueue 为每个队列维护一份索引，每条索引 20 字节，记录消息在 CommitLog 中的位置、大小与 tag 哈希。消费组同样以队列为单位分配消费者。</p>
+<p>RabbitMQ 3.10 的核心是交换机、绑定、队列三件套，vhost 负责逻辑隔离。队列分经典队列与仲裁队列，后者基于 Raft 做多副本。它没有分区概念，并行度靠增加队列与消费者，单个队列的吞吐有上限。</p>
+<p>Pulsar 2.10 用租户、命名空间、主题三层组织资源，主题再切分区。消息落在 BookKeeper 的 ledger 里，Broker 本身不持久化数据，因此可以无状态扩容；每个订阅持有自己的 cursor，独立记录消费进度。</p>
+<table>
+<thead>
+<tr>
+<th>系统</th>
+<th>逻辑单元</th>
+<th>存储形态</th>
+<th>消费进度</th>
+<th>扩容方式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Kafka</td>
+<td>主题、分区</td>
+<td>Broker 本地日志段</td>
+<td>消费组提交 offset</td>
+<td>加 Broker 并迁移分区</td>
+</tr>
+<tr>
+<td>RocketMQ</td>
+<td>主题、消息队列</td>
+<td>CommitLog 加 ConsumeQueue</td>
+<td>Broker 侧消费位点</td>
+<td>加 Broker，队列数需规划</td>
+</tr>
+<tr>
+<td>RabbitMQ</td>
+<td>交换机、队列</td>
+<td>队列（内存与磁盘）</td>
+<td>逐条 ack</td>
+<td>加节点、加队列</td>
+</tr>
+<tr>
+<td>Pulsar</td>
+<td>租户、命名空间、主题</td>
+<td>BookKeeper ledger</td>
+<td>订阅 cursor</td>
+<td>加 BookKeeper 或 Broker</td>
+</tr>
+</tbody></table>
+<p>这些差异很实际：Kafka 扩容常伴随分区迁移，Pulsar 的存储与计算可以分开扩，RocketMQ 受单机磁盘限制，RabbitMQ 堆积时要在内存与磁盘之间倒换。</p>
+<h2 id="投递语义与顺序性"><a href="#投递语义与顺序性" class="headerlink" title="投递语义与顺序性"></a>投递语义与顺序性</h2><p>讨论投递语义先要统一三个词。最多一次是发出去就不管，可能丢；至少一次是确认后才算完成，可能重；恰好一次是既不丢也不重。绝大多数生产系统默认落在至少一次，恰好一次则要靠额外机制去逼近。</p>
+<p>Kafka 的生产者设置 acks&#x3D;all 并开启幂等，可以避免重试导致的重复写入；消费端先处理业务再提交位点，中途崩溃就会重读，所以是至少一次。事务配合 read_committed 能把读消息、算结果、写结果、提交位点做成一个原子操作，但边界止于 Kafka 自身，管不到外部数据库。</p>
+<p>RabbitMQ 用发布确认加手动 ack 保证不丢，代价是网络抖动、消费者超时都会带来重复投递。它没有内建的恰好一次，只能靠业务去重。</p>
+<p>RocketMQ 同步发送加消费成功应答，失败按策略重试，超过次数进入死信队列，语义同样是至少一次。Pulsar 支持单条与累积确认，也提供事务，可以把消费、处理、生产、确认放进一个事务，但适用范围与 Kafka 类似。</p>
+<p>端到端的恰好一次不是中间件的开关，而是“消息语义 + 业务幂等”的组合。选型时该问“它能帮我少写多少去重代码”，而不是“它是不是恰好一次”。</p>
+<h3 id="有序的边界在分区"><a href="#有序的边界在分区" class="headerlink" title="有序的边界在分区"></a>有序的边界在分区</h3><p>Kafka 把同一个 key 的消息送进同一个分区，分区内按 offset 有序。这个保证有两个前提：生产者不能因为重试把后发的消息插到前面，幂等生产者正是为此而生；分区数不能随意增加，因为扩容会改变 key 到分区的映射，新旧消息的顺序关系就断了。</p>
+<p>RocketMQ 的顺序消息需要生产者用队列选择器决定消息进哪个队列，消费者换成顺序监听器逐条处理。队列数通常在创建主题时定好，中途增加队列会让同一业务键落到新队列，顺序断裂；消费失败会阻塞当前队列，所以顺序队列不宜承载慢业务。</p>
+<p>RabbitMQ 只有在单队列、单消费者时才严格有序。多个消费者并发消费同一队列，处理完成的时间自然交错。要保序可以用单活跃消费者，让同一时刻只有一个消费者工作；也可以用一致性哈希交换机，把同一业务键固定路由到同一队列。</p>
+<p>Pulsar 同样是分区内有序，key_shared 订阅按 key 把消息分给不同消费者，兼顾并行与键内顺序。四家的结论其实一致：全局有序等价于单分区单线程，吞吐必然受限。选型时该问的是“乱序的代价有多大”，多数业务只需要业务键级有序。</p>
+<h2 id="延迟、定时与事务消息"><a href="#延迟、定时与事务消息" class="headerlink" title="延迟、定时与事务消息"></a>延迟、定时与事务消息</h2><p>Kafka 没有原生的延迟消息。常见做法是外部调度器扫表后再投递，或者按时间轮搭多级主题，比如 30 秒、1 分钟、5 分钟各一层，到期后逐层下移。能实现，但精度、可靠性与消息量都要自己扛，不建议只为了延迟需求去选 Kafka。</p>
+<p>RabbitMQ 有两条路。第一条是 TTL 加死信交换机：消息过期后转入死信队列再消费。要注意逐条设置 TTL 时，过期只在消息到达队头时才判定，长延迟消息会拖住后面的短延迟消息，通常按档位拆队列。第二条是延迟消息插件，声明 x-delayed-message 类型的交换机，由服务端暂存并到期投递，精度可到毫秒；但它是社区插件，量大时需单独评估。</p>
+<p>RocketMQ 4.9 只支持固定延迟级别，默认 18 级：1 秒、5 秒、10 秒、30 秒，1 到 10 分钟，20 分钟、30 分钟，1 小时、2 小时。发送时指定级别，Broker 到期后转投真实主题。它覆盖了 30 分钟未支付关单、1 小时提醒这类场景，但给不了任意时刻。RocketMQ 5.0 正在推进任意时间的定时消息，本文仍以 4.9 为准。</p>
+<p>Pulsar 提供 deliverAfter 与 deliverAt，由消费者指定相对延迟或绝对时间，服务端跟踪到期后再投递。它不需要预先建一堆延迟主题，但延迟期间消息依然计入积压，海量长延迟会占用 Broker 内存，上线前需要压测。</p>
+<h3 id="事务消息的边界"><a href="#事务消息的边界" class="headerlink" title="事务消息的边界"></a>事务消息的边界</h3><p>RocketMQ 的事务消息是它的招牌。生产者先发一条半消息，写入内部主题但对消费者不可见；接着执行本地事务，成功则提交，失败则回滚；如果 Broker 长时间没收到确认，会主动回查生产者的本地事务状态，默认约一分钟回查一次，最多十五次。它解决的是“数据库写入”与“消息发送”这两件事的原子性，消费端仍然要自己做幂等。</p>
+<p>Kafka 的事务是另一回事，它服务于流处理的读、算、写与位点提交，让下游在 read_committed 下看不到未提交的数据，边界不出 Kafka。Pulsar 从 2.8 起提供的事务也类似。RabbitMQ 没有对应机制，标准做法是本地消息表加定时补偿，或者用 CDC 把数据库变更投递出去。订单场景若团队是 Java 栈，RocketMQ 最省事；否则用 outbox 表配 Kafka 也能达到同样的最终一致。</p>
+<h2 id="积压、回放与多租户"><a href="#积压、回放与多租户" class="headerlink" title="积压、回放与多租户"></a>积压、回放与多租户</h2><p>Kafka 的积压能力取决于磁盘和分区并行度，消费 lag 是最重要的监控指标。回放只需把位点重置到某个 offset 或时间点，代价是下游要能承受重复数据。保留策略决定能回多久，扩分区会破坏 key 顺序，都要在容量规划时定下来。</p>
+<p>Pulsar 用 backlog quota 约束单个订阅的积压，超限后按策略拒绝写入或丢弃最旧消息。分层存储能把冷数据卸载到对象存储，回放窗口很长，代价是读旧数据延迟上升。</p>
+<p>RocketMQ 的 CommitLog 顺序写让堆积表现不错，消费进度保存在 Broker，按时间重置位点也方便；但磁盘写满同样会拒写，ConsumeQueue 损坏后的重建相当耗时。</p>
+<p>RabbitMQ 的堆积是明显弱项。内存到达高水位会触发流控，直接阻塞生产者；消息分页到磁盘后吞吐下降。3.9 引入的 Streams 提供日志式消费，能缓解大积压，但它是另一套抽象，老队列不会自动获得这些能力。</p>
+<p>多租户方面，Pulsar 的租户与命名空间最完整，配额、隔离、跨地域复制都有原生支持；RabbitMQ 用 vhost 隔离，简单够用；Kafka 没有租户概念，只能分集群或用客户端配额近似；RocketMQ 4.9 同样以集群隔离为主。</p>
+<h2 id="运维复杂度与生态"><a href="#运维复杂度与生态" class="headerlink" title="运维复杂度与生态"></a>运维复杂度与生态</h2><p>Kafka 3.2 的生产集群仍以 ZooKeeper 管理元数据，KRaft 要到 3.3 才计划转为生产可用，此时不应按 KRaft 规划生产集群。它的生态最完整，Connect、Streams、ksqlDB、Schema Registry 与各语言客户端齐全，排障资料也最多。</p>
+<p>RocketMQ 组件少，NameServer 无状态，Broker 主从或 DLedger；Java 栈用起来最顺，Spring Cloud Alibaba 集成成熟，Go 与 C++ 客户端多由社区维护。</p>
+<p>RabbitMQ 跑在 Erlang 虚拟机上，集群与仲裁队列成熟，管理界面和插件是加分项，适合中小规模业务消息。</p>
+<p>Pulsar 要同时维护 ZooKeeper、BookKeeper、Broker 与 Proxy，门槛最高；换来的是多租户、跨地域复制与分层存储的原生支持。</p>
+<h2 id="场景对照与打分表"><a href="#场景对照与打分表" class="headerlink" title="场景对照与打分表"></a>场景对照与打分表</h2><p>日志采集与流处理优先 Kafka，多租户或跨地域再看 Pulsar；业务解耦与复杂路由选 RabbitMQ；固定档位的延迟任务用 RocketMQ 最省事，任意时刻则要考虑自建调度；订单事务消息，Java 栈直接用 RocketMQ，否则用 outbox 表配 Kafka；超大积压回放选 Kafka 或 Pulsar；多租户 SaaS 优先 Pulsar，其次用 RabbitMQ 的 vhost。</p>
+<p>先看运维，再看功能，是笔者建议的顺序。功能缺口可以加组件补，运维能力补不上：出故障时谁能看线程栈、谁能扩分区、谁能把积压追回来，这些答案比功能清单更决定生死。下面是一份示意打分，权重应由团队按现状调整。</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>权重</th>
+<th>Kafka</th>
+<th>RocketMQ</th>
+<th>RabbitMQ</th>
+<th>Pulsar</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>运维可控性</td>
+<td>25</td>
+<td>4</td>
+<td>4</td>
+<td>4</td>
+<td>2</td>
+</tr>
+<tr>
+<td>功能匹配</td>
+<td>25</td>
+<td>2</td>
+<td>5</td>
+<td>4</td>
+<td>3</td>
+</tr>
+<tr>
+<td>积压与回放</td>
+<td>15</td>
+<td>5</td>
+<td>4</td>
+<td>2</td>
+<td>5</td>
+</tr>
+<tr>
+<td>生态与客户端</td>
+<td>15</td>
+<td>5</td>
+<td>3</td>
+<td>4</td>
+<td>3</td>
+</tr>
+<tr>
+<td>多租户</td>
+<td>10</td>
+<td>2</td>
+<td>2</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td>团队熟悉度</td>
+<td>10</td>
+<td>4</td>
+<td>3</td>
+<td>4</td>
+<td>1</td>
+</tr>
+<tr>
+<td>加权合计</td>
+<td>100</td>
+<td>3.60</td>
+<td>3.80</td>
+<td>3.60</td>
+<td>3.05</td>
+</tr>
+</tbody></table>
+<p>Kafka 与 RabbitMQ 同分却不能互换，说明总分只用于收敛讨论，最终仍要回到场景。权重稍一调整排名就变，这正是打分表的价值：把“我觉得”变成可争论的参数。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>消息队列选型没有通吃答案：日志型擅长流转与回放，队列型擅长任务与路由，RocketMQ 在两者之间补上了事务与延迟。先确认业务要的是流水还是任务，再用运维可控性做第一道筛子，最后用加权打分统一团队认知。版本会变，模型与边界不会。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>分布式消息队列选型</p><p><a href="https://987763485.github.io/2022/08/06/分布式消息队列选型/">https://987763485.github.io/2022/08/06/分布式消息队列选型/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2022-08-06</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-19</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/golang/">golang</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/">微服务</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2022/08/11/PyTorch%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0%E5%9F%BA%E7%A1%80/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">PyTorch 深度学习基础</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2022/08/04/SDL%E5%AE%89%E5%85%A8%E5%BC%80%E5%8F%91%E7%94%9F%E5%91%BD%E5%91%A8%E6%9C%9F/"><span class="level-item">SDL 安全开发生命周期</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

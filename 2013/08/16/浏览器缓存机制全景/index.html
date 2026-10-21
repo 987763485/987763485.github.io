@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>浏览器缓存机制全景 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="浏览器缓存是前端性能优化里性价比最高的一环：一次正确的配置，能让回访用户的静态资源请求几乎归零；一次错误的配置，能让用户拿着旧版本的 CSS 抱怨样式错乱，而你在本地怎么刷新都复现不了。它横跨 HTTP 协议、服务器配置与前端工程三个层面，任何一环理解不到位，都会以”改了文件不生效”的形式还回来。"><meta property="og:type" content="blog"><meta property="og:title" content="浏览器缓存机制全景"><meta property="og:url" content="https://987763485.github.io/2013/08/16/%E6%B5%8F%E8%A7%88%E5%99%A8%E7%BC%93%E5%AD%98%E6%9C%BA%E5%88%B6%E5%85%A8%E6%99%AF/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="浏览器缓存是前端性能优化里性价比最高的一环：一次正确的配置，能让回访用户的静态资源请求几乎归零；一次错误的配置，能让用户拿着旧版本的 CSS 抱怨样式错乱，而你在本地怎么刷新都复现不了。它横跨 HTTP 协议、服务器配置与前端工程三个层面，任何一环理解不到位，都会以”改了文件不生效”的形式还回来。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2013-08-16T04:54:39.000Z"><meta property="article:modified_time" content="2026-10-21T01:57:50.514Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="web前端"><meta property="article:tag" content="性能优化"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2013/08/16/%E6%B5%8F%E8%A7%88%E5%99%A8%E7%BC%93%E5%AD%98%E6%9C%BA%E5%88%B6%E5%85%A8%E6%99%AF/"},"headline":"浏览器缓存机制全景","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2013-08-16T04:54:39.000Z","dateModified":"2026-10-21T01:57:50.514Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"浏览器缓存是前端性能优化里性价比最高的一环：一次正确的配置，能让回访用户的静态资源请求几乎归零；一次错误的配置，能让用户拿着旧版本的 CSS 抱怨样式错乱，而你在本地怎么刷新都复现不了。它横跨 HTTP 协议、服务器配置与前端工程三个层面，任何一环理解不到位，都会以”改了文件不生效”的形式还回来。"}</script><link rel="canonical" href="https://987763485.github.io/2013/08/16/%E6%B5%8F%E8%A7%88%E5%99%A8%E7%BC%93%E5%AD%98%E6%9C%BA%E5%88%B6%E5%85%A8%E6%99%AF/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2013-08-16T04:54:39.000Z" title="8/16/2013, 12:54:39 PM">2013-08-16</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/">前端开发</a></span><span class="level-item">1 小时读完 (大约6873个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">浏览器缓存机制全景</h1><div class="content"><p>浏览器缓存是前端性能优化里性价比最高的一环：一次正确的配置，能让回访用户的静态资源请求几乎归零；一次错误的配置，能让用户拿着旧版本的 CSS 抱怨样式错乱，而你在本地怎么刷新都复现不了。它横跨 HTTP 协议、服务器配置与前端工程三个层面，任何一环理解不到位，都会以”改了文件不生效”的形式还回来。</p>
+<p>这篇按”缓存在哪、由谁决定、按什么规则走”的顺序，把 2013 年主流浏览器与 HTTP&#x2F;1.1 框架下的缓存机制完整梳理一遍：强缓存、协商缓存、缓存位置、启发式缓存、用户操作的影响、Vary 头、策略设计与服务器配置，最后是那些反复出现的坑。文中所有结论都可以在当年的 Chrome 与 Firefox 上复现。</p>
+<h2 id="缓存的两大分类：强缓存与协商缓存"><a href="#缓存的两大分类：强缓存与协商缓存" class="headerlink" title="缓存的两大分类：强缓存与协商缓存"></a>缓存的两大分类：强缓存与协商缓存</h2><p>所有 HTTP 缓存手段，最终都归到两类里。</p>
+<p>强缓存是”浏览器自己说了算”：响应头里给一个有效期，有效期内浏览器直接用本地副本，一个请求都不发。决定强缓存的头是 <code>Expires</code> 与 <code>Cache-Control</code>。</p>
+<p>协商缓存是”浏览器问服务器要结论”：浏览器带上本地副本的标识问服务器”我这副本还能用吗”，服务器说能用就返回 304 Not Modified（不带 body），不能用就返回 200 带新内容。决定协商缓存的头是 <code>Last-Modified</code>&#x2F;<code>If-Modified-Since</code> 与 <code>ETag</code>&#x2F;<code>If-None-Match</code>。</p>
+<pre class="mermaid">flowchart TD
+  A[浏览器请求资源] --> B{本地有缓存副本吗}
+  B -->|没有| C[正常请求 拿到 200]
+  B -->|有| D{强缓存是否仍在有效期}
+  D -->|是| E[直接用本地副本 不发请求]
+  D -->|否| F[带协商标识请求]
+  F --> G{服务器判断副本是否最新}
+  G -->|最新| H[返回 304 不传 body]
+  G -->|过期| I[返回 200 传新内容]</pre>
+
+<p>一次请求可能同时涉及两类：先看强缓存，命中就直接结束；未命中才进入协商。所以调优的第一顺位是把强缓存配置好，协商缓存是强缓存的兜底，不是替代品。</p>
+<h2 id="强缓存：Expires-与-Cache-Control"><a href="#强缓存：Expires-与-Cache-Control" class="headerlink" title="强缓存：Expires 与 Cache-Control"></a>强缓存：Expires 与 Cache-Control</h2><h3 id="Expires-的绝对时间陷阱"><a href="#Expires-的绝对时间陷阱" class="headerlink" title="Expires 的绝对时间陷阱"></a>Expires 的绝对时间陷阱</h3><p>HTTP&#x2F;1.0 时代的产物，写法是一个绝对的 GMT 时间：</p>
+<figure class="highlight http"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="attribute">Expires</span><span class="punctuation">: </span>Thu, 15 Aug 2013 20:00:00 GMT</span><br></pre></td></tr></table></figure>
+
+<p>意思是”到这个时刻之前，都可以用本地副本”。它的致命问题在于依赖双方时钟一致。用户把系统时间往前调一年，浏览器就认为缓存早已过期，每次都重新请求；往后调，则会在真正过期后继续使用旧副本。服务器与客户端时钟不同步时，这个头的语义完全不可靠。</p>
+<p>2013 年的主流做法是仍然保留 <code>Expires</code> 以兼容只认 HTTP&#x2F;1.0 的老代理，但真正生效的判定交给 <code>Cache-Control</code>。</p>
+<h3 id="Cache-Control-的完整指令集"><a href="#Cache-Control-的完整指令集" class="headerlink" title="Cache-Control 的完整指令集"></a>Cache-Control 的完整指令集</h3><p>HTTP&#x2F;1.1 用 <code>Cache-Control</code> 取代 <code>Expires</code> 成为主力，它用相对时长（max-age 以秒计）规避时钟问题，并提供了一组指令控制缓存行为：</p>
+<figure class="highlight http"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="attribute">Cache-Control</span><span class="punctuation">: </span>max-age=31536000, public</span><br></pre></td></tr></table></figure>
+
+<p>各指令的语义如下：</p>
+<table>
+<thead>
+<tr>
+<th>指令</th>
+<th>作用对象</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>max-age&#x3D;秒</td>
+<td>浏览器与中间代理</td>
+<td>响应在多少秒内视为新鲜，优先级高于 Expires</td>
+</tr>
+<tr>
+<td>no-cache</td>
+<td>浏览器与中间代理</td>
+<td>每次使用前都必须向服务器验证，不是”不缓存”</td>
+</tr>
+<tr>
+<td>no-store</td>
+<td>浏览器与中间代理</td>
+<td>根本不存，任何副本都不保留</td>
+</tr>
+<tr>
+<td>public</td>
+<td>中间代理</td>
+<td>响应可被共享缓存（如 CDN、代理）存储</td>
+</tr>
+<tr>
+<td>private</td>
+<td>中间代理</td>
+<td>仅终端浏览器可缓存，共享缓存不得存储</td>
+</tr>
+<tr>
+<td>must-revalidate</td>
+<td>浏览器</td>
+<td>过期后必须向源服务器验证，不得在离线时用旧副本</td>
+</tr>
+</tbody></table>
+<p><code>no-cache</code> 这个名字极具误导性：它表示”可以存，但每次用之前都要问服务器”，走的是协商缓存路线。真正”不要存”的是 <code>no-store</code>。这个混淆在面试与实际配置里都高频出现。</p>
+<p><code>public</code> 与 <code>private</code> 的区别只在有中间代理（CDN、公司网关）时才体现。如果响应里带用户相关数据（比如拼接了用户名的一段 JSON），必须标 <code>private</code>，否则 CDN 可能把 A 用户的内容缓存给 B 用户。</p>
+<p><code>must-revalidate</code> 常与 <code>max-age</code> 搭配，用在”过期后宁可报错也不许用旧数据”的场景，比如价格、库存类接口。</p>
+<p>优先级上，<code>Cache-Control</code> 优于 <code>Expires</code>；两者同时存在且冲突时，浏览器按 <code>Cache-Control</code> 走。<code>no-store</code> 与 <code>no-cache</code> 之间，<code>no-store</code> 更强。</p>
+<figure class="highlight nginx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Nginx 配置示例：静态资源强缓存一年</span></span><br><span class="line"><span class="section">location</span> <span class="regexp">~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$</span> &#123;</span><br><span class="line">  <span class="attribute">expires</span> <span class="number">1y</span>;                      <span class="comment"># Nginx 会自动换算成 max-age 与 Expires</span></span><br><span class="line">  <span class="attribute">add_header</span> Cache-Control <span class="string">&quot;public, max-age=31536000&quot;</span>;</span><br><span class="line">  <span class="attribute">access_log</span> <span class="literal">off</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>expires 1y</code> 是 Nginx 的简写，它会同时输出 <code>Expires</code> 与 <code>Cache-Control: max-age=31536000</code>，比手写两个头更稳妥。</p>
+<h2 id="协商缓存：Last-Modified-与-ETag"><a href="#协商缓存：Last-Modified-与-ETag" class="headerlink" title="协商缓存：Last-Modified 与 ETag"></a>协商缓存：Last-Modified 与 ETag</h2><p>强缓存未命中时，浏览器发起一次带条件的请求。服务器有两种方式判断副本是否最新。</p>
+<h3 id="Last-Modified-与-If-Modified-Since"><a href="#Last-Modified-与-If-Modified-Since" class="headerlink" title="Last-Modified 与 If-Modified-Since"></a>Last-Modified 与 If-Modified-Since</h3><p>最直观的一种：服务器在响应头里告诉浏览器文件最后修改时间，浏览器下次请求时把这个时间放在 <code>If-Modified-Since</code> 里回传。服务器拿它与文件的当前修改时间比对，一致就返回 304。</p>
+<figure class="highlight http"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"># 首次响应</span><br><span class="line"><span class="meta">HTTP/1.1</span> <span class="number">200</span> OK</span><br><span class="line"><span class="attribute">Last-Modified</span><span class="punctuation">: </span>Wed, 14 Aug 2013 09:30:00 GMT</span><br><span class="line"><span class="attribute">Content-Type</span><span class="punctuation">: </span>text/css</span><br><span class="line"></span><br><span class="line"><span class="language-dart"><span class="comment">/* css 内容 */</span></span></span><br><span class="line"><span class="language-dart"></span></span><br><span class="line"><span class="language-dart"># 再次请求</span></span><br><span class="line"><span class="language-dart">GET /<span class="keyword">static</span>/main.css HTTP/<span class="number">1.1</span></span></span><br><span class="line"><span class="language-dart"><span class="title class_">If</span>-<span class="title class_">Modified</span>-<span class="title class_">Since</span>: <span class="title class_">Wed</span>, <span class="number">14</span> <span class="title class_">Aug</span> <span class="number">2013</span> <span class="number">09</span>:<span class="number">30</span>:<span class="number">00</span> GMT</span></span><br><span class="line"><span class="language-dart"></span></span><br><span class="line"><span class="language-dart"># 未修改则</span></span><br><span class="line"><span class="language-dart">HTTP/<span class="number">1.1</span> <span class="number">304</span> <span class="title class_">Not</span> <span class="title class_">Modified</span></span></span><br></pre></td></tr></table></figure>
+
+<p>它的短板有三个。其一，精度只到秒，一秒内多次修改会被误判为未修改。其二，它只看修改时间不看内容：文件被还原、被替换成同样时间戳的旧版本，都会误判。其三，某些服务器上生成时间不等于内容变化时间（比如动态拼接但模板没变的页面）。</p>
+<h3 id="ETag-与-If-None-Match"><a href="#ETag-与-If-None-Match" class="headerlink" title="ETag 与 If-None-Match"></a>ETag 与 If-None-Match</h3><p>ETag 是文件内容的唯一标识（通常由内容哈希或 inode 加时间戳加大小生成），服务器把标识放在响应头，浏览器下次请求时放在 <code>If-None-Match</code> 里回传。服务器比对标识，一致返回 304。</p>
+<figure class="highlight http"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"># 首次响应</span><br><span class="line"><span class="meta">HTTP/1.1</span> <span class="number">200</span> OK</span><br><span class="line"><span class="attribute">ETag</span><span class="punctuation">: </span>&quot;5f2b8a3c-1a4&quot;</span><br><span class="line"><span class="attribute">Last-Modified</span><span class="punctuation">: </span>Wed, 14 Aug 2013 09:30:00 GMT</span><br><span class="line"></span><br><span class="line"><span class="language-apache"><span class="comment"># 再次请求</span></span></span><br><span class="line"><span class="language-apache"><span class="attribute">GET</span> /static/main.css HTTP/<span class="number">1</span>.<span class="number">1</span></span></span><br><span class="line"><span class="language-apache"><span class="attribute">If</span>-None-Match: <span class="string">&quot;5f2b8a3c-1a4&quot;</span></span></span><br><span class="line"><span class="language-apache"></span></span><br><span class="line"><span class="language-apache"><span class="comment"># 未修改则</span></span></span><br><span class="line"><span class="language-apache"><span class="attribute">HTTP</span>/<span class="number">1</span>.<span class="number">1</span> <span class="number">304</span> Not Modified</span></span><br></pre></td></tr></table></figure>
+
+<p>ETag 有三种形态，语法上由可选的 <code>W/</code> 前缀区分：</p>
+<figure class="highlight http"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="attribute">ETag</span><span class="punctuation">: </span>&quot;5f2b8a3c-1a4&quot;        # 强校验，逐字节相同才算匹配</span><br><span class="line"><span class="attribute">ETag</span><span class="punctuation">: </span>W/&quot;5f2b8a3c-1a4&quot;      # 弱校验，语义等价即可匹配</span><br></pre></td></tr></table></figure>
+
+<p>强校验要求实体字节完全一致；弱校验只要求语义等价，允许内容有细微差异（比如尾部多一个换行）。强校验可以用于范围请求等场景，弱校验不行。第三种形态其实是无引号形式，不合规范但某些服务器会输出。</p>
+<p>当响应同时带 <code>Last-Modified</code> 与 <code>ETag</code> 时，浏览器会把两个都带上，但服务器<strong>必须优先用 ETag 判断</strong>。原因是 ETag 的精度与准确性都高于 Last-Modified，后者只是兼容性兜底。</p>
+<h3 id="两者的对比与选型"><a href="#两者的对比与选型" class="headerlink" title="两者的对比与选型"></a>两者的对比与选型</h3><table>
+<thead>
+<tr>
+<th>维度</th>
+<th>Last-Modified</th>
+<th>ETag</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>依据</td>
+<td>文件修改时间</td>
+<td>内容计算出的标识</td>
+</tr>
+<tr>
+<td>精度</td>
+<td>秒级</td>
+<td>内容级</td>
+</tr>
+<tr>
+<td>误判</td>
+<td>时间不变但内容变会漏判</td>
+<td>基本无</td>
+</tr>
+<tr>
+<td>计算开销</td>
+<td>查文件系统元数据</td>
+<td>可能需读文件算哈希</td>
+</tr>
+<tr>
+<td>多服务器</td>
+<td>时间戳一致即可</td>
+<td>需保证各节点算法一致</td>
+</tr>
+</tbody></table>
+<p>结论是两者都要开，<code>Last-Modified</code> 作为不支持 ETag 的老代理的降级。但 ETag 在多机部署时有个坑：如果 ETag 由 inode 生成，同一份文件在不同服务器上的 inode 不同，用户请求落到不同机器会被判定为”不匹配”而反复返回 200。解决办法是让 ETag 只基于内容计算（Nginx 默认只用大小加时间戳，是安全的选择）。</p>
+<figure class="highlight nginx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Nginx 默认行为：etag 由 last_modified + content_length 组成</span></span><br><span class="line"><span class="comment"># 集群环境下这是安全值，不建议改成基于 inode</span></span><br><span class="line"><span class="section">location</span> <span class="regexp">~* \.(css|js)$</span> &#123;</span><br><span class="line">  <span class="attribute">etag</span> <span class="literal">on</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="304-省了流量，没省往返"><a href="#304-省了流量，没省往返" class="headerlink" title="304 省了流量，没省往返"></a>304 省了流量，没省往返</h3><p>协商缓存常被形容为”几乎免费”，这个说法只对了一半。304 响应的 body 确实是空的，带宽几乎不花，但它仍然是一个完整的请求响应周期：DNS 查询（可能被缓存）、TCP 连接、发送请求、等待服务器处理、接收响应头。在国内的网络环境下，这一来一回的 RTT 常常在几十到几百毫秒之间。</p>
+<p>这带来两个实践结论。第一，协商缓存是兜底不是主力，能用强缓存覆盖的资源就不要指望 304。第二，控制 304 的数量比控制单个 304 的体积更重要——一个页面引用了三十个需要协商的资源，就是三十个往返，哪怕每个都命中 304，累计延迟也相当可观。</p>
+<p>所以完整的优化思路是分层递进的：能用内容指纹加永久强缓存的，一个请求都不发；必须协商的（HTML），控制数量与体积；既不能强缓存又频繁变化的接口数据，考虑在客户端做短期内存缓存，避免短时间内重复请求同一个 URL。</p>
+<p>另一个容易被忽略的点是，协商缓存依赖请求头里的条件字段。如果请求因为某些原因没有带上 <code>If-None-Match</code>（比如用户按了 Ctrl+F5），服务器就无法判断，只能返回完整内容。这也是前面”用户行为”一节重要性的延伸。</p>
+<h3 id="如何验证协商缓存真的生效"><a href="#如何验证协商缓存真的生效" class="headerlink" title="如何验证协商缓存真的生效"></a>如何验证协商缓存真的生效</h3><p>浏览器开发者工具的 Network 面板会显示每个请求的状态码，304 会明确标注。但更有说服气的验证是用命令行直接看响应头，排除浏览器行为的干扰：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 第一次请求，记录 ETag</span></span><br><span class="line">curl -I http://example.com/static/main.css</span><br><span class="line"></span><br><span class="line"><span class="comment"># 第二次请求，带上 If-None-Match，看是否返回 304</span></span><br><span class="line">curl -I -H <span class="string">&#x27;If-None-Match: &quot;5f2b8a3c-1a4&quot;&#x27;</span> http://example.com/static/main.css</span><br></pre></td></tr></table></figure>
+
+<p><code>curl -I</code> 只发 HEAD 请求，输出响应头。如果第二次返回 <code>304 Not Modified</code> 且没有 body，说明协商链路是通的。这个方法的优势是完全可控——想带什么条件字段就带什么，不受浏览器刷新策略影响，是确认服务器配置是否生效的最直接手段。</p>
+<h2 id="缓存位置：memory-cache-与-disk-cache"><a href="#缓存位置：memory-cache-与-disk-cache" class="headerlink" title="缓存位置：memory cache 与 disk cache"></a>缓存位置：memory cache 与 disk cache</h2><p>强缓存命中的副本放在哪，浏览器有两级存储。</p>
+<p>memory cache 是内存缓存，读取最快，但生命周期与渲染进程绑定——标签页关闭、进程被回收，缓存即消失。disk cache 是磁盘缓存，持久化，可跨标签页与跨会话复用，但读取要经过磁盘 IO。</p>
+<p>Chrome 的分配策略大致是：渲染过程中用到的资源（当前页面的 CSS、JS、图片）优先放 memory cache，以便二次引用零成本；体积较大或当前页面用不到的资源倾向放 disk cache，避免撑爆内存。这也解释了一个常被误认作 bug 的现象：同一个 URL，在当前页刷新命中 memory cache 极快，关掉标签页重新打开则明显慢一些——前者读内存，后者读磁盘。</p>
+<p>判断缓存来自哪一层，可以在 Chrome DevTools 的 Network 面板看 Size 列：标注 <code>from memory cache</code> 与 <code>from disk cache</code> 的请求没有实际网络往返。当年调试缓存问题时，这一列是第一个要看的地方。</p>
+<pre class="mermaid">flowchart TD
+  A[请求资源] --> B{memory cache 有且新鲜吗}
+  B -->|是| C[从内存读 无网络请求]
+  B -->|否| D{disk cache 有且新鲜吗}
+  D -->|是| E[从磁盘读 无网络请求]
+  D -->|否| F[走网络请求]</pre>
+
+<h2 id="启发式缓存：没有缓存头时的默认行为"><a href="#启发式缓存：没有缓存头时的默认行为" class="headerlink" title="启发式缓存：没有缓存头时的默认行为"></a>启发式缓存：没有缓存头时的默认行为</h2><p>如果响应既没有 <code>Cache-Control</code> 也没有 <code>Expires</code>，浏览器并不会认为”不能缓存”，而是进入启发式缓存（heuristic caching）：按 <code>Last-Modified</code> 的值推算一个新鲜期。</p>
+<p>RFC 2616 给出的常见算法是取”当前时间与 Last-Modified 之差的一个比例”（实现里常用 10%）。例如文件最后修改于 10 天前，浏览器可能在接下来 1 天内把它当作新鲜副本直接使用。</p>
+<p>这个行为是很多”改了文件不更新”的隐形元凶：服务器没配缓存头，只带了 Last-Modified，用户在一个未知时长的窗口内拿到旧文件，而你这边毫不知情。所以配置缓存时的第一条原则是：不要依赖启发式缓存，所有响应都显式给出 <code>Cache-Control</code>。</p>
+<p>启发式缓存还有一层连带影响：它让”未配置缓存头的站点”表现出看似正常的缓存行为，从而掩盖了配置缺失。测试时一切正常，直到某次更新后部分用户反馈样式错乱，才回头查响应头。反过来，如果你的本意是”这个响应完全不要缓存”，就必须显式写 <code>no-store</code>——留空不等于不缓存，这是 RFC 2616 与后来所有浏览器实现的既定行为。</p>
+<p>另外要注意启发式缓存不适用于没有 <code>Last-Modified</code> 的响应（比如某些动态生成的 200 响应）。这种情况下浏览器通常直接按不可缓存处理，每次重新请求。这种”有时缓存有时不缓存”的不确定性，正是必须显式配置的又一个理由。</p>
+<h2 id="用户行为对缓存的影响"><a href="#用户行为对缓存的影响" class="headerlink" title="用户行为对缓存的影响"></a>用户行为对缓存的影响</h2><p>这是高频面试题，也是日常排查最实用的知识。同样是刷新页面，不同操作触发的缓存策略完全不同。</p>
+<table>
+<thead>
+<tr>
+<th>用户操作</th>
+<th>强缓存</th>
+<th>协商缓存</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>地址栏回车 &#x2F; 点击链接打开</td>
+<td>生效</td>
+<td>生效</td>
+</tr>
+<tr>
+<td>F5 或常规刷新按钮</td>
+<td>不生效</td>
+<td>生效</td>
+</tr>
+<tr>
+<td>Ctrl+F5 强制刷新</td>
+<td>不生效</td>
+<td>不生效</td>
+</tr>
+</tbody></table>
+<p>逐个解释背后的机制。</p>
+<p><strong>地址栏回车或点开链接</strong> 是一次普通导航请求，请求头里不带任何条件字段，浏览器完全按缓存规则走：强缓存命中就直接用本地副本，未命中才带条件字段问服务器。这是正常用户访问的状态，也是缓存配置要服务的对象。</p>
+<p><strong>F5 刷新</strong> 时浏览器会清空当前页面的 memory cache，并在请求头里加上 <code>Cache-Control: no-cache</code>（注意这是请求头，语义是”我不要用强缓存副本”）。资源会重新走网络，但请求仍带 <code>If-Modified-Since</code> 与 <code>If-None-Match</code>，所以协商缓存照样生效，未修改的资源依然返回 304。这个设计的意图是”我要最新的页面，但别浪费带宽重传没变的东西”。</p>
+<p><strong>Ctrl+F5 强制刷新</strong> 时浏览器连协商缓存一并跳过：请求头带 <code>Cache-Control: no-cache</code>，且不带 <code>If-Modified-Since</code> 与 <code>If-None-Match</code>，同时可能带 <code>Pragma: no-cache</code>。服务器收不到任何条件字段，只能返回完整 200 响应。</p>
+<p>掌握这三行的差异，排查问题时的第一句话就能问对：”你是 Ctrl+F5 刷的吗？”很多”改了没生效”的报告，真相只是用户按了强制刷新，或者反过来——用户一直按 F5，而服务器给的是无协商头的纯静态响应。</p>
+<pre class="mermaid">sequenceDiagram
+  participant U as 用户
+  participant B as 浏览器
+  participant S as 服务器
+  U->>B: 地址栏回车
+  B->>S: GET /app.js
+  S-->>B: 200 + Cache-Control: max-age=31536000
+  U->>B: F5 刷新
+  B->>S: GET /app.js (Cache-Control: no-cache, If-None-Match)
+  S-->>B: 304 Not Modified
+  U->>B: Ctrl+F5 强制刷新
+  B->>S: GET /app.js (不带任何协商字段)
+  S-->>B: 200 + 完整内容</pre>
+
+<h2 id="Vary-头：缓存也要看请求"><a href="#Vary-头：缓存也要看请求" class="headerlink" title="Vary 头：缓存也要看请求"></a>Vary 头：缓存也要看请求</h2><p>Vary 解决的是”同一个 URL，响应内容却不同”的问题。最常见的是内容协商：服务器根据 <code>Accept-Encoding</code> 返回 gzip 压缩版或原文，根据 <code>Accept-Language</code> 返回不同语言版本。</p>
+<figure class="highlight http"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="attribute">Vary</span><span class="punctuation">: </span>Accept-Encoding</span><br></pre></td></tr></table></figure>
+
+<p>它的含义是：缓存这个响应时，要把 <code>Accept-Encoding</code> 请求头一起作为 key。之后浏览器带不同 <code>Accept-Encoding</code> 请求同一 URL，不能直接复用这份缓存。</p>
+<figure class="highlight http"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="attribute">Vary</span><span class="punctuation">: </span>Accept-Encoding, User-Agent</span><br></pre></td></tr></table></figure>
+
+<p>多个字段用逗号分隔。这个头是双刃剑：写对了能防止压缩版被当成原文发给不支持 gzip 的客户端，写错了（比如无脑 <code>Vary: User-Agent</code>）会让缓存命中率崩塌——每种 User-Agent 都各存一份，等于没缓存。</p>
+<p>调试时可以在 Network 面板里查看响应头，如果发现同一资源被反复下载，Vary 的字段是否过宽是常见原因之一。</p>
+<h2 id="Cookie-与-Storage-不是-HTTP-缓存"><a href="#Cookie-与-Storage-不是-HTTP-缓存" class="headerlink" title="Cookie 与 Storage 不是 HTTP 缓存"></a>Cookie 与 Storage 不是 HTTP 缓存</h2><p>一个必须澄清的边界：Cookie、localStorage、sessionStorage 属于客户端存储，不走 HTTP 缓存那套规则。</p>
+<p>HTTP 缓存由响应头驱动，由浏览器自动管理，目的是减少网络请求。Cookie 由 <code>Set-Cookie</code> 写入，随每次同源请求自动带回，目的是携带身份与会话状态。localStorage 则完全由 JavaScript 读写，不参与任何请求过程。</p>
+<p>把三者混为一谈会导致错误的设计决策。典型的错误是想”用 localStorage 缓存接口数据来减少请求”——localStorage 的读写是同步的，且容量通常只有 5 MB 左右，存放大块数据会阻塞主线程；它也没有过期机制，需要自己维护失效逻辑。2013 年的实践中，localStorage 适合存少量配置与状态，不适合当接口缓存层用。</p>
+<h2 id="缓存策略设计"><a href="#缓存策略设计" class="headerlink" title="缓存策略设计"></a>缓存策略设计</h2><p>把上面的机制落到站点层面，核心原则只有一条：<strong>内容会变的文件用协商缓存，内容不会变的文件用强缓存。</strong></p>
+<p>难点在于”怎么让浏览器知道这个文件变了”。答案是在文件名上做文章——内容指纹（fingerprinting）：</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">&lt;!-- 内容变化时文件名随之变化 --&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">link</span> <span class="attr">rel</span>=<span class="string">&quot;stylesheet&quot;</span> <span class="attr">href</span>=<span class="string">&quot;/css/main.a3f5c2.css&quot;</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">script</span> <span class="attr">src</span>=<span class="string">&quot;/js/app.8b1d4e.js&quot;</span>&gt;</span><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>文件名带内容哈希，文件内容一旦改变，URL 就变了，浏览器视为全新资源，直接请求新文件。而旧文件可以放心配置超长 <code>max-age</code>，因为永远不会有请求来问它。这样”永久强缓存”与”内容更新”就不再矛盾。</p>
+<p>HTML 是反过来的：它是入口，必须能随时更新，所以给协商缓存：</p>
+<figure class="highlight nginx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># HTML：协商缓存，每次问服务器</span></span><br><span class="line"><span class="section">location</span> <span class="regexp">~* \.html$</span> &#123;</span><br><span class="line">  <span class="attribute">add_header</span> Cache-Control <span class="string">&quot;no-cache&quot;</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment"># 带指纹的静态资源：强缓存一年</span></span><br><span class="line"><span class="section">location</span> <span class="regexp">~* \.(js|css|png|jpg|jpeg|gif|svg|woff)$</span> &#123;</span><br><span class="line">  <span class="attribute">expires</span> <span class="number">1y</span>;</span><br><span class="line">  <span class="attribute">add_header</span> Cache-Control <span class="string">&quot;public, max-age=31536000&quot;</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>no-cache</code> 在这里的用法正是它的真实语义：允许存，但每次用之前都要验证。HTML 体积小，多一次 304 的往返代价极低，却能保证用户永远拿到最新的资源引用。</p>
+<p>这条组合是 2013 年之后成为行业标准做法的，也是各类构建工具（Grunt 的 gulp-rev、FIS 的 md5 后缀）输出的默认策略。</p>
+<h3 id="CDN-缓存"><a href="#CDN-缓存" class="headerlink" title="CDN 缓存"></a>CDN 缓存</h3><p>CDN 在链路上多了一跳，规则大体一致但有几个注意点。</p>
+<p>CDN 节点会按源站的缓存头决定自己的存储行为，所以源站配置错了，CDN 会忠实地把错误行为复制到所有节点。<code>private</code> 在 CDN 场景下尤其重要：带用户数据的响应必须标 <code>private</code>，否则会被缓存在共享节点上分发给所有用户。</p>
+<p>CDN 也提供主动刷新（purge）能力，可以指定 URL 让所有节点立刻回源站拉新内容。对于来不及做文件指纹的历史资源，这是紧急更新的手段，但有生效延迟，且频繁 purge 会增加回源压力。</p>
+<figure class="highlight nginx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 源站侧给 CDN 的明确信号</span></span><br><span class="line"><span class="section">location</span> <span class="regexp">~* \.(js|css)$</span> &#123;</span><br><span class="line">  <span class="attribute">expires</span> <span class="number">1y</span>;</span><br><span class="line">  <span class="attribute">add_header</span> Cache-Control <span class="string">&quot;public, max-age=31536000&quot;</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="section">location</span> /api/ &#123;</span><br><span class="line">  <span class="attribute">add_header</span> Cache-Control <span class="string">&quot;private, no-cache, must-revalidate&quot;</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>API 响应标 <code>private</code> 是防止 CDN 缓存用户私有数据的关键一行。</p>
+<h2 id="常见坑与排查"><a href="#常见坑与排查" class="headerlink" title="常见坑与排查"></a>常见坑与排查</h2><p><strong>坑一：改了文件不更新。</strong> 资源没有指纹，且强缓存时间设得过长，用户拿着旧副本。排查方法是看 Network 面板的 Size 列，如果是 <code>from memory cache</code> 或 <code>from disk cache</code> 且没有网络请求，说明强缓存还在有效期。修复方式要么上文件指纹，要么缩短 max-age 改用协商缓存。</p>
+<p><strong>坑二：本地永远是新的，线上是旧的。</strong> 本地开发环境通常没有配缓存头，或者你习惯按 Ctrl+F5，问题被掩盖。上线后配置了长缓存，用户侧立刻暴露。修复方式是测试时用干净的浏览器 profile，并明确区分 F5 与 Ctrl+F5 的预期行为。</p>
+<p><strong>坑三：HTML 被强缓存，新版本永远下不来。</strong> 这是最严重的组合：HTML 配了一年 max-age，同时静态资源又用了新指纹。用户永远停留在第一次访问时的那份 HTML，引用的永远是最初那批 CSS&#x2F;JS。HTML 必须协商缓存，这条没有例外。</p>
+<p><strong>坑四：Vary 过宽导致命中率归零。</strong> <code>Vary: User-Agent</code> 会让每种 UA 各存一份。多数场景只需要 <code>Vary: Accept-Encoding</code>。</p>
+<p><strong>坑五：集群 ETag 不一致。</strong> 多台服务器 ETag 算法不同，用户请求在不同机器间跳转时反复 304 失败、返回完整内容。修复是统一 ETag 生成规则，或直接用 Nginx 默认的”大小加时间戳”方案。</p>
+<p><strong>坑六：HTTPS 与 HTTP 混用缓存。</strong> 不同协议、不同端口、带不带查询串，在浏览器看来都可能是不同资源。调试时确认 URL 完全一致，包括尾部的 <code>?v=1</code>。</p>
+<p><strong>坑七：缓存与回退按钮行为不一致。</strong> 用户点浏览器的后退按钮时，某些浏览器会直接从内存缓存里恢复页面而不重新请求，于是看到一个”上一个版本”的页面。这与缓存头无关，是浏览器的历史记录策略，但排查时容易被误判为缓存未失效。规避方式是给页面加一段检测脚本，在页面从缓存恢复时强制刷新。</p>
+<p><strong>坑八：CDN 节点缓存了错误内容却无从察觉。</strong> CDN 回源拉到的内容本身是错的（比如源站配置错误、回源时刚好遇到异常响应），之后这个错误内容被分发到所有节点，且因为缓存头有效而长期存在。此时刷新源站无用，必须走 CDN 的 purge 或刷新接口。这类问题的排查难点在于用户与开发者在不同网络位置，看到的可能是不同节点的内容。</p>
+<p><strong>坑九：接口数据被中间代理缓存。</strong> 内网代理、公司网关有时会按自己的规则缓存响应，尤其是没带 <code>Cache-Control</code> 的 JSON 接口。用户看到的数据是几分钟前的，而服务器日志显示没有任何新请求。给 API 响应显式加上 <code>Cache-Control: private, no-cache</code> 或 <code>no-store</code>，能避免大多数代理自作主张。</p>
+<p><strong>坑十：调试时开启了 Disable cache。</strong> Chrome DevTools 的 Network 面板有一个 Disable cache 复选框，勾选后所有缓存逻辑被跳过。排查完忘记取消，之后的所有观察都不真实。这个小复选框造成的时间浪费，累计起来相当可观。</p>
+<p>排查的顺序建议固定为：先看 Network 面板的状态码与 Size 列（是 200 还是 304，是网络还是缓存），再看响应头确认缓存策略，最后对比请求头判断是哪种用户行为触发。三步下来，绝大多数缓存问题都能定位。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>浏览器缓存的全部规则可以用两条主线概括：强缓存决定”发不发请求”，由 Expires 与 Cache-Control 驱动，<code>max-age</code> 是主力、<code>no-cache</code> 与 <code>no-store</code> 的差别必须分清；协商缓存决定”要不要重传内容”，由 Last-Modified 与 ETag 驱动，ETag 优先级更高但要注意集群一致性。缓存分 memory 与 disk 两层，无缓存头时会按 Last-Modified 做启发式缓存，这也是隐性故障的来源。策略上遵循”内容不变的资源上指纹加永久强缓存，HTML 走协商缓存”，配合 Vary 头防止缓存错投，并始终记住 Cookie 与 Storage 不属于 HTTP 缓存。最后把三种用户行为的差异记牢：地址栏回车全走缓存，F5 跳过强缓存保留协商，Ctrl+F5 两者都跳过——排查问题时先问清用户按的是哪个键，能省一半时间。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li>RFC 2616：Hypertext Transfer Protocol – HTTP&#x2F;1.1（缓存章节 13、条件请求章节 14.25-14.26）：<a href="https://www.ietf.org/rfc/rfc2616.txt">https://www.ietf.org/rfc/rfc2616.txt</a></li>
+<li>MDN Web Docs：HTTP caching：<a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching">https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching</a></li>
+<li>MDN Web Docs：Cache-Control：<a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control">https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control</a></li>
+<li>W3C：Note on HTTP&#x2F;1.1 Conditional Requests（RFC 7232 前的相关规范说明）：<a href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html">https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html</a></li>
+<li>Nginx 官方文档：ngx_http_headers_module 与 expires 指令：<a href="https://nginx.org/en/docs/http/ngx_http_headers_module.html">https://nginx.org/en/docs/http/ngx_http_headers_module.html</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>浏览器缓存机制全景</p><p><a href="https://987763485.github.io/2013/08/16/浏览器缓存机制全景/">https://987763485.github.io/2013/08/16/浏览器缓存机制全景/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2013-08-16</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-21</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/web%E5%89%8D%E7%AB%AF/">web前端</a><a class="link-muted mr-2" rel="tag" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/">性能优化</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2013/08/18/%E7%A7%BB%E5%8A%A8%E7%AB%AF%E9%A1%B5%E9%9D%A2%E5%88%87%E6%8D%A2%E5%8A%A8%E7%94%BB/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">移动端页面切换动画</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2013/08/11/jQuery%E7%9A%84extend%E4%B8%8E%E5%B7%A5%E5%85%B7%E6%96%B9%E6%B3%95%E6%89%A9%E5%B1%95/"><span class="level-item">jQuery 的 extend 与工具方法扩展</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

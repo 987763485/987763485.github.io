@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>字符串匹配算法：indexOf 与 KMP - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="高亮关键词，卡在了匹配上"><meta property="og:type" content="blog"><meta property="og:title" content="字符串匹配算法：indexOf 与 KMP"><meta property="og:url" content="https://987763485.github.io/2016/08/21/%E5%AD%97%E7%AC%A6%E4%B8%B2%E5%8C%B9%E9%85%8D%E7%AE%97%E6%B3%95indexOf%E4%B8%8EKMP/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="高亮关键词，卡在了匹配上"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2016-08-21T04:15:17.000Z"><meta property="article:modified_time" content="2026-10-21T01:57:50.512Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="javascript"><meta property="article:tag" content="算法与数据结构"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2016/08/21/%E5%AD%97%E7%AC%A6%E4%B8%B2%E5%8C%B9%E9%85%8D%E7%AE%97%E6%B3%95indexOf%E4%B8%8EKMP/"},"headline":"字符串匹配算法：indexOf 与 KMP","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2016-08-21T04:15:17.000Z","dateModified":"2026-10-21T01:57:50.512Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"高亮关键词，卡在了匹配上"}</script><link rel="canonical" href="https://987763485.github.io/2016/08/21/%E5%AD%97%E7%AC%A6%E4%B8%B2%E5%8C%B9%E9%85%8D%E7%AE%97%E6%B3%95indexOf%E4%B8%8EKMP/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2016-08-21T04:15:17.000Z" title="8/21/2016, 12:15:17 PM">2016-08-21</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/">算法与数据结构</a></span><span class="level-item">26 分钟读完 (大约3940个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">字符串匹配算法：indexOf 与 KMP</h1><nav class="series-nav" aria-label="系列文章导航"><div class="series-nav-meta"><i class="fas fa-book-open" aria-hidden="true"></i><span>本文属于《<a class="series-nav-title" href="/series/algo/">算法与数据结构</a>》第 6/13 篇</span></div><div class="series-nav-links"><a class="series-nav-link series-nav-prev" href="/2015/08/15/ES6Set%E4%B8%8EMap%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><i class="fas fa-chevron-left" aria-hidden="true"></i><span>上一篇</span></a><a class="series-nav-link series-nav-index" href="/series/algo/">系列目录</a><a class="series-nav-link series-nav-next" href="/2016/08/26/%E4%BA%8C%E5%88%86%E6%9F%A5%E6%89%BE%E4%B8%8E%E5%B8%B8%E8%A7%81%E5%8F%98%E4%BD%93/"><span>下一篇</span><i class="fas fa-chevron-right" aria-hidden="true"></i></a></div></nav><div class="content"><h2 id="高亮关键词，卡在了匹配上"><a href="#高亮关键词，卡在了匹配上" class="headerlink" title="高亮关键词，卡在了匹配上"></a>高亮关键词，卡在了匹配上</h2><p>八月中旬，日志检索页加了一个关键词高亮。页面一次展示一份四兆左右的日志，用户输入一个词，命中的地方加黄底。第一版很直接：用 <code>indexOf</code> 从前往后找，找到一个就包一层标签，再从上一次的位置继续。</p>
+<p>单词搜索还算能忍，半秒左右。可运营习惯一次贴三个词进来，三份循环叠在一起，页面要卡两三秒，输入框都跟着掉帧。我当时的判断很武断：<code>indexOf</code> 是逐个字符比，最坏情况太慢，应该上 KMP。</p>
+<p>花了一个下午把 KMP 写出来，接到页面上，结果没有变快多少。真正的大头不在匹配，在每命中一次就重建一小段 DOM，几千次下来，浏览器光排样式就花掉了大半时间。算法只优化了整件事里很小的一段。</p>
+<p>这件事没白做。KMP 后来在别的地方派上了用场，也让我第一次认真算清楚”朴素匹配到底差在哪”。下面先把算法写对，再说它在什么情况下值得用。</p>
+<h2 id="朴素匹配：最坏的情况不是乱写的"><a href="#朴素匹配：最坏的情况不是乱写的" class="headerlink" title="朴素匹配：最坏的情况不是乱写的"></a>朴素匹配：最坏的情况不是乱写的</h2><p>朴素匹配就是逐位对齐，从每个位置尝试一次：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">naiveSearch</span>(<span class="params">text, pattern</span>) &#123;</span><br><span class="line">  <span class="keyword">if</span> (pattern.<span class="property">length</span> === <span class="number">0</span>) &#123; <span class="keyword">return</span> <span class="number">0</span>; &#125;</span><br><span class="line">  <span class="keyword">var</span> n = text.<span class="property">length</span>;</span><br><span class="line">  <span class="keyword">var</span> m = pattern.<span class="property">length</span>;</span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">var</span> i = <span class="number">0</span>; i + m &lt;= n; i += <span class="number">1</span>) &#123;</span><br><span class="line">    <span class="keyword">var</span> j = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">while</span> (j &lt; m &amp;&amp; text.<span class="title function_">charAt</span>(i + j) === pattern.<span class="title function_">charAt</span>(j)) &#123;</span><br><span class="line">      j += <span class="number">1</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> (j === m) &#123; <span class="keyword">return</span> i; &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> -<span class="number">1</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>大多数时候它很快：第一个字符不符就直接跳下一位，实际比较次数接近 O(n)。最坏情况出现在大量重复字符上，比如在 <code>aaaaaaaaab</code> 里找 <code>aaab</code>。每一次对齐都要先比三个 <code>a</code> 再失败，然后右移一位，再比三个 <code>a</code>。文本长度是 n，模式长度是 m，最坏就是 O(n·m)。</p>
+<p>四兆文本里找一个十个字符的模式，如果文本恰好是重复字符，最坏比较次数能到千万级。这个数量在 JS 里不算灾难，但足够让一次搜索从毫秒掉到几百毫秒。真正的问题是：失败之后，我们已经知道前面那一段是什么了，朴素匹配却把知道的信息全扔了，从下一个位置从头再比。</p>
+<p>拿小一点的例子数一遍更直观。文本是九个 <code>a</code> 加一个 <code>b</code>，模式是 <code>aaab</code>。从位置 0 到 5，每个起点都要先匹配三个 <code>a</code>、再在第四个字符上失败，共六次对齐、每次四次比较；位置 6 才匹配成功。文本长度 10、模式长度 4，比较次数二十多，接近 n·m。文本再长十倍，这个乘积就跟着长十倍，而不是像线性算法那样只长一倍。</p>
+<h2 id="KMP-的核心：失败时别回头"><a href="#KMP-的核心：失败时别回头" class="headerlink" title="KMP 的核心：失败时别回头"></a>KMP 的核心：失败时别回头</h2><p>KMP 只做一件事：利用已经匹配过的前缀，决定失败之后模式串能往后滑多少，文本指针不后退。</p>
+<p>拿模式 <code>ababaca</code> 举例。当它在某个位置失配时，我们要问：已经匹配的那一段里，最长的”既是前缀又是后缀”的部分有多长。这个长度就是下一次可以保留的匹配长度。</p>
+<p>先看前缀表：</p>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>0</th>
+<th>1</th>
+<th>2</th>
+<th>3</th>
+<th>4</th>
+<th>5</th>
+<th>6</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>字符</td>
+<td>a</td>
+<td>b</td>
+<td>a</td>
+<td>b</td>
+<td>a</td>
+<td>c</td>
+<td>a</td>
+</tr>
+<tr>
+<td>前缀表</td>
+<td>0</td>
+<td>0</td>
+<td>1</td>
+<td>2</td>
+<td>3</td>
+<td>0</td>
+<td>1</td>
+</tr>
+</tbody></table>
+<p>读法是逐行看前缀：</p>
+<ul>
+<li>到位置 2，前缀 <code>aba</code> 的最长相等前后缀是 <code>a</code>，长度 1。</li>
+<li>到位置 4，<code>ababa</code> 的最长相等前后缀是 <code>aba</code>，长度 3。</li>
+<li>到位置 5，字符变成 <code>c</code>，<code>ababac</code> 没有任何相等的前后缀，长度回到 0。</li>
+</ul>
+<p>假设文本匹配到 <code>ababa</code> 之后，下一个字符不是 <code>c</code>。朴素匹配会从这次对齐的下一位重新开始；KMP 看前缀表，知道 <code>ababa</code> 的最长相等前后缀是 <code>aba</code>，于是把模式串往后挪两位，让 <code>aba</code> 对齐到文本末尾那三个字符，继续比。文本指针一步都没退。</p>
+<p>拿文本 <code>abababacaba</code> 和模式 <code>ababaca</code> 实际走一遍，能看清它省在哪：</p>
+<table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>文本位置 i</th>
+<th>模式位置 j</th>
+<th>发生了什么</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>0 到 4</td>
+<td>0 到 4</td>
+<td><code>ababa</code> 逐字符匹配</td>
+</tr>
+<tr>
+<td>2</td>
+<td>5</td>
+<td>5</td>
+<td>文本是 <code>b</code>、模式是 <code>c</code>，失配</td>
+</tr>
+<tr>
+<td>3</td>
+<td>5</td>
+<td>3</td>
+<td><code>j</code> 跳到前缀表 <code>table[4]</code> 的值 3，<code>i</code> 不动</td>
+</tr>
+<tr>
+<td>4</td>
+<td>5 到 8</td>
+<td>3 到 6</td>
+<td>从 <code>b</code> 接着比，一路匹配到模式末尾</td>
+</tr>
+<tr>
+<td>5</td>
+<td>9</td>
+<td>7</td>
+<td>返回起点 <code>9 - 7 = 2</code></td>
+</tr>
+</tbody></table>
+<p>朴素匹配在第 2 步失配后，会从文本位置 1 重新开始，把已经确认过的 <code>baba</code> 再比一遍。KMP 一次都没有回头。</p>
+<p>为什么跳到 <code>table[j - 1]</code> 不会漏掉答案？因为已经匹配的那一段文本，等于模式的前 j 个字符。前缀表给的是这段里最长的相等前后缀长度 k，也就是说，模式的前 k 个字符，和刚才那段文本的最后 k 个字符相同。把模式往后挪，让这 k 个字符对齐，是唯一可能继续匹配的位置；挪得比这更少，反而会把已知相同的部分错开。这不是严格证明，但足够说服自己：跳过的位置里不可能藏着答案。</p>
+<h2 id="把前缀表写出来"><a href="#把前缀表写出来" class="headerlink" title="把前缀表写出来"></a>把前缀表写出来</h2><p>构造前缀表的过程本身也用了这个思路：当前字符匹配，长度加一；不匹配，就沿着表往回跳，直到匹配或者回到零。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">buildTable</span>(<span class="params">pattern</span>) &#123;</span><br><span class="line">  <span class="keyword">var</span> table = [<span class="number">0</span>];</span><br><span class="line">  <span class="keyword">var</span> k = <span class="number">0</span>;</span><br><span class="line">  <span class="keyword">var</span> i = <span class="number">1</span>;</span><br><span class="line">  <span class="keyword">while</span> (i &lt; pattern.<span class="property">length</span>) &#123;</span><br><span class="line">    <span class="keyword">if</span> (pattern.<span class="title function_">charAt</span>(i) === pattern.<span class="title function_">charAt</span>(k)) &#123;</span><br><span class="line">      k += <span class="number">1</span>;</span><br><span class="line">      table[i] = k;</span><br><span class="line">      i += <span class="number">1</span>;</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (k &gt; <span class="number">0</span>) &#123;</span><br><span class="line">      k = table[k - <span class="number">1</span>];</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">      table[i] = <span class="number">0</span>;</span><br><span class="line">      i += <span class="number">1</span>;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> table;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这段代码值得对着 <code>ababaca</code> 走一遍。<code>k</code> 始终表示”当前位置之前，最长相等前后缀的长度”；失配时的 <code>k = table[k - 1]</code> 是在找次长的候选，而不是从头再来。</p>
+<h2 id="搜索主体"><a href="#搜索主体" class="headerlink" title="搜索主体"></a>搜索主体</h2><p>有了表，搜索就是两个指针的事：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">kmpSearch</span>(<span class="params">text, pattern</span>) &#123;</span><br><span class="line">  <span class="keyword">if</span> (pattern.<span class="property">length</span> === <span class="number">0</span>) &#123; <span class="keyword">return</span> <span class="number">0</span>; &#125;</span><br><span class="line">  <span class="keyword">var</span> table = <span class="title function_">buildTable</span>(pattern);</span><br><span class="line">  <span class="keyword">var</span> i = <span class="number">0</span>;</span><br><span class="line">  <span class="keyword">var</span> j = <span class="number">0</span>;</span><br><span class="line">  <span class="keyword">while</span> (i &lt; text.<span class="property">length</span>) &#123;</span><br><span class="line">    <span class="keyword">if</span> (text.<span class="title function_">charAt</span>(i) === pattern.<span class="title function_">charAt</span>(j)) &#123;</span><br><span class="line">      i += <span class="number">1</span>;</span><br><span class="line">      j += <span class="number">1</span>;</span><br><span class="line">      <span class="keyword">if</span> (j === pattern.<span class="property">length</span>) &#123;</span><br><span class="line">        <span class="keyword">return</span> i - j;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (j &gt; <span class="number">0</span>) &#123;</span><br><span class="line">      j = table[j - <span class="number">1</span>];</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">      i += <span class="number">1</span>;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> -<span class="number">1</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>复杂度是 O(n + m)：构造表 O(m)，搜索时文本指针只前进不后退，O(n)。空间是 O(m)，存那张表。跟朴素匹配比，它用一点额外空间换掉了最坏情况下的重复比较。</p>
+<p>很多教程把前缀表整体右移一位，首位写 -1，叫 <code>next</code> 数组，失配时代码写成 <code>j = next[j]</code>。两种写法等价，下标差一位；混着抄就会在边界上错位，症状是模式第一个字符失配时死循环或者跳过匹配。我们统一用前缀表本身，因为构造时不用处理 -1 这个哨兵，读起来少一个特例；代价是失配时写 <code>table[j - 1]</code>，多一个减一。团队里只留一种写法，比两种都”看得懂”重要。</p>
+<p>要找全部出现位置，改动很小：匹配成功之后不直接返回，而是记下位置，然后让 <code>j</code> 跳到 <code>table[j - 1]</code>，继续找重叠的匹配。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">kmpAll</span>(<span class="params">text, pattern</span>) &#123;</span><br><span class="line">  <span class="keyword">if</span> (pattern.<span class="property">length</span> === <span class="number">0</span>) &#123; <span class="keyword">return</span> []; &#125;</span><br><span class="line">  <span class="keyword">var</span> table = <span class="title function_">buildTable</span>(pattern);</span><br><span class="line">  <span class="keyword">var</span> result = [];</span><br><span class="line">  <span class="keyword">var</span> i = <span class="number">0</span>;</span><br><span class="line">  <span class="keyword">var</span> j = <span class="number">0</span>;</span><br><span class="line">  <span class="keyword">while</span> (i &lt; text.<span class="property">length</span>) &#123;</span><br><span class="line">    <span class="keyword">if</span> (text.<span class="title function_">charAt</span>(i) === pattern.<span class="title function_">charAt</span>(j)) &#123;</span><br><span class="line">      i += <span class="number">1</span>;</span><br><span class="line">      j += <span class="number">1</span>;</span><br><span class="line">      <span class="keyword">if</span> (j === pattern.<span class="property">length</span>) &#123;</span><br><span class="line">        result.<span class="title function_">push</span>(i - j);</span><br><span class="line">        j = table[j - <span class="number">1</span>];</span><br><span class="line">      &#125;</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (j &gt; <span class="number">0</span>) &#123;</span><br><span class="line">      j = table[j - <span class="number">1</span>];</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">      i += <span class="number">1</span>;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> result;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="在-JS-里，原生-indexOf-往往更快"><a href="#在-JS-里，原生-indexOf-往往更快" class="headerlink" title="在 JS 里，原生 indexOf 往往更快"></a>在 JS 里，原生 indexOf 往往更快</h2><p>写完之后我做了对照：同一段文本、同一个模式，分别用 <code>naiveSearch</code>、<code>kmpSearch</code> 和原生 <code>indexOf</code>。</p>
+<p>结论不太给面子：在绝大多数真实日志上，原生 <code>indexOf</code> 最快，KMP 和朴素匹配差不多；只有把文本换成大量重复字符的构造数据，KMP 才明显领先。这些观察都在同一台机器上、只反映相对量级，不是基准数据，但方向很清楚。</p>
+<p>原因不神秘。原生 <code>indexOf</code> 在引擎内部实现，省掉了 JS 层的函数调用和逐字符 <code>charAt</code> 的开销，引擎还会针对常见情况做优化。KMP 的 O(n) 是渐近意义上的优势，常数项却比不过原生代码。用 JS 手写 KMP 去替换 <code>indexOf</code>，大多数时候是负优化。</p>
+<p>这也是”算法复杂度”最容易骗人的地方：O(n) 比 O(n·m) 好，是在 n 足够大、常数项可比的前提下。真实场景里 n 可能只有几万，原生实现一次比较只要几个机器指令，你的 KMP 每次循环都要付 JS 的解释开销。</p>
+<p>顺带说一句 BM。Boyer-Moore 从模式末尾往前比，失配时按坏字符和好后缀规则整段跳，平均情况下比 KMP 跳得多。不少标准库的长字符串查找会采用这一族启发式，具体到某个引擎、某个版本用哪种实现，不在我们能控制的范围里。知道这件事的实际意义是：不要假设原生 <code>indexOf</code> 就是逐字符朴素匹配——它可能已经用了更聪明的办法，手写的 KMP 未必追得上。</p>
+<h2 id="什么时候它真的有用"><a href="#什么时候它真的有用" class="headerlink" title="什么时候它真的有用"></a>什么时候它真的有用</h2><p>不是完全没用。我们后来在两个地方用了 KMP。</p>
+<p>第一处是流式扫描。数据一块一块到达，不能回头重扫；朴素匹配在失配后需要回退文本指针，而块已经处理过去了。KMP 的文本指针单向前进，天然适合这种场景。我们在一个解析自定义协议的模块里用了它，每次喂一块，保留住 <code>j</code> 和前缀表，跨块继续。</p>
+<p>第二处是自己实现匹配、不能用原生方法的环境。比如要同时返回每个匹配的起止位置、还要在匹配过程中做额外判断，原生 <code>indexOf</code> 只给起点，拿不到中间状态。</p>
+<p>但如果只是”在一段字符串里找一个词”，直接用 <code>indexOf</code>，不要手写 KMP。判断标准不是”哪个算法更高级”，而是”原生方法够不够用”。</p>
+<h2 id="两个-JS-特有的边界"><a href="#两个-JS-特有的边界" class="headerlink" title="两个 JS 特有的边界"></a>两个 JS 特有的边界</h2><p>第一个是编码单位。JS 字符串按 UTF-16 码元计数，<code>charAt</code> 取的是一个码元，不是”一个字符”。<code>indexOf</code> 返回的也是码元下标。对于中文，一个汉字通常占一个码元，没问题；对于表情符号这类增补平面字符，一个字符占两个码元。</p>
+<p>KMP 按码元比较，匹配结果和 <code>indexOf</code> 一致，偏移量也一致。真正的坑在于：如果模式串从一个代理对中间开始，它可能匹配到”半个字符”。我们没在业务里遇到过，但写通用文本工具时得记住，按码元切分和按字符切分不是一回事。字符串长度那篇讲过 <code>length</code> 和视觉宽度的差别，这里只强调匹配下标同样按码元算。</p>
+<p>第二个是空模式。原生 <code>indexOf(&#39;&#39;)</code> 返回 0，我们的 KMP 也返回 0；<code>kmpAll</code> 对空模式返回空数组，这是自己定的约定，要在文档里写清楚，不然调用方会以为函数坏了。</p>
+<h2 id="四组用例"><a href="#四组用例" class="headerlink" title="四组用例"></a>四组用例</h2><p>KMP 这种带下标的代码，最容易在边界上错一位。我们留了四组用例，改完跑一遍：</p>
+<ul>
+<li>空模式：<code>kmpSearch(&#39;abc&#39;, &#39;&#39;)</code> 返回 0，和 <code>indexOf</code> 一致。</li>
+<li>模式比文本长：返回 -1，循环不能越界。</li>
+<li>重叠匹配：<code>kmpAll(&#39;aaaaa&#39;, &#39;aaa&#39;)</code> 返回 <code>[0, 1, 2]</code>，匹配成功后 <code>j</code> 要回跳，不能直接归零。</li>
+<li>代理对：含表情符号的文本，返回的位置和 <code>indexOf</code> 一致，按码元算。</li>
+</ul>
+<p>第三条最容易漏。很多实现匹配成功后把 <code>j</code> 置 0，普通的词看着没问题，一旦模式自身有重叠，就会少报位置。<code>kmpAll</code> 里那行 <code>j = table[j - 1]</code> 就是为它写的。</p>
+<p>前两组防越界，第三组防漏报，第四组防编码假设。四组都不长，但把当年那个下午踩过的坑都圈进去了。</p>
+<h2 id="多个关键词，别一个一个跑"><a href="#多个关键词，别一个一个跑" class="headerlink" title="多个关键词，别一个一个跑"></a>多个关键词，别一个一个跑</h2><p>回到日志高亮。三个关键词各跑一遍全文，等于把文本扫了三遍。即使每次都是原生 <code>indexOf</code>，总量也上去了，何况每命中一次还要动 DOM。</p>
+<p>我们最后的做法不是换算法，是换策略：一次遍历文本，同时记录每个关键词当前匹配到第几个字符，命中就记位置。这实际上是把多个模式的前缀状态并在一起，思路和多模式匹配算法一致；更正规的做法是建一棵字典树，把词表挂上去，一次扫描同时走所有分支。当期我们没有上那么重的结构，只做了”首字符索引 + 逐词验证”，在词表只有十几个、文本四兆的场景下够用。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> byFirst = &#123;&#125;;</span><br><span class="line"><span class="keyword">for</span> (<span class="keyword">var</span> w = <span class="number">0</span>; w &lt; words.<span class="property">length</span>; w += <span class="number">1</span>) &#123;</span><br><span class="line">  <span class="keyword">var</span> ch = words[w].<span class="title function_">charAt</span>(<span class="number">0</span>);</span><br><span class="line">  (byFirst[ch] || (byFirst[ch] = [])).<span class="title function_">push</span>(words[w]);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 逐字符扫文本，只对首字符命中的词做一次 indexOf 验证</span></span><br><span class="line"><span class="keyword">for</span> (<span class="keyword">var</span> i = <span class="number">0</span>; i &lt; text.<span class="property">length</span>; i += <span class="number">1</span>) &#123;</span><br><span class="line">  <span class="keyword">var</span> candidates = byFirst[text.<span class="title function_">charAt</span>(i)];</span><br><span class="line">  <span class="keyword">if</span> (!candidates) &#123; <span class="keyword">continue</span>; &#125;</span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">var</span> c = <span class="number">0</span>; c &lt; candidates.<span class="property">length</span>; c += <span class="number">1</span>) &#123;</span><br><span class="line">    <span class="keyword">if</span> (text.<span class="title function_">indexOf</span>(candidates[c], i) === i) &#123;</span><br><span class="line">      <span class="title function_">record</span>(i, candidates[c]);</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这段代码的复杂度依然依赖 <code>indexOf</code>，最坏情况下退化成”每个首字符命中都做一次完整比较”。它解决的是”少扫几遍全文”，不是”单次匹配的下界”。我们把两件事分开算，才知道该优化哪一头。这段经历留下的判断顺序是：先看能不能少扫几遍，再看单次匹配能不能用原生，最后才考虑手写 KMP。顺序反了，就会像我那个下午一样，把时间花在不是瓶颈的地方。</p>
+<h2 id="收尾的表"><a href="#收尾的表" class="headerlink" title="收尾的表"></a>收尾的表</h2><table>
+<thead>
+<tr>
+<th>场景</th>
+<th>用什么</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>在一个字符串里找一个词</td>
+<td>原生 <code>indexOf</code></td>
+<td>实现经过优化，常数项小</td>
+</tr>
+<tr>
+<td>找全部出现位置</td>
+<td><code>indexOf</code> 循环或 KMP</td>
+<td>数据量小用前者，需要单次扫描用后者</td>
+</tr>
+<tr>
+<td>文本分块到达、不能回退</td>
+<td>KMP</td>
+<td>文本指针只前进</td>
+</tr>
+<tr>
+<td>大量重复字符的构造数据</td>
+<td>KMP</td>
+<td>避开朴素匹配的最坏情况</td>
+</tr>
+<tr>
+<td>多个关键词同时找</td>
+<td>字典树或多模式匹配</td>
+<td>避免把文本扫很多遍</td>
+</tr>
+<tr>
+<td>需要匹配中间状态</td>
+<td>手写 KMP</td>
+<td>原生方法只给起点</td>
+</tr>
+</tbody></table>
+<p>KMP 值得学，不是因为它该出现在每个搜索框后面，而是因为它把”失配之后还能利用什么信息”这件事讲透了。真正用的时候，先量一下瓶颈在哪；量完你可能会发现，最慢的那一步跟算法无关。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>字符串匹配算法：indexOf 与 KMP</p><p><a href="https://987763485.github.io/2016/08/21/字符串匹配算法indexOf与KMP/">https://987763485.github.io/2016/08/21/字符串匹配算法indexOf与KMP/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2016-08-21</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-21</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/javascript/">javascript</a><a class="link-muted mr-2" rel="tag" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/">算法与数据结构</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2016/08/26/%E4%BA%8C%E5%88%86%E6%9F%A5%E6%89%BE%E4%B8%8E%E5%B8%B8%E8%A7%81%E5%8F%98%E4%BD%93/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">二分查找与常见变体</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2016/08/14/%E5%8F%AF%E8%A7%86%E5%8C%96%E5%9B%BE%E8%A1%A8%E5%BA%93ECharts%E5%85%A5%E9%97%A8/"><span class="level-item">可视化图表库 ECharts 入门</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

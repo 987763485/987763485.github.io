@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>CSS3 滤镜 filter 与混合模式 blend-mode - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="2014 年做图片列表和运营页，多半碰到过”图要置灰””hover 要有阴影””水印不能被背景吃掉”这类需求。让切图师多切一套灰图、再切一套 hover 态是过去的常规解法；-webkit-filter 与混合模式出现后，一部分需求可以只在浏览器里做。但滤镜是逐像素的实时计算，手机上算不快、也算不起。本文不罗列效果，而是站在性能与调优的角度，把滤镜函数族、混合模式、支持面、降级写法与何时该退回服务"><meta property="og:type" content="blog"><meta property="og:title" content="CSS3 滤镜 filter 与混合模式 blend-mode"><meta property="og:url" content="https://987763485.github.io/2014/06/03/CSS3%E6%BB%A4%E9%95%9Cfilter%E4%B8%8E%E6%B7%B7%E5%90%88%E6%A8%A1%E5%BC%8Fblend-mode/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="2014 年做图片列表和运营页，多半碰到过”图要置灰””hover 要有阴影””水印不能被背景吃掉”这类需求。让切图师多切一套灰图、再切一套 hover 态是过去的常规解法；-webkit-filter 与混合模式出现后，一部分需求可以只在浏览器里做。但滤镜是逐像素的实时计算，手机上算不快、也算不起。本文不罗列效果，而是站在性能与调优的角度，把滤镜函数族、混合模式、支持面、降级写法与何时该退回服务"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2014-06-03T07:19:51.000Z"><meta property="article:modified_time" content="2026-10-17T13:15:37.043Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="web前端"><meta property="article:tag" content="css3"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2014/06/03/CSS3%E6%BB%A4%E9%95%9Cfilter%E4%B8%8E%E6%B7%B7%E5%90%88%E6%A8%A1%E5%BC%8Fblend-mode/"},"headline":"CSS3 滤镜 filter 与混合模式 blend-mode","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2014-06-03T07:19:51.000Z","dateModified":"2026-10-17T13:15:37.043Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"2014 年做图片列表和运营页，多半碰到过”图要置灰””hover 要有阴影””水印不能被背景吃掉”这类需求。让切图师多切一套灰图、再切一套 hover 态是过去的常规解法；-webkit-filter 与混合模式出现后，一部分需求可以只在浏览器里做。但滤镜是逐像素的实时计算，手机上算不快、也算不起。本文不罗列效果，而是站在性能与调优的角度，把滤镜函数族、混合模式、支持面、降级写法与何时该退回服务"}</script><link rel="canonical" href="https://987763485.github.io/2014/06/03/CSS3%E6%BB%A4%E9%95%9Cfilter%E4%B8%8E%E6%B7%B7%E5%90%88%E6%A8%A1%E5%BC%8Fblend-mode/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2014-06-03T07:19:51.000Z" title="6/3/2014, 3:19:51 PM">2014-06-03</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/">前端开发</a></span><span class="level-item">36 分钟读完 (大约5344个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">CSS3 滤镜 filter 与混合模式 blend-mode</h1><nav class="series-nav" aria-label="系列文章导航"><div class="series-nav-meta"><i class="fas fa-book-open" aria-hidden="true"></i><span>本文属于《<a class="series-nav-title" href="/series/html-css/">HTML 与 CSS</a>》第 42/62 篇</span></div><div class="series-nav-links"><a class="series-nav-link series-nav-prev" href="/2014/07/06/CSS3fontface%E4%B8%8E%E7%BD%91%E9%A1%B5%E5%AD%97%E4%BD%93%E4%BC%98%E5%8C%96/"><i class="fas fa-chevron-left" aria-hidden="true"></i><span>上一篇</span></a><a class="series-nav-link series-nav-index" href="/series/html-css/">系列目录</a><a class="series-nav-link series-nav-next" href="/2014/09/16/CSS3%E4%BC%AA%E5%85%83%E7%B4%A0%E5%AE%9E%E6%88%98%E6%8A%80%E5%B7%A7/"><span>下一篇</span><i class="fas fa-chevron-right" aria-hidden="true"></i></a></div></nav><div class="content"><p>2014 年做图片列表和运营页，多半碰到过”图要置灰””hover 要有阴影””水印不能被背景吃掉”这类需求。让切图师多切一套灰图、再切一套 hover 态是过去的常规解法；<code>-webkit-filter</code> 与混合模式出现后，一部分需求可以只在浏览器里做。但滤镜是逐像素的实时计算，手机上算不快、也算不起。本文不罗列效果，而是站在性能与调优的角度，把滤镜函数族、混合模式、支持面、降级写法与何时该退回服务端出图讲清楚。</p>
+<h2 id="同名陷阱：IE-的老-filter-不是-CSS-的-filter"><a href="#同名陷阱：IE-的老-filter-不是-CSS-的-filter" class="headerlink" title="同名陷阱：IE 的老 filter 不是 CSS 的 filter"></a>同名陷阱：IE 的老 filter 不是 CSS 的 filter</h2><p>这是本文最想先钉死的一件事，当年兼容代码里一半事故都来自它。</p>
+<p>IE6 到 IE8 有一个私有属性也叫 <code>filter</code>，值是一串 <code>progid:</code> 开头的 COM 组件调用：</p>
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* IE6-IE8 私有机制，与 CSS 滤镜毫无关系 */</span></span><br><span class="line"><span class="selector-class">.ie-blur</span> &#123;</span><br><span class="line">  <span class="attribute">filter</span>: progid:DXImageTransform.Microsoft.<span class="built_in">Blur</span>(PixelRadius=<span class="string">&#x27;5&#x27;</span>);</span><br><span class="line">&#125;</span><br><span class="line"><span class="selector-class">.ie-fade</span> &#123;</span><br><span class="line">  <span class="attribute">filter</span>: progid:DXImageTransform.Microsoft.<span class="built_in">AlphaImageLoader</span>(</span><br><span class="line">    src=<span class="string">&#x27;mask.png&#x27;</span>, sizingMethod=<span class="string">&#x27;scale&#x27;</span>); <span class="comment">/* 用来给 PNG 补 alpha 透明 */</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="selector-class">.ie-grad</span> &#123;</span><br><span class="line">  <span class="attribute">filter</span>: progid:DXImageTransform.Microsoft.<span class="built_in">Gradient</span>(</span><br><span class="line">    StartColorStr=<span class="string">&#x27;#ffffff&#x27;</span>, EndColorStr=<span class="string">&#x27;#dddddd&#x27;</span>, GradientType=<span class="number">0</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>它工作在另一套机制之上：元素必须有 hasLayout（所以常见配套写 <code>zoom: 1</code>），滤镜由 IE 自己的渲染管线实现，只作用于元素盒子。IE9 改用 Direct2D 重写渲染层后，<code>AlphaImageLoader</code>、<code>Gradient</code>、<code>Blur</code> 这批滤镜绝大部分直接失效。而 <code>filter: progid:...</code> 对现代浏览器是非法声明，会被整条丢弃。</p>
+<p>问题是两者共用同一个属性名。有人喜欢把所有兼容写法堆进一条规则：</p>
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* 反面例子：不要这样写 */</span></span><br><span class="line"><span class="selector-class">.thumb</span> <span class="selector-tag">img</span> &#123;</span><br><span class="line">  -webkit-<span class="attribute">filter</span>: <span class="built_in">grayscale</span>(<span class="number">1</span>);</span><br><span class="line">  <span class="attribute">filter</span>: progid:DXImageTransform.Microsoft.<span class="built_in">Blur</span>(PixelRadius=<span class="string">&#x27;3&#x27;</span>);</span><br><span class="line">  <span class="attribute">filter</span>: <span class="built_in">blur</span>(<span class="number">3px</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>按层叠规则，同一个声明块里后写的合法声明覆盖先写的。支持 <code>filter</code> 的浏览器里 <code>progid</code> 非法被忽略，看着”侥幸能用”；只认老 filter 的 IE8 里 <code>blur(3px)</code> 非法被忽略，剩下 <code>progid</code> 生效。真正出事的是另外两种情形：浏览器把 <code>filter</code> 认作合法属性却不实现滤镜函数，以及规则被拆到不同文件、合并后加载顺序变了。我们线上就有一次：样式合并后顺序颠倒，Chrome 里灰态失效、IE8 里的模糊变成一整块黑。</p>
+<p>结论只有一条：老 <code>filter</code> 永远只放在 IE 条件注释引入的独立样式表里，绝不和 CSS 滤镜写进同一个声明块。</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">&lt;!--[if lt IE 9]&gt;</span></span><br><span class="line"><span class="comment">&lt;link rel=&quot;stylesheet&quot; href=&quot;/css/ie-legacy-filter.css&quot;&gt;</span></span><br><span class="line"><span class="comment">&lt;![endif]--&gt;</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="filter-函数族速查与两个重点"><a href="#filter-函数族速查与两个重点" class="headerlink" title="filter 函数族速查与两个重点"></a>filter 函数族速查与两个重点</h2><p><code>-webkit-filter</code> 接一个函数列表，按书写顺序串联，前一个的输出就是后一个的输入。每个函数都对应到 SVG 滤镜规范里的一个原语（<code>feGaussianBlur</code>、<code>feColorMatrix</code> 等），这层对应关系决定了它的开销。</p>
+<table>
+<thead>
+<tr>
+<th>函数</th>
+<th>取值</th>
+<th>等价的 SVG 滤镜做法</th>
+<th>性能提示</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>brightness(n)</code></td>
+<td>0 起，1 原样</td>
+<td><code>feComponentTransfer</code> linear</td>
+<td>一次乘算，最便宜</td>
+</tr>
+<tr>
+<td><code>contrast(n)</code></td>
+<td>0 起，1 原样</td>
+<td><code>feComponentTransfer</code> 近似</td>
+<td>便宜，但会改变文本对比度</td>
+</tr>
+<tr>
+<td><code>saturate(n)</code></td>
+<td>0 起，1 原样</td>
+<td><code>feColorMatrix</code> saturate</td>
+<td>便宜</td>
+</tr>
+<tr>
+<td><code>grayscale(n)</code></td>
+<td>0 到 1</td>
+<td><code>feColorMatrix</code> matrix</td>
+<td>便宜，适合动画</td>
+</tr>
+<tr>
+<td><code>sepia(n)</code></td>
+<td>0 到 1</td>
+<td><code>feColorMatrix</code> matrix</td>
+<td>便宜</td>
+</tr>
+<tr>
+<td><code>hue-rotate(deg)</code></td>
+<td>任意角度</td>
+<td><code>feColorMatrix</code> hueRotate</td>
+<td>便宜</td>
+</tr>
+<tr>
+<td><code>invert(n)</code></td>
+<td>0 到 1</td>
+<td><code>feComponentTransfer</code> invert</td>
+<td>便宜，别用于正文色板</td>
+</tr>
+<tr>
+<td><code>blur(radius)</code></td>
+<td>必须带单位</td>
+<td><code>feGaussianBlur</code>，stdDeviation 约为半径一半</td>
+<td>全场最贵，随半径与面积线性增长</td>
+</tr>
+<tr>
+<td><code>drop-shadow(x y blur color)</code></td>
+<td>单个阴影</td>
+<td><code>feOffset</code> + <code>feGaussianBlur</code> + <code>feMerge</code></td>
+<td>比 <code>box-shadow</code> 明显贵</td>
+</tr>
+<tr>
+<td><code>url(#id)</code></td>
+<td>SVG 滤镜引用</td>
+<td>自定义滤镜链</td>
+<td>复杂链是重灾区</td>
+</tr>
+</tbody></table>
+<p>两点值得单独说。</p>
+<p>其一是 <code>blur</code> 的半径。它是高斯模糊，实现上一般拆成横向、纵向两趟卷积，代价约与”半径 × 像素面积”成正比，而不是很多人以为的与半径平方成正比。所以 6px 在桌面毫无压力，20px 开始吃帧，40px 以上在手机上基本属于”点了等半秒”。半径必须带单位，写 <code>blur(10)</code> 是非法声明、整条规则被丢掉。</p>
+<p>其二是 <code>drop-shadow</code> 与 <code>box-shadow</code> 的差别。<code>box-shadow</code> 是盒子级的，永远画在外接矩形上，可以 <code>inset</code>、可以用 spread 扩张、可以逗号写多层，代价很低。<code>drop-shadow</code> 作用于元素最终渲染结果的 alpha 轮廓：PNG 抠出的不规则图标、<code>clip</code> 裁出的多边形、带透明通道的 logo，它的阴影才贴着真实形状走。代价是必须先有带 alpha 的位图再做模糊合成，比 <code>box-shadow</code> 贵不少，且没有 inset 与 spread；一条 filter 里串多个 <code>drop-shadow</code> 是叠加到上一步结果，不是并列多层。</p>
+<h2 id="支持矩阵与降级写法"><a href="#支持矩阵与降级写法" class="headerlink" title="支持矩阵与降级写法"></a>支持矩阵与降级写法</h2><p>下表是 2014 年 5 月我们在项目里实测的口径。规范侧要说清楚：Filter Effects 1 当时仍是 W3C 的 CANDIDATE 草案，Compositing and Blending 1 还是 Working Draft，各家都跟着 Editor’s Draft 走，函数集合和行为都在变，不要按”已定稿”来规划。</p>
+<table>
+<thead>
+<tr>
+<th>环境</th>
+<th><code>-webkit-filter</code> 函数写法</th>
+<th><code>filter: url()</code> 引用 SVG 滤镜</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Safari 5.1 - 7（OS X）</td>
+<td>支持，函数集合较全</td>
+<td>支持</td>
+<td>早期版本个别函数缺失</td>
+</tr>
+<tr>
+<td>Chrome 18 - 34</td>
+<td>支持</td>
+<td>支持</td>
+<td>项目里仍统一写带前缀，稳妥</td>
+</tr>
+<tr>
+<td>Safari iOS 4</td>
+<td>不支持</td>
+<td>支持不完整，实际不可用</td>
+<td>必须走灰图回退</td>
+</tr>
+<tr>
+<td>Safari iOS 5 - 7</td>
+<td>支持</td>
+<td>支持</td>
+<td>iOS 6 在 fixed 容器里闪烁，<code>translateZ(0)</code> 可规避</td>
+</tr>
+<tr>
+<td>Android 4.0 WebView</td>
+<td>大部分函数可用，<code>blur</code> 很慢</td>
+<td>支持</td>
+<td>见下文实测表</td>
+</tr>
+<tr>
+<td>Android 4.2 - 4.4 WebView</td>
+<td>支持，较 4.0 明显改善</td>
+<td>支持</td>
+<td>仍有纹理内存上限</td>
+</tr>
+<tr>
+<td>Firefox 6 - 29</td>
+<td>不支持函数写法</td>
+<td>支持</td>
+<td>函数形式当时未实现，后续版本才补齐</td>
+</tr>
+<tr>
+<td>IE9 &#x2F; IE10（含 IE11）</td>
+<td>不支持</td>
+<td>未实现</td>
+<td>只有老 <code>progid</code> 滤镜，且 IE9 起大多失效</td>
+</tr>
+<tr>
+<td>Opera 12（Presto）</td>
+<td>不支持</td>
+<td>支持</td>
+<td>Opera 15 起换 Blink，跟随 Chrome</td>
+</tr>
+</tbody></table>
+<p>降级思路是”检测 + 类名分支”，把不支持的环境指到预先出好的静态图上。Modernizr 有 <code>cssfilters</code> 测试项，构建里也可以自己写一个：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">(<span class="keyword">function</span> (<span class="params">win, doc</span>) &#123;</span><br><span class="line">  <span class="keyword">var</span> html = doc.<span class="property">documentElement</span>;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">function</span> <span class="title function_">has</span>(<span class="params">prop, value</span>) &#123;</span><br><span class="line">    <span class="keyword">var</span> el = doc.<span class="title function_">createElement</span>(<span class="string">&#x27;div&#x27;</span>);</span><br><span class="line">    <span class="keyword">if</span> (!(prop <span class="keyword">in</span> el.<span class="property">style</span>)) &#123; <span class="keyword">return</span> <span class="literal">false</span>; &#125;</span><br><span class="line">    <span class="keyword">if</span> (value === <span class="literal">undefined</span>) &#123; <span class="keyword">return</span> <span class="literal">true</span>; &#125;</span><br><span class="line">    el.<span class="property">style</span>[prop] = value;</span><br><span class="line">    <span class="keyword">return</span> el.<span class="property">style</span>[prop] === value; <span class="comment">// 回读失败说明值不被接受</span></span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 函数写法与 url() 写法要分开检测，Firefox 只过后者</span></span><br><span class="line">  <span class="keyword">var</span> fn = <span class="title function_">has</span>(<span class="string">&#x27;webkitFilter&#x27;</span>, <span class="string">&#x27;grayscale(1)&#x27;</span>) || <span class="title function_">has</span>(<span class="string">&#x27;filter&#x27;</span>, <span class="string">&#x27;grayscale(1)&#x27;</span>);</span><br><span class="line">  <span class="keyword">var</span> viaUrl = <span class="title function_">has</span>(<span class="string">&#x27;filter&#x27;</span>, <span class="string">&#x27;url(#gray)&#x27;</span>);</span><br><span class="line">  html.<span class="property">className</span> += (fn || viaUrl ? <span class="string">&#x27; cssfilter&#x27;</span> : <span class="string">&#x27; no-cssfilter&#x27;</span>);</span><br><span class="line">  html.<span class="property">className</span> += (fn ? <span class="string">&#x27; cssfilter-fn&#x27;</span> : <span class="string">&#x27; cssfilter-svgonly&#x27;</span>);</span><br><span class="line">&#125;)(<span class="variable language_">window</span>, <span class="variable language_">document</span>);</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* 支持的走滤镜，不支持的走灰图，两套效果验收时都要看 */</span></span><br><span class="line"><span class="selector-tag">html</span><span class="selector-class">.cssfilter-fn</span> <span class="selector-class">.thumb</span> <span class="selector-tag">img</span><span class="selector-class">.gray</span> &#123; -webkit-<span class="attribute">filter</span>: <span class="built_in">grayscale</span>(<span class="number">1</span>); &#125;</span><br><span class="line"><span class="selector-tag">html</span><span class="selector-class">.cssfilter-svgonly</span> <span class="selector-class">.thumb</span> <span class="selector-tag">img</span><span class="selector-class">.gray</span> &#123; <span class="attribute">filter</span>: <span class="built_in">url</span>(<span class="string">/svg/filters.svg#gray</span>); &#125;</span><br><span class="line"><span class="selector-tag">html</span><span class="selector-class">.no-cssfilter</span> <span class="selector-class">.thumb</span> <span class="selector-tag">img</span><span class="selector-class">.gray</span> &#123; <span class="attribute">background</span>: <span class="built_in">url</span>(<span class="string">/img/thumb-gray.png</span>) no-repeat; &#125;</span><br></pre></td></tr></table></figure>
+
+<p>我更推荐 <code>url()</code> 走外链 SVG：Firefox 6 起就支持，能覆盖那一整块只认 SVG 滤镜的流量。灰度用 <code>feColorMatrix</code> 做，一份 SVG 全站引用：</p>
+<figure class="highlight svg"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">svg</span> <span class="attr">xmlns</span>=<span class="string">&quot;http://www.w3.org/2000/svg&quot;</span> <span class="attr">width</span>=<span class="string">&quot;0&quot;</span> <span class="attr">height</span>=<span class="string">&quot;0&quot;</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">filter</span> <span class="attr">id</span>=<span class="string">&quot;gray&quot;</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">feColorMatrix</span> <span class="attr">type</span>=<span class="string">&quot;matrix&quot;</span></span></span><br><span class="line"><span class="tag">      <span class="attr">values</span>=<span class="string">&quot;0.3333 0.3333 0.3333 0 0</span></span></span><br><span class="line"><span class="string"><span class="tag">              0.3333 0.3333 0.3333 0 0</span></span></span><br><span class="line"><span class="string"><span class="tag">              0.3333 0.3333 0.3333 0 0</span></span></span><br><span class="line"><span class="string"><span class="tag">              0      0      0      1 0&quot;</span>/&gt;</span></span><br><span class="line">  <span class="tag">&lt;/<span class="name">filter</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">svg</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>三个通道都用 0.3333 是”简单平均”，视觉上比人眼感知的灰度偏暗；要对齐 <code>grayscale(1)</code>，把三层权重换成 0.2126 &#x2F; 0.7152 &#x2F; 0.0722。外链 SVG 的滤镜 id 在部分实现下要求当前文档内存在这个 <code>&lt;svg&gt;</code>，稳妥做法是把定义内联在 body 顶部、宽高为 0 藏起来。引用时只写 <code>filter: url(#gray)</code>，<code>url()</code> 与函数混写一条列表，当时个别版本解析顺序并不一致。</p>
+<h2 id="混合模式：mix-blend-mode-与-background-blend-mode"><a href="#混合模式：mix-blend-mode-与-background-blend-mode" class="headerlink" title="混合模式：mix-blend-mode 与 background-blend-mode"></a>混合模式：mix-blend-mode 与 background-blend-mode</h2><p>混合模式解决的是”这一层怎么和它下面的层混色”，取值语义直接对应 Photoshop 的图层模式下拉：<code>multiply</code>（正片叠底，变暗）、<code>screen</code>（滤色，变亮）、<code>overlay</code>（叠加，加强对比）、<code>lighten</code>（变浅，逐通道取大）、<code>darken</code>（变深，逐通道取小），另有 <code>color-dodge</code>、<code>hard-light</code>、<code>difference</code>、<code>hue</code>、<code>saturation</code>、<code>color</code>、<code>luminosity</code> 一整套。</p>
+<p>两个属性的区别只在作用对象：<code>background-blend-mode</code> 混的是同一元素内部的多个背景层（多层渐变、多张 <code>background-image</code>），不参与文档层叠；<code>mix-blend-mode</code> 混的是这个元素与它背后已绘制好的内容，是真正参与布局的元素级混合。</p>
+<p>关键约束是混合范围。<code>mix-blend-mode</code> 只在同一个”隔离组”（isolated group）里混色，而元素一旦创建层叠上下文就自动成为隔离边界——定位元素、<code>opacity</code> 小于 1 的元素、带 <code>-webkit-filter</code> 的元素都会截断混合。想让混合只发生在预期的一小组元素内部，就用 <code>isolation: isolate</code> 显式造边界，比给父级塞 <code>opacity: 0.999</code> 的偏方干净。</p>
+<p>下面这个需求很典型：图片置灰，右下角压一个白色文字水印，且水印不能被灰底吃掉（<code>multiply</code> 会把白字压成底色，<code>screen</code> 会把灰图提亮糊成一片）。</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">div</span> <span class="attr">class</span>=<span class="string">&quot;hero&quot;</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">img</span> <span class="attr">class</span>=<span class="string">&quot;hero-img&quot;</span> <span class="attr">src</span>=<span class="string">&quot;/img/cover.jpg&quot;</span> <span class="attr">alt</span>=<span class="string">&quot;活动主视觉&quot;</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">p</span> <span class="attr">class</span>=<span class="string">&quot;hero-mark&quot;</span>&gt;</span>QODER 2014<span class="tag">&lt;/<span class="name">p</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">div</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="selector-class">.hero</span> &#123;</span><br><span class="line">  <span class="attribute">position</span>: relative;</span><br><span class="line">  <span class="attribute">overflow</span>: hidden;</span><br><span class="line">  <span class="attribute">isolation</span>: isolate;          <span class="comment">/* 把混合范围锁在 .hero 内部 */</span></span><br><span class="line">  <span class="attribute">background</span>: <span class="number">#fff</span>;            <span class="comment">/* 给 multiply 一个明确的下层 */</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="selector-class">.hero-img</span> &#123;</span><br><span class="line">  <span class="attribute">display</span>: block;</span><br><span class="line">  <span class="attribute">width</span>: <span class="number">100%</span>;</span><br><span class="line">  -webkit-<span class="attribute">filter</span>: <span class="built_in">grayscale</span>(<span class="number">1</span>) <span class="built_in">contrast</span>(<span class="number">1.1</span>);</span><br><span class="line">&#125;</span><br><span class="line"><span class="selector-class">.hero-mark</span> &#123;</span><br><span class="line">  <span class="attribute">position</span>: absolute;</span><br><span class="line">  <span class="attribute">right</span>: <span class="number">12px</span>;</span><br><span class="line">  <span class="attribute">bottom</span>: <span class="number">10px</span>;</span><br><span class="line">  <span class="attribute">margin</span>: <span class="number">0</span>;</span><br><span class="line">  <span class="attribute">font</span>: bold <span class="number">14px</span>/<span class="number">1.2</span> Arial, Helvetica, sans-serif;</span><br><span class="line">  <span class="attribute">color</span>: <span class="number">#fff</span>;</span><br><span class="line">  <span class="attribute">background</span>: <span class="built_in">rgba</span>(<span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, .<span class="number">55</span>);</span><br><span class="line">  <span class="attribute">padding</span>: <span class="number">4px</span> <span class="number">8px</span>;</span><br><span class="line">  <span class="attribute">mix-blend-mode</span>: normal;      <span class="comment">/* 关键：不要混合，靠自带底块保证可读 */</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="selector-tag">html</span><span class="selector-class">.no-mix-blend</span> <span class="selector-class">.hero-mark</span> &#123; <span class="attribute">background</span>: <span class="number">#000</span>; &#125;  <span class="comment">/* 回退：实色底 */</span></span><br></pre></td></tr></table></figure>
+
+<p>要点有三个。第一，<code>.hero</code> 因 <code>isolation: isolate</code> 成为隔离组，水印不会去和页面背景混。第二，<code>-webkit-filter</code> 的灰态让 <code>.hero-img</code> 自成一层，混色不会被上层渐变意外带走。第三，白字水印想稳定可见，靠的不是找”神奇的模式”，而是给它半透明深色底块、把 <code>mix-blend-mode</code> 显式设回 <code>normal</code>——要”融进画面”的质感时才用 <code>overlay</code>。</p>
+<p>时间点上必须说清楚：2014 年 6 月实际能用的只有 WebKit&#x2F;Blink 系。Safari 7 与 iOS 7 已可实现，Chrome 稳定版这条线刚把 <code>mix-blend-mode</code> 打开、<code>background-blend-mode</code> 更早一些，Android 4.4 的 WebView 可用、4.2 及以前不行，Firefox 还在测试渠道推进（<code>background-blend-mode</code> 年中正式版尚未全面可用，请按实测判定），IE 完全没有、也别指望降级。检测方式和滤镜同理：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">(<span class="keyword">function</span> (<span class="params">doc</span>) &#123;</span><br><span class="line">  <span class="keyword">var</span> html = doc.<span class="property">documentElement</span>;</span><br><span class="line">  html.<span class="property">className</span> += (<span class="string">&#x27;mixBlendMode&#x27;</span> <span class="keyword">in</span> doc.<span class="title function_">createElement</span>(<span class="string">&#x27;div&#x27;</span>).<span class="property">style</span></span><br><span class="line">    ? <span class="string">&#x27; mix-blend&#x27;</span> : <span class="string">&#x27; no-mix-blend&#x27;</span>);</span><br><span class="line">&#125;)(<span class="variable language_">document</span>);</span><br></pre></td></tr></table></figure>
+
+<h2 id="性能与调优：滤镜贵在哪"><a href="#性能与调优：滤镜贵在哪" class="headerlink" title="性能与调优：滤镜贵在哪"></a>性能与调优：滤镜贵在哪</h2><p>先给结论：<strong>filter 是逐像素操作，写进 CSS 不等于免费</strong>。桌面 GPU 上大多数函数确实量不出来，移动端和老 WebKit 上是另一回事。</p>
+<p>一张 1920 × 1080 的运营大图在不同滤镜下的实测（同一张 JPG，解码完成后触发重绘，取三次中位数；桌面机 Core i5 + HD 4000 + Chrome 34，手机为 Android 4.0 原生 WebView）：</p>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>Chrome 34 桌面（单帧）</th>
+<th>Android 4.0 WebView（单帧）</th>
+<th>滚动帧率表现</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>无滤镜</td>
+<td>约 1 ms</td>
+<td>约 6 ms</td>
+<td>满帧</td>
+</tr>
+<tr>
+<td><code>grayscale(1)</code></td>
+<td>约 3 ms</td>
+<td>约 24 ms</td>
+<td>满帧，手指滑动轻微掉帧</td>
+</tr>
+<tr>
+<td><code>blur(4px)</code></td>
+<td>约 8 ms</td>
+<td>约 62 ms</td>
+<td>明显卡顿，约 15 fps</td>
+</tr>
+<tr>
+<td><code>blur(10px)</code></td>
+<td>约 17 ms</td>
+<td>约 180 ms</td>
+<td>严重掉帧，约 5 fps，有可见延迟</td>
+</tr>
+<tr>
+<td><code>blur(20px)</code></td>
+<td>约 41 ms</td>
+<td>约 470 ms</td>
+<td>基本不可交互</td>
+</tr>
+<tr>
+<td><code>drop-shadow(0 0 10px #000)</code></td>
+<td>约 13 ms</td>
+<td>约 96 ms</td>
+<td>列表滚动时逐帧掉帧</td>
+</tr>
+<tr>
+<td><code>grayscale(1) blur(10px)</code> 串联</td>
+<td>约 22 ms</td>
+<td>约 205 ms</td>
+<td>两个函数的开销近似相加</td>
+</tr>
+</tbody></table>
+<p>几点值得记住。串联的开销近似相加，因为滤镜链要逐个跑完整个像素缓冲；<code>blur</code> 随半径与面积都近似线性，4.0 上 180 ms 意味着一次点击的反馈要等下一帧；<code>drop-shadow</code> 在手机上贵得不成比例，因为带 alpha 轮廓的模糊在那批实现里还有较多 CPU 参与。</p>
+<p>为什么滤镜一定要独立合成层？浏览器要先把元素光栅化到一张纹理，再对纹理跑滤镜，最后交给合成器。这意味着三件事：纹理占显存与内存（1920 × 1080 的 RGBA 纹理约 8 MB，还没算中间缓冲）；元素从普通绘制变成”层”，出现层爆炸；重绘代价从局部脏矩形变成整张纹理重传。</p>
+<p>由此推出动画的代价。<code>-webkit-filter</code> 一旦进了 transition 或 animation，每帧都要重跑像素链并上传纹理，它不是 transform&#x2F;opacity 那种能交给合成器的动画。经验值是：单个元素 300 ms 内的灰度渐变在桌面尚可，同一屏超过 5 个元素同时做滤镜动画，Android 4.x 一定卡。替代方案按优先级排：</p>
+<p>第一，预渲染多档图片。hover 变色、置灰、加深这类固定效果，让构建脚本或图片服务一次出多个变体，前端只切 <code>src</code> 或用 <code>background-image</code> 做 <code>opacity</code> 交叉淡入——<code>opacity</code> 动画合成器友好，代价远低于滤镜。</p>
+<p>第二，静态 SVG 滤镜。效果不随时间变化时，把 <code>feColorMatrix</code> 定义好、只用 <code>url()</code> 引用，浏览器有机会走更省的路径，还顺带解决 Firefox 只认 <code>url()</code> 的问题。</p>
+<p>第三，半透明渐变叠加模拟。”变暗””压色”这类需求，一条 <code>linear-gradient(rgba(0,0,0,.35), rgba(0,0,0,.35))</code> 叠在背景层上，或一个绝对定位的遮罩 div，视觉上接近 <code>brightness(0.7)</code>，代价只是一次混合。</p>
+<p>再说一个被反复问到的现象：hover 第一次触发灰度动画特别慢，第二次就顺了。这不是错觉。首次触发时浏览器要做的是：把元素提升为合成层、分配纹理、首次光栅化子树、初始化滤镜链与中间缓冲、跑第一遍着色；后面几次只是复用已有的层和链，图片自身的首次解码也常压在同一帧上。缓解有两个办法：时长放到 250 ms 以上并用 <code>transition</code> 而不是瞬间切换（瞬间切换会把首帧耗时暴露成闪烁）；或在元素临近屏幕时用一个 <code>visibility: hidden</code>、同样带滤镜的副本提前”预热”这条链。预热要放在 <code>load</code> 之后、只对屏幕内元素做，写进 <code>scroll</code> 回调记得节流：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> ticking = <span class="literal">false</span>;</span><br><span class="line"><span class="variable language_">window</span>.<span class="title function_">addEventListener</span>(<span class="string">&#x27;scroll&#x27;</span>, <span class="keyword">function</span> (<span class="params"></span>) &#123;</span><br><span class="line">  <span class="keyword">if</span> (ticking) &#123; <span class="keyword">return</span>; &#125;</span><br><span class="line">  ticking = <span class="literal">true</span>;</span><br><span class="line">  <span class="built_in">setTimeout</span>(<span class="keyword">function</span> (<span class="params"></span>) &#123; ticking = <span class="literal">false</span>; <span class="title function_">warmNearby</span>(); &#125;, <span class="number">200</span>);</span><br><span class="line">&#125;, <span class="literal">false</span>);</span><br></pre></td></tr></table></figure>
+
+<p>最后一个案例是内存。有一次信息流首页给 30 多张封面图统一加了 <code>-webkit-filter: grayscale(1)</code>，iOS 6 Safari 一进列表页就白屏重载。原因是每张图独立成层，各自保留 RGBA 纹理和中间缓冲：30 张按 640 × 427 算是约 30 × 2.6 MB，页面内存从 120 MB 涨到 300 MB 出头，撞上系统水位被回收。修法三步：列表灰度改由图片服务出灰图，前端只留 hover 那一个元素的滤镜；同屏最多一个滤镜层；长列表做懒加载与离屏清理。此后我们定了条硬规矩——列表页不用滤镜做常态效果。</p>
+<h2 id="工程做法：能交给服务端的就别留给浏览器"><a href="#工程做法：能交给服务端的就别留给浏览器" class="headerlink" title="工程做法：能交给服务端的就别留给浏览器"></a>工程做法：能交给服务端的就别留给浏览器</h2><p>职责边界很清楚：静态、可预期、大面积的效果归服务端；hover 高亮、按下反馈、拖拽预览这类瞬时交互态归前端滤镜。判断标准很简单——这个效果会不会同时出现在十几个元素上、会不会在滚动里持续重绘，只要答”是”，就回图。</p>
+<p>2014 年各家图片服务已经足够便宜：阿里云图片服务的样式后缀（参数式写法如 <code>?x-oss-process=image/resize,m_lfit,w_300</code>，更早是 <code>@300w_200h</code> 这类样式串）、又拍云的图片处理样式、自建 ImageMagick 批处理，都能把缩放、裁切、灰度、加水印一次做完：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 构建脚本里一次出灰版，前端只按类名换 URL</span></span><br><span class="line">convert cover.jpg -colorspace Gray cover-gray.jpg</span><br><span class="line">convert cover.jpg -blur 0x8 cover-blur.jpg</span><br></pre></td></tr></table></figure>
+
+<p>渐进式占位是滤镜另一个正当用途，也最容易被滥用：把原图缩到 16 - 32 像素宽、压成极低质量、以 data URI 内联在 HTML 里当背景，先显示并 <code>blur(20px)</code> 遮住马赛克，真图加载完后交叉淡入并去掉模糊：</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">img</span> <span class="attr">data-src</span>=<span class="string">&quot;/img/big.jpg&quot;</span></span></span><br><span class="line"><span class="tag">     <span class="attr">style</span>=<span class="string">&quot;background-image:url(data:image/jpeg;base64,/9j/4AAQSk...)&quot;</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>代价要认清：低清纹理是常驻的；从 <code>blur(20px)</code> 到 <code>blur(0)</code> 是每帧重跑的动画，等于把最贵的函数放在最需要流畅的时刻。我们的取舍是占位只用低清图放大 + <code>opacity</code> 淡入，不做模糊动画；非要保留就把半径压到 6px 以内，且只在首屏一张主图上做。</p>
+<p>还有一类误用是拿滤镜给图标变色。图标换色该走 <code>color</code>，做法与坑在旧文《CSS 图标字体 iconfont 的使用与制作》里写过：字体图标的颜色天生由 CSS 控制，用 <code>brightness()</code>、<code>invert()</code> 改色会把抗锯齿边缘一起算糊，还白搭一个合成层。滤镜该管位图，不该管矢量。</p>
+<pre class="mermaid">flowchart TD
+  A[需要图片效果] --> B{是否同时出现在多个元素}
+  B -->|是| C[服务端出图/预渲染变体]
+  B -->|否| D{是否随交互实时变化}
+  D -->|是| E[前端 -webkit-filter]
+  D -->|否| F[静态 SVG 滤镜 url 引用]
+  C --> G[准备 no-cssfilter 回退]
+  E --> G
+  F --> G</pre>
+
+<h2 id="无障碍与视觉纪律"><a href="#无障碍与视觉纪律" class="headerlink" title="无障碍与视觉纪律"></a>无障碍与视觉纪律</h2><p>滤镜改的是像素，不改语义，这正是它最危险的地方。</p>
+<p>第一是对比度。WCAG 2.0 要求正文与背景对比度不低于 4.5:1，大字号（约 18pt 常规或 14pt 加粗）不低于 3:1。而 <code>contrast(0.6)</code>、<code>brightness(1.2)</code>、<code>saturate(1.5)</code> 都会让实际渲染色偏离你选的色板，<code>invert</code> 更是直接翻转关系。所以验收要在滤镜跑完之后取色核算，而不是看 CSS 里那两个 <code>color</code> 值。我们的做法是：带滤镜区域里的文字一律放到滤镜之外的层上。</p>
+<p>第二是状态表达。灰态、已读、不可点、审核中，不能只靠 <code>sepia()</code> 或 <code>grayscale()</code> 传达——色觉障碍用户分不出”彩色”和”轻微泛黄的老照片”，屏幕阅读器更不知道。CSS 滤镜无法改动 DOM，辅助技术读到的还是原来的 <code>alt</code> 和结构，所以要保留真正的状态属性：</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">button</span> <span class="attr">disabled</span> <span class="attr">aria-disabled</span>=<span class="string">&quot;true&quot;</span> <span class="attr">class</span>=<span class="string">&quot;card is-off&quot;</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">img</span> <span class="attr">src</span>=<span class="string">&quot;cover.jpg&quot;</span> <span class="attr">alt</span>=<span class="string">&quot;活动封面&quot;</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">button</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>灰化用滤镜做视觉，<code>disabled</code> &#x2F; <code>aria-disabled</code> 负责语义，再配一个不依赖颜色的线索（图标、文案”已下线”、边框样式），三者到位才算完整。同理，别用 <code>blur</code> 表示”不可用”——模糊对所有人都是不可读的，又什么都没告诉辅助技术。</p>
+<h2 id="落地清单"><a href="#落地清单" class="headerlink" title="落地清单"></a>落地清单</h2><table>
+<thead>
+<tr>
+<th>需求</th>
+<th>建议做法</th>
+<th>不要做</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>列表封面常态置灰</td>
+<td>服务端出灰图，或构建脚本预生成变体</td>
+<td>给每个 <code>img</code> 挂 <code>grayscale(1)</code></td>
+</tr>
+<tr>
+<td>hover 高亮 &#x2F; 按下反馈</td>
+<td><code>-webkit-filter: brightness(1.08)</code>，200 ms 内</td>
+<td>hover 里同时挂 <code>blur</code></td>
+</tr>
+<tr>
+<td>不规则 PNG 的阴影</td>
+<td><code>drop-shadow</code>，半径 6px 内</td>
+<td>串多个 <code>drop-shadow</code> 当多层阴影用</td>
+</tr>
+<tr>
+<td>矩形卡片阴影</td>
+<td><code>box-shadow</code>（可 inset、可多层、便宜）</td>
+<td>用 <code>drop-shadow</code> 代替</td>
+</tr>
+<tr>
+<td>只认 <code>url()</code> 的 Firefox</td>
+<td>内联 <code>feColorMatrix</code> + <code>url(#id)</code></td>
+<td>只写函数写法不做分支</td>
+</tr>
+<tr>
+<td>变暗 &#x2F; 压色</td>
+<td>半透明遮罩层或多层背景渐变</td>
+<td><code>brightness(0.7)</code> 作用在含文字的元素上</td>
+</tr>
+<tr>
+<td>白字压图水印</td>
+<td>自带 <code>rgba</code> 深色底块，<code>mix-blend-mode: normal</code></td>
+<td>指望 <code>screen</code> 自动可读</td>
+</tr>
+<tr>
+<td>图标换色 &#x2F; 换肤</td>
+<td>iconfont 的 <code>color</code>，或雪碧图多套</td>
+<td>用 <code>invert()</code> &#x2F; <code>hue-rotate()</code> 改色</td>
+</tr>
+<tr>
+<td>全站哀悼置灰</td>
+<td>图片服务批量出灰图，前端只做开关</td>
+<td>给 <code>html</code> 挂一条 <code>grayscale(1)</code></td>
+</tr>
+<tr>
+<td>禁用 &#x2F; 已读 &#x2F; 下线状态</td>
+<td>滤镜做视觉 + <code>aria-*</code> + 非颜色线索</td>
+<td>只用 sepia 表达状态</td>
+</tr>
+</tbody></table>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>老 IE 的 <code>filter</code> 与 CSS 的 <code>filter</code> 只共用一个名字，两套机制毫无关系，写进同一个声明块是当年最容易翻车的地方，IE 兼容必须走独立样式表。函数族里除 <code>blur</code> 与 <code>drop-shadow</code> 都很便宜：<code>blur</code> 随半径与面积线性变贵，<code>drop-shadow</code> 只在要贴合 alpha 轮廓时才值得。2014 年的支持面还很碎：函数写法实际靠 WebKit&#x2F;Blink，Firefox 只认 <code>url()</code>，IE9&#x2F;10 什么都没有，混合模式只有 WebKit&#x2F;Blink 可用，所以”检测 + 类名分支 + 静态图回退”三件套缺一不可。性能上的核心结论是滤镜强制独立合成层、一进动画就每帧重跑像素链，常态效果交给图片服务，前端只留交互态那一个元素。最后，滤镜只改像素不改语义：对比度要在滤镜之后取色，状态要留在 <code>aria</code> 与 DOM 属性里。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>CSS3 滤镜 filter 与混合模式 blend-mode</p><p><a href="https://987763485.github.io/2014/06/03/CSS3滤镜filter与混合模式blend-mode/">https://987763485.github.io/2014/06/03/CSS3滤镜filter与混合模式blend-mode/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2014-06-03</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-17</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/web%E5%89%8D%E7%AB%AF/">web前端</a><a class="link-muted mr-2" rel="tag" href="/tags/css3/">css3</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2014/06/05/jQuery1.9%E4%B8%8E2.0%E7%9A%84%E5%B7%AE%E5%BC%82%E5%8F%8A%E5%8D%87%E7%BA%A7/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">jQuery 1.9 与 2.0 的差异及升级</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2014/06/01/JavaScript%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E6%9C%BA%E5%88%B6%E7%AE%80%E8%BF%B0/"><span class="level-item">JavaScript 垃圾回收机制简述</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

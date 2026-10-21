@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Elasticsearch 集群调优 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="调优 Elasticsearch 集群时，最容易犯的错误是先抄一组参数，再回头寻找证据。本文以 7.x 版本为背景，从负载类型与瓶颈定位讲起，依次讨论分片、写入链路、段合并、内存与线程池、查询执行和分片分配。读完之后，你应当能按“测量、假设、验证”的顺序处理大多数性能问题，而不是依赖零散的经验值。"><meta property="og:type" content="blog"><meta property="og:title" content="Elasticsearch 集群调优"><meta property="og:url" content="https://987763485.github.io/2020/10/19/Elasticsearch%E9%9B%86%E7%BE%A4%E8%B0%83%E4%BC%98/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="调优 Elasticsearch 集群时，最容易犯的错误是先抄一组参数，再回头寻找证据。本文以 7.x 版本为背景，从负载类型与瓶颈定位讲起，依次讨论分片、写入链路、段合并、内存与线程池、查询执行和分片分配。读完之后，你应当能按“测量、假设、验证”的顺序处理大多数性能问题，而不是依赖零散的经验值。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2020-10-19T08:44:30.000Z"><meta property="article:modified_time" content="2026-10-18T15:11:33.765Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="devops"><meta property="article:tag" content="docker"><meta property="article:tag" content="linux"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2020/10/19/Elasticsearch%E9%9B%86%E7%BE%A4%E8%B0%83%E4%BC%98/"},"headline":"Elasticsearch 集群调优","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2020-10-19T08:44:30.000Z","dateModified":"2026-10-18T15:11:33.765Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"调优 Elasticsearch 集群时，最容易犯的错误是先抄一组参数，再回头寻找证据。本文以 7.x 版本为背景，从负载类型与瓶颈定位讲起，依次讨论分片、写入链路、段合并、内存与线程池、查询执行和分片分配。读完之后，你应当能按“测量、假设、验证”的顺序处理大多数性能问题，而不是依赖零散的经验值。"}</script><link rel="canonical" href="https://987763485.github.io/2020/10/19/Elasticsearch%E9%9B%86%E7%BE%A4%E8%B0%83%E4%BC%98/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2020-10-19T08:44:30.000Z" title="10/19/2020, 4:44:30 PM">2020-10-19</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/">容器与运维</a></span><span class="level-item">1 小时读完 (大约8097个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Elasticsearch 集群调优</h1><div class="content"><p>调优 Elasticsearch 集群时，最容易犯的错误是先抄一组参数，再回头寻找证据。本文以 7.x 版本为背景，从负载类型与瓶颈定位讲起，依次讨论分片、写入链路、段合并、内存与线程池、查询执行和分片分配。读完之后，你应当能按“测量、假设、验证”的顺序处理大多数性能问题，而不是依赖零散的经验值。</p>
+<h2 id="从负载出发：先测量，再动参数"><a href="#从负载出发：先测量，再动参数" class="headerlink" title="从负载出发：先测量，再动参数"></a>从负载出发：先测量，再动参数</h2><p>同一个参数在不同负载下的效果可能完全相反。把 <code>refresh_interval</code> 调大，对批量写入是明显的吞吐优化，对“写入后立刻搜索”的场景却是可见性倒退；把堆调大，对聚合查询可能减少磁盘读取，对写入型节点却可能换来更长的 GC 停顿。因此调优的第一步不是改配置，而是给集群归类：它到底在为什么样的请求服务。</p>
+<table>
+<thead>
+<tr>
+<th>负载类型</th>
+<th>主要开销</th>
+<th>优先观察的指标</th>
+<th>常见症状</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>写入型（日志、指标）</td>
+<td>分词与倒排、段合并、磁盘顺序写</td>
+<td>写入速率、merge 耗时、write 队列拒绝数</td>
+<td>bulk 返回 429、段数量持续上涨、磁盘写满</td>
+</tr>
+<tr>
+<td>查询型（站内搜索）</td>
+<td>打分、页缓存命中、段数量</td>
+<td>查询 P95&#x2F;P99、慢日志、缓存命中率</td>
+<td>慢查询集中在少数索引、GC 随查询量抖动</td>
+</tr>
+<tr>
+<td>聚合型（报表、分析）</td>
+<td>全局序号、fielddata、CPU</td>
+<td>聚合耗时、熔断次数、堆占用</td>
+<td>节点发热、circuit breaker 异常、长停顿</td>
+</tr>
+</tbody></table>
+<p>现实中的集群往往是混合负载：白天查询、夜间跑批，或者同一个集群既有日志索引又有业务索引。这时比调参更有效的手段是按索引拆分职责，把写入密集的索引与查询密集的索引放到不同节点上，再用分片分配规则隔离。先分清负载，后面的每个决定才有判断依据。</p>
+<h3 id="用一组只读命令建立基线"><a href="#用一组只读命令建立基线" class="headerlink" title="用一组只读命令建立基线"></a>用一组只读命令建立基线</h3><p>调优前后需要有可比较的基线。下面几条命令不会修改集群状态，适合作为每次变更前后的固定检查项：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 集群整体状态与节点数</span></span><br><span class="line">curl -s <span class="string">&#x27;localhost:9200/_cluster/health?pretty&#x27;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 每个索引的主分片数、副本数、文档数与存储大小</span></span><br><span class="line">curl -s <span class="string">&#x27;localhost:9200/_cat/indices?v&amp;h=index,health,pri,rep,docs.count,store.size,pri.store.size&#x27;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 各节点线程池的活跃线程、排队数与拒绝数</span></span><br><span class="line">curl -s <span class="string">&#x27;localhost:9200/_cat/thread_pool?v&amp;h=node_name,name,active,queue,rejected,completed&#x27;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># JVM、操作系统、文件系统与索引统计</span></span><br><span class="line">curl -s <span class="string">&#x27;localhost:9200/_nodes/stats/indices,os,jvm,fs?pretty&#x27;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 当前最忙的线程，排查 CPU 热点</span></span><br><span class="line">curl -s <span class="string">&#x27;localhost:9200/_nodes/hot_threads?threads=3&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p><code>_cluster/health</code> 的 <code>status</code> 只说明分片是否分配完整，不说明性能好坏；真正有信息量的是 <code>_cat/indices</code> 里的分片规模、<code>_cat/thread_pool</code> 里的 <code>rejected</code> 累计值，以及 <code>_nodes/stats</code> 中 <code>jvm.gc</code> 的收集次数与耗时。把这些值按时间窗口采样，才能判断“慢”是持续状态还是某个批处理任务带来的短时尖峰。</p>
+<p>慢日志用于定位具体请求：把 <code>index.search.slowlog.threshold.query.warn</code> 与 <code>index.indexing.slowlog.threshold.index.warn</code> 调到业务可接受的阈值，超过阈值的查询或写入会连同耗时、来源写入日志；阈值过低会让日志本身变成 IO 负担。GC 日志则应在 <code>jvm.options</code> 中确认开启并滚动，结合 <code>_nodes/stats/jvm</code> 区分频繁小停顿与偶发长停顿。</p>
+<h3 id="瓶颈对照表"><a href="#瓶颈对照表" class="headerlink" title="瓶颈对照表"></a>瓶颈对照表</h3><table>
+<thead>
+<tr>
+<th>现象</th>
+<th>更可能的瓶颈</th>
+<th>下一步动作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CPU 长期偏高，<code>hot_threads</code> 多落在 <code>index</code> 或 <code>merge</code> 线程</td>
+<td>分词、合并或刷新过频</td>
+<td>检查 mapping 与 <code>refresh_interval</code>，评估 merge 限流</td>
+</tr>
+<tr>
+<td>old GC 次数上升、单次停顿变长</td>
+<td>堆过大、对象分配率高或 fielddata 膨胀</td>
+<td>看 GC 日志与堆内大对象，缩小 bulk、移除 text 聚合</td>
+</tr>
+<tr>
+<td><code>iowait</code> 高，merge 长期落后</td>
+<td>磁盘带宽不足或 merge 线程过多</td>
+<td>换 SSD、降低 merge 并发、减少小段</td>
+</tr>
+<tr>
+<td>网络打满，客户端大量重试</td>
+<td>副本过多、分片分布不均或 bulk 过大</td>
+<td>看 <code>_cat/allocation</code>，检查路由与副本设置</td>
+</tr>
+<tr>
+<td>单节点分片数上万，集群状态更新慢</td>
+<td>分片过多</td>
+<td>合并小索引，改用 rollover，减少历史索引副本</td>
+</tr>
+</tbody></table>
+<p>改参数时坚持一次只动一个变量，并保留一个可回滚的窗口。比如先把 <code>refresh_interval</code> 从 1s 调到 30s，观察一天的写入拒绝数与查询可见性，再决定是否继续调整 translog。若同时改五个参数，出现问题时无法判断是哪一个起了作用。</p>
+<h2 id="分片策略：数量、大小与路由"><a href="#分片策略：数量、大小与路由" class="headerlink" title="分片策略：数量、大小与路由"></a>分片策略：数量、大小与路由</h2><p>分片是调优中代价最高的决定。<code>number_of_shards</code> 在索引创建后不能直接修改，只能通过 shrink、split 或 reindex 重建，因此它必须在建索引之前想清楚。分片数量既影响写入并行度，也影响集群状态大小、恢复速度和查询的扇出成本。</p>
+<h3 id="目标大小与数量约束"><a href="#目标大小与数量约束" class="headerlink" title="目标大小与数量约束"></a>目标大小与数量约束</h3><p>业界比较稳妥的经验是：单个分片的大小控制在 10 GB 到 50 GB 之间，每个节点的分片数不超过“堆内存 GB 数乘以 20”。后一条约束来自集群状态与段元数据的开销：分片越多，主节点维护的集群状态越大，数据节点上打开的 Lucene 文件也越多，恢复时要重放的 translog 越多。</p>
+<p>分片过多与过少各有代价：</p>
+<ul>
+<li>分片过多：每个分片都有固定的内存与文件句柄开销，集群状态更新变慢，一次查询要访问更多分片，协调节点合并结果的成本上升；恢复时并发重放大量小分片，反而拖长恢复时间。</li>
+<li>分片过少：单个分片过大，恢复与迁移都以整个分片为单位，时间长且占用带宽；写入无法分散到更多节点；一次 merge 可能长时间占满磁盘。</li>
+</ul>
+<p>可以用一个简单的算式估算主分片数：用实测的单日主分片存储量除以目标分片大小，再向上取整。例如某日志索引每天的主分片数据约 180 GB，目标分片 30 GB，则主分片取 6；保留 30 天就是 180 个主分片，分布在 3 个节点上每节点 60 个，若堆为 16 GB，按每 GB 堆 20 个分片的上限是 320 个，仍在安全范围内。注意这里的 180 GB 应来自 <code>pri.store.size</code> 的实测值，而不是原始日志量，压缩比因数据而异，不能拍脑袋。</p>
+<h3 id="按天建索引，还是-rollover"><a href="#按天建索引，还是-rollover" class="headerlink" title="按天建索引，还是 rollover"></a>按天建索引，还是 rollover</h3><p>按天建索引实现简单，但流量低谷期会产生大量很小的索引：每天几百万条文档却占三个主分片，几个月后集群里全是“碎片”。更稳妥的方式是用带序号的索引名加写别名，由 rollover 按大小或时间切分：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">PUT /logs<span class="number">-000001</span></span><br><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;settings&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;number_of_shards&quot;</span><span class="punctuation">:</span> <span class="number">3</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;number_of_replicas&quot;</span><span class="punctuation">:</span> <span class="number">1</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;refresh_interval&quot;</span><span class="punctuation">:</span> <span class="string">&quot;30s&quot;</span></span><br><span class="line">  <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;aliases&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;logs-write&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;is_write_index&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">true</span></span> <span class="punctuation">&#125;</span></span><br><span class="line">  <span class="punctuation">&#125;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>后续写入统一走 <code>logs-write</code>，当当前索引达到阈值时触发滚动：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">POST /logs-write/_rollover</span><br><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;conditions&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;max_size&quot;</span><span class="punctuation">:</span> <span class="string">&quot;30gb&quot;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;max_age&quot;</span><span class="punctuation">:</span> <span class="string">&quot;1d&quot;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;max_docs&quot;</span><span class="punctuation">:</span> <span class="number">200000000</span></span><br><span class="line">  <span class="punctuation">&#125;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>rollover 的好处是分片大小可控：无论每天数据量如何波动，切出来的索引都在目标范围内。配合索引生命周期管理，还可以在索引变旧后减少副本、执行 force merge，把磁盘留给真正需要查询的数据。</p>
+<h3 id="路由与副本"><a href="#路由与副本" class="headerlink" title="路由与副本"></a>路由与副本</h3><p>默认路由是对文档 <code>_id</code> 做哈希，数据分布通常足够均匀。自定义 <code>routing</code> 能把同一业务键的文档放到同一分片，便于按用户或租户查询，但如果某个路由值对应的数据量远大于其他值，就会形成热点分片，写入和查询都压在一个节点上。使用自定义路由前，先确认键的基数足够大、分布足够均匀。</p>
+<p>副本的作用有两个：故障时接管主分片，以及分摊查询。增加副本会成倍增加存储与写入放大，因为每个副本都要执行同样的索引操作。对写入型集群，副本从 1 降到 0 能显著减少写入压力，但此时节点故障会丢数据，只适合可重建的数据且在维护窗口内短期使用；对查询型集群，增加副本往往比升级 CPU 更直接。这个取舍要写进容量规划，而不是临时改设置。</p>
+<h3 id="分配、水位与热点节点"><a href="#分配、水位与热点节点" class="headerlink" title="分配、水位与热点节点"></a>分配、水位与热点节点</h3><p>节点磁盘使用率由三个水位控制，7.x 的默认值是低水位 85%、高水位 90%、洪泛水位 95%。超过低水位后新分片不再分配进来，超过高水位会尝试迁走分片，超过洪泛水位则相关索引被加上只读块，写入直接失败。可以用下面的命令确认某个分片为什么没有分配：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">curl -s <span class="string">&#x27;localhost:9200/_cluster/allocation/explain?pretty&#x27;</span> \</span><br><span class="line">  -H <span class="string">&#x27;Content-Type: application/json&#x27;</span> \</span><br><span class="line">  -d <span class="string">&#x27;&#123;&quot;index&quot;: &quot;logs-000001&quot;, &quot;shard&quot;: 0, &quot;primary&quot;: true&#125;&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p>返回结果会逐条列出“不允许分配”的原因，例如节点磁盘超过水位、分配过滤规则不匹配、已有同一分片的副本。遇到 unassigned 分片时先看这个接口，不要急着手工 reroute。跨机架或跨可用区部署时，可以设置 <code>cluster.routing.allocation.awareness.attributes</code>，让主副本落在不同故障域；同时注意“强制感知”会在域数量不足时拒绝分配，需要预留容量。滚动重启或维护时，可以临时把 <code>cluster.routing.allocation.enable</code> 设为 <code>primaries</code>，减少无谓的副本搬迁；日常则用 <code>cluster.routing.allocation.cluster_concurrent_rebalance</code> 限制同时迁移的分片数，避免再平衡本身成为磁盘与网络的尖峰。</p>
+<h2 id="写入链路：refresh、translog-与-flush"><a href="#写入链路：refresh、translog-与-flush" class="headerlink" title="写入链路：refresh、translog 与 flush"></a>写入链路：refresh、translog 与 flush</h2><p>一次写入并不是“落盘即完成”，它要经过内存缓冲、translog 与 Lucene 段三个环节。很多看似矛盾的调优建议，其实是在这条链路上选择不同的持久化点。</p>
+<pre class="mermaid">flowchart TD
+    A[客户端 bulk 请求] --> B[写入内存缓冲]
+    A --> C[追加 translog]
+    C --> D{durability}
+    D -->|request| E[每次请求 fsync]
+    D -->|async| F[按 sync_interval fsync]
+    B --> G[refresh 生成 segment]
+    G --> H[文档可被搜索]
+    B --> I[flush 提交 Lucene]
+    I --> J[清理旧 translog]</pre>
+
+<h3 id="refresh-interval：搜索可见性的代价"><a href="#refresh-interval：搜索可见性的代价" class="headerlink" title="refresh_interval：搜索可见性的代价"></a>refresh_interval：搜索可见性的代价</h3><p><code>refresh_interval</code> 的默认值是 1s，意思是每秒把内存缓冲里的文档写成一个小段并重新打开搜索器，让新文档可以被搜到。刷新的代价不只是写磁盘：每次刷新都会产生新段，增加后续合并压力，并使查询缓存部分失效。写入量越大，1s 的刷新越像一台不停制造小文件的机器。</p>
+<p>批量导入或重建索引时，通常把刷新间隔调大甚至设为 <code>-1</code>：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">PUT /logs<span class="number">-000001</span>/_settings</span><br><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;index&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;refresh_interval&quot;</span><span class="punctuation">:</span> <span class="string">&quot;-1&quot;</span></span><br><span class="line">  <span class="punctuation">&#125;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>设为 <code>-1</code> 表示关闭周期性刷新，文档仍会写入缓冲和 translog，但在手动 refresh 之前不可搜索。导入完成后务必恢复，例如改成 <code>30s</code>，既降低刷新频率，又保证秒级可见性。如果业务在写入后必须立刻查到，可以使用 <code>?refresh=wait_for</code> 让请求等待下一次刷新，而不是对每条文档使用 <code>refresh=true</code>，后者会让每次写入都强制生成段。</p>
+<h3 id="translog-的两种持久化模式"><a href="#translog-的两种持久化模式" class="headerlink" title="translog 的两种持久化模式"></a>translog 的两种持久化模式</h3><p>translog 是写入后的预写日志。<code>index.translog.durability</code> 有两个取值：</p>
+<table>
+<thead>
+<tr>
+<th>取值</th>
+<th>行为</th>
+<th>故障时可能丢失</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>request</code>（默认）</td>
+<td>每个索引、删除、bulk 请求返回前执行 fsync</td>
+<td>已确认的请求不会丢</td>
+<td>订单、账务、审计等不可重建数据</td>
+</tr>
+<tr>
+<td><code>async</code></td>
+<td>写入页缓存，按 <code>index.translog.sync_interval</code> 周期 fsync，默认 5s</td>
+<td>操作系统崩溃或断电时可能丢最近一个周期</td>
+<td>日志、指标等可重放数据</td>
+</tr>
+</tbody></table>
+<p><code>async</code> 并不等于“不写磁盘”，进程崩溃时页缓存仍在，通常不会丢数据；它防范的是机器断电或内核崩溃。把 durability 关掉换取吞吐，本质上是用一个明确的数据丢失窗口换更少的 fsync。这个决定应该由数据 owner 做出并写进文档，而不是运维为了压测好看随手改掉。</p>
+<p>另一个相关参数是 <code>index.translog.flush_threshold_size</code>，默认 512 MB。translog 超过阈值会触发 flush，把内存中的段提交为 Lucene 提交点并开启新的 translog 世代。阈值调大能减少 flush 次数，但节点重启后需要重放的日志更多，恢复时间更长。</p>
+<h3 id="flush-不等于-refresh"><a href="#flush-不等于-refresh" class="headerlink" title="flush 不等于 refresh"></a>flush 不等于 refresh</h3><p>refresh 让文档可搜索，flush 则负责持久化提交点并清理旧 translog，两者解决的是不同问题。<code>_flush</code> 不是控制搜索可见性的手段，<code>_refresh</code> 也不负责清理 translog。排障时把这两个概念混为一谈，很容易得出“刷新了为什么还丢数据”的错误结论。</p>
+<p>对写入型集群，合理的组合通常是：刷新间隔 30s 左右、durability 按数据价值选择、bulk 请求批量提交。真正的吞吐提升来自“减少每次写入的固定开销”，而不是把每个开关都推到极端。</p>
+<h2 id="写入吞吐：bulk、mapping-与-pipeline"><a href="#写入吞吐：bulk、mapping-与-pipeline" class="headerlink" title="写入吞吐：bulk、mapping 与 pipeline"></a>写入吞吐：bulk、mapping 与 pipeline</h2><h3 id="bulk-的大小与并发"><a href="#bulk-的大小与并发" class="headerlink" title="bulk 的大小与并发"></a>bulk 的大小与并发</h3><p>官方给出的起点是每批 5 MB 到 15 MB，但这不是固定答案。批量太小，请求解析、网络往返与 translog fsync 的固定成本占比过高；批量太大，协调节点要缓存整个请求，堆压力上升，单个请求失败后的重试成本也更高。实践方法是从 5 MB 开始，在观察写入速率与 GC 的前提下逐步加大，直到速率不再上升或拒绝开始出现。</p>
+<p>并发度同样需要试探。一个 bulk 请求会按目标分片拆成多个子请求并行执行，所以单批已经具备一定并行性；再叠加大量客户端并发，只会让 write 队列堆积、段数量暴涨。比较稳妥的做法是：控制客户端并发在“节点数乘以每节点少量请求”的量级，遇到 <code>es_rejected_execution_exception</code> 时按指数退避重试，而不是立刻加大队列。</p>
+<h3 id="mapping-决定写入成本"><a href="#mapping-决定写入成本" class="headerlink" title="mapping 决定写入成本"></a>mapping 决定写入成本</h3><p>写入成本很大一部分在 mapping 上。默认的动态映射会把字符串同时映射为 <code>text</code> 和 <code>keyword</code> 子字段，前者分词建倒排，后者建 doc values；如果日志里不断出现新字段，还会持续更新集群状态，最终触发字段数上限。7.x 的 <code>index.mapping.total_fields.limit</code> 默认是 1000，超过后新字段会被拒绝，这类故障往往在运行数月后才暴露。</p>
+<p>控制字段膨胀有三种常用手段：</p>
+<ul>
+<li>把索引的 <code>dynamic</code> 设为 <code>strict</code>，遇到未定义字段直接报错，迫使上游收敛结构；设为 <code>false</code> 则忽略新字段，文档仍可写入但字段不可搜索。</li>
+<li>用 <code>dynamic_templates</code> 按字段名或类型匹配，把字符串统一映射为 <code>keyword</code>，避免无意义的分词。</li>
+<li>对确定不需要检索的字段使用 <code>index: false</code>，对不需要排序和聚合的字段使用 <code>doc_values: false</code>，对只用于过滤的字段关闭 norms。</li>
+</ul>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">PUT /logs<span class="number">-000001</span>/_mapping</span><br><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;dynamic&quot;</span><span class="punctuation">:</span> <span class="string">&quot;strict&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;properties&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;message&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;type&quot;</span><span class="punctuation">:</span> <span class="string">&quot;text&quot;</span> <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;service&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;type&quot;</span><span class="punctuation">:</span> <span class="string">&quot;keyword&quot;</span> <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;trace_id&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;type&quot;</span><span class="punctuation">:</span> <span class="string">&quot;keyword&quot;</span><span class="punctuation">,</span> <span class="attr">&quot;index&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">false</span></span><span class="punctuation">,</span> <span class="attr">&quot;doc_values&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">false</span></span> <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;response_ms&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;type&quot;</span><span class="punctuation">:</span> <span class="string">&quot;integer&quot;</span> <span class="punctuation">&#125;</span></span><br><span class="line">  <span class="punctuation">&#125;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>上面把 <code>trace_id</code> 设为不可搜索、不建 doc values，是因为它只用于展示，不参与过滤和聚合。每关掉一个倒排或列存结构，都节省一份磁盘和写入 CPU，但也要确认没有查询依赖它。</p>
+<h3 id="pipeline-的隐性成本"><a href="#pipeline-的隐性成本" class="headerlink" title="pipeline 的隐性成本"></a>pipeline 的隐性成本</h3><p>ingest pipeline 在每个文档上依次执行处理器。<code>grok</code> 的正则匹配、<code>date</code> 的多格式解析、脚本处理器都属于 CPU 密集操作，放在高吞吐写入路径上会被放大。使用前先用 <code>_simulate</code> 接口验证模式和输出，尽量把解析工作前移到采集端；确需在集群内处理时，控制正则复杂度，避免回溯失控，并注意处理器失败会导致文档被拒绝或进入失败索引。</p>
+<p>pipeline 还会影响 bulk 的错误定位：一批中某条文档处理失败，返回结果里会带对应的条目，客户端应逐条检查 <code>errors</code> 字段，而不是只看 HTTP 状态码。批量写入的可靠性，往往取决于客户端有没有正确处理部分失败。</p>
+<h2 id="段合并、force-merge-与磁盘-IO"><a href="#段合并、force-merge-与磁盘-IO" class="headerlink" title="段合并、force_merge 与磁盘 IO"></a>段合并、force_merge 与磁盘 IO</h2><p>每次 refresh 都会产生新的 Lucene 段，段一旦写出就不再修改。删除和更新只是标记，真正的空间回收与查询加速依赖后台合并：把若干小段合成更大的段，同时丢弃被删除的文档。合并是顺序读写大文件，代价是磁盘带宽与 CPU，收益是更少的段、更小的索引和更快的查询。</p>
+<h3 id="看段的数量，而不是只看索引大小"><a href="#看段的数量，而不是只看索引大小" class="headerlink" title="看段的数量，而不是只看索引大小"></a>看段的数量，而不是只看索引大小</h3><p><code>_cat/segments</code> 能列出每个分片的段数与大小。持续写入的索引，段数在几十到上百之间波动是正常的，因为后台合并一直在追赶；但如果段数长期只增不减，或单个分片有数百个小段，查询就要在每个段上执行过滤和打分，延迟会明显上升。refresh 越频繁、merge 越跟不上，这个数字越难看。</p>
+<h3 id="force-merge-只对只读索引有意义"><a href="#force-merge-只对只读索引有意义" class="headerlink" title="force_merge 只对只读索引有意义"></a>force_merge 只对只读索引有意义</h3><p><code>_forcemerge</code> 可以强制把分片合并到指定段数，常见用法是 <code>max_num_segments=1</code>。它适合历史索引、冷数据或刚重建完不再写入的索引：段数降到 1 后，查询只需要打开一个段，磁盘占用也会因清理删除标记而下降。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -X POST <span class="string">&#x27;localhost:9200/logs-2020.10.01/_forcemerge?max_num_segments=1&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p>对仍在写入的索引执行 force merge 通常是反效果：合并刚完成，新的 refresh 又产生小段，后台合并还得再做一遍，期间磁盘被长时间占满，写入和查询一起变慢。需要回收删除空间时，可以用 <code>only_expunge_deletes=true</code>，它只合并含删除文档的段，代价比全量合并小。</p>
+<h3 id="限流与磁盘保护"><a href="#限流与磁盘保护" class="headerlink" title="限流与磁盘保护"></a>限流与磁盘保护</h3><p>合并会与查询、写入争抢磁盘。网上常见的建议是调 <code>indices.store.throttle.max_bytes_per_sec</code> 给合并限速，但这个设置从 6.0 起已废弃，7.x 不再支持；合并改由 ConcurrentMergeScheduler 自动节流，真正可调的是 <code>index.merge.scheduler.max_thread_count</code>，机械盘建议设为 1，SSD 保留默认即可。调整前先看 <code>_cat/segments</code> 的段数、merge 耗时与 <code>iowait</code>，确认瓶颈确实在合并，而不是照搬旧版本的参数。</p>
+<p>磁盘写满会让整个索引变成只读，恢复过程远比提前限流麻烦。监控上应同时看 <code>_cat/allocation</code> 的使用率、merge 的耗时与 <code>iowait</code>，不要等洪泛水位触发才处理。</p>
+<h2 id="JVM、内存与线程池"><a href="#JVM、内存与线程池" class="headerlink" title="JVM、内存与线程池"></a>JVM、内存与线程池</h2><h3 id="堆不是越大越好"><a href="#堆不是越大越好" class="headerlink" title="堆不是越大越好"></a>堆不是越大越好</h3><p>Elasticsearch 的堆建议不超过物理内存的 50%，剩余内存留给操作系统页缓存。Lucene 读取段文件时依赖页缓存，如果堆把内存吃光，查询会退化为频繁的磁盘读，延迟成倍上升。单节点给堆留出余量，比把所有内存都塞进 JVM 更划算。</p>
+<p>另一个硬约束是压缩指针。HotSpot 在堆小于约 32 GB 时可以用 32 位压缩对象指针，超过这个界限后退化为 64 位指针，同样的对象占用更多内存，堆从 31 GB 加到 40 GB 实际可用对象数可能没有增加，GC 停顿反而更长。因此常见做法是把堆控制在 30 GB 上下；确实需要更大内存时，优先增加节点而不是无限加大单堆。</p>
+<p>7.x 自带 JDK 默认使用 G1 GC，暂停目标默认在 200ms 量级。对大多数集群，保留默认并观察 GC 日志即可，不必手写一堆调优参数。要关注的是 old GC 的频率与单次停顿：如果 old GC 每隔几分钟就出现且停顿持续上升，通常说明堆内有长期存活的大对象，例如 fielddata、聚合中间结果或过大的批量请求，应先找对象来源，而不是换 GC 算法。</p>
+<h3 id="内存锁定与系统参数"><a href="#内存锁定与系统参数" class="headerlink" title="内存锁定与系统参数"></a>内存锁定与系统参数</h3><p><code>bootstrap.memory_lock: true</code> 让 JVM 锁定堆内存，避免被换出到 swap。swap 对 Elasticsearch 的伤害很大：一次换入换出可能造成数秒停顿，还会让节点被主节点误判为失联。启用内存锁定需要在 systemd 中放开 <code>LimitMEMLOCK=infinity</code>，否则启动会失败。与之配套的是把 <code>vm.swappiness</code> 调低，并在监控中确认没有 swap 使用。</p>
+<p><code>vm.max_map_count</code> 必须至少为 262144，否则 Lucene 打开大量段文件时会触发 <code>max virtual memory areas vm.max_map_count is too low</code>。这是部署检查项，不是性能参数，但它在分片多、段多时最容易暴露。</p>
+<h3 id="页缓存与磁盘"><a href="#页缓存与磁盘" class="headerlink" title="页缓存与磁盘"></a>页缓存与磁盘</h3><p>堆之外的内存主要给页缓存。判断页缓存是否充足，可以看 <code>_nodes/stats/fs</code> 中的可用空间与读写量，以及查询延迟是否随索引增长而恶化。若磁盘读频繁、页缓存命中低，增加内存或减少节点上的分片数，往往比调 JVM 参数更有效。</p>
+<h3 id="线程池与拒绝"><a href="#线程池与拒绝" class="headerlink" title="线程池与拒绝"></a>线程池与拒绝</h3><p>Elasticsearch 用固定大小的线程池隔离不同类型的请求。7.x 中，<code>search</code> 线程数约为处理器核数的 1.5 倍加 1，队列默认 1000；<code>write</code> 线程数约等于处理器核数，队列默认 10000；<code>get</code> 也有独立线程池。队列满时请求被拒绝，客户端收到 <code>es_rejected_execution_exception</code>。</p>
+<p>拒绝不是故障，而是背压信号：集群在告诉你“到达速率超过了处理能力”。把队列调大通常只会把拒绝推迟，请求在队列里等待的时间变长，客户端超时后重试，反而制造更多流量。正确的顺序是：先确认拒绝集中在哪个池、哪个节点，再看该池对应的操作是否真的需要这么多并发，最后才考虑调整队列或增加节点。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 观察拒绝发生在 search 还是 write</span></span><br><span class="line">curl -s <span class="string">&#x27;localhost:9200/_cat/thread_pool?v&amp;h=node_name,name,active,queue,rejected,completed&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p>批量写入客户端应在收到 429 时指数退避，并限制重试次数；把重试放在应用层，配合幂等的文档 ID，比在集群侧堆队列更可控。</p>
+<h2 id="查询性能：上下文、缓存与分页"><a href="#查询性能：上下文、缓存与分页" class="headerlink" title="查询性能：上下文、缓存与分页"></a>查询性能：上下文、缓存与分页</h2><h3 id="filter-与-query-的差别"><a href="#filter-与-query-的差别" class="headerlink" title="filter 与 query 的差别"></a>filter 与 query 的差别</h3><p>查询上下文计算相关度分数，过滤上下文只回答“是否匹配”，结果可以缓存。把不参与打分的条件放进 <code>filter</code>，既省 CPU，也让缓存有机会生效：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">GET /logs<span class="number">-000001</span>/_search</span><br><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;query&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;bool&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">      <span class="attr">&quot;must&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span></span><br><span class="line">        <span class="punctuation">&#123;</span> <span class="attr">&quot;match&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;message&quot;</span><span class="punctuation">:</span> <span class="string">&quot;timeout&quot;</span> <span class="punctuation">&#125;</span> <span class="punctuation">&#125;</span></span><br><span class="line">      <span class="punctuation">]</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;filter&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span></span><br><span class="line">        <span class="punctuation">&#123;</span> <span class="attr">&quot;term&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;service&quot;</span><span class="punctuation">:</span> <span class="string">&quot;gateway&quot;</span> <span class="punctuation">&#125;</span> <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">        <span class="punctuation">&#123;</span> <span class="attr">&quot;range&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;ts&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;gte&quot;</span><span class="punctuation">:</span> <span class="string">&quot;now-1d&quot;</span> <span class="punctuation">&#125;</span> <span class="punctuation">&#125;</span> <span class="punctuation">&#125;</span></span><br><span class="line">      <span class="punctuation">]</span></span><br><span class="line">    <span class="punctuation">&#125;</span></span><br><span class="line">  <span class="punctuation">&#125;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>判断标准很简单：这个条件是否影响“谁更相关”。服务名、时间范围、状态码通常只做筛选，放在 <code>filter</code>；全文关键词才需要打分。</p>
+<h3 id="doc-values、fielddata-与序号"><a href="#doc-values、fielddata-与序号" class="headerlink" title="doc_values、fielddata 与序号"></a>doc_values、fielddata 与序号</h3><p>排序和聚合依赖列式存储 doc values，keyword、数值、日期字段默认开启，text 字段没有 doc values。对 text 字段打开 fielddata 再聚合，会把分词结果全部加载进堆，基数一高就可能 OOM，这是生产环境最常见的查询事故之一。正确做法是为需要聚合的字段增加 keyword 子字段，或直接使用 keyword 类型。</p>
+<p>对频繁做 terms 聚合的字段，可以打开 <code>eager_global_ordinals</code>，把构建全局序号的成本前移到 refresh 阶段，避免每次查询都付出这份开销。它适合“写入不频繁、聚合很频繁”的维度字段，不适合高基数且持续变化的字段。</p>
+<h3 id="总数、分页与缓存"><a href="#总数、分页与缓存" class="headerlink" title="总数、分页与缓存"></a>总数、分页与缓存</h3><p>7.x 中 <code>track_total_hits</code> 默认只精确统计到 10000 条。如果页面只需要展示“约多少结果”，保留默认或设为 <code>false</code> 即可；只有确实需要精确总数时才设为 <code>true</code>，代价是要遍历所有匹配文档。</p>
+<p><code>from</code> 加 <code>size</code> 的深分页会让协调节点先取出 <code>from + size</code> 条再丢弃前面的部分，翻到几千页时开销惊人，且受 <code>index.max_result_window</code> 限制。遍历大量结果应使用 <code>scroll</code>，它保留一份搜索上下文，适合导出；用户交互式的“下一页”更适合 <code>search_after</code>，用上一页最后一条的排序值作为游标，并带一个唯一字段作为决胜条件，避免翻页时重复或遗漏。scroll 上下文会占用资源，用完必须清理，不能无限期保留。</p>
+<p>请求缓存只对 <code>size: 0</code> 的聚合类请求生效，默认开启；普通查询依赖的是段级查询缓存，段合并后缓存自然失效。判断一条查询慢在哪里，用 <code>profile</code> 比猜更可靠：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">GET /logs<span class="number">-000001</span>/_search</span><br><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;profile&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">true</span></span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;query&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;term&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;service&quot;</span><span class="punctuation">:</span> <span class="string">&quot;gateway&quot;</span> <span class="punctuation">&#125;</span> <span class="punctuation">&#125;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>返回结果会按查询类型列出耗时与命中数，能直接看出是倒排查找、打分还是聚合拖慢了这个请求。</p>
+<h2 id="调优复盘与常见误区"><a href="#调优复盘与常见误区" class="headerlink" title="调优复盘与常见误区"></a>调优复盘与常见误区</h2><p>下面用一个写入型集群的排查过程串起前面的内容。场景是日志集群在业务高峰出现大量 429，节点 CPU 偏高，GC 停顿变长。这里只描述诊断顺序与判断逻辑，不虚构具体数字。</p>
+<h3 id="一次写入型集群的排查"><a href="#一次写入型集群的排查" class="headerlink" title="一次写入型集群的排查"></a>一次写入型集群的排查</h3><ol>
+<li>确认症状边界。查看客户端错误分布，确认 429 来自 bulk 而非查询；用 <code>_cat/thread_pool</code> 确认拒绝集中在 <code>write</code> 池且分布在多个数据节点，而不是单节点异常。</li>
+<li>看写入路径。<code>_nodes/stats/indices</code> 显示 indexing 与 merge 耗时占比高，<code>_cat/segments</code> 显示单分片段数偏多，索引按天创建且单索引分片偏小。</li>
+<li>看资源。GC 日志显示 old GC 次数上升但单次停顿尚可，<code>_cat/allocation</code> 显示磁盘接近高水位，<code>iowait</code> 偏高。此时瓶颈更可能是“小段过多、合并与写入争抢磁盘”，而不是 CPU 不足。</li>
+<li>先改成本最低的项。把写入索引的 <code>refresh_interval</code> 从 1s 调到 30s，减少刷新产生的小段；客户端把 bulk 控制在 5 MB 到 15 MB，限制并发并在 429 时退避；确认 mapping 没有把无用字段建成 text。</li>
+<li>再改结构性项。把按天索引改为按大小 rollover，让分片规模稳定；对已不再写入的历史索引在低峰执行 force merge；结合数据价值评估 translog durability，日志类数据可以接受 async 的丢失窗口。</li>
+<li>验证与回滚。保持流量窗口可比，观察拒绝数、写入 P99、merge 耗时与 GC 停顿是否同时改善。若某一项没有改善，回滚该项再继续，避免多个变更互相掩盖。</li>
+</ol>
+<h3 id="常见误区"><a href="#常见误区" class="headerlink" title="常见误区"></a>常见误区</h3><table>
+<thead>
+<tr>
+<th>误区</th>
+<th>后果</th>
+<th>更合理的做法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>把堆加到 32 GB 以上</td>
+<td>压缩指针失效，停顿更长</td>
+<td>控制在 30 GB 上下，增加节点</td>
+</tr>
+<tr>
+<td>为“以后数据会多”预建大量分片</td>
+<td>集群状态膨胀，恢复变慢</td>
+<td>按实测数据量与 rollover 扩展</td>
+</tr>
+<tr>
+<td>对活跃索引 force merge</td>
+<td>合并完又被新段填满，磁盘被打满</td>
+<td>只对只读索引执行</td>
+</tr>
+<tr>
+<td>生产环境长期关闭 translog 持久化</td>
+<td>断电丢数据，且难以追溯</td>
+<td>按数据价值选择，明确记录取舍</td>
+</tr>
+<tr>
+<td>只盯 CPU 或只盯 QPS</td>
+<td>忽略拒绝、GC 与磁盘，调错方向</td>
+<td>建立一组基线指标</td>
+</tr>
+<tr>
+<td>先调参后测量</td>
+<td>无法归因，问题反复</td>
+<td>先采样，一次只改一个变量</td>
+</tr>
+</tbody></table>
+<p>这些问题有一个共同点：把局部指标当成整体健康。调优的目标不是让某个数字好看，而是让集群在目标延迟内稳定处理预期负载。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>集群调优的起点是负载判断，而不是参数表：先分清写入、查询与聚合各占多少，再用线程池拒绝、GC、磁盘与段数定位瓶颈。分片要在建索引前规划，控制单分片大小与每 GB 堆的分片数，按 rollover 而不是按天切分。写入侧理解 refresh、translog 与 flush 各自的职责，按数据价值选择持久化；合并只对只读索引做，force merge 不是日常操作。内存上给页缓存留空间，堆控制在压缩指针边界以内，把拒绝当作背压而不是敌人。最后，一次只改一个变量并保留回滚窗口，这比任何“最佳实践参数”都更可靠。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://www.elastic.co/guide/en/elasticsearch/reference/7.9/tune-for-indexing-speed.html">Tune for indexing speed</a></li>
+<li><a href="https://www.elastic.co/guide/en/elasticsearch/reference/7.9/tune-for-search-speed.html">Tune for search speed</a></li>
+<li><a href="https://www.elastic.co/guide/en/elasticsearch/reference/7.9/tune-for-disk-usage.html">Tune for disk usage</a></li>
+<li><a href="https://www.elastic.co/guide/en/elasticsearch/reference/7.9/size-your-shards.html">Size your shards</a></li>
+<li><a href="https://www.elastic.co/guide/en/elasticsearch/reference/7.9/index-modules.html">Index modules</a></li>
+<li><a href="https://www.elastic.co/guide/en/elasticsearch/reference/7.9/index-modules-translog.html">Translog settings</a></li>
+<li><a href="https://www.elastic.co/guide/en/elasticsearch/reference/7.9/index-modules-merge.html">Merge settings</a></li>
+<li><a href="https://www.elastic.co/guide/en/elasticsearch/reference/7.9/indices-forcemerge.html">Force merge API</a></li>
+<li><a href="https://www.elastic.co/guide/en/elasticsearch/reference/7.9/modules-threadpool.html">Thread pools</a></li>
+<li><a href="https://www.elastic.co/guide/en/elasticsearch/reference/7.9/cluster-allocation-explain.html">Cluster allocation explain</a></li>
+<li><a href="https://www.elastic.co/guide/en/elasticsearch/reference/7.9/modules-cluster.html">Cluster-level shard allocation settings</a></li>
+<li><a href="https://www.elastic.co/guide/en/elasticsearch/reference/7.9/index-modules-slowlog.html">Indexing and search slow logs</a></li>
+<li><a href="https://www.elastic.co/guide/en/elasticsearch/reference/7.9/query-filter-context.html">Query and filter context</a></li>
+<li><a href="https://www.elastic.co/guide/en/elasticsearch/reference/7.9/paginate-search-results.html">Paginate search results</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Elasticsearch 集群调优</p><p><a href="https://987763485.github.io/2020/10/19/Elasticsearch集群调优/">https://987763485.github.io/2020/10/19/Elasticsearch集群调优/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2020-10-19</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/devops/">devops</a><a class="link-muted mr-2" rel="tag" href="/tags/docker/">docker</a><a class="link-muted mr-2" rel="tag" href="/tags/linux/">linux</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2020/10/21/%E8%BF%9E%E6%8E%A5%E6%B1%A0%E5%8F%82%E6%95%B0%E8%B0%83%E4%BC%98%E5%AE%9E%E8%B7%B5/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">连接池参数调优实践</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2020/10/14/Kibana%E6%97%A5%E5%BF%97%E5%88%86%E6%9E%90%E5%AE%9E%E8%B7%B5/"><span class="level-item">Kibana 日志分析实践</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

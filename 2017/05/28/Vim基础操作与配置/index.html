@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Vim 基础操作与配置 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="本文从一次 ssh 上去改配置的尴尬经历讲起，把 Vim 的模式、移动、编辑、搜索、寄存器与宏、替换、配置和插件梳理一遍。适合刚在服务器上被迫使用 vi 的开发者，读完之后至少能做到不慌、能改、能退出来。"><meta property="og:type" content="blog"><meta property="og:title" content="Vim 基础操作与配置"><meta property="og:url" content="https://987763485.github.io/2017/05/28/Vim%E5%9F%BA%E7%A1%80%E6%93%8D%E4%BD%9C%E4%B8%8E%E9%85%8D%E7%BD%AE/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="本文从一次 ssh 上去改配置的尴尬经历讲起，把 Vim 的模式、移动、编辑、搜索、寄存器与宏、替换、配置和插件梳理一遍。适合刚在服务器上被迫使用 vi 的开发者，读完之后至少能做到不慌、能改、能退出来。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2017-05-27T23:10:37.000Z"><meta property="article:modified_time" content="2026-10-18T10:56:45.065Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="linux"><meta property="article:tag" content="容器技术"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2017/05/28/Vim%E5%9F%BA%E7%A1%80%E6%93%8D%E4%BD%9C%E4%B8%8E%E9%85%8D%E7%BD%AE/"},"headline":"Vim 基础操作与配置","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2017-05-27T23:10:37.000Z","dateModified":"2026-10-18T10:56:45.065Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"本文从一次 ssh 上去改配置的尴尬经历讲起，把 Vim 的模式、移动、编辑、搜索、寄存器与宏、替换、配置和插件梳理一遍。适合刚在服务器上被迫使用 vi 的开发者，读完之后至少能做到不慌、能改、能退出来。"}</script><link rel="canonical" href="https://987763485.github.io/2017/05/28/Vim%E5%9F%BA%E7%A1%80%E6%93%8D%E4%BD%9C%E4%B8%8E%E9%85%8D%E7%BD%AE/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2017-05-27T23:10:37.000Z" title="5/28/2017, 7:10:37 AM">2017-05-28</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/">容器与运维</a></span><span class="level-item">27 分钟读完 (大约4102个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Vim 基础操作与配置</h1><div class="content"><p>本文从一次 ssh 上去改配置的尴尬经历讲起，把 Vim 的模式、移动、编辑、搜索、寄存器与宏、替换、配置和插件梳理一遍。适合刚在服务器上被迫使用 vi 的开发者，读完之后至少能做到不慌、能改、能退出来。</p>
+<h2 id="从一次-ssh-改配置说起"><a href="#从一次-ssh-改配置说起" class="headerlink" title="从一次 ssh 改配置说起"></a>从一次 ssh 改配置说起</h2><p>周五下午，测试环境的 Nginx 配置被改坏，页面直接 502。我 ssh 到服务器，<code>sudo vi /etc/nginx/nginx.conf</code>，用方向键挪到报错的那一行，敲了几个字符发现屏幕没有反应，才想起要先按 <code>i</code>。改完想保存退出，按了 Esc 又不知道该输入什么，手指在键盘上乱按一通，最后 <code>Ctrl-Z</code> 把进程挂到后台，以为已经退出，其实终端还被占着。</p>
+<p>这类事故的根源不是命令记不住，而是没有建立“模式”的概念。Vim 继承自 vi，2017 年主流发行版自带的是 Vim 7.4，Vim 8.0 在 2016 年 9 月发布，新装的系统上已经能见到。服务器上敲 <code>vi</code>，打开的通常就是 Vim。它和记事本最大的差别在于：同一个按键在不同模式下含义完全不同，<code>i</code> 在普通模式下是“进入插入模式”，在插入模式下就是一个字母 i。</p>
+<p>Vim 有四种常用模式。</p>
+<ul>
+<li>普通模式：打开文件后的默认状态，移动、删除、复制都在这里完成。</li>
+<li>插入模式：按 <code>i</code>、<code>a</code>、<code>o</code> 等进入，这时打字才是打字，Esc 返回普通模式。</li>
+<li>可视模式：按 <code>v</code> 进入，先选中一段文本，再对选区执行命令。</li>
+<li>命令行模式：普通模式下按 <code>:</code>，光标跳到屏幕底部，输入保存、替换一类的命令。</li>
+</ul>
+<p>判断自己在哪个模式，最直接的办法是看屏幕右下角。插入模式会显示 <code>-- INSERT --</code>，可视模式显示 <code>-- VISUAL --</code>，块选择显示 <code>-- VISUAL BLOCK --</code>，命令行模式则是一个冒号加闪烁的光标。刚开始练 Vim 时，每次按键前瞄一眼右下角，比背十条快捷键有用。</p>
+<h2 id="移动光标：先把位置找对"><a href="#移动光标：先把位置找对" class="headerlink" title="移动光标：先把位置找对"></a>移动光标：先把位置找对</h2><p>普通模式下不该去碰方向键。<code>h</code>、<code>j</code>、<code>k</code>、<code>l</code> 分别对应左、下、上、右，手指停在主键区，移动时不用把手挪到角落。刚开始会觉得别扭，一周之后就会形成肌肉记忆。</p>
+<p>按词移动比按字符快：<code>w</code> 到下一个词首，<code>b</code> 回到上一个词首，<code>e</code> 到当前词的词尾。行内定位用 <code>0</code> 到行首、<code>^</code> 到第一个非空白字符、<code>$</code> 到行尾。<code>0</code> 和 <code>^</code> 的区别在缩进代码里很明显，<code>^</code> 会跳过行首的空白，直接停在第一个字符上。</p>
+<p>跨行跳转靠 <code>gg</code> 和 <code>G</code>：<code>gg</code> 到文件第一行，<code>G</code> 到最后一行，<code>42G</code> 跳到第 42 行。行号也可以用命令行模式，<code>:42</code> 回车效果相同，要到末行则写 <code>:$</code>。</p>
+<p>段落之间用 <code>{</code> 和 <code>}</code> 跳，一次越过一个空行块。改 Nginx 的 <code>server</code> 配置时，一个块接一个块地看，比一行行滚要清楚。<code>%</code> 在配对的括号之间来回跳，从 <code>{</code> 跳到 <code>}</code>，再按一次跳回来，检查嵌套层级很顺手。</p>
+<p>以上命令都可以带数字前缀：<code>3w</code> 前进三个词，<code>5j</code> 下移五行，<code>2}</code> 越过两个段落。Vim 里“次数 + 命令”是通用语法，后面的删除、复制同样适用。</p>
+<h2 id="编辑：把操作当成动词加动作"><a href="#编辑：把操作当成动词加动作" class="headerlink" title="编辑：把操作当成动词加动作"></a>编辑：把操作当成动词加动作</h2><p>进入插入模式有六个入口，区别值得记清：<code>i</code> 在光标前插入，<code>a</code> 在光标后插入，<code>I</code> 跳到行首第一个非空白字符前插入，<code>A</code> 跳到行尾插入，<code>o</code> 在当前行下方新开一行，<code>O</code> 在上方新开一行。改配置时最常用的是 <code>A</code> 和 <code>o</code>：前者补一个分号，后者加一整行。</p>
+<p>删除与复制：<code>x</code> 删一个字符，<code>dd</code> 删整行，<code>yy</code> 复制整行，<code>p</code> 粘贴到光标之后。<code>dd</code> 之后用 <code>p</code> 可以把它粘到别处，相当于剪切。<code>cc</code> 删除整行并进入插入模式，等于“重写这一行”；<code>s</code> 删掉光标下的字符并进入插入模式，适合只改一个字符的场景。</p>
+<p>Vim 的编辑命令遵循“动词 + 动作”的语法。<code>d</code> 表示删除，后面接一个范围：<code>dw</code> 删到下一个词首，<code>d$</code> 删到行尾，<code>d0</code> 删到行首，<code>dd</code> 是整行的特例。<code>diw</code> 删掉光标所在的一个词，中间的 <code>i</code> 表示 inner，只处理词本身；<code>daw</code> 会连词后面的空格一起删。<code>c</code> 是同一个语法，<code>cw</code> 改一个词，<code>ci&quot;</code> 改一对引号里的内容。这种组合数量有限、可以推导，不用为每种情况背一条命令。改配置里的一个值，<code>ciw</code> 比先删再补更稳。</p>
+<p><code>.</code> 重复上一次修改，是 Vim 效率的来源。它重放的是一整套改动，包括动作范围和插入的文本。把若干行的 <code>true</code> 改成 <code>false</code>，可以先用 <code>/true</code> 找到第一处，<code>ciw</code> 输入 <code>false</code>，Esc，再按 <code>n</code> 跳到下一个匹配，按 <code>.</code> 重复。找到、改掉、跳下一个、点一下，节奏非常稳定。</p>
+<p>撤销用 <code>u</code>，重做用 <code>Ctrl-r</code>。Vim 的撤销是树状的，可以退回分支再走另一条路，日常记住这两个就够。</p>
+<p>搜索用 <code>/关键词</code> 向下、<code>?关键词</code> 向上，回车后 <code>n</code> 找同方向下一个，<code>N</code> 找反方向。光标停在某个词上按 <code>*</code>，直接以这个词为目标搜索，省去输入。<code>:set hlsearch</code> 打开全部匹配的高亮，<code>:nohlsearch</code> 临时关掉。高亮常驻会干扰阅读，通常映射一个快捷键随时清除。</p>
+<h2 id="可视模式与列编辑"><a href="#可视模式与列编辑" class="headerlink" title="可视模式与列编辑"></a>可视模式与列编辑</h2><p><code>v</code> 进入字符可视模式，<code>V</code> 进入行可视模式，<code>Ctrl-v</code> 进入块可视模式。选中之后按 <code>d</code> 删除、<code>y</code> 复制、<code>&gt;</code> 右缩进、<code>&lt;</code> 左缩进，也可以直接 <code>c</code> 改掉选区。<code>&gt;</code> 在普通模式下要跟动作，<code>&gt;&gt;</code> 才是缩进当前行，在可视模式里对整段选区按一次就够。</p>
+<p>块可视是 Vim 里被低估的功能。要把一段配置整体注释掉，用 <code>Ctrl-v</code> 选中这些行的第一列，按 <code>I</code> 输入 <code>#</code>，再按 Esc，所有被选中的行都会加上井号。反过来，选住行首的注释符号按 <code>d</code>，就能批量取消注释。对齐多行的等号、删除一列多余的空格，也是同样的操作。这个能力在 Vim 7.4 上已经完整可用，不需要插件。</p>
+<p><code>gv</code> 重新选中上一次的选区，改完发现漏了一行时很方便。</p>
+<h2 id="文件、缓冲区、窗口与标签页"><a href="#文件、缓冲区、窗口与标签页" class="headerlink" title="文件、缓冲区、窗口与标签页"></a>文件、缓冲区、窗口与标签页</h2><p><code>:w</code> 写入，<code>:q</code> 退出，<code>:wq</code> 保存并退出，普通模式下按 <code>ZZ</code> 等效。<code>:q!</code> 放弃修改强制退出，这一条最该先记住：改坏了不想保存，用它，而不是去按 <code>Ctrl-Z</code> 或者直接关终端。</p>
+<p><code>:e 文件名</code> 打开另一个文件。Vim 用缓冲区管理所有打开过的文件，<code>:ls</code> 列出，<code>:bn</code>、<code>:bp</code> 切到下一个、上一个，<code>:b 3</code> 直接跳到 3 号缓冲区。缓冲区是文件在内存里的副本，窗口只是它的一个视图，同一个缓冲区可以开在两个窗口里。</p>
+<p>分屏用 <code>:sp</code> 水平切分、<code>:vsp</code> 垂直切分，<code>Ctrl-w</code> 加 <code>h</code>、<code>j</code>、<code>k</code>、<code>l</code> 在窗口之间移动。对照同一份配置的两段，或者一边看日志一边改配置，分屏比来回切换省事。标签页用 <code>:tabnew</code> 新建，<code>gt</code>、<code>gT</code> 前后切换。窗口适合“同时看”，标签页适合“分任务放”。</p>
+<h2 id="寄存器与宏"><a href="#寄存器与宏" class="headerlink" title="寄存器与宏"></a>寄存器与宏</h2><p>复制和删除都会写进寄存器。无名寄存器存最近一次操作，<code>&quot;0</code> 存最近一次复制，<code>&quot;1</code> 到 <code>&quot;9</code> 存删除历史。用 <code>&quot;ayy</code> 把当前行复制进 a 寄存器，再用 <code>&quot;ap</code> 粘贴，就不会覆盖无名寄存器里的内容。<code>:reg</code> 可以查看所有寄存器的当前值。</p>
+<p>系统剪贴板是 <code>+</code> 寄存器，<code>&quot;+yy</code> 复制到剪贴板，<code>&quot;+p</code> 从剪贴板粘贴。前提是 Vim 编译时带了 <code>+clipboard</code>，用 <code>:echo has(&#39;clipboard&#39;)</code> 检查，返回 0 就说明这个 Vim 不带剪贴板支持。服务器上的 vim 为了体积常常关掉这个特性，这时不必折腾，本地编辑完再传上去更省时间。</p>
+<p>宏用来录制一段操作。普通模式下按 <code>qa</code> 开始录制到 a 寄存器，做完一套动作再按 <code>q</code> 停止，<code>@a</code> 回放，<code>@@</code> 重复上一次回放。例如清理一份日志，每行开头是一段时间戳，要在行尾补一个分号：<code>qa</code>、<code>0dw</code>、<code>$a;</code>、Esc、<code>j</code>、<code>q</code>，然后 <code>200@a</code>。执行时留意失败的位置，宏一旦在空行上出错，后面的行会跟着乱。</p>
+<h2 id="替换与全局命令"><a href="#替换与全局命令" class="headerlink" title="替换与全局命令"></a>替换与全局命令</h2><p>替换的格式是 <code>:[范围]s/旧/新/标志</code>。<code>%</code> 代表整个文件，<code>:%s/old/new/g</code> 是全文替换；不带范围只作用于当前行；<code>:10,20s/old/new/g</code> 限定行区间。标志里的 <code>g</code> 表示一行内的所有匹配都替换，默认只换第一个；<code>c</code> 逐个确认，提示时按 <code>y</code> 替换、<code>n</code> 跳过、<code>a</code> 全部替换、<code>q</code> 退出。改生产配置时加 <code>c</code> 比一把梭稳妥。</p>
+<p>Vim 的正则默认是 magic 模式，括号和加号要写转义。在模式开头加 <code>\v</code> 打开 very magic，之后 <code>()</code>、<code>+</code>、<code>?</code> 都按常见写法来：<code>:%s/\v(\w+) = (\d+)/\2 = \1/g</code> 可以把 <code>key = 1</code> 交换成 <code>1 = key</code>。捕获组在替换串里用 <code>\1</code> 到 <code>\9</code> 引用，<code>&amp;</code> 代表整个匹配。</p>
+<p><code>:g/模式/命令</code> 对匹配的行执行命令，<code>:g/^#/d</code> 删除所有注释行，<code>:v/模式/d</code> 删除不匹配的行。清理配置和日志时，这两条往往比写脚本快。</p>
+<h2 id="一份够用的-vimrc"><a href="#一份够用的-vimrc" class="headerlink" title="一份够用的 .vimrc"></a>一份够用的 .vimrc</h2><p>配置写在 <code>~/.vimrc</code>。下面这份够日常使用：</p>
+<figure class="highlight vim"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">set</span> <span class="keyword">number</span></span><br><span class="line"><span class="keyword">set</span> tabstop=<span class="number">4</span></span><br><span class="line"><span class="keyword">set</span> <span class="built_in">shiftwidth</span>=<span class="number">4</span></span><br><span class="line"><span class="keyword">set</span> expandtab</span><br><span class="line"><span class="keyword">set</span> ignorecase</span><br><span class="line"><span class="keyword">set</span> smartcase</span><br><span class="line"><span class="keyword">set</span> incsearch</span><br><span class="line"><span class="keyword">set</span> hlsearch</span><br><span class="line"><span class="keyword">set</span> backspace=<span class="built_in">indent</span>,eol,start</span><br><span class="line"><span class="keyword">let</span> mapleader = <span class="string">&quot;,&quot;</span></span><br><span class="line"><span class="keyword">nnoremap</span> <span class="symbol">&lt;leader&gt;</span>h :<span class="keyword">nohlsearch</span><span class="symbol">&lt;CR&gt;</span></span><br><span class="line"><span class="keyword">nnoremap</span> <span class="symbol">&lt;leader&gt;</span><span class="keyword">w</span> :<span class="keyword">w</span><span class="symbol">&lt;CR&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p><code>number</code> 显示行号。<code>tabstop</code> 决定 Tab 显示多宽，<code>shiftwidth</code> 决定 <code>&gt;&gt;</code> 和自动缩进移动几格，<code>expandtab</code> 把 Tab 写成空格；团队协作时这一条最能减少 diff 里的空白噪音。<code>ignorecase</code> 让搜索忽略大小写，<code>smartcase</code> 在输入里出现大写时自动切回大小写敏感。<code>incsearch</code> 边输入边预览第一个匹配，<code>hlsearch</code> 高亮全部结果。<code>backspace</code> 那行让退格键能跨过缩进和换行，不设的话在行首按退格没有反应。</p>
+<p>映射统一用 <code>nnoremap</code> 这类 noremap 变体，避免递归展开带来的连锁反应。<code>&lt;leader&gt;</code> 是自定义前缀键，默认是反斜杠，改成逗号更顺手。改完执行 <code>:source ~/.vimrc</code> 立即生效，不用重启。</p>
+<h2 id="插件管理：只装需要的"><a href="#插件管理：只装需要的" class="headerlink" title="插件管理：只装需要的"></a>插件管理：只装需要的</h2><p>2017 年常见的插件装法有这么几种。Pathogen 只做一件事：把插件放在 <code>~/.vim/bundle/</code> 下，靠调整 runtimepath 让 Vim 找到它们，安装就是 <code>git clone</code>，删除就是删目录。Vundle 在此之上做了声明式管理，在 <code>.vimrc</code> 里用 <code>Plugin &#39;名称&#39;</code> 列出，执行 <code>:PluginInstall</code> 安装。vim-plug 的用法接近，安装脚本更轻，用 <code>:PlugInstall</code>，当年已经有相当多人在用，但还不能说它是唯一选择。</p>
+<p>插件按类别记即可：</p>
+<ul>
+<li>文件树：NERDTree，用 <code>:NERDTreeToggle</code> 开关侧栏。</li>
+<li>模糊查找：ctrlp，按文件名和缓冲区名查找，配合 ag 速度更好。</li>
+<li>语法检查：Syntastic 同步检查，保存时卡一下；ALE 走异步，大项目里体验更好。</li>
+<li>补全：YouCompleteMe 用 clang 做 C&#x2F;C++ 补全，安装要编译，配置成本不低。</li>
+</ul>
+<p>插件不求多。文件树和模糊查找解决“找文件”，语法检查解决“写完立刻知道错”，其余的等有明确痛点再装。装得太多，启动变慢、按键冲突，反而要花时间排查。</p>
+<h2 id="几个容易踩的坑"><a href="#几个容易踩的坑" class="headerlink" title="几个容易踩的坑"></a>几个容易踩的坑</h2><p>第一个坑是 <code>Ctrl-S</code>。在终端里按下它，屏幕立刻卡住，输入没有反应，很多人以为 ssh 断了。原因是终端软件的流控把输出暂停了，按 <code>Ctrl-Q</code> 恢复即可。Vim 里保存用 <code>:w</code>，不要把编辑器的习惯带进来。</p>
+<p>第二个坑是粘贴时的自动缩进。从浏览器复制一段带缩进的代码，在插入模式里粘贴，会看到每行越来越往右缩。原因是 Vim 对新行做自动缩进，粘贴内容里的换行被当成了手动回车。办法是先 <code>:set paste</code> 再粘贴，粘完 <code>:set paste!</code> 关闭。Vim 8.0 能借助终端支持的 bracketed paste 识别粘贴，但服务器上的终端未必支持，<code>:set paste</code> 仍然最稳。</p>
+<p>第三个坑是 root 下配置不生效。<code>sudo vi</code> 用的是 root 的环境，读的是 <code>/root/.vimrc</code>，不是你的 <code>~/.vimrc</code>。要么把配置复制过去，要么用 <code>sudoedit</code> 以当前用户编辑，避免两头维护。</p>
+<p>第四个坑是编码。文件里的中文变成乱码，先看 <code>:set fileencoding</code> 和 <code>:set fileencodings</code>。统一用 UTF-8：<code>set fileencoding=utf-8</code>，探测顺序写成 <code>utf-8,gbk,latin1</code>。Windows 上编辑过的文件可能带 BOM，用 <code>:set bomb?</code> 查看，必要时 <code>:set nobomb</code> 去掉。</p>
+<h2 id="速查表与小结"><a href="#速查表与小结" class="headerlink" title="速查表与小结"></a>速查表与小结</h2><p>下面这张表按使用频率排列，不必背，先在服务器上照着敲，把最常用的十来条用熟。</p>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>命令</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>回到普通模式</td>
+<td><code>Esc</code></td>
+<td>所有命令的起点</td>
+</tr>
+<tr>
+<td>插入</td>
+<td><code>i</code> &#x2F; <code>a</code> &#x2F; <code>o</code></td>
+<td>光标前 &#x2F; 后 &#x2F; 下方新行</td>
+</tr>
+<tr>
+<td>保存退出</td>
+<td><code>:wq</code></td>
+<td>等价于 <code>ZZ</code></td>
+</tr>
+<tr>
+<td>放弃修改</td>
+<td><code>:q!</code></td>
+<td>改坏了用它</td>
+</tr>
+<tr>
+<td>文件首尾</td>
+<td><code>gg</code> &#x2F; <code>G</code></td>
+<td>可加计数，如 <code>42G</code></td>
+</tr>
+<tr>
+<td>缩进</td>
+<td><code>&gt;&gt;</code> &#x2F; <code>&lt;&lt;</code></td>
+<td>可视模式下直接按</td>
+</tr>
+<tr>
+<td>删词 &#x2F; 删行</td>
+<td><code>diw</code> &#x2F; <code>dd</code></td>
+<td>动词加动作</td>
+</tr>
+<tr>
+<td>复制粘贴</td>
+<td><code>yy</code> &#x2F; <code>p</code></td>
+<td><code>dd</code> 后 <code>p</code> 相当于剪切</td>
+</tr>
+<tr>
+<td>撤销重做</td>
+<td><code>u</code> &#x2F; <code>Ctrl-r</code></td>
+<td>撤销是树状的</td>
+</tr>
+<tr>
+<td>搜索</td>
+<td><code>/</code>、<code>?</code>、<code>n</code>、<code>N</code></td>
+<td><code>*</code> 搜索当前词</td>
+</tr>
+<tr>
+<td>全文替换</td>
+<td><code>:%s/old/new/g</code></td>
+<td>加 <code>c</code> 逐个确认</td>
+</tr>
+<tr>
+<td>录制回放</td>
+<td><code>qa</code> &#x2F; <code>@a</code></td>
+<td><code>@@</code> 重复</td>
+</tr>
+<tr>
+<td>分屏</td>
+<td><code>:sp</code> &#x2F; <code>:vsp</code></td>
+<td><code>Ctrl-w</code> 切换</td>
+</tr>
+<tr>
+<td>个人配置</td>
+<td><code>~/.vimrc</code></td>
+<td><code>:source</code> 后生效</td>
+</tr>
+</tbody></table>
+<p>Vim 的学习曲线陡，但前期只需要一小撮命令就能覆盖服务器上的大多数改动：进出模式、移动、删改、搜索、保存退出。把这几件事练成条件反射，再去补寄存器、宏和插件。练习顺序建议是先解决“进得去、出得来”，再练移动与删除，最后学搜索替换；每天在真实文件上改几处，比对着教程敲一遍有效。</p>
+<p>配置不要一次抄一大份，遇到一个问题加一行，半年后自然长成适合自己的样子。真正要防的不是命令记不全，而是在错误的模式里使劲按键。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Vim 基础操作与配置</p><p><a href="https://987763485.github.io/2017/05/28/Vim基础操作与配置/">https://987763485.github.io/2017/05/28/Vim基础操作与配置/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2017-05-28</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/linux/">linux</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/">容器技术</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2017/06/04/SSH%E5%85%8D%E5%AF%86%E7%99%BB%E5%BD%95%E4%B8%8E%E7%AB%AF%E5%8F%A3%E8%BD%AC%E5%8F%91/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">SSH 免密登录与端口转发</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2017/05/23/Docker%E5%AE%B9%E5%99%A8%E9%97%B4%E9%80%9A%E4%BF%A1%E6%96%B9%E6%A1%88/"><span class="level-item">Docker 容器间通信方案</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>esbuild 与 SWC 编译加速 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="改一行代码要等好几秒才看到编译结果，这个痛点在 2024 年已有务实解法：把翻译代码这件事交给原生语言编写的编译器，而不是用 JavaScript 写的工具去翻译 JavaScript。本文介绍 esbuild 与 SWC 各自解决什么问题、快在哪里、哪些地方必须把活交回 Babel 与 webpack。适合被构建耗时困扰或准备换工具的读者，读完能得到接入姿势、迁移检查表和度量方法。"><meta property="og:type" content="blog"><meta property="og:title" content="esbuild 与 SWC 编译加速"><meta property="og:url" content="https://987763485.github.io/2024/04/04/esbuild%E4%B8%8ESWC%E7%BC%96%E8%AF%91%E5%8A%A0%E9%80%9F/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="改一行代码要等好几秒才看到编译结果，这个痛点在 2024 年已有务实解法：把翻译代码这件事交给原生语言编写的编译器，而不是用 JavaScript 写的工具去翻译 JavaScript。本文介绍 esbuild 与 SWC 各自解决什么问题、快在哪里、哪些地方必须把活交回 Babel 与 webpack。适合被构建耗时困扰或准备换工具的读者，读完能得到接入姿势、迁移检查表和度量方法。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2024-04-03T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-19T07:04:16.692Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="web前端"><meta property="article:tag" content="typescript"><meta property="article:tag" content="react"><meta property="article:tag" content="vue"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2024/04/04/esbuild%E4%B8%8ESWC%E7%BC%96%E8%AF%91%E5%8A%A0%E9%80%9F/"},"headline":"esbuild 与 SWC 编译加速","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2024-04-03T16:00:00.000Z","dateModified":"2026-10-19T07:04:16.692Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"改一行代码要等好几秒才看到编译结果，这个痛点在 2024 年已有务实解法：把翻译代码这件事交给原生语言编写的编译器，而不是用 JavaScript 写的工具去翻译 JavaScript。本文介绍 esbuild 与 SWC 各自解决什么问题、快在哪里、哪些地方必须把活交回 Babel 与 webpack。适合被构建耗时困扰或准备换工具的读者，读完能得到接入姿势、迁移检查表和度量方法。"}</script><link rel="canonical" href="https://987763485.github.io/2024/04/04/esbuild%E4%B8%8ESWC%E7%BC%96%E8%AF%91%E5%8A%A0%E9%80%9F/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2024-04-03T16:00:00.000Z" title="4/4/2024, 12:00:00 AM">2024-04-04</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/">前端开发</a></span><span class="level-item">31 分钟读完 (大约4605个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">esbuild 与 SWC 编译加速</h1><div class="content"><p>改一行代码要等好几秒才看到编译结果，这个痛点在 2024 年已有务实解法：把翻译代码这件事交给原生语言编写的编译器，而不是用 JavaScript 写的工具去翻译 JavaScript。本文介绍 esbuild 与 SWC 各自解决什么问题、快在哪里、哪些地方必须把活交回 Babel 与 webpack。适合被构建耗时困扰或准备换工具的读者，读完能得到接入姿势、迁移检查表和度量方法。</p>
+<h2 id="传统构建工具慢在哪里"><a href="#传统构建工具慢在哪里" class="headerlink" title="传统构建工具慢在哪里"></a>传统构建工具慢在哪里</h2><p>要理解新工具为什么快，得先看清老工具的时间花在了哪里。以 webpack 加 Babel 的组合为例，一个模块从进入构建到产出代码，要经历读取源文件、按 loader 依次转换、解析成语法树、插件做依赖分析、生成代码、压缩。问题不在步骤多，而在步骤之间传递的是字符串。</p>
+<p>第一个开销是<strong>解析与生成的多次往返</strong>：Babel 把源码解析成语法树、转换完打印回字符串，链上若还有第二个转换器，又要重新解析再打印一次。每多一个环节就多一次往返，同一段 JSX 可能被解析三遍，位置信息与注释也在交接中丢失。</p>
+<p>第二个开销来自<strong>中间语法树的形态</strong>：JavaScript 写的编译器里，语法树是堆上散布的大量小对象，节点靠引用连接，遍历就是密集分配与指针跳转，用完留下成批短命对象，规模上去后内存涨得快、GC 停顿频繁。</p>
+<p>第三个开销是<strong>执行模型</strong>：解析与转换在主线程串行推进，文件之间本无强依赖却排队等待，改用多进程或线程池时又要跨线程传递依赖状态与插件上下文，改造代价高、收益打折。第四个开销是<strong>磁盘往返</strong>：中间产物序列化进缓存目录、命中时再反序列化回来，”缓存命中”并不等于免费。</p>
+<p>下图对比两条路线：上半段反复展开再折叠语法树，下半段一次解析、一次生成。</p>
+<pre class="mermaid">flowchart TD
+    A[源文件] --> B[解析为语法树]
+    B --> C[打印为代码字符串]
+    C --> D[下一个转换器重新解析]
+    D --> E[再打印一次]
+    E --> F[依赖分析与合并]
+    F --> G[独立工具压缩]
+    G --> H[产物落盘]
+    I[源文件] --> J[解析为内部语法树]
+    J --> K[同一棵树上有符号链接与依赖收集]
+    K --> L[多文件并行转换]
+    L --> M[内置压缩后一次写出]</pre>
+
+<p>看清这四类开销，就能理解加速工具的设计动机：减少往返、紧凑的语法树结构、文件级并行、少落盘。语言选择只是手段，不是原因。</p>
+<h2 id="esbuild-的设计选择与能力边界"><a href="#esbuild-的设计选择与能力边界" class="headerlink" title="esbuild 的设计选择与能力边界"></a>esbuild 的设计选择与能力边界</h2><h3 id="为什么它快"><a href="#为什么它快" class="headerlink" title="为什么它快"></a>为什么它快</h3><p>esbuild 用 Go 语言重写，发布形态是平台相关的可执行文件，构建时不再依赖 Node 运行时的解释与垃圾回收。它的加速点逐条对应上一节的四个开销：<strong>同一份语法树完成解析与生成</strong>，词法分析、符号链接、转换与打印共用一套紧凑结构，环节之间不再打印成字符串重新解析；<strong>跨文件并行</strong>，扫描、解析、转换按文件推进，与依赖图构建重叠，单个慢文件不拖住流水线，这是最主要的收益来源；<strong>内置压缩</strong>，在同一进程完成，省掉交给独立工具再读回来的往返；<strong>少落盘</strong>，输入到输出尽量留在内存，一次写出。</p>
+<p>命令行用法很直接：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 单文件打包：入口是 src/main.ts，产出压缩后的 ESM</span></span><br><span class="line">esbuild src/main.ts --bundle --format=esm --outfile=dist/app.js \</span><br><span class="line">  --minify --sourcemap --target=es2020</span><br></pre></td></tr></table></figure>
+
+<p>编程用法适合嵌进自己的脚本或构建任务：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> &#123; build &#125; = <span class="built_in">require</span>(<span class="string">&#x27;esbuild&#x27;</span>);</span><br><span class="line"></span><br><span class="line"><span class="title function_">build</span>(&#123;</span><br><span class="line">  <span class="attr">entryPoints</span>: [<span class="string">&#x27;src/main.ts&#x27;</span>],</span><br><span class="line">  <span class="attr">bundle</span>: <span class="literal">true</span>,</span><br><span class="line">  <span class="attr">format</span>: <span class="string">&#x27;esm&#x27;</span>,</span><br><span class="line">  <span class="attr">outfile</span>: <span class="string">&#x27;dist/app.js&#x27;</span>,</span><br><span class="line">  <span class="attr">minify</span>: <span class="literal">true</span>,</span><br><span class="line">  <span class="attr">sourcemap</span>: <span class="literal">true</span>,</span><br><span class="line">  <span class="attr">target</span>: [<span class="string">&#x27;es2020&#x27;</span>, <span class="string">&#x27;chrome100&#x27;</span>], <span class="comment">// 只降级语法，不注入 polyfill</span></span><br><span class="line">  <span class="attr">loader</span>: &#123; <span class="string">&#x27;.ts&#x27;</span>: <span class="string">&#x27;ts&#x27;</span>, <span class="string">&#x27;.png&#x27;</span>: <span class="string">&#x27;dataurl&#x27;</span> &#125;,</span><br><span class="line">  <span class="attr">logLevel</span>: <span class="string">&#x27;info&#x27;</span>,</span><br><span class="line">&#125;).<span class="title function_">catch</span>(<span class="function">() =&gt;</span> process.<span class="title function_">exit</span>(<span class="number">1</span>));</span><br></pre></td></tr></table></figure>
+
+<h3 id="边界在哪里"><a href="#边界在哪里" class="headerlink" title="边界在哪里"></a>边界在哪里</h3><p>快是有前提的，把边界写清楚比只讲优点有用。</p>
+<p><strong>它不做类型检查。</strong> esbuild 处理 TypeScript 的方式是”擦除类型”：解析时容忍类型标注，输出时去掉，仅此而已。类型错误、不兼容赋值、缺失导出它一概不管。因此迁移后 <code>tsc</code> 仍要在流水线里跑，只是不再负责产出代码：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 类型检查单独一步：不产出文件，只做校验</span></span><br><span class="line">tsc -p tsconfig.json --noEmit</span><br><span class="line"><span class="comment"># 代码产出交给 esbuild，两者并行或串行都可</span></span><br></pre></td></tr></table></figure>
+
+<p>这条分工要和团队讲明白：构建变快不等于类型检查消失，否则 CI 会出现”编译通过但类型是错的”。类型检查自身的优化是另一个话题，本文不展开。<strong>它也不生成 <code>.d.ts</code></strong>，声明文件仍要 <code>tsc</code> 或专门工具产出。</p>
+<p><strong>语法与特性支持有具体限制。</strong> 以 0.20 前后的版本口径来看，迁移前用自己的版本逐项实测：</p>
+<ul>
+<li><code>const enum</code>：跨文件常量枚举内联在当时的版本里支持有限，<code>isolatedModules</code> 下容易退化成普通枚举；</li>
+<li>装饰器：主流形态仍是旧版实验性装饰器，标准装饰器当时刚开始对齐；</li>
+<li><code>emitDecoratorMetadata</code>：不输出装饰器元数据，依赖 <code>reflect-metadata</code> 的注入写法不能直接替换；</li>
+<li>有运行时语义的构造：<code>namespace</code> 值合并、参数属性、<code>import = require</code> 要逐个确认；</li>
+<li>不做 polyfill 注入：<code>target</code> 只降级语法，运行时补齐不归它管。</li>
+</ul>
+<p>这些限制不构成否决，但决定了 esbuild 在流水线里的正确位置：负责快，不负责全。</p>
+<h2 id="esbuild-的四种常见接入姿势"><a href="#esbuild-的四种常见接入姿势" class="headerlink" title="esbuild 的四种常见接入姿势"></a>esbuild 的四种常见接入姿势</h2><p>接法不对同样拿不到收益。下面四种姿势覆盖大多数项目。</p>
+<p><strong>第一种：只做转译，不做打包。</strong> 风险最低的切入点：把 <code>ts-loader</code> 或 Babel 的语法降级交给 esbuild，打包仍归 webpack 负责，产物结构与插件生态不变。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 逐个文件转译：不开 bundle，只把 tsx 变成可运行的 JS</span></span><br><span class="line">esbuild src/App.tsx --loader=tsx --format=esm --target=es2020 \</span><br><span class="line">  --sourcemap --outfile=dist/App.js</span><br></pre></td></tr></table></figure>
+
+<p>这种模式要额外对齐影响单文件语义的选项：JSX 工厂、<code>useDefineForClassFields</code>、装饰器开关；依赖路径解析的 <code>paths</code> 不会被完整尊重。</p>
+<p><strong>第二种：单文件打包。</strong> 小工具与内部脚本适合一条命令产出可运行文件，连依赖一起打进去。</p>
+<p><strong>第三种：作为库的构建器。</strong> 要点是多格式输出、外部依赖声明与源码映射。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> &#123; build &#125; = <span class="built_in">require</span>(<span class="string">&#x27;esbuild&#x27;</span>);</span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> common = &#123;</span><br><span class="line">  <span class="attr">entryPoints</span>: [<span class="string">&#x27;src/index.ts&#x27;</span>],</span><br><span class="line">  <span class="attr">bundle</span>: <span class="literal">true</span>,</span><br><span class="line">  <span class="attr">sourcemap</span>: <span class="literal">true</span>,        <span class="comment">// 库也建议出 map，便于使用方定位</span></span><br><span class="line">  <span class="attr">external</span>: [<span class="string">&#x27;react&#x27;</span>, <span class="string">&#x27;react-dom&#x27;</span>], <span class="comment">//  peer 依赖不打进产物</span></span><br><span class="line">  <span class="attr">logLevel</span>: <span class="string">&#x27;info&#x27;</span>,</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 同一份源码出两种格式，两份产物并列发布</span></span><br><span class="line"><span class="title class_">Promise</span>.<span class="title function_">all</span>([</span><br><span class="line">  <span class="title function_">build</span>(&#123; ...common, <span class="attr">format</span>: <span class="string">&#x27;cjs&#x27;</span>, <span class="attr">outfile</span>: <span class="string">&#x27;dist/index.cjs&#x27;</span> &#125;),</span><br><span class="line">  <span class="title function_">build</span>(&#123; ...common, <span class="attr">format</span>: <span class="string">&#x27;esm&#x27;</span>, <span class="attr">outfile</span>: <span class="string">&#x27;dist/index.mjs&#x27;</span> &#125;),</span><br><span class="line">]).<span class="title function_">catch</span>(<span class="function">() =&gt;</span> process.<span class="title function_">exit</span>(<span class="number">1</span>));</span><br></pre></td></tr></table></figure>
+
+<p>硬约束是 esbuild 不产出 <code>.d.ts</code>：声明仍要 <code>tsc --emitDeclarationOnly</code> 补一步，在同一任务里串联。库产物开 <code>minify</code> 要谨慎，局部名字失去意义、堆栈可读性下降，很多团队选择不压缩、留给使用方去压。</p>
+<p><strong>第四种：开发与生产两套配置。</strong> 开发要反馈速度：监听、增量重建、不全量压缩；生产要产物质量：压缩、分片、目标降级。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 开发：监听变化，只转译不打包，保留源码映射</span></span><br><span class="line">esbuild src/main.ts --bundle --outfile=dist/app.js --sourcemap=inline --watch</span><br><span class="line"></span><br><span class="line"><span class="comment"># 生产：明确目标与压缩，一次跑完</span></span><br><span class="line">esbuild src/main.ts --bundle --outfile=dist/app.min.js --minify \</span><br><span class="line">  --sourcemap --target=es2018 --legal-comments=none</span><br></pre></td></tr></table></figure>
+
+<p>混用一套配置的后果很常见：开发时被压缩拖慢，生产时漏掉压缩。</p>
+<p>顺带说明一句边界：esbuild 在 Vite 中承担依赖预构建一类的角色，但那套机制的细节不在本文范围内，此处不展开。</p>
+<h2 id="SWC-的定位与基本用法"><a href="#SWC-的定位与基本用法" class="headerlink" title="SWC 的定位与基本用法"></a>SWC 的定位与基本用法</h2><p>SWC 是另一个方向的解法：用 Rust 编写的编译工具。它与 esbuild 的关键差别不在语言而在定位——主战场是<strong>转换</strong>，即把一份源码按目标语法改写成另一份源码；打包、最小化、解析只是配套能力，转译才是第一公民。</p>
+<p>命令行形态是 <code>swc</code> 加上插件包：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 安装 CLI 与常见预设：2024 年 1.3/1.4 一线的版本</span></span><br><span class="line">npm install --save-dev @swc/cli @swc/core @swc/helpers</span><br><span class="line">npx swc src -d dist --source-maps</span><br></pre></td></tr></table></figure>
+
+<p>编程形态是 <code>@swc/core</code>，适合写进构建脚本：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> &#123; transformSync &#125; = <span class="built_in">require</span>(<span class="string">&#x27;@swc/core&#x27;</span>);</span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> output = <span class="title function_">transformSync</span>(</span><br><span class="line">  <span class="string">`import React from &#x27;react&#x27;;</span></span><br><span class="line"><span class="string">   const show = (name: string) =&gt; &lt;p title=&#123;name&#125;&gt;你好 &#123;name&#125;&lt;/p&gt;;`</span>,</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="attr">filename</span>: <span class="string">&#x27;demo.tsx&#x27;</span>,</span><br><span class="line">    <span class="attr">jsc</span>: &#123;</span><br><span class="line">      <span class="attr">parser</span>: &#123; <span class="attr">syntax</span>: <span class="string">&#x27;typescript&#x27;</span>, <span class="attr">tsx</span>: <span class="literal">true</span> &#125;, <span class="comment">// 声明输入是 TS + JSX</span></span><br><span class="line">      <span class="attr">target</span>: <span class="string">&#x27;es2020&#x27;</span>,</span><br><span class="line">    &#125;,</span><br><span class="line">    <span class="attr">module</span>: &#123; <span class="attr">type</span>: <span class="string">&#x27;es&#x27;</span> &#125;,</span><br><span class="line">    <span class="attr">sourceMap</span>: <span class="literal">true</span>,</span><br><span class="line">  &#125;</span><br><span class="line">);</span><br><span class="line"></span><br><span class="line">process.<span class="property">stdout</span>.<span class="title function_">write</span>(output.<span class="property">code</span>);</span><br></pre></td></tr></table></figure>
+
+<p>要注意 <code>@swc/helpers</code>：降级后的 class、异步生成器、解构等语法会引用一小段运行时辅助函数，这些引用默认指向该包，所以它必须作为依赖出现在产物一侧。</p>
+<p>生态位置只述事实：Next.js 在 2024 年已经把 SWC 作为默认的编译与打包路径，这说明它的转译正确性在大规模真实项目上被反复验证过；Next.js 侧的配置取舍属于框架篇目，本文不展开。</p>
+<h2 id="SWC-插件机制与-Babel-生态的迁移现实"><a href="#SWC-插件机制与-Babel-生态的迁移现实" class="headerlink" title="SWC 插件机制与 Babel 生态的迁移现实"></a>SWC 插件机制与 Babel 生态的迁移现实</h2><p>Babel 的护城河不是语法转换而是插件生态。换掉它之前先回答一个问题：我们的插件能不能换。</p>
+<p>SWC 的插件用 Rust 编写、编译成 Wasm，在编译期直接操作 SWC 的语法树，配置里通过 <code>jsc.experimental.plugins</code> 声明。速度远超 JavaScript 插件，代价也明确：作者要会 Rust，要跟随 SWC 的语法树定义，调试手段更少。</p>
+<p>迁移现实因此分成三类：</p>
+<ul>
+<li><strong>可直接替换的</strong>：TS 与 JSX 语法转换、常见 ES 提案降级、<code>import</code> 形态转换、自动运行时，都是 <code>jsc.transform</code> 的内置能力。</li>
+<li><strong>移植后才能替换的</strong>：埋点注入、编译期常量替换、日志织入等自定义插件，要重写为 Wasm 插件，成本取决于原插件对 Babel 工具函数与访问者状态的依赖深度。</li>
+<li><strong>当时替换不掉的</strong>：依赖 Babel 运行时机制的宏类方案、依赖转换上下文的复杂改写、输出装饰器元数据的插件、与框架约定绑定的调试插件；这类项目就让 Babel 继续处理它们。</li>
+</ul>
+<p>配置文件形态是一段 <code>.swcrc</code>：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;jsc&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;parser&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;syntax&quot;</span><span class="punctuation">:</span> <span class="string">&quot;typescript&quot;</span><span class="punctuation">,</span> <span class="attr">&quot;tsx&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">true</span></span><span class="punctuation">,</span> <span class="attr">&quot;decorators&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">false</span></span> <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;transform&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;react&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;runtime&quot;</span><span class="punctuation">:</span> <span class="string">&quot;automatic&quot;</span> <span class="punctuation">&#125;</span><span class="punctuation">,</span> <span class="attr">&quot;optimizer&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;globals&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">null</span></span> <span class="punctuation">&#125;</span> <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;target&quot;</span><span class="punctuation">:</span> <span class="string">&quot;es2019&quot;</span></span><br><span class="line">  <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;module&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;type&quot;</span><span class="punctuation">:</span> <span class="string">&quot;es&quot;</span><span class="punctuation">,</span> <span class="attr">&quot;strict&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">false</span></span> <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;sourceMaps&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">true</span></span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;isModule&quot;</span><span class="punctuation">:</span> <span class="string">&quot;unknown&quot;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>调用侧可以显式传参，不依赖配置文件，便于把同一份逻辑用在脚本里：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> &#123; transformFileSync, minifySync &#125; = <span class="built_in">require</span>(<span class="string">&#x27;@swc/core&#x27;</span>);</span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> code = <span class="title function_">transformFileSync</span>(<span class="string">&#x27;src/App.tsx&#x27;</span>, &#123;</span><br><span class="line">  <span class="attr">jsc</span>: &#123; <span class="attr">parser</span>: &#123; <span class="attr">syntax</span>: <span class="string">&#x27;typescript&#x27;</span>, <span class="attr">tsx</span>: <span class="literal">true</span> &#125;, <span class="attr">target</span>: <span class="string">&#x27;es2019&#x27;</span> &#125;,</span><br><span class="line">  <span class="attr">module</span>: &#123; <span class="attr">type</span>: <span class="string">&#x27;es&#x27;</span> &#125;,</span><br><span class="line">  <span class="attr">sourceMaps</span>: <span class="literal">true</span>,</span><br><span class="line">&#125;).<span class="property">code</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 需要压缩时单独走一步，产物保留注释里的许可证信息</span></span><br><span class="line"><span class="keyword">const</span> small = <span class="title function_">minifySync</span>(code, &#123; <span class="attr">compress</span>: <span class="literal">false</span>, <span class="attr">mangle</span>: <span class="literal">true</span>, <span class="attr">format</span>: &#123; <span class="attr">comments</span>: <span class="literal">true</span> &#125; &#125;);</span><br></pre></td></tr></table></figure>
+
+<p>容易忽略的差别：Babel 插件能看到尚未降级的语法，SWC 插件只看到它那棵树在某个阶段的形态。移植不要逐行照搬，先确认插件真正依赖哪一层信息。</p>
+<h2 id="转译与打包是两条路线"><a href="#转译与打包是两条路线" class="headerlink" title="转译与打包是两条路线"></a>转译与打包是两条路线</h2><p>把两者理解成”更快的 webpack”是最常见的误判：它们替代的是不同环节。</p>
+<pre class="mermaid">flowchart LR
+    S[源码] --> T[转译层: esbuild 或 SWC]
+    T --> R{产物形态}
+    R -->|单文件与应用| B[简单打包: esbuild/SWC]
+    R -->|库与精细分片| P[精细打包: Rollup 或 webpack]
+    P --> O[产物与运行时]
+    B --> O</pre>
+
+<p>转译层只处理单个文件，输入输出都是文件粒度，天然可并行，快工具在这里收益最大。打包层要解析依赖图、决定模块进哪个分片、处理循环依赖、生成加载运行时代码，这些工作彼此耦合，很难靠并行解决。</p>
+<p>于是合理的分工出现：<strong>esbuild 或 SWC 负责快，Rollup 或 webpack 负责细。</strong> 各自擅长的产物形态也不同。</p>
+<ul>
+<li>esbuild：应用的单文件或少分片产物、内部工具、Node 服务端脚本、库的双格式产出；tree-shaking 有效，但副作用边界与分片命名的控制不如专用打包器精细。</li>
+<li>SWC：TS 与 JSX 的转译本身、作为框架的编译后端；它的打包能力在 2024 年仍在补齐，多数项目不用它做最终打包。</li>
+<li>Rollup：以 ESM 形态发布的库，副作用标注与摇树精度成熟，产物接近手写。</li>
+<li>webpack：资源种类多、需要复杂分片策略与运行时能力（模块联邦、按分片加载）的大型应用。</li>
+</ul>
+<p>记法：转译换工具，打包看诉求；多数项目最优解是新工具做转译、老打包器做产物。</p>
+<h2 id="迁移检查表"><a href="#迁移检查表" class="headerlink" title="迁移检查表"></a>迁移检查表</h2><p>真正让人返工的不是速度不达预期，而是产物语义变了没人注意。动手前逐项过一遍这张表。</p>
+<table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>要对齐的内容</th>
+<th>出问题时先查这里</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>JSX 与 TS 配置</td>
+<td>运行时形态与工厂函数</td>
+<td>运行期找不到工厂</td>
+</tr>
+<tr>
+<td>装饰器与元数据</td>
+<td>是否依赖元数据输出</td>
+<td>报元数据缺失</td>
+</tr>
+<tr>
+<td>目标与降级</td>
+<td>降级目标与浏览器基线</td>
+<td>语法报错或过度降级</td>
+</tr>
+<tr>
+<td>补齐责任</td>
+<td>运行时补齐换由谁负责</td>
+<td>某个接口不存在</td>
+</tr>
+<tr>
+<td>源码映射</td>
+<td>堆栈能否定位回源文件</td>
+<td>只显示产物行列</td>
+</tr>
+<tr>
+<td>第三方资源</td>
+<td>单文件组件与样式链路</td>
+<td>某类文件无人处理</td>
+</tr>
+</tbody></table>
+<p>最后一项最容易被低估：内置 <code>loader</code> 能处理常见资源类型，但单文件组件要先拆开模板与脚本，样式模块化与预处理也各有链路，这些不在默认能力内，仍要靠专用插件完成。</p>
+<h2 id="如何度量收益"><a href="#如何度量收益" class="headerlink" title="如何度量收益"></a>如何度量收益</h2><p>“快了好几倍”无法复现，也没有价值。度量要固定输入、分轮次、按阶段拆开。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 冷缓存：清掉构建缓存与产物后再计时</span></span><br><span class="line"><span class="built_in">rm</span> -rf node_modules/.cache dist</span><br><span class="line"><span class="keyword">time</span> esbuild src/main.ts --bundle --outfile=dist/app.js --minify</span><br><span class="line"></span><br><span class="line"><span class="comment"># 热缓存：同一命令连续跑第二次，观察重复构建的差异</span></span><br><span class="line"><span class="keyword">time</span> esbuild src/main.ts --bundle --outfile=dist/app.js --minify</span><br><span class="line"></span><br><span class="line"><span class="comment"># 分阶段观察：让工具输出内部耗时与元信息</span></span><br><span class="line">esbuild src/main.ts --bundle --outfile=/dev/null --log-level=debug --metafile=meta.json</span><br></pre></td></tr></table></figure>
+
+<p>对照组要同一份输入、同一台机器、同一依赖版本；冷启动与重复构建分开记录，并行收益在这两种场景下并不一致。再按解析、转译、打包、压缩分别计时，才知道慢在哪一步、该换掉哪一段。</p>
+<p>结论要写成条件区间而不是单点：文件多、单文件小、核数多的项目并行收益明显，只有几个巨型文件时收益有限。本文不给统一倍数，具体数字都只在特定机器上成立，属于示意值。</p>
+<h2 id="什么时候仍该用-Babel-或-webpack"><a href="#什么时候仍该用-Babel-或-webpack" class="headerlink" title="什么时候仍该用 Babel 或 webpack"></a>什么时候仍该用 Babel 或 webpack</h2><p>以下情形保留原方案更划算。</p>
+<ul>
+<li>构建依赖成体系的自定义插件，且深植于 Babel 的访问者机制：重写成本高于省下的时间。</li>
+<li>需要精细的分包与产物控制：命名分片、按路由切分、共享依赖协商。</li>
+<li>转换不止语法一层：样式抽取、文档注入、编译期写死变量、覆盖率统计。</li>
+<li>浏览器基线很低，需要构建层统一承担运行时补齐的责任。</li>
+<li>团队更看重可预测性：换工具的收益盖不住回归验证的成本。</li>
+</ul>
+<p>判断口径是一句话：转译瓶颈就换，语义与生态瓶颈先估迁移成本。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>esbuild 与 SWC 的价值来自结构性选择：一次解析一次生成、文件级并行、转译与压缩在同一进程，而不是把循环换快。它们的边界同样清楚：不做类型检查、不生成声明文件、对需要运行时语义的语法支持有限。让它们做流水线里最快的那一段，把类型与精细产物留在原处，是风险最低的用法；收益自己测，结论写成条件区间。</p>
+<table>
+<thead>
+<tr>
+<th>能力需求</th>
+<th>esbuild 的做法</th>
+<th>SWC 的做法</th>
+<th>仍需 Babel 或 webpack</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TS 与 JSX 转译</td>
+<td>擦除类型后输出</td>
+<td>内置转换配置</td>
+<td>需装饰器元数据时</td>
+</tr>
+<tr>
+<td>类型检查</td>
+<td>不负责</td>
+<td>不负责</td>
+<td>继续跑 <code>tsc</code></td>
+</tr>
+<tr>
+<td>打包产出</td>
+<td>内置打包器</td>
+<td>非主要能力</td>
+<td>精细分包与运行时</td>
+</tr>
+<tr>
+<td>压缩</td>
+<td>同进程内置</td>
+<td>可单独调用</td>
+<td>需特殊注释与产物时</td>
+</tr>
+<tr>
+<td>自定义转换</td>
+<td>插件能力有限</td>
+<td>Wasm 插件</td>
+<td>已有大量 JS 插件</td>
+</tr>
+<tr>
+<td>声明文件</td>
+<td>不生成</td>
+<td>不生成</td>
+<td>交给 <code>tsc</code> 产出</td>
+</tr>
+</tbody></table>
+</div><div class="article-licensing box"><div class="licensing-title"><p>esbuild 与 SWC 编译加速</p><p><a href="https://987763485.github.io/2024/04/04/esbuild与SWC编译加速/">https://987763485.github.io/2024/04/04/esbuild与SWC编译加速/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2024-04-04</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-19</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/web%E5%89%8D%E7%AB%AF/">web前端</a><a class="link-muted mr-2" rel="tag" href="/tags/typescript/">typescript</a><a class="link-muted mr-2" rel="tag" href="/tags/react/">react</a><a class="link-muted mr-2" rel="tag" href="/tags/vue/">vue</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2024/04/06/Flutter%E6%B7%B7%E5%90%88%E5%BC%80%E5%8F%91%E4%B8%8EPlatformChannel/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Flutter 混合开发与 Platform Channel</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2024/03/30/Kotlin%E5%8D%8F%E7%A8%8B%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90/"><span class="level-item">Kotlin 协程源码解析</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

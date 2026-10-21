@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>等保测评报告编写要点 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="测评报告是等级保护测评项目里唯一会被反复翻开的交付物：备案时要交，监督检查时要看，整改立项时要引用，下一个测评周期还要拿它做对比。本文从报告的实际读者出发，讲清楚报告的骨架与结论逻辑、测评对象和范围怎么描述、符合性判定怎么写、问题描述怎样做到可复核、证据如何组织、风险与整改建议如何分级，以及复测闭环和常见写作问题。适合第一次独立撰写报告的测评人员、负责迎评的系统负责人，以及需要审阅报告的合规与运维"><meta property="og:type" content="blog"><meta property="og:title" content="等保测评报告编写要点"><meta property="og:url" content="https://987763485.github.io/2023/03/31/%E7%AD%89%E4%BF%9D%E6%B5%8B%E8%AF%84%E6%8A%A5%E5%91%8A%E7%BC%96%E5%86%99%E8%A6%81%E7%82%B9/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="测评报告是等级保护测评项目里唯一会被反复翻开的交付物：备案时要交，监督检查时要看，整改立项时要引用，下一个测评周期还要拿它做对比。本文从报告的实际读者出发，讲清楚报告的骨架与结论逻辑、测评对象和范围怎么描述、符合性判定怎么写、问题描述怎样做到可复核、证据如何组织、风险与整改建议如何分级，以及复测闭环和常见写作问题。适合第一次独立撰写报告的测评人员、负责迎评的系统负责人，以及需要审阅报告的合规与运维"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2023-03-30T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-19T02:15:05.065Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="网络安全"><meta property="article:tag" content="等级保护"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2023/03/31/%E7%AD%89%E4%BF%9D%E6%B5%8B%E8%AF%84%E6%8A%A5%E5%91%8A%E7%BC%96%E5%86%99%E8%A6%81%E7%82%B9/"},"headline":"等保测评报告编写要点","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2023-03-30T16:00:00.000Z","dateModified":"2026-10-19T02:15:05.065Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"测评报告是等级保护测评项目里唯一会被反复翻开的交付物：备案时要交，监督检查时要看，整改立项时要引用，下一个测评周期还要拿它做对比。本文从报告的实际读者出发，讲清楚报告的骨架与结论逻辑、测评对象和范围怎么描述、符合性判定怎么写、问题描述怎样做到可复核、证据如何组织、风险与整改建议如何分级，以及复测闭环和常见写作问题。适合第一次独立撰写报告的测评人员、负责迎评的系统负责人，以及需要审阅报告的合规与运维"}</script><link rel="canonical" href="https://987763485.github.io/2023/03/31/%E7%AD%89%E4%BF%9D%E6%B5%8B%E8%AF%84%E6%8A%A5%E5%91%8A%E7%BC%96%E5%86%99%E8%A6%81%E7%82%B9/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2023-03-30T16:00:00.000Z" title="3/31/2023, 12:00:00 AM">2023-03-31</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a></span><span class="level-item">1 小时读完 (大约7561个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">等保测评报告编写要点</h1><div class="content"><p>测评报告是等级保护测评项目里唯一会被反复翻开的交付物：备案时要交，监督检查时要看，整改立项时要引用，下一个测评周期还要拿它做对比。本文从报告的实际读者出发，讲清楚报告的骨架与结论逻辑、测评对象和范围怎么描述、符合性判定怎么写、问题描述怎样做到可复核、证据如何组织、风险与整改建议如何分级，以及复测闭环和常见写作问题。适合第一次独立撰写报告的测评人员、负责迎评的系统负责人，以及需要审阅报告的合规与运维同事。</p>
+<h2 id="一、先搞清楚报告写给谁看"><a href="#一、先搞清楚报告写给谁看" class="headerlink" title="一、先搞清楚报告写给谁看"></a>一、先搞清楚报告写给谁看</h2><p>很多初次写报告的人，会把它写成测评过程的流水账：哪天进场、访谈了谁、跑了哪些工具，按时间顺序铺一遍，末尾补一句结论。这样的文档作者自己看着踏实，换一个人读却几乎不能用，因为读者要的不是过程，而是判断。</p>
+<p>测评报告本质是一份结论性文件，它要回答三个问题：被测对象是什么、对相应等级的安全要求满足到什么程度、不满足的地方怎么办。过程记录与证据材料都为这三个答案服务。凡是不能支撑结论的内容，要么进附录，要么不写。</p>
+<h3 id="1-1-四类读者，三种读法"><a href="#1-1-四类读者，三种读法" class="headerlink" title="1.1 四类读者，三种读法"></a>1.1 四类读者，三种读法</h3><p>第一类是委托方的系统负责人。他关心能不能通过、还差什么、要花多大力气，最常读的是整体结论、问题清单和整改建议。第二类是主管部门与备案受理方。他们关注范围是否覆盖完整、依据是否准确、结论是否有支撑，读法是抽查：随手翻到一条问题，看证据能不能对上。第三类是整改实施方，通常是运维和开发人员。他们需要知道问题出在哪台设备、哪个配置项、改成什么样子算改完，因此位置、现象、验收标准对他们最重要。第四类是三五年后的复测人员，也可能是你自己。系统已经换过一茬人，上一版报告就是唯一的起点，编号能不能接得上，直接决定下一轮的工作量。</p>
+<p>同一份文档要同时满足这四种读法，靠的不是写得更长，而是分层：结论层给判断，明细层给事实，附录层给证据。三层之间用编号互相引用，读者想停在哪一层都可以。</p>
+<h3 id="1-2-一份稳定的报告骨架"><a href="#1-2-一份稳定的报告骨架" class="headerlink" title="1.2 一份稳定的报告骨架"></a>1.2 一份稳定的报告骨架</h3><p>报告的结构不必逐字套模板，但骨架应当稳定，这样读者换一个项目也不用重新适应。比较通用的组织方式如下。</p>
+<p>第一部分是项目与委托信息，写明委托方、测评机构、测评类型（首次测评、复测或监督检查中的测评）、实施时间与报告版本。这部分最容易出错的是日期与版本：实施时间要和证据采集时间对得上，版本号要能追溯修订。</p>
+<p>第二部分是测评依据与范围，列出所依据的标准与文件，写清本次测评覆盖的业务、组件和责任边界。依据只写标准号与标准名称，不要凭印象复述条款内容。</p>
+<p>第三部分是被测系统描述，包括业务功能、网络拓扑、部署方式与定级情况。</p>
+<p>第四部分是测评过程与方法说明，交代访谈、配置核查、工具测试、文档审查各自覆盖了什么，哪些结论来自哪种方法。</p>
+<p>第五部分是单项测评结果，按层面组织，逐项给出判定、事实与证据引用。</p>
+<p>第六部分是整体测评结论，说明汇总规则和最终判断。</p>
+<p>第七部分是问题与风险分析，把不符合与部分符合的条目展开成可读的问题描述，并给出风险等级。</p>
+<p>第八部分是整改建议，按紧急程度分层。</p>
+<p>第九部分是附录，包括证据索引、访谈记录、工具输出摘要与缩略语表。</p>
+<pre class="mermaid">flowchart TD
+  A[项目与委托信息] --> B[测评依据与范围]
+  B --> C[被测系统描述]
+  C --> D[测评过程与方法]
+  D --> E[单项测评结果]
+  E --> F[整体测评结论]
+  F --> G[问题与风险分析]
+  G --> H[整改建议]
+  H --> I[附录与证据索引]</pre>
+
+<p>篇幅上有个经验：结论、问题、建议应占主要篇幅，过程描述压缩到能自证方法可靠即可。见过不少报告把网络拓扑写了十几页，问题描述只有干巴巴两行，读者读完仍不知道系统哪里不行。</p>
+<h2 id="二、测评对象与范围：把边界写到纸面上"><a href="#二、测评对象与范围：把边界写到纸面上" class="headerlink" title="二、测评对象与范围：把边界写到纸面上"></a>二、测评对象与范围：把边界写到纸面上</h2><p>等保测评的对象是定级对象，而不是一个笼统的系统。定级对象有明确边界：它由若干业务应用和支撑它们的主机、数据库、中间件、网络设备、安全设备组成，部署在特定机房或云上，由特定组织运维，并与外部系统存在数据交换。报告里的对象描述，就是要让没到过现场的人也能在脑子里画出这张图。</p>
+<h3 id="2-1-三段式：业务、组件、责任"><a href="#2-1-三段式：业务、组件、责任" class="headerlink" title="2.1 三段式：业务、组件、责任"></a>2.1 三段式：业务、组件、责任</h3><p>第一段写业务。业务名称、业务性质（对外服务还是内部管理）、服务对象与规模区间、承载的数据类型，特别要说明是否涉及个人信息、是否涉及重要数据。数据类型不是套话，它直接决定后面风险分析和整改建议的落脚点。</p>
+<p>第二段写组件。应用与接口、数据库、中间件、操作系统、虚拟化平台或云平台、网络与安全设备、运维通道（堡垒机、VPN）、备份与灾备设施、终端与移动端。每一项最好给出角色和大致数量级，但数量必须来自实际盘点，不能凭拓扑图推测。</p>
+<p>第三段写责任。自建机房要说明物理环境由谁保障；托管机房要说明门禁、供电、消防的责任划分；云上系统要说明 IaaS、PaaS、SaaS 各层分别由云服务商和租户承担哪些安全职责，依据是云服务商公开的责任共担说明与合同约定。这一段写不清，后面的不适用判定就会站不住脚：物理环境的要求对纯云上租户是否适用，取决于责任边界，而不取决于测评人员方便不方便。</p>
+<h3 id="2-2-三张清单决定范围是否可信"><a href="#2-2-三张清单决定范围是否可信" class="headerlink" title="2.2 三张清单决定范围是否可信"></a>2.2 三张清单决定范围是否可信</h3><p>范围描述的可信度，最终落在三张清单上：资产清单、人员清单、接口清单。资产清单要与证据里的主机名、IP、系统标识对得上；人员清单要覆盖系统负责人、运维、开发与安全管理岗位，访谈对象应能在清单里找到；接口清单要列出与第三方系统、上级平台、支付与短信通道的交互，因为边界处的访问控制与数据完整性往往最薄弱。</p>
+<p>纳入范围要写，排除范围也要写，并且写清排除的理由与影响。例如灾备中心尚未启用、本期不纳入，就应当注明启用后需在下一周期补充测评，而不是默默不提。</p>
+<h3 id="2-3-常见遗漏"><a href="#2-3-常见遗漏" class="headerlink" title="2.3 常见遗漏"></a>2.3 常见遗漏</h3><p>实际项目里被漏掉的，往往不是核心应用，而是围绕它的支撑设施：数据库实例与数据库账号、堡垒机与运维终端、日志集中采集平台、备份介质与恢复演练记录、移动端应用与小程序的后端接口、云上的对象存储与内容分发、第三方接口的鉴权方式。这些组件一旦遗漏，报告给出的整体符合就是有条件的，而这个条件没有写出来，等于把风险留给了读者。</p>
+<h3 id="2-4-不适用不是省略"><a href="#2-4-不适用不是省略" class="headerlink" title="2.4 不适用不是省略"></a>2.4 不适用不是省略</h3><p>某个要求在当前对象上没有对应场景时，应判定为不适用并说明理由，例如该对象不提供无线接入。错误写法有两种：留空让读者猜，或者为了省事直接写符合。前者让汇总表对不上，后者是结论错误。还有一种更隐蔽，是把没测写成不适用。前者是工作量问题，后者是事实判断问题，不能混。</p>
+<h2 id="三、单项结论与整体结论：两套逻辑"><a href="#三、单项结论与整体结论：两套逻辑" class="headerlink" title="三、单项结论与整体结论：两套逻辑"></a>三、单项结论与整体结论：两套逻辑</h2><p>单项结论回答“这一条要求满足了吗”，整体结论回答“这个对象总体上达到相应等级的保护能力了吗”。两者相关，但推不出彼此。把它们当成同一套逻辑，是报告失真最常见的根源。</p>
+<h3 id="3-1-四种单项结论的准确含义"><a href="#3-1-四种单项结论的准确含义" class="headerlink" title="3.1 四种单项结论的准确含义"></a>3.1 四种单项结论的准确含义</h3><p>符合：该要求涉及的措施存在、配置正确、在实际运行中有效，且有证据支持。</p>
+<p>部分符合：要求可以拆成若干子项，部分子项满足，部分子项缺失或失效。</p>
+<p>不符合：主要要求未满足，或者虽有措施但经核实无效。</p>
+<p>不适用：对象中不存在该要求所针对的场景，并且写明了理由。</p>
+<p>两个容易走偏的地方。一是把已配置当成符合。策略配置了，但日志里看不到生效记录；口令策略设了，但存在绕过路径；这类情况属于措施无效，不能判符合。二是把有制度文件当成符合。制度只证明写了，不证明做了，执行情况要通过访谈、记录和抽样验证。这两种偏差在文档类要求上尤其常见。</p>
+<h3 id="3-2-判定句写成三段式"><a href="#3-2-判定句写成三段式" class="headerlink" title="3.2 判定句写成三段式"></a>3.2 判定句写成三段式</h3><p>一条单项结论最好同时给出三样东西：判定、事实、证据。判定用标准术语，事实用一句话讲清满足什么、缺什么，证据指向附录编号。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">【判定】部分符合</span><br><span class="line">【事实】主机侧已启用登录失败处理与操作审计，但审计记录仅保存在本地，未集中采集，</span><br><span class="line">        留存时间无法满足要求。</span><br><span class="line">【证据】E-04-02、E-04-05</span><br></pre></td></tr></table></figure>
+
+<p>反例是只写判定，不写事实。读者看到”部分符合”四个字，既不知道哪部分符合，也不知道差在哪里，只能去翻证据。判定句写完整，能省掉后面大量沟通。</p>
+<h3 id="3-3-整体结论不是算术平均"><a href="#3-3-整体结论不是算术平均" class="headerlink" title="3.3 整体结论不是算术平均"></a>3.3 整体结论不是算术平均</h3><p>不能因为不符合项占比低就给出整体符合。理由至少有四条。</p>
+<p>第一，不同要求对安全结果的影响不同。边界防护、身份鉴别、安全审计上的缺失，通常比文档格式上的缺失更直接地影响安全能力。</p>
+<p>第二，要识别系统性缺失。同一类问题在多台主机、多个系统上重复出现，说明技术基线或管理流程整体失效，不能按条数摊薄成百分比。</p>
+<p>第三，补偿措施要看有效性。存在替代控制且经验证有效，可以降低风险，但不能自动把不符合改成符合；补偿措施本身也需要证据。</p>
+<p>第四，范围完整性是前提。范围漏掉了组件，汇总表再整齐也没有意义。</p>
+<p>因此整体结论的写法应当是：先给判断，再给理由，最后给限制条件，例如在本次测评范围内、以整改前的状态为准。这三句话缺一句，结论都容易被误读。</p>
+<h3 id="3-4-汇总表怎么设计"><a href="#3-4-汇总表怎么设计" class="headerlink" title="3.4 汇总表怎么设计"></a>3.4 汇总表怎么设计</h3><p>汇总表一般按层面分行，列包括测评项类别、符合、部分符合、不符合、不适用，以及主要问题编号。最后一行合计。设计上有三条硬要求：合计必须与单项明细逐条对得上；正文引用的数字必须能在附录里找到对应记录；不适用项要有理由栏或者引用说明。</p>
+<p>这里要提醒：具体数量以实际测评记录为准。不同系统、等级与标准版本对应的要求项并不相同，汇总表的数字不能照抄其他项目。表格整齐是形式，能对上是底线。</p>
+<h2 id="四、问题描述：让另一个人能照着复核"><a href="#四、问题描述：让另一个人能照着复核" class="headerlink" title="四、问题描述：让另一个人能照着复核"></a>四、问题描述：让另一个人能照着复核</h2><p>问题描述是报告里最见功力的部分。一段好的描述，应该让没去过现场的复核人员仅凭文字和证据编号，就能判断这个结论成立。</p>
+<h3 id="4-1-四要素：现象、位置、证据、影响"><a href="#4-1-四要素：现象、位置、证据、影响" class="headerlink" title="4.1 四要素：现象、位置、证据、影响"></a>4.1 四要素：现象、位置、证据、影响</h3><p>现象是看到了什么。是配置项的值、是缺失的记录、还是访谈中的回答。现象只写观察结果，不写推测。</p>
+<p>位置是在哪看到的。主机名或设备名、IP、组件与版本、配置路径或菜单路径、账号角色。位置的精度标准是能再次打开。</p>
+<p>证据是凭什么这么说。证据编号、截图编号、配置片段编号、访谈记录编号。</p>
+<p>影响是会导致什么。落到该要求所保护的安全属性上，说明可能后果与前提条件。</p>
+<p>在此之上再加两项会更完整：复现路径，即按什么步骤能看到同样的现象；判定，即对应哪种单项结论。复现路径对运维特别有用，他们照着走一遍就能确认问题是否真实存在，也能判断整改后是否真的改掉了。</p>
+<h3 id="4-2-含糊描述的典型症状"><a href="#4-2-含糊描述的典型症状" class="headerlink" title="4.2 含糊描述的典型症状"></a>4.2 含糊描述的典型症状</h3><p>含糊不是文笔问题，而是信息缺失。下面几组对照能说明差别。</p>
+<table>
+<thead>
+<tr>
+<th>含糊写法</th>
+<th>缺什么</th>
+<th>改法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>部分主机未开启审计</td>
+<td>哪些主机、审计哪一项、比例多少</td>
+<td>列出主机标识或引用清单编号，写明审计策略字段与当前值</td>
+</tr>
+<tr>
+<td>口令策略较弱</td>
+<td>弱在哪里</td>
+<td>给出最小长度、复杂度、有效期、历史口令数量的实际取值</td>
+</tr>
+<tr>
+<td>日志留存不足</td>
+<td>实际多久、要求多久</td>
+<td>给出实际留存天数与日志平台的配置位置</td>
+</tr>
+<tr>
+<td>管理制度不完善</td>
+<td>缺哪份、缺哪条</td>
+<td>指出制度名称与缺失环节，如发布、评审、修订</td>
+</tr>
+</tbody></table>
+<p>表格里第三列是改法，不是让作者把话说得更长。改法的共同点是把形容词换成可核对的事实。</p>
+<h3 id="4-3-一个可套用的模板"><a href="#4-3-一个可套用的模板" class="headerlink" title="4.3 一个可套用的模板"></a>4.3 一个可套用的模板</h3><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">【问题编号】P-04-03</span><br><span class="line">【所属层面】安全计算环境</span><br><span class="line">【现象】数据库账号口令策略中最小长度设置为 6，未启用复杂度校验，未设置口令有效期。</span><br><span class="line">【位置】数据库实例 db-01（示例地址 192.0.2.15），账号安全策略页面与参数配置文件。</span><br><span class="line">【证据】E-04-07 截图、E-04-08 参数导出。</span><br><span class="line">【复现】以管理员登录管理控制台，进入账号安全策略页面查看口令规则。</span><br><span class="line">【影响】弱口令可被猜测或撞库命中，进而获得数据库高权限，影响数据机密性与完整性。</span><br><span class="line">【判定】部分符合</span><br></pre></td></tr></table></figure>
+
+<p>模板不是让人填空交差。每一栏都要有具体内容，宁可多花十分钟核实主机名，也不要在报告里写某主机、某系统这类模糊指代。</p>
+<h3 id="4-4-影响一栏的边界"><a href="#4-4-影响一栏的边界" class="headerlink" title="4.4 影响一栏的边界"></a>4.4 影响一栏的边界</h3><p>影响要写得有依据、有节制。写可能导致什么，不写具体攻击步骤、工具名称与参数；写数据类型的敏感程度，不写具体个人信息；不把单点配置缺失夸大成系统将被完全控制。同时也不能反向缩水成存在一定安全风险这种没有信息量的话。</p>
+<p>判断标准很简单：一个有经验的运维读完影响，应该知道先修哪一个、为什么先修它。如果读完仍然没有优先级感，说明这一栏还没写到位。</p>
+<h2 id="五、证据组织：截图与配置摘录的规范"><a href="#五、证据组织：截图与配置摘录的规范" class="headerlink" title="五、证据组织：截图与配置摘录的规范"></a>五、证据组织：截图与配置摘录的规范</h2><p>证据是报告的骨头。结论可以写得漂亮，但没有证据支撑的结论在复核时一文不值。证据组织要解决三个问题：找得到、看得懂、信得过。</p>
+<h3 id="5-1-编号、索引与引用"><a href="#5-1-编号、索引与引用" class="headerlink" title="5.1 编号、索引与引用"></a>5.1 编号、索引与引用</h3><p>证据体系通常有三层编号：问题编号、证据编号、附录索引。问题编号按层面加序号，证据编号跟在问题后面，附录索引按编号排序并给出所在页码或附件名。三者必须闭环：正文每条判定都能指向证据，每份证据都能被至少一条判定引用，附录里不出现孤儿证据。</p>
+<p>一条问题至少一份直接证据。直接证据是能单独支撑判定的材料，例如策略配置界面加参数导出；访谈记录、拓扑图属于间接证据。不能用间接证据支撑技术判定，也不能让一条证据同时证明三件不相关的事。</p>
+<h3 id="5-2-截图六要素"><a href="#5-2-截图六要素" class="headerlink" title="5.2 截图六要素"></a>5.2 截图六要素</h3><p>一张合格的截图要尽量包含：系统或设备标识、界面路径、采集时间、关键参数、操作账号（脱敏后）、采集人。这六项不一定都出现在同一张图里，缺的部分要在图注里补齐。</p>
+<p>常见毛病有几种：只截一个弹窗，没有主机名，读者不知道这是哪台机器；把多张图拼在一起却不标注顺序和来源；用手机翻拍屏幕，反光、摩尔纹、时间都看不清；截图里带着真实口令、密钥或个人信息。这些问题都不难避免，难的是每次都记得。</p>
+<p>一条经验：一张图只证明一件事。想让一张图同时证明口令策略、审计配置和账号权限，结果往往是三件事都看不清。</p>
+<h3 id="5-3-配置与日志摘录"><a href="#5-3-配置与日志摘录" class="headerlink" title="5.3 配置与日志摘录"></a>5.3 配置与日志摘录</h3><p>命令行输出要带提示符与主机名，让人知道在哪台机器上执行。配置片段要带文件路径与前后几行上下文，孤零零一行参数无法判断它属于哪个配置块。日志要带查询条件与时间范围，只贴几行日志，读者无法判断这是全量还是抽样。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 证据文件按 编号_系统_组件_内容_日期 命名，归档时计算校验值</span></span><br><span class="line"><span class="built_in">sha256sum</span> E-04-08_db-01_password-policy_20230315.txt \</span><br><span class="line">  &gt;&gt; evidence-sha256.txt</span><br></pre></td></tr></table></figure>
+
+<p>导出类证据保留原始格式，不要为了排版转成图片；原始文件与报告一起归档，正文只放摘要和编号。图片无法二次检索，也无法验证是否被修改，原始配置两者都可以。</p>
+<h3 id="5-4-脱敏的边界"><a href="#5-4-脱敏的边界" class="headerlink" title="5.4 脱敏的边界"></a>5.4 脱敏的边界</h3><p>脱敏要统一规则、可逆可查、保留判定所需信息。IP 可以保留网段、隐去主机位；账号保留角色、隐去姓名；口令与密钥一律替换为固定占位符；个人信息只保留类型，不保留内容。脱敏后要能看出问题依然存在，例如口令策略截图里最小长度这个字段必须清晰可见。</p>
+<p>脱敏还要留痕：谁脱敏、按什么规则、原件在哪里。否则复测时无法判断是配置变了，还是图被人改过。</p>
+<h3 id="5-5-保存与移交"><a href="#5-5-保存与移交" class="headerlink" title="5.5 保存与移交"></a>5.5 保存与移交</h3><p>证据目录按项目、系统、层面三级组织，文件名带编号与日期，归档后设为只读并计算校验值。移交时给清单并双方签字，写清份数、格式与存放位置。保存期限按合同与机构制度执行。</p>
+<h2 id="六、风险分析与整改建议：从不符合到怎么办"><a href="#六、风险分析与整改建议：从不符合到怎么办" class="headerlink" title="六、风险分析与整改建议：从不符合到怎么办"></a>六、风险分析与整改建议：从不符合到怎么办</h2><h3 id="6-1-不符合是事实，风险是判断"><a href="#6-1-不符合是事实，风险是判断" class="headerlink" title="6.1 不符合是事实，风险是判断"></a>6.1 不符合是事实，风险是判断</h3><p>不符合回答要求是否满足，风险回答如果不满足会怎样、可能性多大。两者不能互相替代：一条不符合可能风险很低，因为对象在内网、有补偿控制、数据不敏感；另一条不符合可能风险很高，因为对象直接暴露在互联网、承载个人信息。</p>
+<p>把风险等级直接等同于不符合的严重程度，是最省事也最容易出错的做法。读者拿到的将是一份没有优先级的清单，整改只能按编号顺序推进。</p>
+<h3 id="6-2-分级的五个维度"><a href="#6-2-分级的五个维度" class="headerlink" title="6.2 分级的五个维度"></a>6.2 分级的五个维度</h3><p>影响对象的重要性、暴露面、利用前提、现有补偿措施、数据敏感度。这五个维度不需要打分，但每个等级都要能说出理由，例如该服务对互联网开放且承载个人信息，同类缺陷在边界设备上重复出现，因此定为高风险。</p>
+<pre class="mermaid">flowchart TD
+  A[不符合项] --> B{是否对互联网或第三方开放}
+  B -- 是 --> C{是否涉及身份鉴别或数据访问}
+  B -- 否 --> D{是否有经验证的补偿措施}
+  C -- 是 --> E[高风险]
+  C -- 否 --> F[中风险]
+  D -- 是 --> G[中风险或低风险]
+  D -- 否 --> H[中风险]</pre>
+
+<p>这张图只是决策的骨架，不是评分公式。同样的分支，在不同业务上得出的等级可能不同，理由比等级本身更重要。</p>
+<h3 id="6-3-建议分三层"><a href="#6-3-建议分三层" class="headerlink" title="6.3 建议分三层"></a>6.3 建议分三层</h3><p>立即整改：不改就可能被直接利用，或者整改成本很低。例如关闭不必要的公网映射、启用口令复杂度、修正明显错误的访问控制规则。</p>
+<p>计划整改：需要变更窗口、预算或采购。例如部署日志集中采集、补充备份设施、替换已停止维护的组件。</p>
+<p>长期建设：涉及架构与制度。例如区域划分调整、安全管理制度体系重构、运维流程改造。</p>
+<p>每条建议写四件事：做什么、在哪做、验收标准、建议时限。再补一个责任角色，方便委托方分派。四件事里最容易漏的是验收标准，而它恰恰是复测的依据。</p>
+<h3 id="6-4-建议必须可验收"><a href="#6-4-建议必须可验收" class="headerlink" title="6.4 建议必须可验收"></a>6.4 建议必须可验收</h3><p>加强安全管理、提高人员安全意识、完善相关制度这类建议，写了等于没写，因为没人能判断是否完成。可验收的建议是动词加对象加结果：把审计日志接入集中平台并设置留存期；对数据库账号启用复杂度校验并限制失败次数。时限可以给区间，但要与整改难度匹配。</p>
+<table>
+<thead>
+<tr>
+<th>问题</th>
+<th>不可验收的建议</th>
+<th>可验收的建议</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>日志未集中采集</td>
+<td>完善日志管理</td>
+<td>将主机与应用日志接入集中平台，设置留存期与告警规则，提供接入清单</td>
+</tr>
+<tr>
+<td>口令策略较弱</td>
+<td>加强账号安全</td>
+<td>启用复杂度校验，设置最小长度、有效期与历史口令数量，导出策略截图</td>
+</tr>
+<tr>
+<td>备份未演练</td>
+<td>重视备份工作</td>
+<td>每季度执行一次恢复演练，记录恢复时间与数据完整性校验结果</td>
+</tr>
+</tbody></table>
+<h2 id="七、复测与整改闭环"><a href="#七、复测与整改闭环" class="headerlink" title="七、复测与整改闭环"></a>七、复测与整改闭环</h2><p>报告交付不是终点。整改是否真的发生、是否真的有效，需要在复测里验证，否则整份报告就停在纸面。</p>
+<h3 id="7-1-整改反馈表"><a href="#7-1-整改反馈表" class="headerlink" title="7.1 整改反馈表"></a>7.1 整改反馈表</h3><p>委托方按问题编号逐条填写：整改措施、完成时间、责任人、验证方式、附件。核对时看两件事：措施是否直接对应问题，证据是否支持措施。一条措施覆盖五条不相关的问题，通常说明并没有真正整改。</p>
+<h3 id="7-2-复测范围怎么定"><a href="#7-2-复测范围怎么定" class="headerlink" title="7.2 复测范围怎么定"></a>7.2 复测范围怎么定</h3><p>原问题逐条复测；整改引起的变更做回归，例如组件升级后复测版本与关联策略；同类资产抽样，确认整改是普遍执行，而不是只改了点名的那一台。抽样规则要写进报告，避免复测结论的适用范围被默默放大。</p>
+<h3 id="7-3-复测结论的写法"><a href="#7-3-复测结论的写法" class="headerlink" title="7.3 复测结论的写法"></a>7.3 复测结论的写法</h3><p>分已整改、部分整改、未整改三种，各附新证据编号。原证据不覆盖、不删除，新旧证据并存，读者能看到变化过程。报告升版时写修订说明：改了哪些结论、依据是什么、由谁复核。</p>
+<h3 id="7-4-闭环的三个断点"><a href="#7-4-闭环的三个断点" class="headerlink" title="7.4 闭环的三个断点"></a>7.4 闭环的三个断点</h3><p>只交整改说明不交证据；复测只测原来那条，不管变更引入的新问题；版本管理混乱，复测报告与原报告对不上号。这三个断点任意一个存在，闭环就是名义上的。</p>
+<h2 id="八、常见写作问题清单"><a href="#八、常见写作问题清单" class="headerlink" title="八、常见写作问题清单"></a>八、常见写作问题清单</h2><h3 id="8-1-结论与证据不匹配"><a href="#8-1-结论与证据不匹配" class="headerlink" title="8.1 结论与证据不匹配"></a>8.1 结论与证据不匹配</h3><p>判定为符合，证据只显示配置页面，没有生效记录；判定为不符合，证据却是一张看不出问题的截图；一条证据被反复引用到不相关的多个结论上。改法是逐条核对，证据不足就补采，补不到就调整判定。</p>
+<h3 id="8-2-描述含糊"><a href="#8-2-描述含糊" class="headerlink" title="8.2 描述含糊"></a>8.2 描述含糊</h3><p>大量使用部分、相关、适当、存在隐患这类词，没有主机、没有字段、没有取值。改法是把形容词换成事实，把范围换成清单，把推测换成观察。</p>
+<h3 id="8-3-范围遗漏"><a href="#8-3-范围遗漏" class="headerlink" title="8.3 范围遗漏"></a>8.3 范围遗漏</h3><p>漏组件、漏责任边界、漏第三方接口，最后整体结论的适用范围被悄悄放大。定稿前用资产清单反向核对报告目录，凡是清单里有、报告里没有的，都要有解释。</p>
+<h3 id="8-4-口径与体例不一致"><a href="#8-4-口径与体例不一致" class="headerlink" title="8.4 口径与体例不一致"></a>8.4 口径与体例不一致</h3><p>同一事实在摘要与明细里说法不同；层面名称与术语混用；模板残留了上一个项目的系统名；把工具扫描结果直接当结论；把未发现写成不存在；整改建议与问题编号对不上。定稿前按问题编号把正文、汇总表、附录、建议表四处对齐，是最有效的一道检查。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>测评报告的价值不在篇幅，而在每个判断都能被复核、每条建议都能被执行。结论层说清判断与理由，明细层写实现象、位置、证据与影响，附录层保证证据可查。范围写到边界与责任，单项结论区分符合与措施无效，整体结论看关键项与系统性缺失，不能做算术平均。四要素描述、证据闭环、风险分级与可验收建议决定报告能否推动整改，复测与版本管理则把它变成可持续的安全记录。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li>GB&#x2F;T 22239-2019《信息安全技术 网络安全等级保护基本要求》</li>
+<li>GB&#x2F;T 28448-2019《信息安全技术 网络安全等级保护测评要求》</li>
+<li>GB&#x2F;T 22240-2020《信息安全技术 网络安全等级保护定级指南》</li>
+<li><a href="https://std.samr.gov.cn/">全国标准信息公共服务平台</a></li>
+<li><a href="https://openstd.samr.gov.cn/">国家标准全文公开系统</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>等保测评报告编写要点</p><p><a href="https://987763485.github.io/2023/03/31/等保测评报告编写要点/">https://987763485.github.io/2023/03/31/等保测评报告编写要点/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2023-03-31</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-19</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a><a class="link-muted mr-2" rel="tag" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/">等级保护</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2023/04/07/Seata%E5%88%86%E5%B8%83%E5%BC%8F%E4%BA%8B%E5%8A%A1%E5%AE%9E%E6%88%98/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Seata 分布式事务实战</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2023/03/26/TypeScript5%E8%A3%85%E9%A5%B0%E5%99%A8%E8%BF%81%E7%A7%BB/"><span class="level-item">TypeScript 5 装饰器迁移</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

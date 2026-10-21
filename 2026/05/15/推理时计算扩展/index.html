@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>推理时计算扩展 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="推理时计算扩展说的是件很朴素的事：模型权重不动，把更多算力花在回答这一次问题上。它常被说成”多试几次”或”再想想”，但要让收益稳定，就得把这两句口号拆成可测量的东西——预算口径、搜索结构、验证器质量、采样多样性、延迟形态与配额治理。本文按这条线展开，给出可复用的伪码骨架、一张预算决策表和一份实验记录表模板，并明确说明它在哪些任务形态上不如检索、不如路由、不如直接换模型。"><meta property="og:type" content="blog"><meta property="og:title" content="推理时计算扩展"><meta property="og:url" content="https://987763485.github.io/2026/05/15/%E6%8E%A8%E7%90%86%E6%97%B6%E8%AE%A1%E7%AE%97%E6%89%A9%E5%B1%95/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="推理时计算扩展说的是件很朴素的事：模型权重不动，把更多算力花在回答这一次问题上。它常被说成”多试几次”或”再想想”，但要让收益稳定，就得把这两句口号拆成可测量的东西——预算口径、搜索结构、验证器质量、采样多样性、延迟形态与配额治理。本文按这条线展开，给出可复用的伪码骨架、一张预算决策表和一份实验记录表模板，并明确说明它在哪些任务形态上不如检索、不如路由、不如直接换模型。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2026-05-14T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-20T16:42:51.345Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="大模型"><meta property="article:tag" content="python"><meta property="article:tag" content="rust"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2026/05/15/%E6%8E%A8%E7%90%86%E6%97%B6%E8%AE%A1%E7%AE%97%E6%89%A9%E5%B1%95/"},"headline":"推理时计算扩展","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2026-05-14T16:00:00.000Z","dateModified":"2026-10-20T16:42:51.345Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"推理时计算扩展说的是件很朴素的事：模型权重不动，把更多算力花在回答这一次问题上。它常被说成”多试几次”或”再想想”，但要让收益稳定，就得把这两句口号拆成可测量的东西——预算口径、搜索结构、验证器质量、采样多样性、延迟形态与配额治理。本文按这条线展开，给出可复用的伪码骨架、一张预算决策表和一份实验记录表模板，并明确说明它在哪些任务形态上不如检索、不如路由、不如直接换模型。"}</script><link rel="canonical" href="https://987763485.github.io/2026/05/15/%E6%8E%A8%E7%90%86%E6%97%B6%E8%AE%A1%E7%AE%97%E6%89%A9%E5%B1%95/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2026-05-14T16:00:00.000Z" title="5/15/2026, 12:00:00 AM">2026-05-15</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></span><span class="level-item">1 小时读完 (大约9081个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">推理时计算扩展</h1><div class="content"><p>推理时计算扩展说的是件很朴素的事：模型权重不动，把更多算力花在回答这一次问题上。它常被说成”多试几次”或”再想想”，但要让收益稳定，就得把这两句口号拆成可测量的东西——预算口径、搜索结构、验证器质量、采样多样性、延迟形态与配额治理。本文按这条线展开，给出可复用的伪码骨架、一张预算决策表和一份实验记录表模板，并明确说明它在哪些任务形态上不如检索、不如路由、不如直接换模型。</p>
+<h2 id="两种扩展：并行与串行"><a href="#两种扩展：并行与串行" class="headerlink" title="两种扩展：并行与串行"></a>两种扩展：并行与串行</h2><p>训练阶段的算力只花一次，却服务于此后每一次请求；推理时计算扩展反过来，权重不动，把算力加在单次请求上。它的基本杠杆只有三个：让一次采样生成更长的中间步骤、同一次问题多采样几条独立轨迹再收口、以及让轨迹与外部世界交互之后再回来。前两个分别对应并行扩展与串行扩展，第三个通常作为前两者的支撑条件出现，本身不构成独立方向。</p>
+<p>并行扩展（parallel scaling）指对同一问题跑 N 条相互独立的轨迹，再用某种选择器收敛到单一答案——选择器可以是多数投票、验证分数，也可以是一次执行结果。它的成本对 N 近似线性，延迟可以通过批处理与并发摊平，因此工程上最容易先落地。它的收益曲线之所以呈凹形，核心原因通常不是”模型想不出来”，而是错误之间不独立：同一个底座、同一批训练数据、同一条提示，会把 10 条轨迹推向同一类误解。错误高度相关时，N 从 1 提到 2 有可见收益，提到 8 只是把同一份偏见复制了 8 份，账面成本却翻了 8 倍。</p>
+<p>串行扩展（sequential scaling）指把单条轨迹拉长：分阶段推理、递归分解、拿到中间结果后复核再进入下一阶段。它的成本随序列长度上升得更快，因为注意力计算与缓存占用同时增长（具体机制属于推理服务层的讨论，此处不复述）；它的延迟无法靠并发摊薄，而且早期步骤的错误会沿上下文累积——模型相当擅长把上一步的错误”圆”成顺理成章的下一步。作为回报，串行扩展可以在步骤之间插入检查点，让校验发生在结论成型之前，这是并行扩展结构上做不到的事。</p>
+<p>两条价格曲线不同，选择规则因此相当直接：存在可靠验证器时优先并行，因为生成便宜、挑选可靠、失败可归因；任务能自然分解且中间产物可检查时优先串行；两者都不满足时，多花算力基本等于多花钱。这条规则会在第六节的决策表里细化成可操作口径，但要先把一个前提说清楚：验证器的可靠性不是”打分准不准”，而是它的误差方向会不会被选择压力持续逼近。</p>
+<h2 id="预算的三种口径"><a href="#预算的三种口径" class="headerlink" title="预算的三种口径"></a>预算的三种口径</h2><p>“多想一会儿”要变成可控变量，第一步是选一个既能被系统强制执行、又能被实验复现的口径。常见三种口径各有失真方式。</p>
+<p>token 预算。给单次请求的输出与中间推理 token 设上限，由服务层截断。优点是单位明确、能在网关强制执行、与资源占用直接挂钩。失真是 token 数与”想清楚”并不等价：同一个上限，模型可能用来铺陈冗长解释，也可能提前收束；上限压得过紧时，被截掉的往往恰好是最后那段汇总与自检，于是错误率上升却看不出原因。</p>
+<p>步骤预算。以可数的中间动作为单位：一次候选生成算一步，一次工具调用算一步，一次校验算一步。优点是可观测性最好，天然适配 agent 循环，方便做”用了多少步、还剩多少步”的界面与配额。失真是步骤边界必须由执行框架事先定义，否则模型会把”读了 5 个文件”表述成 1 步，预算被语义滑动吃掉。把计数写死在 harness 层（每次工具调用固定计数一次，与模型自述无关）是唯一稳妥的做法。</p>
+<p>时间预算。给请求一个绝对 deadline。优点是与用户侧 SLA 对齐，熔断语义清晰。失真最大：同一 deadline 在不同负载、不同批量、不同模型规模下完成的步数不同，可复现性最差；扩缩容或容量紧张期间它还会悄悄改变答案质量，而监控上看不到任何异常。结论是时间预算适合做熔断与保护，不适合做实验档位。</p>
+<p>分配策略上，总预算要拆成三段而不是全给首轮生成：首轮生成、扩展分支、校验复核。校验段应留固定比例（示意值为首轮 40%、扩展 35%、复核 25%；团队可重新约定，但必须在实验开始前写死）。关键在于这个预留由调度器强制执行，而不是靠提示词请求模型”记得检查一下”——后者在预算紧张时最先被牺牲。</p>
+<p>还有一类容易被忽略的现象：预算边界处的行为突变。当剩余预算落在模型在训练分布里习得的”典型解答长度”附近或以下时，输出会出现三种退化。其一是伪收敛：提前给出结论，并把不确定性用肯定语气抹平。其二是反思压缩：原本该逐条核对的自检被缩成一句”以上推理是合理的”。其三是硬截断：预算在句子中间用完，下游解析器拿到结构不完整的输出，进而触发重试放大。三者都有可观测特征——结论出现在预算使用率的很高位置、自检段落长度骤降、结束原因为长度上限。工程对策不是”再多给一点点预算”卡在临界点上，而是把预算给到舒适区，同时显式要求预算不足时输出部分答案并标注哪些部分未经验证。宁可要一份带标注的不完整答案，也不要一份语气完整的错误答案。</p>
+<h2 id="树搜索与验证器打分"><a href="#树搜索与验证器打分" class="headerlink" title="树搜索与验证器打分"></a>树搜索与验证器打分</h2><p>把”多想”组织成搜索，就绕不开四件事：候选生成、价值评估、剪枝、回溯。搜索树的宽度与深度直接和预算挂钩，成本形态接近 b 的 d 次方，所以真正的工程问题从来不是”用哪种搜索算法”，而是”评估函数的质量能不能支撑这个分支因子”。候选生成要有区分度，同分布重复采样只增成本；价值评估可以是终局打分，也可以是中间步骤打分，两者的可靠性来源完全不同；剪枝要有可解释依据，例如低于阈值、被支配解替代、命中硬约束，否则事后无法归因；回溯意味着要保留部分中间结果并重用，实现上依赖推理服务层的缓存能力，机制细节另文已述，本文只关心它对预算回收的影响。</p>
+<p>验证器从哪里来，按可靠性从高到低排：</p>
+<ul>
+<li>能执行的：跑单元测试、跑解释器、跑校验器。返回码、断言失败信息、编译错误列表是最硬的信号，因为它们不依赖模型判断。</li>
+<li>能形式化的：schema 校验、类型检查、单位与量纲核对、静态规则、命名与格式规范、合规清单。它们覆盖面窄但结果可复现。</li>
+<li>能对证据的：要求打分方引用具体行号、原文片段、日志摘要或执行输出，第三方可复核。没有证据字段的打分，本质上仍是猜测。</li>
+<li>判别模型或另一条轨迹的打分：最弱的一档，且与生成器共享盲区。</li>
+</ul>
+<p>验证器噪声如何把搜索带回幻觉，这条机制值得写透。best-of-N 的动作是对验证分数取 argmax，这在数学上等价于沿着验证器的误差方向做优化：N 越大，越容易选中恰好落在验证器误判区里的那一条。也就是说，把答案带偏的不是生成器变差，而是选择压力专门去挖验证器的盲区。分数分布通常是重尾的，少数高分候选对均值的贡献远大于多数候选，于是”平均分在涨”和”质量在涨”可以长期背离。账面表现也很典型：通过率上升、置信度上升，人工抽审却发现自信的错误变多了。</p>
+<p>缓解手段要与机制一一对应：</p>
+<ul>
+<li>把验证器当过滤器而不是排序器。先用硬约束淘汰不可接受的候选，剩下的按原文顺序或随机取，避免持续逼近误差边界。</li>
+<li>双验证器一致性。来源不同的两个验证器都通过才算通过；两者的一致率本身就是可观测指标，一致率下降往往先于质量下降。</li>
+<li>保留 top-k 而不是 top-1。多条并列时把候选集交给下一段流程——更多检查、换一种提问方式、或转人工——而不是强行造一个全序。</li>
+<li>要求证据字段。无证据的高分降级为待复核，而不是直接采信。</li>
+<li>定期做校准核对。在有可执行验证的真值切片上，用执行结果作为基准，检查学习型打分器的排序相关性是否退化。</li>
+</ul>
+<p>过程奖励与结果奖励的取舍也落在这里。结果奖励只判终局，信号稀疏，容易被投机——凑出正确答案的形状而过程完全错误。过程奖励判中间步骤，能直接指导搜索方向，但依赖步骤级标注，而且很容易被”看起来规范的中间步骤”骗过：步骤写得工整不等于步骤正确。折中做法是能用可执行检查点的地方就不要用学习型过程奖励；确实需要学习信号时，把它限制在”提示搜索往哪里走”，不让它单独决定最终答案。</p>
+<p>生成与验证分离是另一个结构性决定。把生成器与验证器拆成两次调用甚至两个模型，价值在于切断误差相关性：同一个模型做自我批改，倾向于在它自己犯错的地方同样犯错。代价也要写清：要维护两套提示、两套评测、两套版本与两套故障模式，而且验证器必须能看到证据而不只是结论，否则所谓分离只是换了个口吻的自评。</p>
+<h2 id="并行采样、投票与多样性控制"><a href="#并行采样、投票与多样性控制" class="headerlink" title="并行采样、投票与多样性控制"></a>并行采样、投票与多样性控制</h2><p>并行扩展有两种收口方式，混用会让归因失效，先分清楚。</p>
+<p>自洽性（self-consistency）指生成多条独立推理轨迹，把最终答案规范成可判等的形式后取多数。它能奏效有两个前提：答案可规范（数值、选项、可字符串判等的短串），以及错误足够分散。投票能消掉随机错，消不掉共同偏——所有轨迹共享的误解会以一致同意的形式通过。它不需要验证器，这是它受欢迎的全部理由；它也处理不了开放式文本，因为两段方案之间不存在”相等”关系，多数表决无从定义。</p>
+<p>最优选择（best-of-N）指用验证器或打分器挑一条。它把可达质量的上限抬到 N 条里最好的那条，但下限由验证器决定。两者的差别可以这样记：自洽性的收益受限于错误相关性，best-of-N 的收益受限于验证器噪声，而两者的成本结构几乎一样，所以选哪个取决于你手上更缺”分散的错误”还是更缺”可靠的裁判”。</p>
+<p>多样性有四个杠杆，各自带副作用：</p>
+<ul>
+<li>温度与核采样参数。最直接，但随机性提高通常先破坏格式稳定性与算术可靠性，换来的是一堆低质候选，而不是候选空间的真正扩张。</li>
+<li>种子。便于复现与回放，固定种子集合适合做 A&#x2F;B，但它不改变错误结构——同一提示同一种子换批次，看到的仍是同一类误解。</li>
+<li>提示扰动。换分解方式、换表示（代数与几何、列表与表格）、换单位制、换提问语言。收益最大，风险也最隐蔽：扰动会悄悄改掉题目条件，于是 N 条轨迹在回答 N 个不同问题。控制原则是扰动只作用于”怎么解”，不作用于”解什么”，并保留一份原始表述用于最终比对。</li>
+<li>异构生成器。不同规模或不同族，误差相关性最低，但运维成本与评测口径成本同时上升，且不同模型的截断行为与格式倾向不一致，过滤逻辑要按来源分支。</li>
+</ul>
+<p>下面是一段可复用的伪码骨架，只表达控制流与预算口径，不含任何具体库接口：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">solve_with_budget</span>(<span class="params">prompt, spec, budget</span>):</span><br><span class="line">    reserve = budget.check_reserve()            <span class="comment"># 复核预留，由调度层强制扣住</span></span><br><span class="line">    candidates = generate(prompt, spec, n=budget.gen_slots)  <span class="comment"># 每条独立超时</span></span><br><span class="line">    survivors = []</span><br><span class="line">    <span class="keyword">for</span> c <span class="keyword">in</span> candidates:</span><br><span class="line">        <span class="keyword">if</span> c.truncated:                         <span class="comment"># 预算耗尽的半成品不参与择优</span></span><br><span class="line">            mark_partial(c)</span><br><span class="line">            <span class="keyword">continue</span></span><br><span class="line">        <span class="keyword">if</span> hard_pass(c, spec):                  <span class="comment"># 可执行、可形式化约束只做过滤</span></span><br><span class="line">            evidence = cite_evidence(c, spec)   <span class="comment"># 要求可核对的证据字段</span></span><br><span class="line">            <span class="keyword">if</span> evidence.ok:</span><br><span class="line">                survivors.append(c)</span><br><span class="line">    <span class="keyword">if</span> <span class="built_in">len</span>(survivors) == <span class="number">1</span>:</span><br><span class="line">        <span class="keyword">return</span> accept(survivors[<span class="number">0</span>], evidence=survivors[<span class="number">0</span>].evidence)</span><br><span class="line">    <span class="keyword">if</span> <span class="built_in">len</span>(survivors) &gt; <span class="number">1</span>:</span><br><span class="line">        <span class="keyword">return</span> resolve_tie(survivors, budget=reserve)   <span class="comment"># 复核或人工，而非按分排序</span></span><br><span class="line">    refined = sequential_refine(prompt, spec, budget.remaining())</span><br><span class="line">    <span class="keyword">return</span> accept_or_flag_unverified(refined)</span><br></pre></td></tr></table></figure>
+
+<p>几个刻意的选择值得说明。截断候选不进入择优，否则等于在训练分布之外奖励”写到预算耗尽”；硬约束只用来淘汰、不用来排序，避免 argmax 逼近验证器边界；多条并列时消耗复核预留而不是造全序；一条都不通过时降级到串行细化，并且最终输出必须带未验证标记。预算的扣除点也在这段控制流里：申请 N 条是一次承诺，实际生成少于 N 条不退还，因为容量已经预留。</p>
+<h2 id="自我校验与反思的成本"><a href="#自我校验与反思的成本" class="headerlink" title="自我校验与反思的成本"></a>自我校验与反思的成本</h2><p>反思的收益集中在”不需要新信息就能查出来”的部分：单位与量纲核对、边界样例、把答案代回原约束、schema 一致性、算术复算、以及把结论与题目原文逐条对齐。这类自查不依赖外部知识，所以自反思确实能拿到真收益，而且成本极低。</p>
+<p>它的失败同样成模式，常见四类：</p>
+<ul>
+<li>确认式反思。第二次生成以第一次输出为条件上下文，先验本身就偏向维持原结论，于是反思文本长成”承认可能存在一些小瑕疵，随后原样重申”。</li>
+<li>局部修补掩盖结构错误。改掉最显眼的一处措辞或一个数值，结构性问题原样保留，输出看起来”处理过意见”，实际变更只发生在表面。</li>
+<li>反思挤占预算。自检段落变长意味着候选数或答案长度变少，同一份预算下并行与串行互相抢占，最后两边都做 half。</li>
+<li>虚假信任外溢。把没有外部验证支撑的反思文本直接展示给用户，用户读到的确定性比模型实际掌握的更强，这是产品层面的伤害而不只是质量问题。</li>
+</ul>
+<p>“越反思越自信”是上述机制的合力结果，而且可测：对同一批样本记录反思轮次与结论翻转次数，如果轮次增加而翻转次数接近零、同时置信表述显著上升，就已经拿到信号，不需要等到线上出问题再回头查。</p>
+<p>替换关系上，凡是能用外部信号的地方就不要用自评：</p>
+<ul>
+<li>用执行代替”再想一遍”：测试通过与否、解释器返回、校验器错误列表。</li>
+<li>用规则代替判断：schema、类型、单位、许可证、命名与格式规范。</li>
+<li>用检索代替回忆：把结论与可引用来源对齐，未命中来源的句子一律标记为待确认。</li>
+<li>用交叉异议代替自我批改：让来源不同的另一方只被要求指出可能的错误位置与理由，不给出正确答案；只有”指出了可复核位置”的异议才计入统计。</li>
+<li>用位置可核对性作为采信门槛：说不出具体位置的自查视为复述，不计入通过条件。</li>
+</ul>
+<p>一句划界：把失败样例沉淀成可检索条目属于规划实践的范围，本文只讨论校验信号本身该从哪里来。</p>
+<h2 id="预算决策表：什么时候不该用它"><a href="#预算决策表：什么时候不该用它" class="headerlink" title="预算决策表：什么时候不该用它"></a>预算决策表：什么时候不该用它</h2><p>先明确三种”不是它该解决的”情形。知识缺失：答案缺的是事实、接口约束或版本差异，多想不会补上信息，检索与工具调用的收益更直接，而且可归因。能力上限：底座在该任务形态上不具备所需能力，扩大预算只会放大同一类错误，此时该动的变量是模型规模、任务表述或交互方式。已经稳定正确：在接近饱和的切片上加预算，带来的是成本、延迟和格式风险，质量曲线早就平了。</p>
+<p>把判定条件按列读，比按行读更可靠：先看有没有可靠验证器，再看延迟约束，最后才看预算上限。当”可靠验证器”这一列是弱或无时，任何形式的并行择优都应降级为过滤或转人工。</p>
+<table>
+<thead>
+<tr>
+<th>任务形态</th>
+<th>可靠验证器</th>
+<th>延迟约束</th>
+<th>预算上限</th>
+<th>推荐手段</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>唯一答案的算术或代数题</td>
+<td>可执行</td>
+<td>宽松</td>
+<td>中</td>
+<td>并行采样加自洽性投票</td>
+<td>答案必须先规范</td>
+</tr>
+<tr>
+<td>有测试覆盖的代码修复</td>
+<td>可执行（测试）</td>
+<td>中</td>
+<td>中</td>
+<td>并行生成加测试过滤</td>
+<td>测试缺失即退化为自评</td>
+</tr>
+<tr>
+<td>多步工具链任务</td>
+<td>部分（步骤结果可见）</td>
+<td>宽松</td>
+<td>高</td>
+<td>串行细化加步间检查点</td>
+<td>步骤由执行层计数</td>
+</tr>
+<tr>
+<td>开放式写作或方案设计</td>
+<td>弱（不可判等）</td>
+<td>中</td>
+<td>低至中</td>
+<td>单轨迹加外部规则清单</td>
+<td>不建议投票</td>
+</tr>
+<tr>
+<td>严格结构化的接口输出</td>
+<td>可形式化</td>
+<td>紧</td>
+<td>低</td>
+<td>并行加 schema 过滤</td>
+<td>校验成本极低，值得默认开</td>
+</tr>
+<tr>
+<td>事实性问答</td>
+<td>需外部来源</td>
+<td>紧</td>
+<td>低</td>
+<td>先检索，预算留给来源核对</td>
+<td>预算给检索轮次而非思考</td>
+</tr>
+<tr>
+<td>高频短请求且质量稳定</td>
+<td>弱</td>
+<td>紧</td>
+<td>极低</td>
+<td>单采样直出</td>
+<td>只保留格式校验</td>
+</tr>
+<tr>
+<td>低延迟交互对话</td>
+<td>弱</td>
+<td>极紧</td>
+<td>极低</td>
+<td>小模型直出加异步复核</td>
+<td>结果回填下一轮</td>
+</tr>
+<tr>
+<td>结构复杂但可分解</td>
+<td>部分</td>
+<td>中</td>
+<td>高</td>
+<td>并行生成分支加串行合并</td>
+<td>两种扩展串联</td>
+</tr>
+<tr>
+<td>高风险决策且可承担人工</td>
+<td>强（证据可核对）</td>
+<td>宽松</td>
+<td>高</td>
+<td>保留 top-k 转人工</td>
+<td>不追求自动收敛</td>
+</tr>
+</tbody></table>
+<p>对应的控制流可以画成一张判定图，落地时它更像是调度器里的一段决策树，而不是模型需要理解的提示词：</p>
+<pre class="mermaid">flowchart TD
+    A[请求进入] --> B{该切片是否已接近稳定正确}
+    B -- 是 --> Z[单轨迹直出只做格式校验]
+    B -- 否 --> C{缺的是信息还是推理}
+    C -- 信息 --> D[先做检索或工具调用]
+    D --> E{来源是否可核对}
+    E -- 否 --> Y[保留 top-k 转人工]
+    E -- 是 --> Z
+    C -- 推理 --> F{是否有可执行或可形式化验证器}
+    F -- 是 --> G[并行采样并给每条独立超时]
+    G --> H{过滤后剩余几条}
+    H -- 恰好一条 --> I[接受并记录证据]
+    H -- 多条并列 --> J[用复核预留二次检查]
+    H -- 零条 --> K[降级为串行细化并标注未验证]
+    F -- 否 --> L{步骤能否自然分解}
+    L -- 能 --> K
+    L -- 不能 --> Y</pre>
+
+<h2 id="延迟、成本与流式的配合"><a href="#延迟、成本与流式的配合" class="headerlink" title="延迟、成本与流式的配合"></a>延迟、成本与流式的配合</h2><p>并行扩展对尾延迟的影响是结构性的。它是典型的 scatter-gather：响应时间由最慢的那条分支决定。当分支时长近似独立时，收齐 N 条的时间等于 N 个样本的最大值，分布整体右移且随 N 增长，P99 的上升幅度比均值更大；再叠加排队与批处理抖动，长尾会更陡。所以”预算多花一倍、延迟只多一点”这种直觉在 P50 上大致成立，在 P99 上不成立，而 SLA 恰恰是拿 P99 谈的。</p>
+<p>对应的手段按机制来配：</p>
+<ul>
+<li>分支独立超时加早停。一旦有候选通过过滤且证据可核对就收敛，主动取消其余分支，把”等齐再答”改成”等到第一个满足条件的”。</li>
+<li>分层预算。先跑 1 条并设接受阈值，不满足才扩到 N；扩档请求携带剩余 deadline，避免扩展后必然超时。</li>
+<li>绝对等待上限。投票与复核阶段有硬 deadline，超时返回带未验证标记的答案，而不是无限等待一条迟迟不通过的分支。</li>
+<li>流式结构化事件先行。先输出”第 k 条完成””测试通过 n 比 m””剩余预算档位”这类事件，再输出最终答案正文；未通过校验的候选内容不进入用户可见文本流，避免出现”错误答案已经打完了”的既成事实。</li>
+<li>若产品要展示过程，展示可核对的检查结果（执行输出、命中的规则），不展示模型自述的确定性。</li>
+<li>取消必须传播。客户端断连要传播到分支池，否则用户早已离开而 N 条分支继续跑满；网关侧要携带剩余 deadline，服务层据此推导分支超时与是否停止扩展。</li>
+<li>重试要区分性质。预算尚未消耗的排队失败可以重试；已经消耗预算的部分失败不该重试放大，改为降级返回，因为重试只是把同一份预算花两遍。</li>
+</ul>
+<p>串行扩展的延迟形态不同：它不是把尾巴拉开，而是把持有时间拉长，因此对排队系统施加的是周转压力而不是峰值压力。两种形态需要不同的容量策略，这也是为什么预算档位要与部署形态一起声明。成本口径上本文不谈单价，只看资源占用形态：并行的形态是”同一时刻多份并发加短时峰值”，容量规划要按峰值预留；串行的形态是”少量并发加长时间持有”，压力体现在并发槽位周转与排队长度上。同一个标称预算在两套系统里并不等价。配额则应该按租户与用户建账户，而不是按请求限流——否则单个用户用并行采样就能占满一整个批处理窗口，把别人的延迟拖进同一个长尾。</p>
+<h2 id="怎么证明多想有效"><a href="#怎么证明多想有效" class="headerlink" title="怎么证明多想有效"></a>怎么证明多想有效</h2><p>先声明立场：本节只给实验设计与记录模板，不给结论数字。推理时扩展的收益高度依赖任务切片、底座与验证器质量，任何跨环境搬过来的”提升幅度”都不成立。</p>
+<p>七条设计约束：</p>
+<ul>
+<li>预算档位固定且实验前声明。用离散档（示意值 1、2、4、8），不要事后补档再挑好看的；每个档位要与执行层一致的口径定义，说清是 token、步骤还是时间。</li>
+<li>并发档位与预算档位分离。同一预算档跑不同并发，才能把排队与尾延迟效应从”多算”效应里剥出来；否则容量变化会被读成收益变化。</li>
+<li>预热与限额。正式计数前跑预热批次，排除冷启动、缓存填充与配额抖动；预热样本一律不入统计。</li>
+<li>配对样本。同一提示、同一底座、同一验证器版本，只变预算一个因素；否则模型差异会被读成预算收益，这是这类实验最常见的自欺。</li>
+<li>随机性入记录。温度、种子集合、重复轮次全部写进实验表，跨轮次给区间而不是报单点最好成绩。</li>
+<li>任务分层。按”是否有可执行验证器””可分解程度””答案长度”切片汇报；总均值几乎不携带信息，收益通常集中在少数切片上。</li>
+<li>抽审做盲评。人工标签的抽样规则事先固定，且抽审时不展示预算档位与候选条数，避免”看起来更用心”的暗示。</li>
+</ul>
+<p>一句划界：样本集建设、评审偏差的系统性校正、发布卡点这些属于评测体系的范围，本文只处理预算实验特有的变量控制。</p>
+<p>记录表模板给到字段级别，值留空，落地时它就是埋点 schema：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>含义</th>
+<th>记录要点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>run_id</td>
+<td>批次标识</td>
+<td>与配置快照绑定，可重放</td>
+</tr>
+<tr>
+<td>generator_version</td>
+<td>生成器版本</td>
+<td>记构建号，不记”最新”</td>
+</tr>
+<tr>
+<td>verifier_version</td>
+<td>验证器版本</td>
+<td>含规则集与打分器标识</td>
+</tr>
+<tr>
+<td>budget_kind</td>
+<td>预算口径</td>
+<td>token、步骤或时间</td>
+</tr>
+<tr>
+<td>budget_tier</td>
+<td>预算档位</td>
+<td>离散档编号</td>
+</tr>
+<tr>
+<td>concurrency_tier</td>
+<td>并发档位</td>
+<td>与预算档位分开记</td>
+</tr>
+<tr>
+<td>temperature &#x2F; seed_set</td>
+<td>随机性设置</td>
+<td>种子集合需可重放</td>
+</tr>
+<tr>
+<td>n_generated</td>
+<td>实际生成条数</td>
+<td>通常小于申请条数</td>
+</tr>
+<tr>
+<td>n_truncated</td>
+<td>长度截断条数</td>
+<td>预算边界退化的直接信号</td>
+</tr>
+<tr>
+<td>n_timeout_cancelled</td>
+<td>分支超时取消数</td>
+<td>早停是否真的生效</td>
+</tr>
+<tr>
+<td>n_hard_pass</td>
+<td>硬约束通过数</td>
+<td>过滤口径下的幸存者</td>
+</tr>
+<tr>
+<td>n_pass_with_evidence</td>
+<td>通过且有可核对证据</td>
+<td>首选主指标</td>
+</tr>
+<tr>
+<td>n_multi_survivor</td>
+<td>多条并列的比例</td>
+<td>验证器分辨力的代理指标</td>
+</tr>
+<tr>
+<td>human_audit_label</td>
+<td>人工抽审标签</td>
+<td>抽样规则事先固定</td>
+</tr>
+<tr>
+<td>p50 &#x2F; p99_latency</td>
+<td>端到端延迟</td>
+<td>按并发档分列</td>
+</tr>
+<tr>
+<td>peak_slots</td>
+<td>峰值并发槽位</td>
+<td>容量规划输入</td>
+</tr>
+</tbody></table>
+<p>两个字段值得盯得比质量分更紧：<code>n_pass_with_evidence</code> 与 <code>human_audit_label</code> 的背离，是验证器正在被逼近误差边界的早期信号；<code>n_multi_survivor</code> 上升，意味着过滤条件已经区分不了候选，继续加 N 只是加成本。</p>
+<h2 id="调度、配额与可观测"><a href="#调度、配额与可观测" class="headerlink" title="调度、配额与可观测"></a>调度、配额与可观测</h2><p>推理时预算一旦被当成产品变量，它就变成一种资源，需要按资源来管。</p>
+<p>预算账户。按租户与用户建立推理时计算额度，粒度是”这一段时间内可支配的扩展量”，而不是”每秒多少请求”。账户要能区分口径（token 与步骤不可互相抵扣），并在超额时给出明确降级路径：降到 1 条直出、只保留格式校验，而不是排队等待。</p>
+<p>优先级与抢占。首轮生成属于交互路径，不该被抢占；扩展分支属于可选路径，可以在容量紧张时被丢弃；复核与投票介于两者之间。把这条差别写进队列，容量事件的表现就从”所有人变慢”变成”扩展档位自动降下来”。</p>
+<p>观测面板最少要有：各预算档位的到达率与转化率（从申请 N 到实际生成几条）、过滤通过率分布及其随时间的漂移、截断率、并列率、取消传播成功率、验证器服务自身的错误率与延迟。缺少”通过率漂移”这一项时，验证器退化通常以质量投诉的形式第一次被注意到。</p>
+<p>典型故障模式有四类：配额泄漏（分支已取消但预留未释放，账户被幽灵消耗填满）；扩展风暴（某个上游失败触发全量重试，重试又各自申请 N 条）；验证器成为单点（过滤全依赖一个执行服务，它一挂就全部退化成”零幸存者”路径，进而把所有请求推向串行细化）；取消未传播（客户端断开后分支继续跑满，成本与延迟都记在自己头上）。前两类靠幂等标识与账户回收解决，后两类靠降级路径与传播链设计解决，都不是提示词层面能修的问题。</p>
+<h2 id="与其他手段的分工"><a href="#与其他手段的分工" class="headerlink" title="与其他手段的分工"></a>与其他手段的分工</h2><ul>
+<li>与路由和级联：路由回答”这次请求交给谁”，推理时扩展回答”交给它之后要不要多算”。两者共享同一份延迟与配额账，预算不足时先降扩展档位，再考虑降级路由，顺序反了会同时损失质量与延迟。</li>
+<li>与 Agent 规划：规划决定动作序列的结构、依赖与失败处理，本文决定在既定结构上投入多少采样与校验；搜索、回溯与执行反馈在规划里的具体组织方式属于前者。</li>
+<li>与长上下文：窗口是容量问题，预算是花算力的方式问题。长输入带来的成本属于容量口径，不该被读成”多想”的收益或负担。</li>
+<li>与长上下文压缩：压缩在信息过剩时降低单次成本，扩展在推理不足时增加单次成本，方向相反；同一份预算不要同时买这两件事，否则永远看不出哪个在起作用。</li>
+<li>与推理模型和思维链：把中间推理内化进解码过程的模型，已经替我们决定了”要不要写中间步骤”，外部预算控制依然需要，但作用点移到候选条数、校验强度与复核预留。</li>
+<li>与微调和蒸馏：如果某类任务上扩展收益长期稳定，成本更优的长期解法是把模式沉进权重，把每次请求都要付的算力开销变成一次性投入；这属于权重更新流程，不在本文范围。</li>
+</ul>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>推理时计算扩展不是”多花点算力换好答案”这么含糊的一件事，它有清晰的机制边界。并行扩展的价格曲线由错误相关性决定，串行扩展的价格曲线由长度成本与误差累积决定，两者的收益上限都握在验证器手里。预算要挑一个能被执行层强制的口径，并把复核段作为预留而不是善意请求。best-of-N 的数学形态就是沿着验证器误差方向做优化，所以 N 越大越要警惕”通过率上升、自信的错误也上升”这个组合；把验证器当过滤器而不是排序器、要求可核对证据、保留 top-k 而不是造全序，是对抗这条机制的三个具体动作。自评在所有信号里最便宜也最容易失真，凡能用执行、规则、检索和位置可核对性替换的地方都该替换。延迟上，并行是求最大值而不是求平均，P99 的账要单独算，取消与超时必须传播。最后，预算是一种资源：它有账户、有优先级、有抢占语义、有自己的故障模式。什么时候不该用它也很清楚——缺信息就检索，缺能力就换手段，已经稳定正确就别加档。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li>Chain-of-Thought Prompting Elicits Reasoning in Large Language Models，arXiv 公开预印本（arxiv.org）</li>
+<li>Self-Consistency Improves Chain of Thought Reasoning in Language Models，arXiv 公开预印本（arxiv.org）</li>
+<li>Tree of Thoughts: Deliberate Problem Solving with Large Language Models，arXiv 公开预印本（arxiv.org）</li>
+<li>Let’s Verify Step by Step，arXiv 公开预印本（arxiv.org）</li>
+<li>Making Language Models Better Reasoners with Step-Aware Verifier，arXiv 公开预印本（arxiv.org）</li>
+<li>Large Language Models Cannot Self-Correct Reasoning Yet，arXiv 公开预印本（arxiv.org）</li>
+<li>Learning to reason with LLMs，OpenAI 官方站点（openai.com）</li>
+<li>Model Context Protocol 规范 2025 年 11 月修订版，项目官方站点（modelcontextprotocol.io）</li>
+<li>文章《agent evals》，Anthropic 官方工程栏目（anthropic.com）</li>
+<li>文章《managed agents》，Anthropic 官方工程栏目（anthropic.com）</li>
+<li>LangChain 与 LangGraph 官方文档，项目官方站点</li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>推理时计算扩展</p><p><a href="https://987763485.github.io/2026/05/15/推理时计算扩展/">https://987763485.github.io/2026/05/15/推理时计算扩展/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2026-05-15</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-21</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="link-muted mr-2" rel="tag" href="/tags/python/">python</a><a class="link-muted mr-2" rel="tag" href="/tags/rust/">rust</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2026/05/17/LLM%E9%A9%B1%E5%8A%A8%E7%9A%84%E6%95%B0%E6%8D%AE%E5%88%86%E6%9E%90Agent/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">LLM 驱动的数据分析 Agent</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2026/05/13/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E6%8A%80%E6%9C%AF%E5%B9%B4%E5%BA%A6%E5%9B%9E%E9%A1%BE%E4%B8%8E%E5%B1%95%E6%9C%9B/"><span class="level-item">大模型技术年度回顾与展望</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>联邦学习与隐私计算 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="本文讨论联邦学习：它要解决什么问题、训练闭环如何运转、各层保护的代价、以及适用边界。适合理解梯度下降训练、又关心跨机构数据协作与合规约束的读者。与《隐私计算技术入门》分工明确：那篇总览四类隐私计算技术，本篇把联邦学习这条线单独讲深。"><meta property="og:type" content="blog"><meta property="og:title" content="联邦学习与隐私计算"><meta property="og:url" content="https://987763485.github.io/2023/05/21/%E8%81%94%E9%82%A6%E5%AD%A6%E4%B9%A0%E4%B8%8E%E9%9A%90%E7%A7%81%E8%AE%A1%E7%AE%97/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="本文讨论联邦学习：它要解决什么问题、训练闭环如何运转、各层保护的代价、以及适用边界。适合理解梯度下降训练、又关心跨机构数据协作与合规约束的读者。与《隐私计算技术入门》分工明确：那篇总览四类隐私计算技术，本篇把联邦学习这条线单独讲深。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2023-05-20T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-19T03:42:39.419Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="网络安全"><meta property="article:tag" content="等级保护"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2023/05/21/%E8%81%94%E9%82%A6%E5%AD%A6%E4%B9%A0%E4%B8%8E%E9%9A%90%E7%A7%81%E8%AE%A1%E7%AE%97/"},"headline":"联邦学习与隐私计算","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2023-05-20T16:00:00.000Z","dateModified":"2026-10-19T03:42:39.419Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"本文讨论联邦学习：它要解决什么问题、训练闭环如何运转、各层保护的代价、以及适用边界。适合理解梯度下降训练、又关心跨机构数据协作与合规约束的读者。与《隐私计算技术入门》分工明确：那篇总览四类隐私计算技术，本篇把联邦学习这条线单独讲深。"}</script><link rel="canonical" href="https://987763485.github.io/2023/05/21/%E8%81%94%E9%82%A6%E5%AD%A6%E4%B9%A0%E4%B8%8E%E9%9A%90%E7%A7%81%E8%AE%A1%E7%AE%97/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2023-05-20T16:00:00.000Z" title="5/21/2023, 12:00:00 AM">2023-05-21</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a></span><span class="level-item">1 小时读完 (大约7520个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">联邦学习与隐私计算</h1><div class="content"><p>本文讨论联邦学习：它要解决什么问题、训练闭环如何运转、各层保护的代价、以及适用边界。适合理解梯度下降训练、又关心跨机构数据协作与合规约束的读者。与《隐私计算技术入门》分工明确：那篇总览四类隐私计算技术，本篇把联邦学习这条线单独讲深。</p>
+<h2 id="数据不出域：联邦学习要解决的问题"><a href="#数据不出域：联邦学习要解决的问题" class="headerlink" title="数据不出域：联邦学习要解决的问题"></a>数据不出域：联邦学习要解决的问题</h2><p>机器学习的默认形态是集中式训练：把散落在各处的数据汇聚到同一个数据仓库或训练集群里，再做梯度下降。它在单一机构内运转良好，一旦跨机构协作就遇到两层阻力。</p>
+<p>第一层是复制问题。数据一旦聚合，副本就落到汇聚方手里，每一次复制都扩大泄露面；原始数据出域的那一刻，往往已越过合同与监管的边界。第二层是动机问题。数据是机构的核心资产，谁都不愿交出底牌，又都想借别人的数据补样本的不足。结果是数据孤岛：单家银行的欺诈样本不够多，单家医院的标注影像不够杂，模型上限被自身体量锁死。</p>
+<p>2021 年 9 月施行的《数据安全法》与 2021 年 11 月施行的《个人信息保护法》，对个人信息处理都提出了目的限定与最小必要的要求；欧盟的 GDPR 更早确立了类似原则。在这些约束下，“先把全量数据收上来再说”很难通过合规审查。联邦学习的范式转换正在于此：不动数据，动模型。各参与方的原始数据留在自己的域内，训练在本地进行，只有参数或梯度之类的中间产物向外传输，由协调方聚合，逐步逼近任何一方单独都训练不出来的全局模型。业界常把这种状态概括为“数据可用不可见”。</p>
+<p>但要立刻澄清一点：这个概括不等于免费。联邦学习并没有让隐私风险消失，而是把它从“原始数据的物理汇聚”收缩、转移到“每轮参数交换与最终全局模型”这两个点上。“采用了联邦学习”与“隐私得到了保护”是两个命题，后文的安全聚合、同态加密、差分隐私与可信执行环境，都是针对这两个点的手段。McMahan 等人在 2016 年的论文中提出了联邦平均算法并系统化了这一框架，此后的开源生态——OpenMined 社区与 PySyft、FedML、FATE、TensorFlow Federated 等——都围绕这条主线展开。</p>
+<h2 id="横向联邦与纵向联邦：场景差异"><a href="#横向联邦与纵向联邦：场景差异" class="headerlink" title="横向联邦与纵向联邦：场景差异"></a>横向联邦与纵向联邦：场景差异</h2><p>把一个数据集看成一张表：行是样本，列是特征。多方数据的关系无非两个方向，联邦学习的两大分支由此划分。</p>
+<p>横向联邦对齐的是样本维：各方特征空间基本相同、用户互不重叠。设想两家业务相似的区域性银行，各有数百万客户流水、字段几乎一致，既无力单独训练鲁棒的反欺诈模型，也不可能把流水交给对方。横向联邦的做法是在相同的模型结构上各自做本地训练，每轮把梯度上传给协调方加权聚合。它最像传统分布式训练，只是“分布式节点”变成了互不信任的机构。</p>
+<p>纵向联邦对齐的是特征维：各方持有部分相同的用户、字段却几乎不重叠。银行有用户的信贷记录，零售平台有同一批用户的消费行为，客户群有交集、各自维度都不完整。纵向联邦按用户 ID 把样本切开，第一步用隐私集合求交（PSI）协议求双方 ID 的交集——PSI 属于多方安全计算的工具箱，本文当作外部组件、不展开。训练时各方只持有自家特征对应的网络分段，在前向与反向过程中交换中间结果，谁也拿不到对方的原始列。</p>
+<p>两个方向的差异可以对照着看：</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>横向联邦</th>
+<th>纵向联邦</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>样本重叠</td>
+<td>极少</td>
+<td>存在交集，需求交对齐</td>
+</tr>
+<tr>
+<td>特征重叠</td>
+<td>基本一致</td>
+<td>几乎不重叠</td>
+</tr>
+<tr>
+<td>上传内容</td>
+<td>完整模型梯度</td>
+<td>中间激活与分段梯度</td>
+</tr>
+<tr>
+<td>单次载荷</td>
+<td>大</td>
+<td>小，但一轮内交换频繁</td>
+</tr>
+<tr>
+<td>密码学依赖</td>
+<td>可选加固</td>
+<td>加密交互接近标配</td>
+</tr>
+<tr>
+<td>典型场景</td>
+<td>同业机构联合建模</td>
+<td>跨行业数据互补建模</td>
+</tr>
+</tbody></table>
+<p>此外还有第三种“迁移联邦”：样本和特征都对不齐、只有少量公共数据，需借迁移学习弥合分布差距；实践中前两类才是主流。</p>
+<p>训练机制的差异也值得注意：横向联邦的载荷是完整梯度，体积随模型大小线性增长，一轮一换；纵向联邦的载荷是与对侧特征相关的中间张量，单次很小，但一次前向加反向要来回多次，对时延敏感，密码学开销占比也更高。SecureBoost 一类树模型方案对分裂梯度做掩码时同样依赖 Paillier 这类加法同态加密——纵向链路里流动的中间表示距离原始特征更近，泄露一步就等于泄露特征本身。</p>
+<h2 id="联邦平均与参数聚合：训练闭环的核心"><a href="#联邦平均与参数聚合：训练闭环的核心" class="headerlink" title="联邦平均与参数聚合：训练闭环的核心"></a>联邦平均与参数聚合：训练闭环的核心</h2><p>联邦平均（FedAvg）是横向联邦的基准算法，思路朴素得近乎“把分布式 SGD 的同步节奏放慢”：协调方维护全局参数，每轮下发给抽样的参与方；参与方在本地数据上连续做若干轮梯度下降，得到新的局部参数；协调方收回后按各方数据量加权平均，作为下一轮的全局参数。注意它聚合的是训练若干步之后的参数差，而不是单步梯度——这是它与普通数据并行的关键区别，也是它能容忍参与方算力参差的原因。</p>
+<p>聚合公式只有一行：全局参数是各局部参数按样本数占比的加权和。示意实现如下，<code>train_locally</code> 由各训练框架负责：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> random</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">federated_average</span>(<span class="params">global_params, clients, local_epochs=<span class="number">5</span></span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;执行一轮联邦平均。train_locally 返回训练后的参数张量列表。&quot;&quot;&quot;</span></span><br><span class="line">    sampled = random.sample(clients, <span class="built_in">max</span>(<span class="number">1</span>, <span class="built_in">len</span>(clients) // <span class="number">10</span>))  <span class="comment"># 部分参与</span></span><br><span class="line">    updates = []</span><br><span class="line">    <span class="keyword">for</span> client <span class="keyword">in</span> sampled:</span><br><span class="line">        params = train_locally(client, global_params, local_epochs)</span><br><span class="line">        updates.append((client.num_samples, params))</span><br><span class="line">    total = <span class="built_in">sum</span>(n <span class="keyword">for</span> n, _ <span class="keyword">in</span> updates)</span><br><span class="line">    new_params = []</span><br><span class="line">    <span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="built_in">len</span>(global_params)):</span><br><span class="line">        acc = <span class="literal">None</span></span><br><span class="line">        <span class="keyword">for</span> n, params <span class="keyword">in</span> updates:</span><br><span class="line">            term = params[i] * (n / total)  <span class="comment"># 按数据量加权</span></span><br><span class="line">            acc = term <span class="keyword">if</span> acc <span class="keyword">is</span> <span class="literal">None</span> <span class="keyword">else</span> acc + term</span><br><span class="line">        new_params.append(acc)</span><br><span class="line">    <span class="keyword">return</span> new_params</span><br></pre></td></tr></table></figure>
+
+<p>这段骨架里藏着两个关键旋钮。第一个是本地轮数 E：E 越大通信越省，但本地步数越多，各参与方的局部解偏离彼此越远——在非独立同分布（non-IID）数据上，本地多步训练会让模型“各自跑偏”，聚合回来的参数互相抵消，轻则收敛变慢，重则震荡不收敛。FedProx 一类改进给本地目标加了 proximal 正则项，把局部解拴在全局解附近，是 2023 年仍在广泛使用的折中。第二个是抽样比例：部分参与既省通信，也是现实妥协——移动设备场景不可能要求全员每轮在线。</p>
+<p>工程上还有聚合语义的细节：参与方数据量本身敏感，聚合权重可用参与轮数或声明规模替代；协调方须为每轮维护轮次号、成员名单与版本快照，否则掉线与重放会让结果不可复现。</p>
+<h2 id="安全聚合与同态加密：梯度保护的作用与代价"><a href="#安全聚合与同态加密：梯度保护的作用与代价" class="headerlink" title="安全聚合与同态加密：梯度保护的作用与代价"></a>安全聚合与同态加密：梯度保护的作用与代价</h2><p>假设协调方按上文运转，一切正常——然后问：它看到明文梯度意味着什么？答案并不令人欣慰：梯度是原始数据的函数，足够精细的梯度可以反推数据。本节先讲两种让聚合本身安全的密码学路线，泄露的量化留到威胁模型一节。</p>
+<p>安全聚合的目标是：协调方只能看到“所有人梯度的加权和”，看不到任何单个参与方的贡献。经典构造（Intel 团队 2017 年的技术报告与 CCS 2017 同名论文）用两两共享密钥生成掩码：每对参与方协商随机掩码，上传时一加一减，聚合时两两抵消，明文只在求和后浮现。麻烦在于容错——联邦场景掉线是常态，若某人的掩码对端恰好掉线，掩码无法抵消，整个求和就废了。因此实用方案都要配密钥恢复与 dropout 容忍协议，这部分状态机才是安全聚合的工程重心。代价是百分之几十量级的额外计算与一定载荷膨胀（示意量级，实际取决于模型与实现），换来聚合通道上的“逐人不可见”。</p>
+<p>同态加密走的是另一条路：参与方用协商好的公钥加密梯度上传，协调方在密文上做加法与标量乘——恰好是加权平均需要的两种运算——聚合结果由持有私钥的一方解密。优点是语义干净：协调方从始至终不接触明文。缺点是成本——公钥运算与密文膨胀使载荷与计算成倍上涨（倍数与密钥长度、打包方式强相关，不给统一数字），且私钥归属绕不开：要么协调方掌私钥（它最终仍能看到聚合值，好在只看到聚合值），要么参与方门限共同持有（引入交互式解密轮次）。实践中常见的组合是安全聚合管上行、同态加密管纵向链路里更敏感的中间量；早期把同态推理做成完整系统的 CryptoNets 一类工作，也验证过这条路的可行性与昂贵。</p>
+<p>两条路线共同的盲区：它们保护传输与聚合中的梯度，保护不了训练好的全局模型——模型一旦发布，任何拿到它的人都能做推断攻击。这不是密码学问题，是信息论问题，需要差分隐私来处理。</p>
+<h2 id="差分隐私注入：位置选择与效用损失"><a href="#差分隐私注入：位置选择与效用损失" class="headerlink" title="差分隐私注入：位置选择与效用损失"></a>差分隐私注入：位置选择与效用损失</h2><p>差分隐私的思路是给“从输出反推输入”设置信息论上限：向输出注入校准过的随机噪声，使任意一个样本在不在训练集里，输出的分布变化都被约束在可量化的范围 ε 内。ε 越小保护越强，但噪声越大、效用越低——这是它与前两条路线的根本不同：安全聚合与同态加密追求“计算过程不泄露”，原则上不损失精度；差分隐私直接买断“输出可被推断”的风险，代价明确记在精度账上。</p>
+<p>注入位置决定了保护的粒度，联邦学习里主要有三处。其一是客户端本地，即把 DP-SGD 的做法搬进每个参与方：单样本梯度裁剪到范数上界（限定敏感度），对累积的局部梯度加高斯噪声后上传。Geyer 等人 2017 年的工作论证了这条“客户级差分隐私”路线：协调方无需可信，保护的是“某个客户是否贡献了某条记录”。其二是聚合层，在求和后、解密前注入噪声，护住模型对外的推断面。其三是发布前对最终参数加噪，粒度最粗，通常只在评估用途下可接受。</p>
+<p>效用损失有三个来源，工程上都要盯。一是梯度裁剪：裁剪是有偏操作，长尾样本——往往恰是少数群体或疑难案例——的梯度被截断，模型对这些分布学不好，偏置可能比精度损失更麻烦。二是噪声与批量的博弈：噪声下界由敏感度和 ε 决定，放大批量能摊薄每步噪声的相对影响，可参与方数据量本来就小，批量拉不上去。三是组合效应：反复访问同一批数据，总 ε 沿轮次累积，矩记账法一类组合分析正是为收紧这条账而生；联邦轮次多、参与随机，ε 的追踪远比集中式难，实践中常见“预算花在哪儿说不清”的状态。</p>
+<p>一个务实的结论：差分隐私与安全聚合不是二选一——后者挡住“梯度被人看”，前者挡住“模型被人问出来”，对应两个攻击面；只上安全聚合的系统，全局模型依然裸露。</p>
+<h2 id="通信瓶颈与系统架构：协调方、参与方与轮次"><a href="#通信瓶颈与系统架构：协调方、参与方与轮次" class="headerlink" title="通信瓶颈与系统架构：协调方、参与方与轮次"></a>通信瓶颈与系统架构：协调方、参与方与轮次</h2><p>把视角从密码学切回系统。联邦学习的性能账本上，最大的一笔往往不是算力而是通信：载荷体积等于模型参数规模乘以精度字节数。一个千万级参数的中等视觉模型，float32 下完整梯度约几十兆字节（示意值）；若数万部手机参与、跑上千轮，总流量以 TB 计。参与方侧多是移动网络或机构出口，上行带宽远差于数据中心——通信因此成为一等公民约束。</p>
+<p>一轮标准交互的时序如下：</p>
+<pre class="mermaid">sequenceDiagram
+    participant S as 协调方
+    participant A as 参与方甲
+    participant B as 参与方乙
+    S->>A: 下发全局参数与轮次号
+    S->>B: 下发全局参数与轮次号
+    A->>A: 本地训练若干轮
+    B->>B: 本地训练若干轮
+    A-->>S: 加密上传参数更新
+    B-->>S: 加密上传参数更新
+    S->>S: 安全聚合与加权平均
+    S->>S: 推进轮次并落盘快照</pre>
+
+<p>协调方是整个系统的枢纽，职责远不止“求平均”：轮次编排（下发成员名单与截止时间）、可回溯的版本与快照管理、身份认证与密钥下发、聚合状态机、审计日志。参与方侧要保证训练可中断、可恢复：移动场景下断点续训与幂等上报是基本要求。</p>
+<p>通信优化按侵入性从低到高：调大 E 用计算换通信，但受漂移约束；梯度稀疏化，只上传绝对值最大的坐标、聚合方按掩码还原；量化与低比特表示配误差反馈；分层聚合，边缘先做局部平均再上传，把 N 对 1 的扇出换成树形。每叠加一种手段，non-IID 上的收敛稳定性都要重新验证，不存在“默认无损”的压缩。</p>
+<p>常被忽略的一点：轮次协议本身也是元数据泄露源——谁在哪轮参与、贡献了多大数据量、掉线规律如何，同样能刻画参与方与其用户，应与载荷同等对待。</p>
+<h2 id="异步与掉队者处理"><a href="#异步与掉队者处理" class="headerlink" title="异步与掉队者处理"></a>异步与掉队者处理</h2><p>同步轮次的结构性弱点：每一轮由最慢的在线参与方决定进度。设备算力、网络质量、手机是否恰好插电闲置——这些因素长尾叠加，轮次时长被尾部拖住，是分布式训练“掉队者问题”在联邦场景下的放大版。</p>
+<p>最正统的答案已经写在架构里：部分参与。每轮只抽样一小部分成员，其余掉线与否不阻塞轮次。但比例不能无限压低——有效样本变少、收敛变慢，少数群体还可能长期抽不到，带来代表性偏差。</p>
+<p>真正的异步方案是放弃轮次同步：拿到参数就训练、算完就上传、收到即聚合。这在异构设备上吞吐最高，代价是 staleness——晚到的更新基于若干轮前的参数算出，直接平均会把全局模型往旧解上拽，陈旧与新鲜更新反复抵消就会震荡。工程折中是带缓冲的准异步：攒够阈值数量的更新再聚一轮，并对陈旧轮数设上限、超龄即丢弃；另有新鲜度加权等思路。2023 年的共识是：完全异步仍难调，多数生产系统停留在“同步加部分参与、辅以超时剔除”。</p>
+<p>围绕掉队者还有一组细粒度手段：轮内截止时间到点即按已收齐成员聚合，缺席者顺延下轮；对持续慢的设备动态削减其本地轮数 E，让它“少干活但仍在场”；预热阶段用小型试跑排除配置错误的节点。注意超时剔除本身也是一种选择压力——被剔的多是网络最差、数据最独特的群体，长期会悄悄改变训练分布。</p>
+<h2 id="威胁模型：成员推断与梯度泄露"><a href="#威胁模型：成员推断与梯度泄露" class="headerlink" title="威胁模型：成员推断与梯度泄露"></a>威胁模型：成员推断与梯度泄露</h2><p>给前面的保护手段建立靶场，必须先立威胁模型。联邦学习通常区分三类对手：诚实但好奇的协调方——忠实执行协议，但会尽力从合法收到的数据里推断额外信息，是最温和也最现实的假设；恶意参与方——自己注册加入联邦，可伪造更新、可联合串通，是最强内部对手；外部窃听者——只能截获信道流量，靠传输加密即可挡住。协议设计按第一类假设定基线，对后两类做增量加固。</p>
+<p>梯度泄露是对“诚实但好奇”最致命的一击。2019 年的 Deep Leakage from Gradients（DLG）工作把“这批真实样本是什么”变成优化问题：给定一小批样本的梯度与模型初值，用随机初始化的假样本去拟合观测梯度，迭代到两者几乎一致，假样本就逼近真样本——在图像任务上能还原出肉眼可辨的原始图片，标签一并泄露。后续工作把所需信息越压越少，纵向联邦的中间激活值也被证明可反推特征。结论很硬：明文梯度上传约等于明文数据上传的弱化版，安全聚合与同态加密因此是梯度通道的及格线。</p>
+<p>成员推断攻击瞄准的是另一端——发布后的全局模型。Shokri 等人 2017 年的经典工作证明：训练过的样本与未训练过的样本，在置信度等输出特征上存在统计差异，用影子模型群训练一个判别器，即可判断任意记录是否在训练集中。哪怕联邦的每一环都加了密，能查询模型、知道候选人群的外部攻击者，仍可能推断出“某人的记录在某个参与方的数据里”——这在医疗、信贷场景本身就是敏感信息。客户端级差分隐私是对此的主要防线，也正好解释了前文的论断：安全聚合挡不住模型面的推断，两类技术必须分面布防。</p>
+<p>恶意参与方则是另一族威胁：投毒攻击（上传精心构造的更新污染全局模型）、后门攻击（让模型对特定触发样本表现异常）、搭便车攻击（不认真训练、只蹭全局模型）。这些靠聚合端鲁棒性来防（中位数或裁剪聚合、参与方信誉、异常更新检测），已超出本文的隐私主题；但威胁建模必须列上：联邦的另一半风险来自“人坏”。</p>
+<h2 id="可信执行环境：另一条信任路线"><a href="#可信执行环境：另一条信任路线" class="headerlink" title="可信执行环境：另一条信任路线"></a>可信执行环境：另一条信任路线</h2><p>前面几节都沿“数据不出密文域”路线做密码学文章，可信执行环境则换了阵营：不依赖数学困难假设，而依赖硬件。基本单元是 CPU 划出的隔离飞地（2023 年的代表是 Intel SGX）：飞地内代码与数据在内存中加密，操作系统与特权软件都读不到；远程证明让参与方上传前校验对面确实在运行未篡改的聚合代码。</p>
+<p>联邦学习的用法很直接：把协调方的聚合环节搬进飞地。参与方验证度量值后，用飞地公钥加密上传；解密、加权、聚合乃至差分隐私噪声注入都在飞地内明文完成，新参数再加密放出。它以接近集中式训练的开销，同时买到通道保护与对全局模型的协同防护。</p>
+<p>代价在于信任假设被转移而非消除：要信任芯片厂商与其微码；飞地内存有限，大模型的聚合状态装不下，模型规模受硬件天花板约束；远程证明的证书链与固件吊销运维繁琐；且学术文献近年持续披露针对 SGX 的微架构侧信道攻击，生产系统应假定飞地可被观测，与密码学手段叠防。几条路线的假设差异可以对照：</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>安全聚合 &#x2F; 同态加密</th>
+<th>可信执行环境</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>信任基础</td>
+<td>数学困难性假设</td>
+<td>芯片厂商与硬件实现</td>
+</tr>
+<tr>
+<td>计算开销</td>
+<td>大，密文运算成倍上涨</td>
+<td>小，飞地内明文运算</td>
+</tr>
+<tr>
+<td>瓶颈</td>
+<td>密码协议状态机与容错</td>
+<td>飞地内存与证明运维</td>
+</tr>
+<tr>
+<td>主要攻击面</td>
+<td>协议实现与密钥管理</td>
+<td>侧信道、固件漏洞</td>
+</tr>
+</tbody></table>
+<p>2023 年的生产实践里，混合部署比单选常见：敏感中间量走密码学，聚合枢纽进飞地，互为冗余。</p>
+<h2 id="治理与合规前提：授权与最小必要"><a href="#治理与合规前提：授权与最小必要" class="headerlink" title="治理与合规前提：授权与最小必要"></a>治理与合规前提：授权与最小必要</h2><p>此前始终默认一个前提：每个参与方有权把自己的数据带进联邦。现实中，这本身就是项目的第一道关。</p>
+<p>授权在先。联邦只是把交出原始数据变为交出梯度，而梯度上传仍构成个人信息处理行为，必须落在收集时告知并获得的授权范围内。若隐私政策只承诺“不与第三方共享数据”，用户很难预期自己的记录正参与一个跨机构模型；GDPR 的目的限定与透明度义务、国内《个人信息保护法》的最小必要原则，同样约束训练用途。先谈技术后补授权，顺序反了。</p>
+<p>最小必要同样约束选型：聚合统计、联合规则校验或第三方模型服务若已能达成业务目标，就不该因为“更先进”而选联邦——它是隐私计算谱系里工程最重的一类，应当留给真正需要“共同训练”的场合。</p>
+<p>跨境与删除是两块试金石。参数虽不含原始数据，跨法域联邦时全局模型的归属与流转仍可能触发出境合规评估：《数据出境安全评估办法》已于 2022 年 9 月施行，《个人信息出境标准合同办法》自 2023 年 6 月 1 日施行，“数据不出域”的架构能收窄原始数据的出境面，但模型产物本身仍需单独评估，不能把联邦自动等同于豁免。另一头，样本删除后影响已写进参数，除非重训或使用机器遗忘技术，删除无法真正生效——联邦只免去清查副本的体力活，没有免除模型侧的义务。</p>
+<p>最后是治理本身：谁出资、谁审计、成员准入与除名流程、模型造成伤害时的责任归属、每轮参数与成员名单是否有可追溯的审计日志。这些应在第一轮训练前写进合作协议，而非泄露后再补。</p>
+<h2 id="适用边界与失败场景"><a href="#适用边界与失败场景" class="headerlink" title="适用边界与失败场景"></a>适用边界与失败场景</h2><p>先说什么条件下联邦学习值得一做：多方数据同构或互补、每方单独样本不足以撑起目标模型、机构间缺乏直接共享的信任但有合作动力、组织愿意承担额外的工程成本。四个条件缺一，性价比就开始下滑。</p>
+<p>下面几类失败场景在实践中反复出现。参与者过少且分布悬殊：两三家机构的数据都严重偏离总体，本地训练各跑各的，聚合后震荡甚至劣于单独训练——联邦不是分布差异的魔法补丁，non-IID 问题在成员极少时几乎无解。模型过大：数百兆的梯度每轮在上万条拥塞线路上往返，不缩模型又不做分层聚合，项目死于带宽预算。数据太少太碎：长尾机构各只有几千条样本，联邦收益抵不过隐私预算与工程成本，联合统计分析往往更实际。存在敌意成员：联盟里可能出现投毒者与搭便车者，又缺乏信誉与审计手段，联邦的边际收益为负。全局模型要公开服务：发布面越大，成员推断的绝对风险越高，既向所有人开放模型、又指望低 ε 保住训练集秘密，目标本身矛盾。</p>
+<p>还有一类“失败”属于定位错误：把联邦学习当作数据采购的洗白通道，或在授权链断裂的情况下先建平台后补手续。技术架构再标准，也补不上合法性起点。</p>
+<p>一个可用的决策清单：是否真的需要联合训练→授权与治理是否闭环→威胁模型是否明确→隐私预算能否量化→通信与算力账能否算平→有无更简单的替代方案。六问有一问答不上，就暂缓立项。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>联邦学习把“数据汇聚”改写成“参数汇聚”，隐私风险随之下沉到梯度通道与全局模型两个点。安全聚合与同态加密管住通道，差分隐私管住模型，可信执行环境用硬件信任换性能，三者都不是万能药；通信瓶颈、掉队者与威胁模型决定系统能不能跑，授权、最小必要与治理决定它该不该跑。把联邦学习当成“合规许愿机”的项目大多会失败，把它当成一组有明确代价的工程权衡，才刚开始做对。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://arxiv.org/abs/1602.05629">McMahan et al., Communication-Efficient Learning of Deep Networks from Decentralized Data（arXiv:1602.05629）</a></li>
+<li><a href="https://arxiv.org/abs/1607.06535">Abadi et al., Deep Learning with Differential Privacy（arXiv:1607.06535）</a></li>
+<li><a href="https://arxiv.org/abs/1712.07557">Geyer et al., Differentially Private Federated Learning: A Client Level Perspective（arXiv:1712.07557）</a></li>
+<li><a href="https://arxiv.org/abs/1610.05820">Shokri et al., Membership Inference Attacks Against Machine Learning Models（arXiv:1610.05820）</a></li>
+<li><a href="https://arxiv.org/abs/1906.08935">Wang et al., Deep Leakage from Gradients（arXiv:1906.08935）</a></li>
+<li><a href="https://openmined.org/">OpenMined 社区主页</a></li>
+<li><a href="https://github.com/OpenMined/PySyft">PySyft 项目仓库</a></li>
+<li><a href="https://github.com/FedML-AI/FedML">FedML 项目仓库</a></li>
+<li><a href="https://www.tensorflow.org/federated">TensorFlow Federated 官方文档</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>联邦学习与隐私计算</p><p><a href="https://987763485.github.io/2023/05/21/联邦学习与隐私计算/">https://987763485.github.io/2023/05/21/联邦学习与隐私计算/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2023-05-21</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-19</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a><a class="link-muted mr-2" rel="tag" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/">等级保护</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2023/05/23/%E5%AF%86%E7%A0%81%E5%BA%94%E7%94%A8%E6%96%B9%E6%A1%88%E7%BC%96%E5%88%B6/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">密码应用方案编制</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2023/05/16/RustRefCell%E4%B8%8E%E5%86%85%E9%83%A8%E5%8F%AF%E5%8F%98%E6%80%A7/"><span class="level-item">Rust RefCell 与内部可变性</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

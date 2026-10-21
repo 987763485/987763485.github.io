@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>秒杀系统：流量削峰与库存扣减 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="秒杀是检验系统高并发能力的典型场景：短时间内涌入的请求远超库存，任何一处非原子操作都会被放大成超卖或重复下单。本文从需求与约束出发，依次讨论分层过滤、Redis 预扣、Lua 原子脚本、异步下单、失败补偿与对账，并给出一套可落地的参考架构。读者应具备 Redis、消息队列与 MySQL 的基本使用经验，读完后能够独立设计一条端到端的秒杀链路，并知道每个环节可能在哪里出错。"><meta property="og:type" content="blog"><meta property="og:title" content="秒杀系统：流量削峰与库存扣减"><meta property="og:url" content="https://987763485.github.io/2021/02/04/%E7%A7%92%E6%9D%80%E7%B3%BB%E7%BB%9F%E6%B5%81%E9%87%8F%E5%89%8A%E5%B3%B0%E4%B8%8E%E5%BA%93%E5%AD%98%E6%89%A3%E5%87%8F/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="秒杀是检验系统高并发能力的典型场景：短时间内涌入的请求远超库存，任何一处非原子操作都会被放大成超卖或重复下单。本文从需求与约束出发，依次讨论分层过滤、Redis 预扣、Lua 原子脚本、异步下单、失败补偿与对账，并给出一套可落地的参考架构。读者应具备 Redis、消息队列与 MySQL 的基本使用经验，读完后能够独立设计一条端到端的秒杀链路，并知道每个环节可能在哪里出错。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2021-02-04T15:08:49.000Z"><meta property="article:modified_time" content="2026-10-18T15:29:00.722Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="后端开发"><meta property="article:tag" content="架构设计"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2021/02/04/%E7%A7%92%E6%9D%80%E7%B3%BB%E7%BB%9F%E6%B5%81%E9%87%8F%E5%89%8A%E5%B3%B0%E4%B8%8E%E5%BA%93%E5%AD%98%E6%89%A3%E5%87%8F/"},"headline":"秒杀系统：流量削峰与库存扣减","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2021-02-04T15:08:49.000Z","dateModified":"2026-10-18T15:29:00.722Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"秒杀是检验系统高并发能力的典型场景：短时间内涌入的请求远超库存，任何一处非原子操作都会被放大成超卖或重复下单。本文从需求与约束出发，依次讨论分层过滤、Redis 预扣、Lua 原子脚本、异步下单、失败补偿与对账，并给出一套可落地的参考架构。读者应具备 Redis、消息队列与 MySQL 的基本使用经验，读完后能够独立设计一条端到端的秒杀链路，并知道每个环节可能在哪里出错。"}</script><link rel="canonical" href="https://987763485.github.io/2021/02/04/%E7%A7%92%E6%9D%80%E7%B3%BB%E7%BB%9F%E6%B5%81%E9%87%8F%E5%89%8A%E5%B3%B0%E4%B8%8E%E5%BA%93%E5%AD%98%E6%89%A3%E5%87%8F/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2021-02-04T15:08:49.000Z" title="2/4/2021, 11:08:49 PM">2021-02-04</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></span><span class="level-item">1 小时读完 (大约8058个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">秒杀系统：流量削峰与库存扣减</h1><div class="content"><p>秒杀是检验系统高并发能力的典型场景：短时间内涌入的请求远超库存，任何一处非原子操作都会被放大成超卖或重复下单。本文从需求与约束出发，依次讨论分层过滤、Redis 预扣、Lua 原子脚本、异步下单、失败补偿与对账，并给出一套可落地的参考架构。读者应具备 Redis、消息队列与 MySQL 的基本使用经验，读完后能够独立设计一条端到端的秒杀链路，并知道每个环节可能在哪里出错。</p>
+<h2 id="需求与约束：先定义什么叫成功"><a href="#需求与约束：先定义什么叫成功" class="headerlink" title="需求与约束：先定义什么叫成功"></a>需求与约束：先定义什么叫成功</h2><p>秒杀的业务描述只有一句话：在某个时刻开放一批数量有限的商品，先到先得。真正困难的是把它放到线上之后，一组彼此冲突的约束会同时出现。本文先逐条拆开这些约束，因为后面的每个设计决策几乎都能回溯到这里。</p>
+<p>第一组约束来自流量形态。读请求与写请求在同一秒内到达，读可以缓存、可以静态化，写却必须落到唯一的事实源上。峰值往往只持续几十秒到几分钟，按峰值长期扩容并不经济，系统必须在平时容量下靠削峰和降级撑过尖峰。这意味着“扩容”不是唯一答案，“拒绝”与“延后”同样是设计的一部分。</p>
+<p>第二组约束是正确性。无超卖是硬约束，卖出的数量不能超过库存；少卖则相对可修复，可以通过回补库存、对账补偿把资格释放出来。这个不对称很重要：所有设计都应优先保证“宁可少卖，不可超卖”，因为超卖之后要么取消订单引发客诉，要么发货造成资损，都比少卖难处理。</p>
+<p>第三组是公平与防刷。活动承诺先到先得、一人一单，接口就不能只靠前端按钮置灰来约束；脚本、代理池、批量账号都会绕过页面直接请求接口。公平性最终要落到服务端的一个唯一键上，而不是落在页面的交互上。</p>
+<p>第四组是幂等。用户重复点击、网关重试、消息队列重投、消费者 rebalance，都会让同一条业务请求被执行多次；如果下单逻辑不是幂等的，重复请求就会变成重复订单和重复扣减。</p>
+<p>第五组是下游保护。数据库连接数、支付服务、优惠券服务都不是为秒杀峰值设计的；秒杀流量如果直接穿透到这些系统，后果不是秒杀失败，而是整个站点不可用。</p>
+<p>把这五组约束翻译成指标，团队才能在评审时判断方案是否合格；具体阈值应结合业务与压测结果确定。</p>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>定义</th>
+<th>目标</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>有效请求成功率</td>
+<td>排除售罄后的请求中，成功拿到资格的比例</td>
+<td>接近 100%</td>
+</tr>
+<tr>
+<td>p99 延迟</td>
+<td>下单接口端到端 99 分位耗时</td>
+<td>由压测基线确定</td>
+</tr>
+<tr>
+<td>数据库写压力</td>
+<td>订单与库存写入的 QPS、活跃连接数</td>
+<td>与库存量同阶，而非点击量</td>
+</tr>
+<tr>
+<td>超卖数量</td>
+<td>成功订单数减去库存</td>
+<td>0</td>
+</tr>
+<tr>
+<td>重复订单</td>
+<td>同一活动同一用户的多笔订单</td>
+<td>0</td>
+</tr>
+<tr>
+<td>对账差异</td>
+<td>Redis、数据库、订单三方库存之差</td>
+<td>0</td>
+</tr>
+</tbody></table>
+<p>要特别区分“售罄”和“失败”。售罄是业务结果，应返回明确的业务码让用户停止重试；5xx 或超时才是系统失败，会诱发重试并放大流量。很多事故的起点，就是把售罄写成了异常。</p>
+<p>本文的主线是：秒杀系统的第一目标不是把请求处理得更快，而是把绝大多数注定失败的请求尽可能便宜地拒绝掉。由此有两个原则：流量在到达核心资源之前逐层衰减；一致性判断收拢到尽可能少的原子操作里。接下来的章节就是这两条原则的展开。</p>
+<h2 id="分层过滤与流量整形：让洪峰逐层衰减"><a href="#分层过滤与流量整形：让洪峰逐层衰减" class="headerlink" title="分层过滤与流量整形：让洪峰逐层衰减"></a>分层过滤与流量整形：让洪峰逐层衰减</h2><p>把请求想象成一条河，库存是下游的窄桥。与其在桥头加宽桥面，不如在上游修几道溢流坝。分层过滤就是这组溢流坝，每层都要回答两个问题：挡掉多少请求，给用户什么反馈。前者决定容量，后者决定用户会不会反复重试。</p>
+<h3 id="客户端：减少无效点击，但不承担正确性"><a href="#客户端：减少无效点击，但不承担正确性" class="headerlink" title="客户端：减少无效点击，但不承担正确性"></a>客户端：减少无效点击，但不承担正确性</h3><p>最直接的一层在浏览器里。点击后立即置灰按钮、进入等待态，避免同一用户连点；倒计时用服务端返回的 <code>serverTime</code> 与 <code>startTime</code> 计算偏移，而不是相信本地时钟，否则时钟偏快的用户会提前发起请求，偏慢的用户会错过开始。活动结束后把按钮切换为“已结束”，停止轮询。</p>
+<p>必须强调：客户端限制只是体验优化。请求可以绕过页面直接打到接口，按钮置灰不能作为幂等或防刷的依据，真正的约束必须在服务端。</p>
+<h3 id="CDN-与静态化：把读流量移出机房"><a href="#CDN-与静态化：把读流量移出机房" class="headerlink" title="CDN 与静态化：把读流量移出机房"></a>CDN 与静态化：把读流量移出机房</h3><p>活动页的 HTML、CSS、JavaScript 和图片全部放到 CDN，页面不含用户相关数据；昵称、资格状态等动态信息通过独立的轻量接口获取。CDN 缓存整页后，源站只处理少量动态请求。缓存 key 带活动版本号，配置变更时主动刷新，而不是等待 TTL 过期。</p>
+<p>售罄后把活动页整体切成静态的“已结束”页面，原本打到源站的刷新流量就变成了 CDN 的边缘命中，源站连一次请求都看不到。</p>
+<h3 id="网关：进入服务前的第一道准入"><a href="#网关：进入服务前的第一道准入" class="headerlink" title="网关：进入服务前的第一道准入"></a>网关：进入服务前的第一道准入</h3><p>网关负责鉴权、活动状态校验、按用户、IP 与设备维度限流，以及识别异常客户端。限流算法不展开，但拒绝必须快速且语义明确：返回 429 或业务码，并在响应头给出重试建议，否则客户端会在同一秒内重试，把限流变成压测。</p>
+<p>网关本身要无状态、可水平扩展，限流状态放在 Redis 或集群计数器里；网关一旦成为单点，前面的分层就失去意义。</p>
+<h3 id="服务预检：用内存挡住大部分请求"><a href="#服务预检：用内存挡住大部分请求" class="headerlink" title="服务预检：用内存挡住大部分请求"></a>服务预检：用内存挡住大部分请求</h3><p>进入秒杀服务后，先做一组无锁的本地检查：是否在时间窗口内、活动是否允许下单、本地售罄标记是否置位、该用户是否已在本地“已参与”集合里。配置启动时加载并订阅刷新；售罄标记由 Redis 的扣减结果广播，允许短暂过期。</p>
+<p>这些检查都是只读的、可能过期的，因此只能用来减少流量，不能用来做最终判断。把它们放在 Redis 之前，是为了让绝大多数请求连一次网络往返都不需要。</p>
+<h3 id="流量整形：把-T0-的尖峰摊平"><a href="#流量整形：把-T0-的尖峰摊平" class="headerlink" title="流量整形：把 T0 的尖峰摊平"></a>流量整形：把 T0 的尖峰摊平</h3><p>即使经过上述过滤，T0 时刻到达核心链路的请求仍然是一个尖峰。整形的手段可以组合使用。</p>
+<p>预热：活动前把配置、库存 key、数据库连接池、HTTP 连接、消息队列的 topic 与分区准备好，避免第一个请求触发建连、建表或缓存加载；JIT 编译、TLS 握手、DNS 解析也算预热。</p>
+<p>分批放行：按固定速率发放“入场券”，拿到券才允许扣减；队列有界，满了返回“排队人数过多”。尖峰被改造成可控的斜坡，代价是部分用户等待。</p>
+<p>只读窗口与库存快照：开始后的前若干秒只展示“抢购中”，库存用“充足、紧张、售罄”三态快照，几秒刷新一次；精确库存既泄露商业信息，也诱发疯狂刷新。</p>
+<p>售罄快速路径：Lua 扣到 0 时同时写入售罄标记，后续请求在本地或网关直接短路；标记必须有 TTL，并在重新放量时清除。</p>
+<p>避免惊群：所有客户端在同一毫秒发起请求，会让建连、TLS 握手、缓存失效同时发生；服务端下发随机抖动，把请求摊开到几百毫秒。抖动上限要小于可感知的等待时间，否则会被误认为卡顿。</p>
+<p>经过这几层，真正到达 Redis 的请求应当只剩库存量的小倍数，而不是点击量；每层都不需要完美，但每层都要挡掉一个数量级。</p>
+<h2 id="库存预扣：Redis-与-Lua-划出的原子边界"><a href="#库存预扣：Redis-与-Lua-划出的原子边界" class="headerlink" title="库存预扣：Redis 与 Lua 划出的原子边界"></a>库存预扣：Redis 与 Lua 划出的原子边界</h2><p>过滤之后，剩下的请求要回答两个问题：还有没有库存，这个用户是不是已经买过。这两个判断必须在同一个原子操作里完成，否则并发一上来就会出错。本节先解释为什么把库存放在 Redis，再给出预扣与回补脚本。</p>
+<h3 id="为什么是-Redis，而不是数据库"><a href="#为什么是-Redis，而不是数据库" class="headerlink" title="为什么是 Redis，而不是数据库"></a>为什么是 Redis，而不是数据库</h3><p>数据库的正确性来自行锁与事务，代价是同一库存行的更新被串行化：所有请求排队等这一行，连接池很快被占满，锁等待反过来拖慢整个实例。Redis 把库存放在内存里，命令单线程执行，Lua 脚本执行期间不会被打断；一次扣减只有一次网络往返，没有锁等待和事务回滚的开销。</p>
+<p>角色要分清：Redis 是资格判定器，在高并发下快速回答“还有没有”；数据库是账本，最终记录“卖给了谁”。Redis 的写入可能因主从异步复制、故障切换或 AOF 落盘间隔而丢失，不能单独承担正确性。这一点在对账一节还会展开。</p>
+<h3 id="key-设计与初始化"><a href="#key-设计与初始化" class="headerlink" title="key 设计与初始化"></a>key 设计与初始化</h3><p>一个活动至少需要三类 key：库存 <code>seckill:{actId}:stock</code>、用户占位 <code>seckill:{actId}:user:{uid}</code>、售罄标记 <code>seckill:{actId}:soldout</code>。花括号里的 <code>actId</code> 是 Redis Cluster 的 hash tag，保证这三个 key 落在同一个槽位；否则 Lua 在集群模式下会因跨槽报错。</p>
+<p>用户占位不要放进大的 Set 或 Hash：大 key 在删除、迁移和过期时都会阻塞主线程，清理成本也高。用独立的 string key 加 TTL 更稳妥，TTL 至少覆盖活动时长、支付超时和对账窗口。</p>
+<p>初始化在活动开始前完成，用 <code>SET key stock NX</code> 写入，值与数据库一致。<code>NX</code> 让初始化幂等：发布脚本重跑时不会把已扣减的库存重置。完成后校验一次数据库与 Redis 的数量，并把活动版本号写进配置，便于追溯。</p>
+<h3 id="为什么单独-DECR-不够"><a href="#为什么单独-DECR-不够" class="headerlink" title="为什么单独 DECR 不够"></a>为什么单独 DECR 不够</h3><p>很多入门实现是“先 GET 判断大于 0，再 DECR”。并发下两个请求同时读到 1，都判断可以购买，各扣一次，库存变成 -1。即使换成一条 <code>DECR</code>，也只能避免读改写丢失，仍有三个问题：库存会被扣成负数；同一用户可以反复扣减；无法区分“未初始化”和“已售罄”。回补时直接 <code>INCR</code>，重试或多重补偿还会把库存加回初始值以上。</p>
+<p><code>WATCH</code> 加 <code>MULTI/EXEC</code> 也能解决原子性，但它是乐观锁：冲突时整个事务重试，热点下冲突率极高，重试会把流量放大数倍。Lua 在 Redis 内部一次执行完，没有中途插入，也没有客户端重试放大。</p>
+<h3 id="一段可用的预扣脚本"><a href="#一段可用的预扣脚本" class="headerlink" title="一段可用的预扣脚本"></a>一段可用的预扣脚本</h3><p>脚本把“校验库存、写入用户占位、扣减库存、写售罄标记”合并为一个原子操作，返回值对应不同的业务结果。</p>
+<figure class="highlight lua"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- KEYS[1] 库存 key，KEYS[2] 用户占位 key，KEYS[3] 售罄标记 key</span></span><br><span class="line"><span class="comment">-- ARGV[1] 占位 id，ARGV[2] 占位 TTL（秒），ARGV[3] 售罄标记 TTL（秒）</span></span><br><span class="line"><span class="keyword">local</span> stock = redis.call(<span class="string">&#x27;GET&#x27;</span>, KEYS[<span class="number">1</span>])</span><br><span class="line"><span class="keyword">if</span> <span class="keyword">not</span> stock <span class="keyword">then</span></span><br><span class="line">  <span class="keyword">return</span> <span class="number">-1</span>                      <span class="comment">-- 库存未初始化，属于配置错误</span></span><br><span class="line"><span class="keyword">end</span></span><br><span class="line"><span class="keyword">if</span> <span class="built_in">tonumber</span>(stock) &lt;= <span class="number">0</span> <span class="keyword">then</span></span><br><span class="line">  redis.call(<span class="string">&#x27;SET&#x27;</span>, KEYS[<span class="number">3</span>], <span class="string">&#x27;1&#x27;</span>, <span class="string">&#x27;EX&#x27;</span>, ARGV[<span class="number">3</span>])</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span>                       <span class="comment">-- 已售罄</span></span><br><span class="line"><span class="keyword">end</span></span><br><span class="line"><span class="keyword">local</span> ok = redis.call(<span class="string">&#x27;SET&#x27;</span>, KEYS[<span class="number">2</span>], ARGV[<span class="number">1</span>], <span class="string">&#x27;NX&#x27;</span>, <span class="string">&#x27;EX&#x27;</span>, ARGV[<span class="number">2</span>])</span><br><span class="line"><span class="keyword">if</span> <span class="keyword">not</span> ok <span class="keyword">then</span></span><br><span class="line">  <span class="keyword">return</span> <span class="number">2</span>                       <span class="comment">-- 同一用户已有占位，重复请求</span></span><br><span class="line"><span class="keyword">end</span></span><br><span class="line"><span class="keyword">local</span> left = redis.call(<span class="string">&#x27;DECR&#x27;</span>, KEYS[<span class="number">1</span>])</span><br><span class="line"><span class="keyword">if</span> left == <span class="number">0</span> <span class="keyword">then</span></span><br><span class="line">  redis.call(<span class="string">&#x27;SET&#x27;</span>, KEYS[<span class="number">3</span>], <span class="string">&#x27;1&#x27;</span>, <span class="string">&#x27;EX&#x27;</span>, ARGV[<span class="number">3</span>])</span><br><span class="line"><span class="keyword">end</span></span><br><span class="line"><span class="keyword">return</span> <span class="number">1</span>                         <span class="comment">-- 预扣成功</span></span><br></pre></td></tr></table></figure>
+
+<p>返回值的含义要在接口层固定：<code>1</code> 拿到资格，进入异步下单；<code>0</code> 售罄，返回业务码而不是异常；<code>2</code> 重复请求，返回上一次结果；<code>-1</code> 配置错误，必须告警，因为活动根本不该开始。</p>
+<p>脚本用 <code>EVAL</code> 调试、<code>EVALSHA</code> 上线：首次执行前 <code>SCRIPT LOAD</code> 缓存脚本，之后只传 SHA1，省带宽也避免每次传输。节点重启或 <code>SCRIPT FLUSH</code> 后返回 <code>NOSCRIPT</code>，客户端要捕获并回退到 <code>EVAL</code>，不要当成业务失败。</p>
+<p>脚本要保持 O(1)：不遍历列表、不用随机数、不依赖当前时间。随机与时间会让结果难以复现，也给主从切换后的核对增加变数。</p>
+<h3 id="回补也要有归属"><a href="#回补也要有归属" class="headerlink" title="回补也要有归属"></a>回补也要有归属</h3><p>预扣成功不代表订单一定创建成功。消息发送失败、消费者拒绝、数据库写入异常，都要把库存还回去。回补不能简单 <code>INCR</code>，否则一次重试就可能加两次；做法是在占位 value 里保存占位 id，回补时核对归属：</p>
+<figure class="highlight lua"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- KEYS[1] 库存 key，KEYS[2] 用户占位 key</span></span><br><span class="line"><span class="comment">-- ARGV[1] 占位 id</span></span><br><span class="line"><span class="keyword">if</span> redis.call(<span class="string">&#x27;EXISTS&#x27;</span>, KEYS[<span class="number">1</span>]) == <span class="number">0</span> <span class="keyword">then</span></span><br><span class="line">  <span class="keyword">return</span> <span class="number">-1</span>                      <span class="comment">-- 库存 key 已过期，交给对账处理</span></span><br><span class="line"><span class="keyword">end</span></span><br><span class="line"><span class="keyword">if</span> redis.call(<span class="string">&#x27;GET&#x27;</span>, KEYS[<span class="number">2</span>]) ~= ARGV[<span class="number">1</span>] <span class="keyword">then</span></span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span>                       <span class="comment">-- 不是本次占位，拒绝回补</span></span><br><span class="line"><span class="keyword">end</span></span><br><span class="line">redis.call(<span class="string">&#x27;DEL&#x27;</span>, KEYS[<span class="number">2</span>])</span><br><span class="line"><span class="keyword">return</span> redis.call(<span class="string">&#x27;INCR&#x27;</span>, KEYS[<span class="number">1</span>])</span><br></pre></td></tr></table></figure>
+
+<p>这段脚本保证：只有占位持有者能回补、回补最多执行一次、库存 key 不存在时不会凭空创建。回补幂等，补偿任务才能安全重试。</p>
+<h2 id="幂等与防重：同一次购买意图只产生一个结果"><a href="#幂等与防重：同一次购买意图只产生一个结果" class="headerlink" title="幂等与防重：同一次购买意图只产生一个结果"></a>幂等与防重：同一次购买意图只产生一个结果</h2><p>即使预扣脚本挡住了同一用户的第二次扣减，请求仍可能在更后的环节重复：客户端超时重发、网关重试、消息重投。幂等要覆盖整条链路，而不只是入口。</p>
+<h3 id="三个层次"><a href="#三个层次" class="headerlink" title="三个层次"></a>三个层次</h3><p>请求级幂等依靠全局唯一的 requestId：服务端记录 requestId 与结果，相同 requestId 再次到达时直接返回上次结果，不再扣减与建单。</p>
+<p>业务级幂等依靠数据库唯一索引。对 <code>(activity_id, user_id)</code> 建唯一键，这是最终防线：无论请求从哪个入口进来，同一用户在同一活动只能有一行订单。</p>
+<p>消息级幂等依靠消费者的业务判重。消息队列只保证至少一次投递，重复消息不可避免；消费者以订单号或 <code>(activity_id, user_id)</code> 为幂等键，重复执行的结果必须与第一次相同。</p>
+<p>Redis 的 <code>SET NX</code> 只能作为快速路径。它可能因为过期、主从切换丢数据而失效，所以不能替代数据库唯一索引；它的价值在于把绝大多数重复请求挡在数据库之前。</p>
+<h3 id="表结构与插入方式"><a href="#表结构与插入方式" class="headerlink" title="表结构与插入方式"></a>表结构与插入方式</h3><p>订单表至少要有两个唯一键：业务唯一键和请求唯一键。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CREATE TABLE</span> seckill_order (</span><br><span class="line">  id <span class="type">BIGINT</span> UNSIGNED <span class="keyword">NOT NULL</span> AUTO_INCREMENT,</span><br><span class="line">  activity_id <span class="type">BIGINT</span> UNSIGNED <span class="keyword">NOT NULL</span>,</span><br><span class="line">  user_id <span class="type">BIGINT</span> UNSIGNED <span class="keyword">NOT NULL</span>,</span><br><span class="line">  request_id <span class="type">CHAR</span>(<span class="number">36</span>) <span class="keyword">NOT NULL</span>,</span><br><span class="line">  sku_id <span class="type">BIGINT</span> UNSIGNED <span class="keyword">NOT NULL</span>,</span><br><span class="line">  status TINYINT <span class="keyword">NOT NULL</span> <span class="keyword">DEFAULT</span> <span class="number">0</span> COMMENT <span class="string">&#x27;0 待支付 1 已支付 2 已关闭&#x27;</span>,</span><br><span class="line">  created_at DATETIME(<span class="number">3</span>) <span class="keyword">NOT NULL</span> <span class="keyword">DEFAULT</span> <span class="built_in">CURRENT_TIMESTAMP</span>(<span class="number">3</span>),</span><br><span class="line">  <span class="keyword">PRIMARY KEY</span> (id),</span><br><span class="line">  <span class="keyword">UNIQUE</span> KEY uk_act_user (activity_id, user_id),</span><br><span class="line">  <span class="keyword">UNIQUE</span> KEY uk_request (request_id),</span><br><span class="line">  KEY idx_status_created (status, created_at)</span><br><span class="line">) ENGINE<span class="operator">=</span>InnoDB <span class="keyword">DEFAULT</span> CHARSET<span class="operator">=</span>utf8mb4;</span><br></pre></td></tr></table></figure>
+
+<p><code>uk_act_user</code> 保证一人一单，<code>uk_request</code> 让接口层的重试也能被识别。插入时不要“先查再插”，那仍然是检查与写入分离的竞态；直接插入，捕获重复键错误，再按业务键把已有订单读出来返回。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">insertOrder</span><span class="params">(ctx context.Context, tx *sql.Tx, o Order)</span></span> (<span class="type">int64</span>, <span class="type">error</span>) &#123;</span><br><span class="line">	res, err := tx.ExecContext(ctx,</span><br><span class="line">		<span class="string">`INSERT INTO seckill_order (activity_id, user_id, request_id, sku_id, status)</span></span><br><span class="line"><span class="string">		 VALUES (?, ?, ?, ?, 0)`</span>,</span><br><span class="line">		o.ActivityID, o.UserID, o.RequestID, o.SKUID)</span><br><span class="line">	<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">var</span> me *mysql.MySQLError</span><br><span class="line">		<span class="keyword">if</span> errors.As(err, &amp;me) &amp;&amp; me.Number == <span class="number">1062</span> &#123;</span><br><span class="line">			<span class="comment">// 重复键说明订单已存在，读出已有订单即可，不是失败</span></span><br><span class="line">			<span class="keyword">return</span> findOrderID(ctx, tx, o.ActivityID, o.UserID)</span><br><span class="line">		&#125;</span><br><span class="line">		<span class="keyword">return</span> <span class="number">0</span>, err</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">return</span> res.LastInsertId()</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>MySQL 在单条语句因重复键失败时不会中止整个事务，同一事务里还能继续查询；这让“插入失败后读旧订单”可行，也避免把正常的重复请求包装成异常。</p>
+<h3 id="状态流转也要幂等"><a href="#状态流转也要幂等" class="headerlink" title="状态流转也要幂等"></a>状态流转也要幂等</h3><p>订单状态只能沿固定方向变化，所有变更都用条件更新表达，例如 <code>UPDATE ... SET status = 1 WHERE id = ? AND status = 0</code>。受影响行数为 1 才表示本次变更生效，为 0 说明状态已经被别的操作改过，当前操作应当放弃而不是覆盖。支付回调、超时关闭、人工补偿都遵守这条规则，才能避免“已支付订单被关闭”这类事故。</p>
+<h2 id="异步下单：状态机、落账与补偿"><a href="#异步下单：状态机、落账与补偿" class="headerlink" title="异步下单：状态机、落账与补偿"></a>异步下单：状态机、落账与补偿</h2><p>Redis 预扣成功后，如果同步创建订单，请求要等待数据库事务、优惠券核销甚至支付网关；等待队列很长，连接和线程会被迅速耗尽。异步化的思路是：Redis 只回答“有没有资格”，订单创建交给消息队列后的消费者，接口尽快返回“订单生成中”。</p>
+<h3 id="一条订单的状态机"><a href="#一条订单的状态机" class="headerlink" title="一条订单的状态机"></a>一条订单的状态机</h3><pre class="mermaid">flowchart LR
+  A[INIT 初始] -->|Lua 预扣成功| B[RESERVED 已占位]
+  B -->|消息投递成功| C[QUEUED 已入队]
+  C -->|消费者建单| D[CREATED 待支付]
+  D -->|支付成功| E[PAID 已支付]
+  D -->|超时未支付| F[CLOSED 已关闭]
+  B -->|投递确定失败| G[FAILED 已回补]</pre>
+
+<p>每个状态只允许特定的迁移，每次迁移都用条件更新或带校验的脚本完成。排查时只要看订单停在哪个状态，就能定位是哪一段链路出了问题。</p>
+<h3 id="消息设计与生产端"><a href="#消息设计与生产端" class="headerlink" title="消息设计与生产端"></a>消息设计与生产端</h3><p>消息体至少包含活动 id、用户 id、sku、requestId、占位 id 与创建时间。分区键用用户 id，让同一用户的消息落到同一分区；秒杀不要求全局顺序，唯一键已经保证结果唯一，按活动分区反而会造成单分区热点。</p>
+<p>生产端开启 <code>acks=all</code> 与重试，Kafka 2.6 的幂等生产者还能消除重试导致的重复。但 Redis 与 Kafka 之间没有事务，预扣成功而消息没发出去仍是缺口。明确失败时立即回补；发送超时属于结果未知，不能马上回补，否则消息可能已落盘，消费者随后建单时库存已被还回去。未知结果记录待确认状态，由对账任务在宽限期后按 requestId 查询订单是否存在，再决定回补还是重发。</p>
+<h3 id="消费端与超时关闭"><a href="#消费端与超时关闭" class="headerlink" title="消费端与超时关闭"></a>消费端与超时关闭</h3><p>消费者在一个事务里插入订单并扣减数据库库存：插入命中唯一键说明消息重复，直接结束事务并确认；扣减影响行数为 0 则回滚、告警并交给对账回补。提交后再确认消息，确认失败导致的重投同样被唯一键吸收。消费失败不能无限重试，超过阈值转入死信队列并告警，避免一条坏消息阻塞整个分区。</p>
+<p>未支付订单需要关闭并释放库存。可以用延迟消息，也可以用定时任务扫表；MySQL 8.0 的 <code>SKIP LOCKED</code> 能让多个扫描实例互不阻塞。关闭执行 <code>UPDATE ... SET status = 2 WHERE id = ? AND status = 0</code>，受影响行数为 1 才回补 Redis 与数据库库存。支付回调同样用条件更新，两个操作只有一个能成功：支付赢了，关闭放弃；关闭赢了，支付回调发现订单已关闭，转入退款。这个竞态不处理，就会出现“订单已关闭但钱已扣”的客诉。</p>
+<h3 id="数据库设计：把数据库放回账本的位置"><a href="#数据库设计：把数据库放回账本的位置" class="headerlink" title="数据库设计：把数据库放回账本的位置"></a>数据库设计：把数据库放回账本的位置</h3><p>数据库在秒杀链路里只做两件事：记录订单，记录库存的最终扣减。它不应承担第一道拦截，因为每次写入都涉及事务、行锁与日志落盘，成本远高于 Redis。</p>
+<h4 id="库存表与条件扣减"><a href="#库存表与条件扣减" class="headerlink" title="库存表与条件扣减"></a>库存表与条件扣减</h4><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CREATE TABLE</span> seckill_stock (</span><br><span class="line">  activity_id <span class="type">BIGINT</span> UNSIGNED <span class="keyword">NOT NULL</span>,</span><br><span class="line">  bucket_no <span class="type">SMALLINT</span> UNSIGNED <span class="keyword">NOT NULL</span> <span class="keyword">DEFAULT</span> <span class="number">0</span>,</span><br><span class="line">  stock <span class="type">INT</span> <span class="keyword">NOT NULL</span>,</span><br><span class="line">  version <span class="type">INT</span> <span class="keyword">NOT NULL</span> <span class="keyword">DEFAULT</span> <span class="number">0</span>,</span><br><span class="line">  updated_at DATETIME(<span class="number">3</span>) <span class="keyword">NOT NULL</span> <span class="keyword">DEFAULT</span> <span class="built_in">CURRENT_TIMESTAMP</span>(<span class="number">3</span>)</span><br><span class="line">    <span class="keyword">ON</span> <span class="keyword">UPDATE</span> <span class="built_in">CURRENT_TIMESTAMP</span>(<span class="number">3</span>),</span><br><span class="line">  <span class="keyword">PRIMARY KEY</span> (activity_id, bucket_no)</span><br><span class="line">) ENGINE<span class="operator">=</span>InnoDB;</span><br></pre></td></tr></table></figure>
+
+<p>扣减把判断写进 WHERE，受影响行数为 1 表示成功，为 0 表示库存不足：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">UPDATE</span> seckill_stock</span><br><span class="line"><span class="keyword">SET</span> stock <span class="operator">=</span> stock <span class="operator">-</span> <span class="number">1</span>, version <span class="operator">=</span> version <span class="operator">+</span> <span class="number">1</span></span><br><span class="line"><span class="keyword">WHERE</span> activity_id <span class="operator">=</span> ? <span class="keyword">AND</span> bucket_no <span class="operator">=</span> ? <span class="keyword">AND</span> stock <span class="operator">&gt;=</span> <span class="number">1</span>;</span><br></pre></td></tr></table></figure>
+
+<p><code>stock &gt;= 1</code> 是真正的守卫，<code>version</code> 用于审计和后台调整时的 CAS，不是防止丢失更新的必需品，因为单条 UPDATE 已经在行锁下原子完成了读改写。用 <code>SELECT ... FOR UPDATE</code> 也能做对，但它多一次往返、锁持有时间更长，热点下所有请求仍然排在同一行上，吞吐不会更好。</p>
+<h4 id="分桶与分片"><a href="#分桶与分片" class="headerlink" title="分桶与分片"></a>分桶与分片</h4><p>单行库存是天然热点。把一份库存拆成 N 个桶，按用户 id 哈希选桶，<code>UPDATE ... WHERE bucket_no = ? AND stock &gt;= 1</code>，行锁冲突被分散到 N 行；总库存是所有桶之和，展示与对账时再聚合。桶数不是越多越好：桶太多会让售罄判断需要扫描全部桶，回补也更复杂。先按单库单表能承受的写入量估算，再用压测校准。</p>
+<p>活动之间可以分表甚至分库，按 activity_id 路由，活动结束后归档。这样一场活动的写入不会影响另一场，也便于按活动限流。数据库最终看到的写入量应当与库存量同阶，而不是与点击量同阶；如果订单表 QPS 跟着点击量走，说明前面的过滤和异步都没有生效。</p>
+<h2 id="超卖防护的深水区：失败矩阵与对账"><a href="#超卖防护的深水区：失败矩阵与对账" class="headerlink" title="超卖防护的深水区：失败矩阵与对账"></a>超卖防护的深水区：失败矩阵与对账</h2><p>Redis 的脚本是原子的，MySQL 的事务是原子的，Kafka 的投递是至少一次的；三者拼在一起，并不存在跨系统的原子操作。不超卖不是某个组件单独保证的，而是本地原子性、幂等、补偿与对账共同收敛的结果。</p>
+<table>
+<thead>
+<tr>
+<th>故障点</th>
+<th>现象</th>
+<th>处理方式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>预扣后消息发送失败</td>
+<td>Redis 已减，订单不存在</td>
+<td>明确失败立即回补；超时先挂起</td>
+</tr>
+<tr>
+<td>消息在队列中丢失</td>
+<td>预扣成功但无订单</td>
+<td>对账按占位补发或回补</td>
+</tr>
+<tr>
+<td>消费者建单前宕机</td>
+<td>消息重投</td>
+<td>唯一键吸收重复</td>
+</tr>
+<tr>
+<td>建单成功但确认失败</td>
+<td>消息重投</td>
+<td>重复插入被唯一键拒绝</td>
+</tr>
+<tr>
+<td>数据库主从切换</td>
+<td>事务回滚或超时</td>
+<td>消息重试，超限进死信</td>
+</tr>
+<tr>
+<td>支付与关闭并发</td>
+<td>状态互相覆盖</td>
+<td>条件更新，只有一方成功</td>
+</tr>
+<tr>
+<td>Redis 故障丢数据</td>
+<td>预扣记录消失</td>
+<td>以数据库为准重建</td>
+</tr>
+</tbody></table>
+<p>表里绝大多数故障的兜底都不是“再试一次”，而是“让重复执行无害”。幂等键与条件更新是贯穿所有行的共同前提。</p>
+<p>对账任务负责发现没有被兜住的差异。它按活动读取三组数据：Redis 剩余库存、数据库各桶库存之和、订单表中占用库存的订单数（待支付与已支付）。理论上应满足：初始库存等于 Redis 剩余、已创建订单与已关闭待回补之和，差额就是尚未建单的在途占位。任一环节漏掉，等式就不成立。</p>
+<p>对账先只读计算差异并告警，确认原因后再修复：Redis 丢数据时用数据库库存减去在途占位重建；孤儿占位按占位 id 回补；重复扣减生成补偿单，而不是直接改库存。所有修复都带幂等键（业务类型加业务 id）和审计记录，默认 dry-run，避免对账脚本本身成为新的故障源。</p>
+<h2 id="热点、容量、降级与压测"><a href="#热点、容量、降级与压测" class="headerlink" title="热点、容量、降级与压测"></a>热点、容量、降级与压测</h2><h3 id="热点-key-与资源隔离"><a href="#热点-key-与资源隔离" class="headerlink" title="热点 key 与资源隔离"></a>热点 key 与资源隔离</h3><p>单个库存 key 在 Cluster 下只落一个槽、一个节点，再高的 QPS 也只能由这个节点承担。解决办法与数据库分桶同构：拆成 N 个 key，按用户哈希选桶，Lua 只操作一个桶；售罄判断改为聚合或单独计数器。代价是展示与对账更复杂，只有压测证明确实是瓶颈时才值得做。</p>
+<p>本地缓存只用于只读数据：活动配置、商品信息、规则开关。库存绝不能缓存在本地用于判断，否则不同实例看到不同的库存，超卖几乎必然发生。本地售罄标记可以有，但必须短 TTL 并能被广播刷新。</p>
+<p>连接池与线程池按隔离而不是共享来设计。下单、查询、对账使用不同的线程池，队列有界，满了快速拒绝；数据库连接池总量按实例数乘以池大小估算，必须小于最大连接数并留出余量。池大小是并发上限，不是吞吐来源，盲目调大只会把压力转成数据库的上下文切换。</p>
+<h3 id="容量估算"><a href="#容量估算" class="headerlink" title="容量估算"></a>容量估算</h3><p>容量靠测量。先用代表性请求压出单实例能力，再按“实例数等于峰值 QPS 除以单实例能力与安全系数之积”估算，安全系数取 0.5 到 0.7。消息队列分区数不小于消费者实例数，否则扩消费者没有意义；数据库写入按库存量估算；Redis 的 ops 按每请求一次脚本计算。QPS 必须来自自己的压测，而不是行业传闻。</p>
+<h3 id="降级与熔断"><a href="#降级与熔断" class="headerlink" title="降级与熔断"></a>降级与熔断</h3><p>降级开关要在活动前准备好并演练：关闭推荐、评论、积分等非核心功能；下单切为排队模式；售罄后返回静态页；数据库连接池接近上限时拒绝新的写请求，保护已有事务。熔断器挂在下游依赖上，失败率超过阈值就快速失败，避免线程被慢调用拖死。</p>
+<p>监控至少覆盖各返回码比例、p99 延迟、Redis 错误与延迟、Kafka 积压、订单创建延迟、数据库 QPS 与连接数、对账差异。所有开关都要有操作审计，活动期间只允许预先演练过的变更。</p>
+<h3 id="压测：验证正确性，而不只是吞吐"><a href="#压测：验证正确性，而不只是吞吐" class="headerlink" title="压测：验证正确性，而不只是吞吐"></a>压测：验证正确性，而不只是吞吐</h3><p>压测的流量模型要接近真实：包含浏览、点击、重复点击与失败重试，用户集合足够大且不重复，请求分布有 T0 尖峰而不是恒定速率。只压下单接口会高估系统能力，只压静态页又会低估写路径的压力。</p>
+<p>正确性断言比吞吐数字更重要。压测后检查：成功订单数等于库存、同一用户没有两笔订单、Redis 与数据库库存一致、没有负库存、消息积压归零。再做故障注入：停掉 Redis、暂停消费者、让数据库变慢、杀掉消费者实例，观察回补、重投与对账是否收敛。wrk 适合压 HTTP 接口并用 Lua 生成唯一用户，JMeter 适合编排登录、浏览、下单的完整场景；工具只负责产生流量，断言要自己写。</p>
+<h2 id="参考架构与常见坑"><a href="#参考架构与常见坑" class="headerlink" title="参考架构与常见坑"></a>参考架构与常见坑</h2><pre class="mermaid">flowchart TD
+  C[客户端] --> CDN[CDN 静态活动页]
+  C --> GW[网关 鉴权与限流]
+  GW --> S[秒杀服务]
+  S -->|Lua 预扣| R[(Redis 库存与占位)]
+  S -->|预扣成功后投递| MQ[(Kafka)]
+  MQ --> O[订单服务]
+  O --> DB[(MySQL 订单与库存)]
+  O --> P[支付服务]
+  J[对账任务] --> R
+  J --> DB
+  J --> MQ</pre>
+
+<p>主链路每一段都允许失败，失败后要么回补，要么重试，要么留给对账收敛；对账任务不在请求路径上，只负责发现和修复偏差。</p>
+<h3 id="常见坑"><a href="#常见坑" class="headerlink" title="常见坑"></a>常见坑</h3><ul>
+<li>先查库存再扣减，检查与写入分离。</li>
+<li>用数据库行锁扛热点，连接池被拖垮。</li>
+<li>没有业务唯一键，重试变成重复订单。</li>
+<li>把消息队列当 exactly-once，消费端不判重。</li>
+<li>支付成功后仍执行超时关闭与回补。</li>
+<li>回补不校验归属，库存被加回多次。</li>
+<li>不做对账，Redis 与数据库漂移无人发现。</li>
+<li>只压 happy path，不注入故障。</li>
+</ul>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>秒杀系统的核心不是某个高性能组件，而是一组约束下的取舍：分层过滤把流量挡在核心之外，Redis 加 Lua 把资格判定收成一次原子操作，唯一键与条件更新让重复执行无害，异步下单与补偿收敛跨系统的不一致。数据库只做账本，Redis 只做闸门，消息队列只做缓冲。最后用对账与故障注入证明系统在异常下仍然正确。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://redis.io/commands/eval">Redis EVAL command documentation</a></li>
+<li><a href="https://redis.io/commands/evalsha">Redis EVALSHA command documentation</a></li>
+<li><a href="https://redis.io/topics/transactions">Redis transactions documentation</a></li>
+<li><a href="https://kafka.apache.org/documentation/">Apache Kafka documentation</a></li>
+<li><a href="https://dev.mysql.com/doc/refman/8.0/en/innodb-locking.html">MySQL 8.0 Reference Manual: InnoDB Locking</a></li>
+<li><a href="https://dev.mysql.com/doc/refman/8.0/en/insert-on-duplicate.html">MySQL 8.0 Reference Manual: INSERT … ON DUPLICATE KEY UPDATE</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>秒杀系统：流量削峰与库存扣减</p><p><a href="https://987763485.github.io/2021/02/04/秒杀系统流量削峰与库存扣减/">https://987763485.github.io/2021/02/04/秒杀系统流量削峰与库存扣减/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2021-02-04</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a><a class="link-muted mr-2" rel="tag" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/">架构设计</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2021/02/09/%E5%BE%AE%E6%9C%8D%E5%8A%A1%E6%97%A5%E5%BF%97%E8%81%9A%E5%90%88%E6%96%B9%E6%A1%88/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">微服务日志聚合方案</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2021/01/30/%E6%9E%B6%E6%9E%84%E6%BC%94%E8%BF%9B%E5%8D%95%E4%BD%93%E5%88%B0%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="level-item">架构演进：单体到微服务</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

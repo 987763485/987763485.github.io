@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>国密 SSL VPN 与双证书方案 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="远程办公把企业内网推到了互联网边缘，SSL VPN 成了最常见的入口。可在等保 2.0 与《密码法》的语境下，只把隧道搭起来并不够，密码算法、证书体系、客户端与运维都要能对得上。本文围绕国密 SSL VPN 的双证书方案，拆开协议组成、证书链、握手、部署与性能评估，适合正在做国密改造或密评准备的工程师阅读。"><meta property="og:type" content="blog"><meta property="og:title" content="国密 SSL VPN 与双证书方案"><meta property="og:url" content="https://987763485.github.io/2020/03/07/%E5%9B%BD%E5%AF%86SSLVPN%E4%B8%8E%E5%8F%8C%E8%AF%81%E4%B9%A6%E6%96%B9%E6%A1%88/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="远程办公把企业内网推到了互联网边缘，SSL VPN 成了最常见的入口。可在等保 2.0 与《密码法》的语境下，只把隧道搭起来并不够，密码算法、证书体系、客户端与运维都要能对得上。本文围绕国密 SSL VPN 的双证书方案，拆开协议组成、证书链、握手、部署与性能评估，适合正在做国密改造或密评准备的工程师阅读。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2020-03-07T08:25:58.000Z"><meta property="article:modified_time" content="2026-10-18T14:30:41.206Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="网络安全"><meta property="article:tag" content="等级保护"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2020/03/07/%E5%9B%BD%E5%AF%86SSLVPN%E4%B8%8E%E5%8F%8C%E8%AF%81%E4%B9%A6%E6%96%B9%E6%A1%88/"},"headline":"国密 SSL VPN 与双证书方案","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2020-03-07T08:25:58.000Z","dateModified":"2026-10-18T14:30:41.206Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"远程办公把企业内网推到了互联网边缘，SSL VPN 成了最常见的入口。可在等保 2.0 与《密码法》的语境下，只把隧道搭起来并不够，密码算法、证书体系、客户端与运维都要能对得上。本文围绕国密 SSL VPN 的双证书方案，拆开协议组成、证书链、握手、部署与性能评估，适合正在做国密改造或密评准备的工程师阅读。"}</script><link rel="canonical" href="https://987763485.github.io/2020/03/07/%E5%9B%BD%E5%AF%86SSLVPN%E4%B8%8E%E5%8F%8C%E8%AF%81%E4%B9%A6%E6%96%B9%E6%A1%88/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2020-03-07T08:25:58.000Z" title="3/7/2020, 4:25:58 PM">2020-03-07</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a></span><span class="level-item">1 小时读完 (大约7700个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">国密 SSL VPN 与双证书方案</h1><div class="content"><p>远程办公把企业内网推到了互联网边缘，SSL VPN 成了最常见的入口。可在等保 2.0 与《密码法》的语境下，只把隧道搭起来并不够，密码算法、证书体系、客户端与运维都要能对得上。本文围绕国密 SSL VPN 的双证书方案，拆开协议组成、证书链、握手、部署与性能评估，适合正在做国密改造或密评准备的工程师阅读。</p>
+<h2 id="一、远程接入为什么绕不开国密"><a href="#一、远程接入为什么绕不开国密" class="headerlink" title="一、远程接入为什么绕不开国密"></a>一、远程接入为什么绕不开国密</h2><p>SSL VPN 的典型场景是出差、居家办公、分支机构与合作伙伴接入。用户通过浏览器或专用客户端建立一条加密隧道，隧道里跑的是 OA、ERP、代码仓库、运维后台这些原本只在内网开放的系统。它同时承担身份认证、密钥协商、数据加密三项职责，是密码应用最集中的位置，也是检查人员最容易发问的位置。</p>
+<p>2020 年 1 月 1 日，《中华人民共和国密码法》施行；此前的 2019 年 12 月 1 日，等保 2.0 系列标准正式实施；商用密码应用安全性评估则在逐步推进。几件事叠加，使“通道加密了”不再等于“密码用对了”。合规关心的不只是有没有加密，而是有没有使用符合要求的商用密码、密钥是否管住、证书是否可信、过程是否可审计。对远程接入来说，最直接的落点就是国密 TLS。</p>
+<p>另一条动因是自主可控。根 CA、证书签发与算法实现都在自己手里，不依赖境外公共信任体系，供应链和信任链更短。这并不意味着国际算法不能用，而是面向境内业务、接受密码检查时，国密方案更省解释成本。</p>
+<p>需要先厘清一个概念：国密 SSL VPN 不是把 TLS 1.2 的套件名换成 SM4 就结束了。它至少包含算法、协议、双证书、客户端、运维五件事。协议层常被称为 TLCP 或 GM-TLS，GM&#x2F;T 0024 是这一层常被提到的规范之一，本文不逐条解读条款。很多改造项目失败，不是算法不会调，而是五件事只做了第一件。</p>
+<h2 id="二、国密-TLS-的协议组成"><a href="#二、国密-TLS-的协议组成" class="headerlink" title="二、国密 TLS 的协议组成"></a>二、国密 TLS 的协议组成</h2><p>从结构看，国密 TLS 与 TLS 1.2 同类：下面是记录层，负责切块、加 MAC、加密；上面是握手层，负责协商套件、交换证书、协商密钥、验证完整性；此外还有告警与密码规格变更等控制消息。差别在于每个密码学位置由谁承担，以及证书模型不同。把它理解成“TLS 1.2 的国密版本”比“另一套全新协议”更准确，但不能按 TLS 1.2 的报文字段逐条对照，两者的消息编号、字段与密钥派生都可能不同。</p>
+<p>SM2 在协议里一人分饰三角。作为签名算法，它用于证书签名、服务器证明持有签名私钥、客户端证书认证；作为加密算法，它保护预主密钥，客户端用服务器加密证书的公钥加密，服务器用对应私钥解开；作为密钥交换算法，它与 ECDH 类似，双方各出临时材料，合成会话密钥的种子。三种用途对应三组密钥材料，工程上必须分开，下一节展开。</p>
+<p>SM3 负责把过程串起来。握手消息摘要、证书签名摘要、密钥派生中的哈希、Finished 校验值都会用到它。输出 256 位，结构与 SHA-256 同属一类，但初始值、常量与压缩函数不同，不能混用。SM4 负责把数据搬过去，分组与密钥都是 128 位，常见组合是 SM4 分组模式配 HMAC-SM3 做完整性保护；具体模式取决于套件与产品实现，配置时不能想当然。</p>
+<table>
+<thead>
+<tr>
+<th>TLS 1.2 中的角色</th>
+<th>国密方案中的承担者</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>签名与身份认证</td>
+<td>SM2 签名</td>
+<td>证书签名、握手签名</td>
+</tr>
+<tr>
+<td>密钥交换</td>
+<td>SM2 密钥交换</td>
+<td>常与临时密钥配合</td>
+</tr>
+<tr>
+<td>预主密钥保护</td>
+<td>SM2 加密</td>
+<td>使用加密证书</td>
+</tr>
+<tr>
+<td>握手摘要与 PRF</td>
+<td>SM3</td>
+<td>含 HMAC-SM3</td>
+</tr>
+<tr>
+<td>记录层加密</td>
+<td>SM4</td>
+<td>模式随套件</td>
+</tr>
+</tbody></table>
+<p>套件名常见 ECC_SM4_SM3、ECDHE_SM4_SM3 这一类写法，前缀表示密钥交换方式，中间是加密算法，最后是摘要算法。不同产品对套件字符串的拼写并不完全一致，有的还会带 CBC 等模式标识。部署时不要凭记忆写配置，先从网关文档或 <code>openssl ciphers</code> 一类命令确认本机认识哪些名字，再做联调。</p>
+<p>国密 TLS 的密钥派生与 Finished 计算都建立在双证书和 SM2 密钥交换之上，把它当成“把 RSA 换成 SM2”的等价替换，会在证书选择上立刻卡住。结构可类比，语义不能照搬。</p>
+<h2 id="三、双证书：一张签名，一张加密"><a href="#三、双证书：一张签名，一张加密" class="headerlink" title="三、双证书：一张签名，一张加密"></a>三、双证书：一张签名，一张加密</h2><p>国际算法体系里，一张 RSA 服务器证书通常同时承担签名和密钥交换。证书的 keyUsage 里既有 digitalSignature，也有 keyEncipherment，私钥既签又解。国密体系把这两件事拆成两张证书、两对密钥：签名证书负责身份与不可否认，加密证书负责密钥交换中的解密。握手时服务器要同时出示两张证书及各自的链，客户端分别验证。</p>
+<p>为什么要拆？第一是密钥用途隔离。签名私钥泄露意味着身份可被冒充，加密私钥泄露意味着历史会话可能被解开，两者的风险等级、应急动作与备份策略不同，混在一把钥匙里就无法分级处置。第二是不可否认性与密钥恢复的冲突：签名私钥要求只由持有人控制，不能代管、不能归档；加密密钥为了业务连续性，往往需要备份或恢复。分开之后，才能既让签名私钥不出设备，又允许加密密钥按制度恢复。第三是运算隔离，签名与解密可以落在 HSM 的不同密钥槽与权限角色上，审计更清楚。</p>
+<p>签发上，两张证书通常使用相同的主体信息，由同一 CA 或同一根下的不同中间 CA 签发。CA 在签发策略里把两者绑定为同一实体，工程上则靠主体名、签发策略与网关配置共同保证。两张证书的序列号、有效期、密钥用途可以不同，部署时必须成对出现。只配签名证书，握手会在密钥交换阶段失败；只配加密证书，服务器无法证明身份。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">签名证书：keyUsage = digitalSignature，用于证书签名与握手签名</span><br><span class="line">加密证书：keyUsage = keyEncipherment / dataEncipherment，用于预主密钥解密</span><br><span class="line">两者共同点：同一 subject、同一信任根、同时部署</span><br></pre></td></tr></table></figure>
+
+<p>双向认证时，客户端同样需要一对证书。网关要验证客户端的签名证书与加密证书，任何一张缺失或链不完整，都可能被拒绝。有些产品在客户端只配一张证书也能连上，那是实现上的兼容路径，不代表符合双证书模型；到了检查或跨产品联调时，问题就会暴露。</p>
+<p>最常见的错误是“一张证书打天下”：把签名证书的 keyUsage 加上 keyEncipherment，或复用同一对 SM2 密钥。实验室里也许能握手成功，但它绕过了双证书分工，私钥保护、密钥恢复和审计都无从谈起。另一个错误是两张证书主体名不一致，CA 认为是两个实体，网关却按一个用户配置。</p>
+<h2 id="四、证书链与信任锚"><a href="#四、证书链与信任锚" class="headerlink" title="四、证书链与信任锚"></a>四、证书链与信任锚</h2><p>证书链由终端证书、中间 CA、根 CA 组成。根 CA 自签，通常离线保管；中间 CA 由根签发，承担日常签发；终端证书由中间 CA 签发。验证时从终端证书往上追，检查签名、有效期、基本约束、密钥用途，直到命中本地信任的根。任何一环缺失或过期，链就断了。</p>
+<p>双证书意味着两条链。签名证书和加密证书可能挂在同一个中间 CA 下，也可能分别挂在“签名 CA”和“加密 CA”下，后者在大型企业里更常见，因为两类密钥的签发策略和审批流程不同。网关必须把两张终端证书及各自需要的中间证书都发给客户端，顺序一般是终端在前、中间在后，根证书可以不发，但客户端必须预置。只发一条链，或者把两张证书混在一个列表里导致顺序错乱，都会让部分客户端验证失败。</p>
+<p>信任锚的预置是落地时最现实的门槛。公共浏览器与操作系统的信任库不会内置企业的国密根，国密根也不在公共信任体系里。客户端要信任它，只有几条路：通过域策略或移动设备管理下发到系统证书库；随专用客户端安装包预置；在中间件自己的信任库里配置；移动端把根证书打包进应用并校验。每条路都有更新问题：根轮换、中间 CA 更换、旧客户端残留旧根，都会造成“同一张证书，有人能连、有人不能连”。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 查看证书的用途与签发者，双证书要分别检查</span></span><br><span class="line">openssl x509 -<span class="keyword">in</span> sign.crt -noout -subject -issuer -dates</span><br><span class="line">openssl x509 -<span class="keyword">in</span> sign.crt -noout -text | grep -A1 <span class="string">&quot;Key Usage&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 用根证书与中间证书验证终端证书</span></span><br><span class="line">openssl verify -CAfile root.crt -untrusted intermediate.crt sign.crt</span><br></pre></td></tr></table></figure>
+
+<p>吊销检查是另一个边界。2019 年到 2020 年初，国内企业 PKI 的 CRL 分发比较普遍，OCSP 的覆盖与稳定性参差不齐，OCSP stapling 在国密网关上并不常见。较稳妥的做法是：网关定期拉取 CRL 并在本地缓存，设置刷新间隔与失效告警；高敏感系统叠加短有效期证书与网关侧黑名单；不要把“客户端会自己查 OCSP”当成默认事实。CRL 过期、分发点不可达、软失败放行，都是实际发生过的故障。两条链都要查，不能只查签名证书。</p>
+<p>链配置的典型故障有：中间证书漏配、顺序颠倒、根证书过期、同一主体名换过密钥、交叉签名造成多条路径。排查时先在网关侧用 <code>openssl verify</code> 复现，再对比客户端日志；网关能过而客户端不能过，优先怀疑信任锚与中间证书，而不是算法。</p>
+<h2 id="五、握手流程：概念级理解"><a href="#五、握手流程：概念级理解" class="headerlink" title="五、握手流程：概念级理解"></a>五、握手流程：概念级理解</h2><p>不必背报文字段，但要知道每一步在解决什么问题。下面的时序是概念示意，消息名称与字段随规范版本和产品实现不同，不能拿它当抓包对照表。</p>
+<pre class="mermaid">sequenceDiagram
+    participant C as 客户端
+    participant G as 国密 SSL VPN 网关
+    participant A as CA
+    C->>G: 客户端问候，列出国密套件与随机数
+    G->>C: 服务端问候，选定套件与随机数
+    G->>C: 签名证书链与加密证书链
+    C->>A: 校验证书链与吊销状态（可缓存）
+    C->>G: 用加密证书公钥保护预主密钥
+    G->>C: 用签名私钥证明身份并校验 Finished
+    C->>G: 客户端双证书（双向认证时）
+    Note over C,G: 双方用 SM3 派生会话密钥，切换到 SM4 加密</pre>
+
+<p>第一步协商套件。客户端列出自己支持的国密套件，网关从中选一个，这决定了后续的密钥交换方式、SM4 模式与摘要组合。套件不匹配是最常见的失败原因之一，尤其在双栈网关上：客户端以为在谈国密，网关却选了国际套件。</p>
+<p>第二步交换并验证证书。网关把两条链一起发给客户端，客户端分别检查链能否到信任根、有效期、keyUsage、主体名与访问地址是否一致、吊销状态。两张都要过，只过一张不能继续。顺序很重要：先验证再使用。不能因为加密证书“只是用来加密”就跳过链验证，否则中间人可以替换它，把预主密钥解给自己。</p>
+<p>第三步保护预主密钥。客户端生成预主密钥，用服务器加密证书的公钥做 SM2 加密后发送，服务器用加密私钥解开；双方再结合随机数，用 SM3 派生主密钥与会话密钥。它与早期 RSA 密钥交换形状相似，但算法、填充和派生过程都不同，不能套用 RSA 的调试经验。</p>
+<p>第四步证明身份与完整性。服务器用签名私钥对握手过程签名，客户端验证；双方再交换 Finished 消息，校验此前所有握手消息的摘要。任何一步被篡改，校验都对不上。双向认证时，客户端也要出示双证书并签名，网关按同样规则验证。最后双方切换到 SM4 加密，记录层数据都在会话密钥保护之下。</p>
+<h2 id="六、客户端兼容性：改造的最大成本"><a href="#六、客户端兼容性：改造的最大成本" class="headerlink" title="六、客户端兼容性：改造的最大成本"></a>六、客户端兼容性：改造的最大成本</h2><p>算法和网关可以在几周内搭起来，客户端兼容往往要拖几个月。2020 年初的主流浏览器与操作系统默认不启用国密 TLS，Chrome、Firefox、Safari、Edge 的公开版本以国际套件为主，系统信任库也不含企业国密根。用户拿标准浏览器去连国密网关，多半在问候阶段就谈不拢。</p>
+<p>常见路径有四类。一是浏览器加中间件或插件，本机起本地代理，浏览器连本地，代理再用国密连网关；二是专用客户端，把协议栈、证书与 USB Key 驱动一起打包；三是移动端 SDK；四是在网关外侧做协议转换，用户侧仍用国际 TLS，进入受控区域后再转国密。第四类看似省事，但转换点本身需要重点防护，合规上要谨慎，通常只适合过渡。</p>
+<p>每一类都有分发和适配成本。中间件要区分操作系统版本、32 位与 64 位、浏览器位数；专用客户端要处理安装权限、自动升级、杀毒软件误报；USB Key 要装驱动，不同系统下的证书枚举行为不一致；移动端要处理证书固定、钥匙串、生物识别与 PIN 的交互。双证书环境下，客户端还可能把两张证书都列出来，用户选错就握手失败。</p>
+<p>测试矩阵要提前定，不能等上线前才凑。至少覆盖操作系统主流版本、浏览器几个大版本、专用客户端版本、有无管理员权限、NAT 与代理环境、USB Key 插拔与锁屏、iOS 与 Android 主流版本、弱网与网络切换。每项都记录能否完成握手、能否选对证书、能否访问目标应用，而不是只看“能连上”。双证书各自带中间证书，握手中传输的证书数量接近国际单证书方案的两倍，老旧客户端可能对消息长度或链深度有限制，精简中间证书能减少这类故障。</p>
+<h2 id="七、网关部署与双栈策略"><a href="#七、网关部署与双栈策略" class="headerlink" title="七、网关部署与双栈策略"></a>七、网关部署与双栈策略</h2><p>SSL VPN 网关应放在 DMZ：外网侧终结远程接入，内网侧以反向代理或受控路由访问应用。不要在核心区直接开公网入口，也不要把网关和目录服务、CA 放在同一网段。典型拓扑如下。</p>
+<pre class="mermaid">flowchart LR
+    U[远程用户] -->|互联网| FW1[边界防火墙]
+    FW1 --> GW[DMZ 国密 SSL VPN 网关]
+    GW -->|受控策略| FW2[内网防火墙]
+    FW2 --> APP[OA / ERP / 运维后台]
+    GW -.-> CA[内部 CA 与 CRL 服务]
+    GW -.-> HSM[密码机或 HSM]
+    ADMIN[管理终端] -->|管理区| GW</pre>
+
+<p>网关有两种常见模式。应用发布或反向代理模式下，用户访问网关上的虚拟目录，网关再向后端发起连接，应用无需改造，适合 Web 类系统；网络扩展模式下，客户端拿到虚拟网卡地址，按路由访问内网网段，适合 C&#x2F;S 架构与多种协议。前者控制粒度更细，后者更接近传统 VPN，选择取决于应用清单与客户端能力。</p>
+<p>与应用对接时，要明确三件事：身份从哪里来、权限在哪里判、日志在哪里留。身份可对接企业目录或统一认证，由网关做认证代理；权限尽量在网关侧按应用、按用户组收敛，后端再校验一次；日志记录认证、握手结果、访问目标与流量，时间同步到统一时钟。只做隧道不做授权，等于把内网大门换了一把更贵的锁。</p>
+<p>双栈是过渡期的核心。常见做法是同一台网关开两个监听端口，一个只允许国密套件，一个保留国际套件；或者两台网关分别承载，前置负载均衡按客户端能力分流。无论哪种，都要防止静默降级：客户端明明支持国密，却因配置或网络问题落到国际套件，管理员毫不知情。网关应记录每个会话实际协商的套件，定期统计国密占比，对“应国密而未国密”的连接告警。</p>
+<p>国际监听不能无限期保留。设明确的退出日期，列出仍依赖它的客户端与系统，逐项迁移；对无法迁移的老系统，用网络隔离、访问时间窗、额外认证补偿，而不是把国际套件当默认选项。双栈只是迁移期间的安全垫。</p>
+<p>高可用还要同步证书与密钥。主备节点必须持有相同的服务器证书与私钥，或共享同一台 HSM；私钥只在一台设备上，切换后备用节点就无法握手。负载均衡要开启会话保持，否则请求在多节点间跳转，会话状态与证书选择都会出问题。</p>
+<h2 id="八、双证书的运维"><a href="#八、双证书的运维" class="headerlink" title="八、双证书的运维"></a>八、双证书的运维</h2><p>证书运维的第一件事是建台账。记录主体、序列号、签发者、密钥用途、有效期、部署位置与责任人，签名证书与加密证书成对登记。没有台账，续期靠个人记忆，迟早出事。</p>
+<p>申请与签发时，私钥应在使用它的地方生成：服务器密钥在 HSM 内生成，只导出证书请求；客户端密钥在 USB Key 或系统密钥库内生成，不导出明文。CA 签发后把证书导回，分别安装并检查 keyUsage 与链。任何一步把私钥导出成文件，都会给合规检查留下麻烦。</p>
+<p>更新是最容易出错的环节。两张证书的有效期可能不同：签名证书偏短，加密证书偏长，或相反。不要等一张到期才想起另一张，续期应成对规划，至少留一个月重叠期，先更新哪张要按产品要求来。监控应在到期前 30 天、15 天、7 天分别告警，并覆盖客户端证书，而不只是网关证书。</p>
+<p>吊销要有预案。签名私钥泄露与加密私钥泄露的处置不同：前者要立即换证、吊销旧证、排查冒用；后者要评估历史会话暴露范围，必要时轮换会话密钥策略。CRL 的发布频率、分发点可达性、客户端缓存时间都要提前确认。紧急吊销后，如果客户端还在用缓存的旧 CRL，实际效果会打折扣。</p>
+<p>自动化续期能省人力，但要留刹车。内部 CA 若有接口，可用脚本完成申请、部署、重载，前提是双证书成对处理、变更可回滚、失败会告警。每次续期后做一次探测握手，确认新链被客户端接受；不要把自动化等同于无人值守。</p>
+<h2 id="九、性能：先定义测什么"><a href="#九、性能：先定义测什么" class="headerlink" title="九、性能：先定义测什么"></a>九、性能：先定义测什么</h2><p>国密开销分布在三处：握手期的 SM2 签名、验签与解密，记录层的 SM4 加解密，以及密钥派生与证书链验证。前两者可以靠硬件加速，后者更消耗 CPU 与内存。不要只问“SM2 比 RSA 快还是慢”，而要问在什么场景、什么并发、什么报文尺寸下慢。</p>
+<p>测试至少分四组：新建连接速率、会话恢复速率、单连接吞吐、混合业务时延。新建连接测每秒完成多少次完整握手，反映 SM2 与证书链成本；恢复连接测会话缓存是否有效；吞吐用大包与小包分别压，小包更能暴露每包开销；时延看 p50 与 p95，而不是平均值。每组固定客户端数量、并发数、链长度与套件，否则数据无法比较。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 先摸清单机算法能力，再上业务压测</span></span><br><span class="line">openssl speed -evp sm4-cbc</span><br><span class="line">openssl speed sm3</span><br><span class="line"><span class="comment"># SM2 签名与验签可用循环调用 pkeyutl 计时，固定消息与密钥</span></span><br></pre></td></tr></table></figure>
+
+<p>硬件密码卡或 HSM 能降低主机 CPU 占用，但会引入调用往返延迟。签名与解密都走 HSM 时，握手速率可能受设备队列限制，而不是 CPU。压测要把 HSM 的并发上限、队列长度、超时策略一起纳入。容量规划还要考虑早高峰握手突发与移动端频繁重连；长连接比例高的场景更看重内存与并发会话数。</p>
+<h2 id="十、安全边界"><a href="#十、安全边界" class="headerlink" title="十、安全边界"></a>十、安全边界</h2><p>私钥保护是第一条边界。服务器签名私钥应放在 HSM 或密码卡内，客户端私钥放在 USB Key 或系统安全存储中，原则是不导出、不落地明文。签名私钥不能托管，加密私钥的备份要分片、双人控制、留审计记录。私钥文件无论加了多少层压缩包，都不应出现在运维目录里。</p>
+<p>会话密钥是第二条边界。每次握手派生独立密钥，长连接要有密钥更新；SM4 的初始向量或计数器必须唯一，CBC 模式下要严格校验填充与 MAC，避免把解密错误暴露成可区分的响应。重放防护在协议层靠随机数与 Finished 校验，在应用层还要靠一次性令牌、时间戳与 nonce 缓存，二者不能互相替代。</p>
+<p>随机数质量是第三条边界。SM2 签名依赖高质量的随机数 k，随机源退化会直接暴露私钥。使用 <code>/dev/urandom</code> 或 HSM 随机源，虚拟机与嵌入式设备要关注启动初期的熵；升级后跑一遍已知测试向量，比事后追查“签名为什么重复”便宜得多。</p>
+<p>最后是验证开关。联调时为了省事关掉证书校验、放宽主机名检查、允许过期证书，这些开关一旦带上生产，前面所有设计都归零。改配置可以，关校验不行。</p>
+<h2 id="十一、密评视角"><a href="#十一、密评视角" class="headerlink" title="十一、密评视角"></a>十一、密评视角</h2><p>密评在 2020 年初仍处于落地初期，各地节奏不同，但检查方向已经清楚，可从四个层面理解。物理和环境层面，关注网关与密码设备的位置、出入控制、介质与电源。网络和通信层面，关注远程接入是否真正使用国密套件、是否双栈降级、分区是否合理。设备和计算层面，关注网关加固、密钥存储、日志完整性与时间同步。应用和数据层面，关注身份鉴别、访问控制、敏感数据保护与签名验签的闭环。</p>
+<p>对 SSL VPN 来说，最容易失分的是“有算法没体系”：套件是国密的，证书还是单证书；网关支持，客户端绕过了；日志只记登录成功，不记协商套件。密评不是一次性验收，而是规划、建设、运行同步考虑的过程，具体流程与评分方法留待专门文章展开。</p>
+<h2 id="十二、常见问题"><a href="#十二、常见问题" class="headerlink" title="十二、常见问题"></a>十二、常见问题</h2><p>只换算法不换证书体系是常见的半成品做法：网关改成 SM4 套件，仍用一张 RSA 证书或单张 SM2 证书，握手在密钥交换阶段失败。双证书链配错表现为“网关侧能过、客户端不能过”，多半是中间证书漏发或顺序错误。客户端不信任根 CA 时，浏览器报证书不受信，专用客户端可能只报连接失败，要先看信任库再看链。</p>
+<p>国际与国密双栈握手失败，常见原因是客户端问候同时带两类套件，网关选了客户端并不真正支持的组合，或负载均衡把请求分到未配置国密证书的节点。私钥导出导致合规风险，往往不是技术故障，而是流程问题：为备份方便把私钥拷出 HSM，之后说不清谁持有。性能未评估就全量上线，会在早高峰集中暴露：握手超时、HSM 队列满、用户反复重连。</p>
+<h2 id="十三、落地路线"><a href="#十三、落地路线" class="headerlink" title="十三、落地路线"></a>十三、落地路线</h2><p>建议分五步走。评估阶段盘点应用、客户端、证书、密码设备与现有加密方式，产出差距清单；试点阶段选一个应用、一组用户、一种客户端，验证握手、双证书、链、吊销与日志，明确成功标准与回滚方案；双栈阶段保留国际监听，把国密设为默认，统计实际协商比例；全量阶段按用户组迁移，补培训与支持；最后做密评整改，把问题分成配置、流程、设备三类逐项闭环。</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>关键动作</th>
+<th>退出条件</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>评估</td>
+<td>应用与客户端盘点、证书台账</td>
+<td>差距清单与优先级确认</td>
+</tr>
+<tr>
+<td>试点</td>
+<td>单应用、单客户端、双证书联调</td>
+<td>握手与业务访问稳定一周</td>
+</tr>
+<tr>
+<td>双栈</td>
+<td>国密默认、国际兜底、套件统计</td>
+<td>国密占比达标、无静默降级</td>
+</tr>
+<tr>
+<td>全量</td>
+<td>分批迁移、培训与支持</td>
+<td>存量客户端完成替换</td>
+</tr>
+<tr>
+<td>整改</td>
+<td>密评问题闭环、复测</td>
+<td>高风险项清零</td>
+</tr>
+</tbody></table>
+<p>每一步都要留回滚路径。证书换错、客户端升级出问题、HSM 切换失败，都必须能在不影响全部用户的前提下退回上一状态。国密改造是密码体系、客户端工程与运维流程的组合工程，算法只是起点。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>国密 SSL VPN 的难点不在把 SM2、SM3、SM4 调通，而在双证书分工、两条链的信任、客户端可达性与证书生命周期的可控。先把证书体系和客户端矩阵打通，再谈性能与全量；双栈是过渡手段，不是长期答案。把协商套件、证书链、吊销状态与密钥操作纳入日志和台账，密评与日常运维才有据可查。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://tools.ietf.org/html/rfc5246">RFC 5246: The Transport Layer Security Protocol Version 1.2</a></li>
+<li><a href="https://tools.ietf.org/html/rfc8446">RFC 8446: The Transport Layer Security Protocol Version 1.3</a></li>
+<li><a href="https://www.openssl.org/docs/">OpenSSL 官方文档</a></li>
+<li><a href="https://www.oscca.gov.cn/">国家密码管理局</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>国密 SSL VPN 与双证书方案</p><p><a href="https://987763485.github.io/2020/03/07/国密SSLVPN与双证书方案/">https://987763485.github.io/2020/03/07/国密SSLVPN与双证书方案/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2020-03-07</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a><a class="link-muted mr-2" rel="tag" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/">等级保护</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2020/03/09/Go%E5%AE%9E%E7%8E%B0%E9%85%8D%E7%BD%AE%E4%B8%AD%E5%BF%83%E5%AE%A2%E6%88%B7%E7%AB%AF/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Go 实现配置中心客户端</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2020/03/05/%E6%BC%8F%E6%B4%9E%E6%89%AB%E6%8F%8F%E4%B8%8ENessus%E5%AE%9E%E8%B7%B5/"><span class="level-item">漏洞扫描与 Nessus 实践</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

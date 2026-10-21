@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>后量子密码算法进展 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="量子计算对公钥密码的威胁不是纯理论问题，但也不该被简化成“某一年突然全部失效”的叙事。本文面向需要做安全规划与合规评估的工程师，梳理截至 2023 年 12 月后量子密码标准化推进到了哪一步、几条技术路线的取舍、尺寸变化带来的工程影响，以及过渡期如何用混合模式与密码敏捷性控制迁移风险。"><meta property="og:type" content="blog"><meta property="og:title" content="后量子密码算法进展"><meta property="og:url" content="https://987763485.github.io/2023/12/07/%E5%90%8E%E9%87%8F%E5%AD%90%E5%AF%86%E7%A0%81%E7%AE%97%E6%B3%95%E8%BF%9B%E5%B1%95/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="量子计算对公钥密码的威胁不是纯理论问题，但也不该被简化成“某一年突然全部失效”的叙事。本文面向需要做安全规划与合规评估的工程师，梳理截至 2023 年 12 月后量子密码标准化推进到了哪一步、几条技术路线的取舍、尺寸变化带来的工程影响，以及过渡期如何用混合模式与密码敏捷性控制迁移风险。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2023-12-06T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-19T05:52:43.307Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="网络安全"><meta property="article:tag" content="等级保护"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2023/12/07/%E5%90%8E%E9%87%8F%E5%AD%90%E5%AF%86%E7%A0%81%E7%AE%97%E6%B3%95%E8%BF%9B%E5%B1%95/"},"headline":"后量子密码算法进展","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2023-12-06T16:00:00.000Z","dateModified":"2026-10-19T05:52:43.307Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"量子计算对公钥密码的威胁不是纯理论问题，但也不该被简化成“某一年突然全部失效”的叙事。本文面向需要做安全规划与合规评估的工程师，梳理截至 2023 年 12 月后量子密码标准化推进到了哪一步、几条技术路线的取舍、尺寸变化带来的工程影响，以及过渡期如何用混合模式与密码敏捷性控制迁移风险。"}</script><link rel="canonical" href="https://987763485.github.io/2023/12/07/%E5%90%8E%E9%87%8F%E5%AD%90%E5%AF%86%E7%A0%81%E7%AE%97%E6%B3%95%E8%BF%9B%E5%B1%95/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2023-12-06T16:00:00.000Z" title="12/7/2023, 12:00:00 AM">2023-12-07</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a></span><span class="level-item">28 分钟读完 (大约4126个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">后量子密码算法进展</h1><div class="content"><p>量子计算对公钥密码的威胁不是纯理论问题，但也不该被简化成“某一年突然全部失效”的叙事。本文面向需要做安全规划与合规评估的工程师，梳理截至 2023 年 12 月后量子密码标准化推进到了哪一步、几条技术路线的取舍、尺寸变化带来的工程影响，以及过渡期如何用混合模式与密码敏捷性控制迁移风险。</p>
+<h2 id="量子计算带来的实际改变"><a href="#量子计算带来的实际改变" class="headerlink" title="量子计算带来的实际改变"></a>量子计算带来的实际改变</h2><p>Shor 与 Grover 这两个常被一起提到的算法，对密码学的冲击方式完全不同，混淆它们会直接把规划方向带偏。</p>
+<h3 id="Shor-算法攻击的是数学难题本身"><a href="#Shor-算法攻击的是数学难题本身" class="headerlink" title="Shor 算法攻击的是数学难题本身"></a>Shor 算法攻击的是数学难题本身</h3><p>RSA 依赖大整数分解难题，ECDH 与 ECDSA 依赖椭圆曲线离散对数难题。两者在经典计算机上都没有已知的多项式时间解法，因此可以靠“把参数放大”换取余量。Shor 算法把这两类问题改写成可在量子计算机上高效求解的形式：核心是把求周期转化为相位估计与傅里叶变换，用叠加和干涉把答案放大出来，整体是多项式时间的。</p>
+<p>这意味着“加大参数”失效：把 RSA 模数从 2048 位推到 4096 位，只把求解时间乘上一个小常数；把曲线从 256 位换到 384 位也挡不住同样的攻击形式。防御只能换问题，用目前没有量子多项式解法的问题构造公钥密码。</p>
+<h3 id="Grover-算法只是把难度开了一次平方"><a href="#Grover-算法只是把难度开了一次平方" class="headerlink" title="Grover 算法只是把难度开了一次平方"></a>Grover 算法只是把难度开了一次平方</h3><p>Grover 是通用搜索加速：在 N 个候选里找出满足条件的那个，经典约需 N 次尝试，它约需平方根次。对称密钥穷举与哈希原像抵抗按开平方衰减，这是强度衰减而非结构崩塌，加长密钥或加大输出长度即可补回。因此标准化重心不是替换对称密码与哈希，而是替换公钥算法中的两类功能：密钥封装或密钥交换，以及数字签名。</p>
+<h3 id="两个常见误区"><a href="#两个常见误区" class="headerlink" title="两个常见误区"></a>两个常见误区</h3><p>一是把“量子计算机能破解 RSA”写成某个确定年份的事件：物理开销、门保真度与纠错策略都是变量，公开研究估计差别很大，给不出可信时间点。二是由此得出“那就再等等”：对承载长期机密性与长期真实性的数据，风险不取决于机器何时出现，而取决于今天流出的密文未来还能被解读多久。</p>
+<h2 id="截至-2023-年-12-月，标准化走到了哪一步"><a href="#截至-2023-年-12-月，标准化走到了哪一步" class="headerlink" title="截至 2023 年 12 月，标准化走到了哪一步"></a>截至 2023 年 12 月，标准化走到了哪一步</h2><p>后量子算法已不是论文里的概念，但此刻还不是可强制执行的正式标准。把状态说准，是一切规划的前提。</p>
+<h3 id="已经发生的事实"><a href="#已经发生的事实" class="headerlink" title="已经发生的事实"></a>已经发生的事实</h3><p>NIST 自 2016 年起公开征集后量子密码算法，在 2022 年 7 月公布了第四轮结果，选定首批进入标准化阶段的算法：基于格的 KYBER 用于密钥封装，基于格的 DILITHIUM 用于数字签名，并把基于哈希的 SPHINCS 类签名方案作为备选，用于在格假设万一出问题时提供安全依据不同的后备；编码类与多变量类等方案仍在后续轮次评估中。2023 年 8 月，相关的联邦信息处理标准即 FIPS 草案文本发布并公开征求意见，内容主要是接口定义、参数集与实现注意事项。</p>
+<h3 id="尚未发生的事实"><a href="#尚未发生的事实" class="headerlink" title="尚未发生的事实"></a>尚未发生的事实</h3><p>到本文写作时点，即 2023 年 12 月 7 日，这些 FIPS 仍是草案：正式标准文件尚未定稿发布，配套细则、实现安全建议与验证机制也还在推进。后果有三：算法名称与参数集的写法可能在定稿时调整；草案公开意见仍可能引起文本改动；任何声称“符合已发布的后量子标准”的采购表述都站不住脚。因此本文统一采用一个口径：草案、标准化进行中、过渡期，既不能推迟到定稿后再开始，也不能当成已强制实施的要求去执行。</p>
+<h3 id="一个可复用的状态判断方法"><a href="#一个可复用的状态判断方法" class="headerlink" title="一个可复用的状态判断方法"></a>一个可复用的状态判断方法</h3><p>把标准化进程画成一条状态链，每件事挂到链上，就能避免把不同成熟度的东西混在一起讨论。</p>
+<pre class="mermaid">flowchart TD
+    A[算法公开征集与多轮分析] --> B[第四轮结果选定]
+    B --> C[标准草案发布征求意见]
+    C --> D[草案修订与定稿]
+    D --> E[正式标准发布]
+    E --> F[配套实现与验证指南]
+    C --> G[实验性部署与研究实现]
+    G --> H[协议层草案与互操作测试]
+    H --> F</pre>
+
+<p>处于草案阶段意味着可以做评估与受控实验，但不具备作为合规结论依据的条件。审阅厂商资料时，先确认它引用的是链条上的哪一环。</p>
+<h2 id="四条技术路线与各自的取舍"><a href="#四条技术路线与各自的取舍" class="headerlink" title="四条技术路线与各自的取舍"></a>四条技术路线与各自的取舍</h2><p>进入标准化视野的后量子公钥算法大致分四类，差异不在“谁更强”，而在各自把代价放在了哪里。</p>
+<table>
+<thead>
+<tr>
+<th>路线</th>
+<th>安全依据</th>
+<th>主要用途</th>
+<th>突出优点</th>
+<th>主要代价</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>格</td>
+<td>带错误格问题的难度</td>
+<td>密钥封装与签名</td>
+<td>尺寸与速度均衡</td>
+<td>假设较新，对时序与侧信道敏感</td>
+</tr>
+<tr>
+<td>哈希</td>
+<td>仅依赖哈希函数性质</td>
+<td>签名</td>
+<td>假设最保守，结构易审计</td>
+<td>签名或密钥尺寸偏大</td>
+</tr>
+<tr>
+<td>编码</td>
+<td>译码类难题</td>
+<td>密钥封装</td>
+<td>部分方案密文较小</td>
+<td>公钥尺寸明显偏大</td>
+</tr>
+<tr>
+<td>多变量</td>
+<td>求解多元多项式方程组</td>
+<td>签名</td>
+<td>签名短、验证快</td>
+<td>公钥巨大，多个候选被攻破</td>
+</tr>
+</tbody></table>
+<p>第四轮结果的落点很清楚：密钥封装与签名主线都选了格路线，哈希路线作备选。格路线在公钥、密文、签名三项尺寸上没有极端短板，运算以线性代数为主，便于统一实现；哈希路线的价值不在性能，而在假设少、易审计，适合充当“万一格假设出问题”时的另一条腿。编码与多变量两类的定位是研究储备，各有一个突出优势，也各有一个足以限制部署的硬代价。对使用者的含义是不要指望全能答案：同一批算法内部通常提供若干参数集，在尺寸与安全余量之间折中，选型要按场景挑。</p>
+<h2 id="尺寸变大之后，工程上会碰到什么"><a href="#尺寸变大之后，工程上会碰到什么" class="headerlink" title="尺寸变大之后，工程上会碰到什么"></a>尺寸变大之后，工程上会碰到什么</h2><p>这里谈的是性能与容量，不是密码强度。多数迁移事故并不来自算法被攻破，而来自“包变大了”在既有链路上引发的连锁反应。尺寸量级差异客观存在，但折算成具体系统的延迟或吞吐必须自己测，本文不给现成数字。</p>
+<h3 id="证书链与握手往返"><a href="#证书链与握手往返" class="headerlink" title="证书链与握手往返"></a>证书链与握手往返</h3><p>公钥、密文与签名对象的尺寸，从经典算法的几十到几百字节量级，上升到后量子方案的数百到数千字节量级。证书携带公钥与签名，单张变大后整条链按层级倍数放大，握手消息于是跨过单个传输记录的边界，被拆成更多分片。</p>
+<p>分片带来三类问题。其一是首包预算：传输层初始拥塞窗口能承载的字节数有限，握手数据超出后服务端要多等一个往返才能收齐证书，首屏被拉长。其二是链路设备：部分中间盒与老旧代理对分片、超长扩展的处理并不健壮，表现为连接随机失败而非明确报错。其三是数据报场景：DTLS 在丢包环境下要重传整个分片消息，代价远高于 TCP。</p>
+<p>迁移前先摸清现状。下面的脚本只量一个数：某个地址实际下发的证书链字节数。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#!/usr/bin/env bash</span></span><br><span class="line"><span class="comment"># 统计远端 TLS 服务下发的证书链总字节数，作为迁移前的尺寸基线</span></span><br><span class="line">host=<span class="string">&quot;<span class="variable">$&#123;1:-example.com&#125;</span>&quot;</span></span><br><span class="line">port=<span class="string">&quot;<span class="variable">$&#123;2:-443&#125;</span>&quot;</span></span><br><span class="line"></span><br><span class="line">openssl s_client -connect <span class="string">&quot;<span class="variable">$&#123;host&#125;</span>:<span class="variable">$&#123;port&#125;</span>&quot;</span> -showcerts &lt;/dev/null 2&gt;/dev/null \</span><br><span class="line">  | awk <span class="string">&#x27;/BEGIN CERTIFICATE/,/END CERTIFICATE/&#x27;</span> \</span><br><span class="line">  | openssl <span class="built_in">base64</span> -d -A 2&gt;/dev/null \</span><br><span class="line">  | <span class="built_in">wc</span> -c | <span class="built_in">tr</span> -d <span class="string">&#x27; &#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p>升级前后各跑一次，与握手耗时、失败率一起记录，就是回归基线。</p>
+<h3 id="嵌入式与高并发这两端的压力点"><a href="#嵌入式与高并发这两端的压力点" class="headerlink" title="嵌入式与高并发这两端的压力点"></a>嵌入式与高并发这两端的压力点</h3><p>资源紧张的设备上，矛盾从网络转向内存。公钥、私钥与运算工作区都要占用随机存取存储器，而微控制器可用的连续堆空间常以千字节计，一次分配失败就表现为握手错误或看门狗复位；算法库的代码体积增量还会挤压应用功能。</p>
+<p>服务端压力集中在握手吞吐：每条新连接都要完成密钥封装解封装与签名验证，连接数上去后直接压低每秒新建连接数。可提前规划的手段有三个：提高会话复用率，让重连不重复完整握手；把签名操作放到合适的计算资源上；控制最大记录尺寸与重协商策略，避免大尺寸握手消息被放大成资源消耗型攻击面。</p>
+<p>还有一类坑属于实现层面：基于格的方案大量使用模运算与采样，分支与访存模式容易被时间差泄露，而固件一旦量产就无法回头。</p>
+<pre class="mermaid">flowchart TD
+    A[算法尺寸量级上升] --> B[证书链与握手消息变长]
+    A --> C[内存与代码占用增加]
+    A --> D[握手计算开销增加]
+    B --> E[分片与首屏往返上升]
+    B --> F[中间盒与代理兼容风险]
+    C --> G[受限设备分配失败]
+    D --> H[每秒新建连接数下降]
+    E --> I[需要按场景做回归测量]
+    F --> I
+    G --> I
+    H --> I</pre>
+
+<h2 id="混合模式：过渡期最务实的用法"><a href="#混合模式：过渡期最务实的用法" class="headerlink" title="混合模式：过渡期最务实的用法"></a>混合模式：过渡期最务实的用法</h2><p>混合模式指同一次密钥协商里同时使用经典方法与后量子方法，把两边的共享密钥合并后再派生会话密钥。它的价值不在性能而在风险对冲：只要两条路径有一条未被攻破，派生结果就仍然可靠。在标准仍是草案的现在，这是合适的姿态。</p>
+<pre class="mermaid">sequenceDiagram
+    participant C as 客户端
+    participant S as 服务端
+    C->>S: 经典密钥 share 与后量子密钥封装公钥
+    S->>C: 经典密钥 share 与后量子密文
+    C->>C: 两个共享密钥合并派生会话密钥
+    S->>S: 两个共享密钥合并派生会话密钥
+    Note over C,S: 任一条路径被攻破时另一条仍提供保护</pre>
+
+<p>三点要说清。第一，混合不是免迁移通行证，它把尺寸代价乘二，上一节的分片与吞吐问题更突出。第二，混合通常只覆盖密钥协商，签名场景要单独规划。第三，合并顺序、标识写法与回退策略都会随协议草案演进，应做成可配置项而不是硬编码分支。</p>
+<h2 id="密码敏捷性与算法迁移"><a href="#密码敏捷性与算法迁移" class="headerlink" title="密码敏捷性与算法迁移"></a>密码敏捷性与算法迁移</h2><p>迁移的起点不是换算法，而是确认自己用了什么。盘点清单至少覆盖五类对象：证书与密钥对及其算法标识、传输加密终端、代码与固件签名链、文档签名与时间戳、需要长期解密的历史密文格式，每项都要能回答算法是什么、有效期到什么时候、由谁负责。</p>
+<p>下面是台账字段设计，字段名可按团队习惯调整，但状态列不可省略，它就是把“草案”与“定稿”区分开的地方。</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 密码资产台账字段示意，非任何官方模板</span></span><br><span class="line"><span class="bullet">-</span> <span class="attr">asset:</span> <span class="string">对外网关TLS</span></span><br><span class="line">  <span class="attr">crypto_function:</span> <span class="string">密钥协商</span></span><br><span class="line">  <span class="attr">current_algorithm:</span> <span class="string">经典椭圆曲线</span></span><br><span class="line">  <span class="attr">candidate_algorithm:</span> <span class="string">后量子密钥封装待定稿参数集</span></span><br><span class="line">  <span class="attr">standard_status:</span> <span class="string">草案</span>        <span class="comment"># 草案 / 实验 / 定稿</span></span><br><span class="line">  <span class="attr">data_lifecycle:</span> <span class="string">会话级</span></span><br><span class="line">  <span class="attr">exposure:</span> <span class="string">公网</span></span><br><span class="line">  <span class="attr">hybrid_enabled:</span> <span class="literal">true</span></span><br><span class="line">  <span class="attr">owner:</span> <span class="string">平台安全组</span></span><br><span class="line">  <span class="attr">action:</span> <span class="string">建立尺寸与失败率基线</span></span><br></pre></td></tr></table></figure>
+
+<p>依赖梳理要看穿一层。应用代码往往只体现“使用了 TLS 库”，真正决定算法的是库版本、网关、密钥管理服务、签发流程与硬件加速卡，其中不支持新算法的专用硬件是典型的长周期瓶颈。</p>
+<p>TLS 与签名两类场景风险差别很大。前者保护当次会话，配置可灰度下发、快速回滚，属于可热替换项；后者保护的是“未来还能不能被验证”，根证书、代码签名证书与时间戳的有效期以十年计，算法一旦被攻破，历史签名无法靠补发新证书挽救。这正是“现在截取、以后解密”风险的落点：长期归档数据、涉及个人隐私与商业秘密的密文、需要长期真实性的电子凭证应优先纳入评估，而不是按系统重要性排序。优先级用暴露面、数据生命周期、替换成本三个维度打分即可。</p>
+<h2 id="怎么跟踪标准化与厂商进展"><a href="#怎么跟踪标准化与厂商进展" class="headerlink" title="怎么跟踪标准化与厂商进展"></a>怎么跟踪标准化与厂商进展</h2><p>跟踪的对象应当是机构与公开工作，而不是结论。值得关注的包括 NIST 的后量子密码标准化工作与草案公示、ISO&#x2F;IEC 第一联合技术委员会第二十七分技术委员会的密码学项目、IETF 中关于在 TLS 使用后量子密钥交换的协议草案、ETSI 关于量子计算密码迁移的研究报告，以及国内密码行业标准化相关技术委员会的工作。Google、Cloudflare 等曾在公网做过实验性部署，可用于观察工程影响，但当时都不构成生产可用的依据。</p>
+<p>方法上，把来源按状态分级并持续复核，比追信息量更关键。</p>
+<table>
+<thead>
+<tr>
+<th>状态</th>
+<th>能做什么</th>
+<th>不能做什么</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>研究实现</td>
+<td>内部实验与测量</td>
+<td>对外承诺合规</td>
+</tr>
+<tr>
+<td>标准草案</td>
+<td>迁移评估与选型</td>
+<td>作为合规结论依据</td>
+</tr>
+<tr>
+<td>协议草案</td>
+<td>灰度实验</td>
+<td>假定接口稳定</td>
+</tr>
+<tr>
+<td>正式标准</td>
+<td>分批替换与验收</td>
+<td>忽略配套验证机制</td>
+</tr>
+</tbody></table>
+<p>采购文件出现“支持后量子”这类表述时，要求对方给出上表中的具体环节与文档类型，不接受只写算法名而不写状态的材料。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>截至 2023 年 12 月，后量子密码的真实状态是算法已经选定、标准仍是草案、正式文本尚待定稿，任何方案都应写在“过渡期”语境里，而不是“已实施”语境里。需要替换的是密钥封装与签名两类公钥功能，对称密码与哈希靠加长参数即可。证书链膨胀、握手分片、内存压力与新建连接吞吐下降才是主要风险，必须按场景自测。现在该做的是盘点台账、梳理依赖、把算法标识从代码里抽出来，并用混合模式做风险对冲。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>后量子密码算法进展</p><p><a href="https://987763485.github.io/2023/12/07/后量子密码算法进展/">https://987763485.github.io/2023/12/07/后量子密码算法进展/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2023-12-07</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-19</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a><a class="link-muted mr-2" rel="tag" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/">等级保护</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2023/12/09/%E5%A8%81%E8%83%81%E6%83%85%E6%8A%A5%E4%B8%8EIOC%E5%88%86%E6%9E%90/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">威胁情报与 IOC 分析</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2023/11/30/SpringBoot%E8%87%AA%E5%8A%A8%E9%85%8D%E7%BD%AE%E5%8E%9F%E7%90%86/"><span class="level-item">Spring Boot 自动配置原理</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

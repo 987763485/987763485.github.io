@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>数据库慢查询治理流程 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="慢查询治理最常见的失败，不是某条 SQL 没优化好，而是没有人对它负责：告警响了临时救火，风波过去一切照旧。本文以 MySQL 5.7 和 8.0 为例，把慢查询当作一项需要长期运营的工程来讨论，从指标基线、发现管线、分诊归因，一直讲到发布门禁、索引治理、故障闭环与九十天落地计划。文中不展开单条 SQL 的排查细节与执行计划逐列解读，这些内容留给同系列的其他篇目，这里只回答一个问题：一个团队如何把"><meta property="og:type" content="blog"><meta property="og:title" content="数据库慢查询治理流程"><meta property="og:url" content="https://987763485.github.io/2020/10/07/%E6%95%B0%E6%8D%AE%E5%BA%93%E6%85%A2%E6%9F%A5%E8%AF%A2%E6%B2%BB%E7%90%86%E6%B5%81%E7%A8%8B/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="慢查询治理最常见的失败，不是某条 SQL 没优化好，而是没有人对它负责：告警响了临时救火，风波过去一切照旧。本文以 MySQL 5.7 和 8.0 为例，把慢查询当作一项需要长期运营的工程来讨论，从指标基线、发现管线、分诊归因，一直讲到发布门禁、索引治理、故障闭环与九十天落地计划。文中不展开单条 SQL 的排查细节与执行计划逐列解读，这些内容留给同系列的其他篇目，这里只回答一个问题：一个团队如何把"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2020-10-07T03:56:19.000Z"><meta property="article:modified_time" content="2026-10-18T15:10:30.055Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="后端开发"><meta property="article:tag" content="数据库"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2020/10/07/%E6%95%B0%E6%8D%AE%E5%BA%93%E6%85%A2%E6%9F%A5%E8%AF%A2%E6%B2%BB%E7%90%86%E6%B5%81%E7%A8%8B/"},"headline":"数据库慢查询治理流程","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2020-10-07T03:56:19.000Z","dateModified":"2026-10-18T15:10:30.055Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"慢查询治理最常见的失败，不是某条 SQL 没优化好，而是没有人对它负责：告警响了临时救火，风波过去一切照旧。本文以 MySQL 5.7 和 8.0 为例，把慢查询当作一项需要长期运营的工程来讨论，从指标基线、发现管线、分诊归因，一直讲到发布门禁、索引治理、故障闭环与九十天落地计划。文中不展开单条 SQL 的排查细节与执行计划逐列解读，这些内容留给同系列的其他篇目，这里只回答一个问题：一个团队如何把"}</script><link rel="canonical" href="https://987763485.github.io/2020/10/07/%E6%95%B0%E6%8D%AE%E5%BA%93%E6%85%A2%E6%9F%A5%E8%AF%A2%E6%B2%BB%E7%90%86%E6%B5%81%E7%A8%8B/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2020-10-07T03:56:19.000Z" title="10/7/2020, 11:56:19 AM">2020-10-07</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></span><span class="level-item">1 小时读完 (大约7594个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">数据库慢查询治理流程</h1><div class="content"><p>慢查询治理最常见的失败，不是某条 SQL 没优化好，而是没有人对它负责：告警响了临时救火，风波过去一切照旧。本文以 MySQL 5.7 和 8.0 为例，把慢查询当作一项需要长期运营的工程来讨论，从指标基线、发现管线、分诊归因，一直讲到发布门禁、索引治理、故障闭环与九十天落地计划。文中不展开单条 SQL 的排查细节与执行计划逐列解读，这些内容留给同系列的其他篇目，这里只回答一个问题：一个团队如何把慢查询管住，并让它持续变好。</p>
+<h2 id="慢查询是治理缺位的症状"><a href="#慢查询是治理缺位的症状" class="headerlink" title="慢查询是治理缺位的症状"></a>慢查询是治理缺位的症状</h2><p>先看一个很多团队都经历过的场景。凌晨两点，核心接口 P99 从 200 ms 涨到 3 s，数据库 CPU 打满，连接数逼近上限，值班同学从慢日志里揪出一条没有走索引的查询，紧急加索引、重启应用，故障恢复。两周后，另一条 SQL 以几乎相同的方式再次把系统拖垮。每一次都被当作独立事故处理，每一次都“解决”了，但问题总量并没有下降。这说明我们修的是症状，不是病因。</p>
+<p>单条 SQL 慢，通常能在几分钟内定位；一批 SQL 反复慢，背后往往是组织问题：这条 SQL 属于哪个服务、谁负责、上线前有没有人看过、变慢之后有没有人跟踪，这些问题的答案都是“不清楚”。没有归属，就没有人对访问路径负责；没有门禁，新问题就会源源不断进入生产；没有基线，讨论“慢不慢”只能靠感觉；没有复盘，同一个坑会被不同的人踩很多次。</p>
+<p>慢查询的外在表现并不只有“查询变慢”一种。本文把它们归为五类信号：延迟 SLO 被击穿，用户可感知；CPU 或磁盘 IO 持续饱和，挤占其他查询；锁等待升高，事务互相拖拽；连接堆积，应用侧线程池被耗尽；以及最容易被忽视的故障疲劳，值班同学对告警逐渐麻木，真正的事故反而被漏掉。这五类信号指向同一个事实：数据库是共享资源，任何一条失控的查询都会外溢成团队问题。</p>
+<p>因此，本文所说的“治理”，不是一次优化运动，而是一套把发现、归因、修复、防回归变成日常动作的机制。它至少包含四样东西：可度量的指标基线，固定的发现与分诊流程，发布前的审核门禁，以及明确到人和服务的责任划分。工具只是载体，流程和角色才是骨架。判断治理是否有效，不看这个季度优化了多少条 SQL，而看三件事：新的慢 SQL 是否更难进入生产，存量问题是否有人认领并有期限，整体指标是否在持续下降。</p>
+<h2 id="指标基线：平均值会掩盖长尾"><a href="#指标基线：平均值会掩盖长尾" class="headerlink" title="指标基线：平均值会掩盖长尾"></a>指标基线：平均值会掩盖长尾</h2><p>治理的第一步不是优化，而是把“慢”变成可比较的数字。没有基线，团队会在两件事上反复消耗：一是争论某条 SQL 到底算不算慢，二是无法证明治理是否有效。基线不需要复杂，一页纸足够，但要覆盖四个层面：业务体验、SQL 行为、资源水位和变更影响。</p>
+<table>
+<thead>
+<tr>
+<th>层面</th>
+<th>指标</th>
+<th>口径</th>
+<th>采集来源</th>
+<th>示例目标（假设）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>业务</td>
+<td>接口 P99</td>
+<td>按路由统计，排除健康检查</td>
+<td>APM 与网关日志</td>
+<td>核心读接口低于 200 ms</td>
+</tr>
+<tr>
+<td>吞吐</td>
+<td>QPS 与慢查询占比</td>
+<td>实例与接口分别统计</td>
+<td>监控与慢日志</td>
+<td>慢查询占比低于 0.1%</td>
+</tr>
+<tr>
+<td>SQL</td>
+<td>单 digest 次数与总耗时</td>
+<td>执行次数乘以平均耗时</td>
+<td>慢日志或 performance_schema</td>
+<td>Top 20 周环比下降</td>
+</tr>
+<tr>
+<td>SQL</td>
+<td>扫描行数比</td>
+<td>扫描行数除以返回行数</td>
+<td>digest 汇总表</td>
+<td>热路径低于 100</td>
+</tr>
+<tr>
+<td>资源</td>
+<td>CPU 与磁盘 IO</td>
+<td>实例峰值与平均利用率</td>
+<td>Prometheus 与 node_exporter</td>
+<td>峰值低于 70%</td>
+</tr>
+<tr>
+<td>资源</td>
+<td>锁等待</td>
+<td>平均与 P99</td>
+<td>performance_schema</td>
+<td>P99 低于 10 ms</td>
+</tr>
+<tr>
+<td>资源</td>
+<td>缓冲池命中率</td>
+<td>逻辑读命中比例</td>
+<td>实例状态与监控</td>
+<td>OLTP 高于 99%</td>
+</tr>
+<tr>
+<td>连接</td>
+<td>活跃连接与池等待</td>
+<td>定时采样</td>
+<td>实例与应用指标</td>
+<td>池等待接近于零</td>
+</tr>
+<tr>
+<td>变更</td>
+<td>发布后 30 分钟 P99</td>
+<td>以发布标记为界对比</td>
+<td>APM</td>
+<td>无显著抬升</td>
+</tr>
+</tbody></table>
+<p>关于平均值，有一个简单的算术例子。假设某接口在一分钟内处理 1000 次请求，其中 980 次耗时 5 ms，20 次因为锁等待耗时 2 s。平均耗时约为 45 ms，看起来仍然健康；但 P99 是 2 s，最慢的 2% 用户经历了完整的两秒卡顿。请求量越大，长尾越容易被平均掉，而线上事故恰恰由长尾触发。这就是本文坚持用 P95、P99 而不是平均值作为主指标的原因。</p>
+<p>百分位本身也有陷阱。第一，不能对多个实例的 P99 再求平均，正确的做法是合并直方图或原始分桶后重新计算；第二，样本量太小时百分位没有意义，一分钟只有几十次调用的接口，应看更长窗口；第三，P99 只描述尾部的位置，不描述尾部有多长，必要时补充 P999 或“超过 1 s 的请求数”。使用 Prometheus 的 histogram 指标时，桶边界要覆盖业务关心的阈值，否则 <code>histogram_quantile</code> 只能在粗粒度的桶之间插值。</p>
+<p>除了延迟，还有几个更能提前预警的指标。扫描行数与返回行数的比值，能在查询还没慢到触发阈值时就暴露访问路径问题；锁等待时间上升，往往先于业务超时出现；缓冲池命中率下降，说明热数据已经放不进内存；活跃连接数持续贴近上限，意味着应用侧很快就会出现获取连接超时。把这些指标和发布记录放在同一张图上，还能快速判断某次变慢是否由变更引起。</p>
+<p>指标目标必须结合业务设定，不能照搬。本文在表格中给出的数值只是示例假设，用于说明量级：核心读接口 P99 控制在 200 ms 以内，热路径单次扫描行数不超过 100 行，锁等待 P99 低于 10 ms，实例 CPU 峰值不超过 70%。这些目标应该在治理启动时由后端、DBA 和业务方共同确认，并每个季度复核一次。目标一旦确定，就写进监控和评审清单，而不是停留在文档里。</p>
+<h2 id="发现管线：慢日志、性能表与采样"><a href="#发现管线：慢日志、性能表与采样" class="headerlink" title="发现管线：慢日志、性能表与采样"></a>发现管线：慢日志、性能表与采样</h2><p>发现管线的目标不是抓到每一条慢查询，而是以可接受的成本稳定回答三个问题：哪些 SQL 指纹在变慢、变慢发生在什么时间、它与哪次变更或哪类业务有关。单一数据源都有盲区，实践中通常把慢日志、<code>performance_schema</code>、连接列表采样和 APM 链路组合起来使用，再以指纹作为关联键。</p>
+<p>慢日志是最稳定的历史记录，按执行时间阈值落盘，适合做日、周维度的趋势分析。它的配置需要权衡：阈值太低会把大量正常查询写进磁盘，阈值太高又会漏掉“单次不慢但调用极频繁”的查询。本文建议在线库从 0.2 s 起步，报表库单独设为 1 s，并根据写入量调整。</p>
+<figure class="highlight ini"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">[mysqld]</span></span><br><span class="line"><span class="attr">slow_query_log</span> = <span class="literal">ON</span></span><br><span class="line"><span class="attr">slow_query_log_file</span> = /var/log/mysql/slow.log</span><br><span class="line"><span class="attr">long_query_time</span> = <span class="number">0.2</span></span><br><span class="line"><span class="attr">log_queries_not_using_indexes</span> = <span class="literal">OFF</span></span><br><span class="line"><span class="attr">min_examined_row_limit</span> = <span class="number">1000</span></span><br><span class="line"><span class="attr">log_slow_admin_statements</span> = <span class="literal">ON</span></span><br></pre></td></tr></table></figure>
+
+<p><code>log_queries_not_using_indexes</code> 默认关闭是有意的：小表全扫也会被记录，噪音会淹没真正的问题；<code>min_examined_row_limit</code> 则过滤掉那些扫描行数很少的语句。两害相权，宁可漏掉一些轻微问题，也要保证慢日志本身可读。</p>
+<p><code>performance_schema</code> 的语句汇总表按指纹聚合，常驻内存，开销可控，适合实时排序。MySQL 5.7 与 8.0 都提供 <code>events_statements_summary_by_digest</code>，它的统计自实例启动或上次清空时开始，重启后归零，因此不能替代慢日志做长期趋势。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> SCHEMA_NAME <span class="keyword">AS</span> db,</span><br><span class="line">       <span class="keyword">LEFT</span>(DIGEST_TEXT, <span class="number">60</span>) <span class="keyword">AS</span> sample,</span><br><span class="line">       COUNT_STAR <span class="keyword">AS</span> exec_count,</span><br><span class="line">       ROUND(SUM_TIMER_WAIT <span class="operator">/</span> <span class="number">1e12</span>, <span class="number">1</span>) <span class="keyword">AS</span> total_sec,</span><br><span class="line">       ROUND(AVG_TIMER_WAIT <span class="operator">/</span> <span class="number">1e9</span>, <span class="number">1</span>) <span class="keyword">AS</span> avg_ms,</span><br><span class="line">       SUM_ROWS_EXAMINED <span class="keyword">AS</span> rows_examined</span><br><span class="line"><span class="keyword">FROM</span> performance_schema.events_statements_summary_by_digest</span><br><span class="line"><span class="keyword">WHERE</span> SCHEMA_NAME <span class="keyword">NOT</span> <span class="keyword">IN</span> (<span class="string">&#x27;mysql&#x27;</span>, <span class="string">&#x27;performance_schema&#x27;</span>, <span class="string">&#x27;sys&#x27;</span>)</span><br><span class="line"><span class="keyword">ORDER</span> <span class="keyword">BY</span> SUM_TIMER_WAIT <span class="keyword">DESC</span></span><br><span class="line">LIMIT <span class="number">20</span>;</span><br></pre></td></tr></table></figure>
+
+<p>慢日志的可读性差，需要聚合工具。Percona Toolkit 3.x 的 <code>pt-query-digest</code> 会把字面量归一化成指纹，输出执行次数、总耗时、平均耗时、扫描行数和样本语句，正好对应分诊需要的字段。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">pt-query-digest \</span><br><span class="line">  --since <span class="string">&#x27;2020-10-01 00:00:00&#x27;</span> \</span><br><span class="line">  --<span class="keyword">until</span> <span class="string">&#x27;2020-10-02 00:00:00&#x27;</span> \</span><br><span class="line">  --order-by <span class="string">&#x27;Query_time:sum&#x27;</span> \</span><br><span class="line">  --<span class="built_in">limit</span> 20 \</span><br><span class="line">  /var/log/mysql/slow.log &gt; /tmp/digest-20201001.txt</span><br></pre></td></tr></table></figure>
+
+<p>连接列表（<code>SHOW PROCESSLIST</code> 或 <code>information_schema.PROCESSLIST</code>）采样补的是另一个维度：某一刻数据库正在做什么。它对短查询不敏感，却很容易抓到锁等待和连接堆积。故障期间每秒采样一次、持续一分钟，往往比翻慢日志更快定位“谁把谁堵住了”。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> $(<span class="built_in">seq</span> 1 60); <span class="keyword">do</span></span><br><span class="line">  mysql -N -e <span class="string">&quot;SELECT NOW(), ID, USER, DB, TIME, STATE, LEFT(INFO, 120)</span></span><br><span class="line"><span class="string">               FROM information_schema.PROCESSLIST</span></span><br><span class="line"><span class="string">               WHERE COMMAND = &#x27;Query&#x27; AND TIME &gt; 1&quot;</span> &gt;&gt; /tmp/pl-sample.tsv</span><br><span class="line">  <span class="built_in">sleep</span> 1</span><br><span class="line"><span class="keyword">done</span></span><br></pre></td></tr></table></figure>
+
+<p>APM 链路提供业务视角：同一条 SQL 由哪个接口、哪类用户触发，影响面有多大。它的采样会漏掉低频慢请求，但非常适合回答“这条 SQL 值不值得优先修”。四类数据各有所长，用指纹拼在一起，才能既看到趋势，又看到现场，还能对应到业务。</p>
+<p>需要提醒的是开销。慢日志的写入量取决于阈值和流量，阈值过低时 IO 影响不可忽略；<code>performance_schema</code> 常驻内存，实例规格小时要关注内存占用；连接采样本身很轻，但不要在高峰期对主库做全表扫描式的统计查询。采样的第一条原则是不要用观测手段制造新的故障。</p>
+<h2 id="分诊矩阵：先修哪一条"><a href="#分诊矩阵：先修哪一条" class="headerlink" title="分诊矩阵：先修哪一条"></a>分诊矩阵：先修哪一条</h2><p>慢查询清单往往一次就有上百条，全部修复既不现实，也会让团队失去焦点。分诊要回答两个问题：先修哪一条，以及它属于哪一类问题。第一个问题决定优先级，第二个问题决定交给谁、用什么手段。</p>
+<p>先纠正一个直觉。工程师容易被“单次最慢”的查询吸引，因为它最刺眼；但系统容量是被总耗时吃掉的。假设某查询每天执行 20 万次、平均 80 ms，总耗时约 4.4 小时；另一条每天执行 20 次、每次 30 s，总耗时只有 10 分钟。后者更值得写进周报，前者对数据库的消耗却是后者的二十多倍。因此排序的主键应该是总耗时，单次最大值只用于识别雪崩型问题。</p>
+<p>分诊矩阵把频率、单次代价和业务重要性放在一起看。下表中的阈值同样是示例假设，团队应根据自己的流量规模调整。</p>
+<table>
+<thead>
+<tr>
+<th>频率</th>
+<th>单次代价</th>
+<th>业务重要性</th>
+<th>优先级</th>
+<th>处置方式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高频</td>
+<td>中高</td>
+<td>核心链路</td>
+<td>P0</td>
+<td>一周内修复，复盘为何漏过门禁</td>
+</tr>
+<tr>
+<td>高频</td>
+<td>低</td>
+<td>核心链路</td>
+<td>P1</td>
+<td>减少调用次数、批量化或缓存</td>
+</tr>
+<tr>
+<td>低频</td>
+<td>高</td>
+<td>核心链路</td>
+<td>P1</td>
+<td>限流、异步化、迁到只读副本</td>
+</tr>
+<tr>
+<td>低频</td>
+<td>高</td>
+<td>非核心</td>
+<td>P3</td>
+<td>登记并限制并发，不占用主线资源</td>
+</tr>
+<tr>
+<td>偶发</td>
+<td>极高</td>
+<td>核心链路</td>
+<td>P0</td>
+<td>先止血，再定位锁或资源争抢</td>
+</tr>
+<tr>
+<td>一次性</td>
+<td>高</td>
+<td>报表分析</td>
+<td>P2</td>
+<td>迁到分析库或离线任务</td>
+</tr>
+</tbody></table>
+<p>矩阵里最容易被误判的是“一次性报表查询”。它单次耗时很长，但频率低、可延迟，正确做法通常不是加索引，而是把它从在线库挪走：放到只读副本、限定时间范围、改为异步导出。反过来，一条平均只有 30 ms 却每秒执行上千次的查询，才更应该被当作在线链路问题处理。判断依据是调用来源、执行计划和业务时段，而不是单看耗时。</p>
+<p>第二个问题是归因。归因不是重新做一遍单条 SQL 诊断，而是把问题放进有限的几个抽屉，交给对应的责任方。抽屉分得越清楚，修复动作越可复制，复盘时也越容易发现系统性缺口。</p>
+<table>
+<thead>
+<tr>
+<th>类别</th>
+<th>典型信号</th>
+<th>首要动作</th>
+<th>常见责任方</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>索引缺失或错配</td>
+<td>扫描行数远大于返回行数</td>
+<td>设计并验证索引</td>
+<td>后端</td>
+</tr>
+<tr>
+<td>隐式转换</td>
+<td>条件列与字面量类型不一致</td>
+<td>统一类型或改写条件</td>
+<td>后端</td>
+</tr>
+<tr>
+<td>深分页</td>
+<td>偏移量增大后耗时线性上升</td>
+<td>游标分页或限制页数</td>
+<td>后端</td>
+</tr>
+<tr>
+<td>ORM 的 N+1</td>
+<td>单请求 SQL 条数异常</td>
+<td>批量加载或预取</td>
+<td>后端</td>
+</tr>
+<tr>
+<td>锁竞争</td>
+<td>锁等待高，事务持锁时间长</td>
+<td>缩短事务、统一加锁顺序</td>
+<td>后端</td>
+</tr>
+<tr>
+<td>表结构或建模</td>
+<td>宽表、无分区、状态列选择性差</td>
+<td>评审后调整结构</td>
+<td>后端与 DBA</td>
+</tr>
+<tr>
+<td>无界扫描</td>
+<td>报表或导出没有时间范围</td>
+<td>增加边界、改为异步</td>
+<td>后端与业务</td>
+</tr>
+<tr>
+<td>连接池饥饿</td>
+<td>应用等待连接，数据库 QPS 不高</td>
+<td>调整池大小与超时</td>
+<td>后端与运维</td>
+</tr>
+<tr>
+<td>基础设施</td>
+<td>IO 利用率高、CPU 争抢、网络抖动</td>
+<td>扩容、迁移或限流</td>
+<td>运维与 DBA</td>
+</tr>
+</tbody></table>
+<p>这张表只用于路由，不展开每一类的诊断细节。比如“索引缺失”背后可能是联合索引顺序不对，也可能是选择性判断错误，具体分析属于单条 SQL 优化的范畴；治理流程关心的是它有没有被分到正确的人手里，以及修复后有没有指标验证。每条进入清单的问题都应该带上四个字段：指纹、责任服务、负责人、期望改善的指标。没有负责人的条目，不进入排期。</p>
+<h2 id="SQL-审核门禁：把问题挡在发布前"><a href="#SQL-审核门禁：把问题挡在发布前" class="headerlink" title="SQL 审核门禁：把问题挡在发布前"></a>SQL 审核门禁：把问题挡在发布前</h2><p>治理性价比最高的环节是发布前。一条慢 SQL 在生产上运行一天消耗的资源，往往超过评审它所需的十分钟。门禁的目标不是让所有 SQL 都完美，而是让高风险 SQL 必须经过有经验的人看一眼。</p>
+<p>门禁分三层。第一层是开发自检，提交前按清单过一遍；第二层是代码评审，评审人必须能看到最终执行的 SQL，而不是只看到 ORM 的链式调用；第三层是 DBA 会签，只针对大表 DDL、新索引、批量任务和核心链路的新查询。三层各司其职，既不把所有压力压给 DBA，也不让门禁流于形式。</p>
+<table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>要求</th>
+<th>级别</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>执行计划</td>
+<td>新查询附 <code>EXPLAIN</code> 结果与预估扫描行数</td>
+<td>必须</td>
+</tr>
+<tr>
+<td>条件列</td>
+<td>WHERE 与 JOIN 列类型一致，有可用索引</td>
+<td>必须</td>
+</tr>
+<tr>
+<td>字段选择</td>
+<td>禁止 <code>SELECT *</code>，覆盖索引场景需注明</td>
+<td>必须</td>
+</tr>
+<tr>
+<td>模糊匹配</td>
+<td>禁止前导通配 <code>LIKE &#39;%关键词&#39;</code></td>
+<td>必须</td>
+</tr>
+<tr>
+<td>列上运算</td>
+<td>索引列禁止套函数或表达式，函数索引需评审</td>
+<td>必须</td>
+</tr>
+<tr>
+<td>分页深度</td>
+<td>偏移量超过一千时改用游标分页</td>
+<td>必须</td>
+</tr>
+<tr>
+<td>列表长度</td>
+<td><code>IN</code> 列表建议不超过 200 个值</td>
+<td>建议</td>
+</tr>
+<tr>
+<td>事务边界</td>
+<td>事务内禁止远程调用、发消息和等待用户输入</td>
+<td>必须</td>
+</tr>
+<tr>
+<td>批量写入</td>
+<td>单批建议不超过 500 行，分批提交</td>
+<td>建议</td>
+</tr>
+<tr>
+<td>ORM 语句</td>
+<td>贴出一次请求实际执行的 SQL 与总条数</td>
+<td>必须</td>
+</tr>
+<tr>
+<td>测试数据</td>
+<td>数据量与分布接近生产，至少同数量级</td>
+<td>建议</td>
+</tr>
+<tr>
+<td>大表变更</td>
+<td>走在线变更窗口，附回滚方案</td>
+<td>必须</td>
+</tr>
+</tbody></table>
+<p>几条禁令值得单独说明。<code>SELECT *</code> 的问题不只是多传字段，它会让原本可以走覆盖索引的查询被迫回表；前导通配的 <code>LIKE &#39;%关键词&#39;</code> 无法使用普通 B-Tree 索引；在索引列上套函数或运算会让索引失效，MySQL 8.0.13 起虽然支持函数索引，但需要单独评审，不能当作默认解法；超长 <code>IN</code> 列表则会让解析和执行付出额外代价。禁令的目的不是禁止，而是要求例外必须说明理由。</p>
+<p>ORM 是门禁最容易漏掉的地方。框架生成的 SQL 往往带多余字段、隐式类型转换，或者在一个循环里逐条查询。评审时要求开发在测试环境打开 SQL 日志，把一次请求实际执行的语句贴出来；对核心接口还要统计单次请求的 SQL 条数，超过阈值就视为 N+1 嫌疑。测试数据同样要讲究，几十行的测试表上所有查询都很快，只有接近生产量级的数据才能暴露扫描和排序问题；无法复制生产数据时，至少保证数据量和分布同数量级。</p>
+<p>门禁要有例外通道。线上故障需要紧急修复时，允许先上线后补审，但必须在四十八小时内补齐记录，并说明为什么绕过。例外不可怕，可怕的是例外没有记录，下次复盘时说不清哪些问题是门禁放进来的。</p>
+<h2 id="索引治理与容量边界"><a href="#索引治理与容量边界" class="headerlink" title="索引治理与容量边界"></a>索引治理与容量边界</h2><h3 id="从加索引到管索引"><a href="#从加索引到管索引" class="headerlink" title="从加索引到管索引"></a>从加索引到管索引</h3><p>很多团队对索引的态度是只加不减。查询慢了加一个，报表慢了再加一个，几年之后单表十几个索引，写入越来越慢，缓冲池被大量索引页占满，却没有人说得清每个索引服务哪条查询。索引治理要把“加”变成“管”：有清单、有责任人、有准入和退出机制。</p>
+<p>清单至少包含四类信息：索引所属的表与服务、建立的日期与原因、当前的读写使用次数、占用的空间。MySQL 的 <code>sys</code> 库提供了两个现成视图，可以先做一轮盘点。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 自实例启动以来从未被使用过的索引</span></span><br><span class="line"><span class="keyword">SELECT</span> <span class="operator">*</span> <span class="keyword">FROM</span> sys.schema_unused_indexes</span><br><span class="line"><span class="keyword">WHERE</span> object_schema <span class="operator">=</span> <span class="string">&#x27;shop&#x27;</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 可以被已有索引覆盖的冗余索引</span></span><br><span class="line"><span class="keyword">SELECT</span> <span class="operator">*</span> <span class="keyword">FROM</span> sys.schema_redundant_indexes</span><br><span class="line"><span class="keyword">WHERE</span> table_schema <span class="operator">=</span> <span class="string">&#x27;shop&#x27;</span>;</span><br></pre></td></tr></table></figure>
+
+<p>这两个视图只能作为线索，不能直接作为删除依据。未使用统计自实例重启后重新计数，季节性查询可能刚好没跑；唯一索引和主键即使“未使用”也不能删；冗余索引的判断基于最左前缀，实际执行计划仍可能依赖它。MySQL 8.0 提供不可见索引，可以先把候选索引设为不可见，观察一个完整业务周期，确认没有性能回退后再删除；5.7 没有这个能力，只能用低峰期试删加快速回滚的方式。</p>
+<p>索引不是免费的。每个二级索引都意味着写入时要多维护一棵树，更新越频繁的表，写放大越明显；索引页还会挤占缓冲池，间接影响读性能。治理时应给单表索引数量设一个预算，例如不超过五个，超过就要说明理由。新增索引的申请必须附带目标查询、当前执行计划和预期收益，不能只说“加个索引试试”。</p>
+<p>变更执行同样需要流程。大表加索引优先使用在线 DDL，并在语句中显式声明算法与锁策略：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">ALTER TABLE</span> orders</span><br><span class="line">  <span class="keyword">ADD</span> INDEX idx_user_created (user_id, created_at),</span><br><span class="line">  ALGORITHM<span class="operator">=</span>INPLACE, LOCK<span class="operator">=</span><span class="keyword">NONE</span>;</span><br></pre></td></tr></table></figure>
+
+<p><code>ALGORITHM=INPLACE</code> 表示尽量原地完成，<code>LOCK=NONE</code> 表示允许并发读写；并非所有操作都支持这两个选项，执行前要查官方文档确认，先在同等数据量的从库或影子表上演练。即使支持在线变更，大表操作仍会产生大量 IO 并可能导致主从延迟，应该放在低峰窗口，并准备好中止与回滚方案。删除索引尤其要谨慎：删错了再建回来，代价可能比当初加索引更大。</p>
+<h3 id="不要用分库分表掩盖慢查询"><a href="#不要用分库分表掩盖慢查询" class="headerlink" title="不要用分库分表掩盖慢查询"></a>不要用分库分表掩盖慢查询</h3><p>索引治理解决的是访问路径，容量规划解决的是资源是否够用，两者不能互相替代。容量规划从增长曲线出发：统计过去六到十二个月的数据量、QPS 和峰值倍数，按业务计划推算未来半年的需求，再留出三到五成的余量。没有增长数据时，宁可先做一次压测，也不要用“感觉还行”做判断。</p>
+<p>当单机接近瓶颈时，手段是有顺序的。先做读写分离，把报表和只读流量迁走；再加缓存，挡住热点读；然后归档冷数据、按时间分区，把单表规模控制住；最后才考虑分库分表。这个顺序背后的逻辑是复杂度：读写分离只增加路由和一致性取舍，缓存要处理失效与穿透，归档和分区改变数据生命周期，而分库分表会引入跨库查询、分布式事务、全局 ID 和扩容迁移，运维成本是数量级的跃升。</p>
+<p>分库分表最危险的用法，是拿来掩盖糟糕的查询。一个全表扫描的查询，拆到十个库之后会变成十次全表扫描；一个没有边界的导出，拆库之后会变成跨十个库的聚合，问题只会更复杂。分片之前应先确认：现有慢查询已经清理到可接受水平，单表数据量确实超出单机舒适区，并且业务能接受分片键带来的查询限制。否则，分片只是把技术债搬到了更贵的地方。</p>
+<h2 id="故障闭环：从告警到复盘"><a href="#故障闭环：从告警到复盘" class="headerlink" title="故障闭环：从告警到复盘"></a>故障闭环：从告警到复盘</h2><p>治理流程必须能处理“已经慢了”的时刻。一个完整的闭环包括告警、分诊、止血、定位、修复、回归和复盘，任何一环缺失，问题都会以另一种形式回来。</p>
+<pre class="mermaid">flowchart TD
+  A[症状告警] --> B[确认影响面]
+  B --> C[止血：限流、终止查询、回滚]
+  C --> D[定位根因]
+  D --> E[修复并验证]
+  E --> F[补充回归用例]
+  F --> G[复盘与行动项]
+  G --> A</pre>
+
+<p>告警要基于症状而不是单条 SQL：P99 抬升、慢查询总耗时、锁等待、连接池等待，比“某条 SQL 超过一秒”更能反映用户受影响的程度。告警触发后先确认影响面：是单条指纹、单个实例，还是一次发布带来的普遍退化。止血手段按风险从低到高排列：终止异常查询、对入口限流、把报表切到只读副本、回滚最近的发布。<code>KILL QUERY</code> 只终止语句并保留连接，通常比 <code>KILL CONNECTION</code> 安全；执行前要核对连接 ID 和发起用户，避免误杀。</p>
+<p>值班手册要把这些动作写成可执行的步骤：如何查当前排在前面的指纹，如何判断锁等待的持有者，哪些操作需要升级给 DBA，回滚命令是什么，对外如何同步。手册不必长，但必须在没有上下文的情况下也能照做。事后复盘只谈系统和流程，不追究个人；每个行动项要有负责人和截止日期，并在下一次周会上验收。</p>
+<p>组织上，每条 SQL 都应该有归属的服务和团队。DBA 负责平台、规范与高风险变更的会签，不负责替所有业务修 SQL；后端团队对自己服务的访问路径负责。每周用三十分钟过一遍按总耗时排序的前十条，逐条确认负责人和进展，比每月开一次大会更有效。监控面板要对开发可见，而不是只挂在 DBA 的屏幕上。延迟 SLO 和错误预算可以把“要不要现在修”变成可讨论的数字：预算充足时按计划排期，预算快速消耗时自动升级优先级。衡量治理效果至少看四个数：慢查询条数、总耗时、P99 和重复发生率。</p>
+<h2 id="自动化与九十天落地"><a href="#自动化与九十天落地" class="headerlink" title="自动化与九十天落地"></a>自动化与九十天落地</h2><p>流程稳定之后，再用自动化减少重复劳动。每天定时把前二十条指纹和环比变化发到团队频道；在 CI 中对新增或修改的 SQL 做静态检查，缺少执行计划或命中禁令时阻止合并；对症状设置带持续时间的告警，避免抖动误报；在慢查询超过阈值时自动抓取执行计划存档，方便事后对比；把核心查询放进基准测试集，索引或结构变更后跑一遍。自动化的边界要清楚：自动终止查询、自动创建索引这类动作风险很高，必须保留人工确认。</p>
+<p>落地不要铺得太开。下面的九十天计划把治理拆成六个阶段，每个阶段都有可验收的交付物。表中的数字是目标假设，不是承诺。</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>时间</th>
+<th>交付物</th>
+<th>成功标准（示例）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>基线</td>
+<td>第 1 至 2 周</td>
+<td>指标看板、慢查询清单、服务归属</td>
+<td>核心服务全部有负责人</td>
+</tr>
+<tr>
+<td>清理</td>
+<td>第 3 至 4 周</td>
+<td>按总耗时排序的前二十条修复</td>
+<td>总耗时下降三成</td>
+</tr>
+<tr>
+<td>门禁</td>
+<td>第 5 至 6 周</td>
+<td>评审清单、CI 检查、例外流程</td>
+<td>新查询评审全覆盖</td>
+</tr>
+<tr>
+<td>索引</td>
+<td>第 7 至 8 周</td>
+<td>索引清单、冗余与未使用索引处置</td>
+<td>单表索引数达标</td>
+</tr>
+<tr>
+<td>运营</td>
+<td>第 9 至 10 周</td>
+<td>周会机制、值班手册、回归集</td>
+<td>周会连续四周按时召开</td>
+</tr>
+<tr>
+<td>复盘</td>
+<td>第 11 至 13 周</td>
+<td>季度报告与下一轮计划</td>
+<td>P99 与重复率有基线对比</td>
+</tr>
+</tbody></table>
+<p>最常见的失败模式有六种：把治理当成一次性运动，风头过去就没人管；把问题甩给 DBA，业务团队始终不掌握自己的访问路径；没有发布门禁，一边清理一边新增；只靠加索引解决所有问题，最后承受写放大和索引膨胀；忽视 ORM 生成的 SQL，评审看到的和实际执行的不是一回事；没有回归测试，同一条 SQL 换个写法又回来了。避开这六种，治理就成功了一半。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>慢查询治理的本质，是把偶发的救火变成可重复的日常：用指标基线定义什么是慢，用发现管线持续看见问题，用分诊矩阵决定先修什么，用发布门禁和索引治理阻止新问题，用故障闭环与组织机制保证问题不反弹。它不追求一次性清零，而追求总量持续下降、重复问题越来越少。九十天计划只是起点，真正起作用的是每周三十分钟的评审，以及每条 SQL 背后那个明确的责任人。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://dev.mysql.com/doc/refman/8.0/en/slow-query-log.html">MySQL 8.0 Reference Manual: The Slow Query Log</a></li>
+<li><a href="https://dev.mysql.com/doc/refman/8.0/en/performance-schema-statement-summary-tables.html">MySQL 8.0 Reference Manual: Performance Schema Statement Summary Tables</a></li>
+<li><a href="https://dev.mysql.com/doc/refman/8.0/en/innodb-online-ddl-operations.html">MySQL 8.0 Reference Manual: Online DDL Operations</a></li>
+<li><a href="https://dev.mysql.com/doc/refman/8.0/en/sys-schema.html">MySQL 8.0 Reference Manual: The sys Schema</a></li>
+<li><a href="https://www.percona.com/doc/percona-toolkit/LATEST/pt-query-digest.html">Percona Toolkit Documentation: pt-query-digest</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>数据库慢查询治理流程</p><p><a href="https://987763485.github.io/2020/10/07/数据库慢查询治理流程/">https://987763485.github.io/2020/10/07/数据库慢查询治理流程/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2020-10-07</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a><a class="link-muted mr-2" rel="tag" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/">数据库</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2020/10/14/Kibana%E6%97%A5%E5%BF%97%E5%88%86%E6%9E%90%E5%AE%9E%E8%B7%B5/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Kibana 日志分析实践</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2020/10/05/Grafana%E5%8F%AF%E8%A7%86%E5%8C%96%E5%91%8A%E8%AD%A6%E9%85%8D%E7%BD%AE/"><span class="level-item">Grafana 可视化告警配置</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

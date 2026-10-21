@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Agent 沙箱与执行安全 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="沙箱这个词常被理解成”一个隔离单元”，但当智能体平台同时服务几十个租户、每天产生大量真实执行时，真正的难点不在某项隔离技术选得对不对，而在边界如何组合、策略如何下发与灰度、凭据与审计如何治理、出事时如何在几十秒内停用。本文按这个尺度展开，把执行安全当作一套可运维的体系来讨论。适合正在把智能体从部门内部工具推向平台化交付的工程师、架构负责人与安全评审同学。读完可以拿到一份”隔离层 × 动作”的权限矩"><meta property="og:type" content="blog"><meta property="og:title" content="Agent 沙箱与执行安全"><meta property="og:url" content="https://987763485.github.io/2026/08/29/Agent%E6%B2%99%E7%AE%B1%E4%B8%8E%E6%89%A7%E8%A1%8C%E5%AE%89%E5%85%A8/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="沙箱这个词常被理解成”一个隔离单元”，但当智能体平台同时服务几十个租户、每天产生大量真实执行时，真正的难点不在某项隔离技术选得对不对，而在边界如何组合、策略如何下发与灰度、凭据与审计如何治理、出事时如何在几十秒内停用。本文按这个尺度展开，把执行安全当作一套可运维的体系来讨论。适合正在把智能体从部门内部工具推向平台化交付的工程师、架构负责人与安全评审同学。读完可以拿到一份”隔离层 × 动作”的权限矩"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2026-08-28T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-20T17:25:33.879Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="大模型"><meta property="article:tag" content="python"><meta property="article:tag" content="agent"><meta property="article:tag" content="typescript"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2026/08/29/Agent%E6%B2%99%E7%AE%B1%E4%B8%8E%E6%89%A7%E8%A1%8C%E5%AE%89%E5%85%A8/"},"headline":"Agent 沙箱与执行安全","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2026-08-28T16:00:00.000Z","dateModified":"2026-10-20T17:25:33.879Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"沙箱这个词常被理解成”一个隔离单元”，但当智能体平台同时服务几十个租户、每天产生大量真实执行时，真正的难点不在某项隔离技术选得对不对，而在边界如何组合、策略如何下发与灰度、凭据与审计如何治理、出事时如何在几十秒内停用。本文按这个尺度展开，把执行安全当作一套可运维的体系来讨论。适合正在把智能体从部门内部工具推向平台化交付的工程师、架构负责人与安全评审同学。读完可以拿到一份”隔离层 × 动作”的权限矩"}</script><link rel="canonical" href="https://987763485.github.io/2026/08/29/Agent%E6%B2%99%E7%AE%B1%E4%B8%8E%E6%89%A7%E8%A1%8C%E5%AE%89%E5%85%A8/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2026-08-28T16:00:00.000Z" title="8/29/2026, 12:00:00 AM">2026-08-29</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></span><span class="level-item">1 小时读完 (大约10500个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Agent 沙箱与执行安全</h1><nav class="series-nav" aria-label="系列文章导航"><div class="series-nav-meta"><i class="fas fa-book-open" aria-hidden="true"></i><span>本文属于《<a class="series-nav-title" href="/series/agent/">Agent 智能体开发</a>》第 32/55 篇</span></div><div class="series-nav-links"><a class="series-nav-link series-nav-prev" href="/2026/02/25/Agent%E4%BB%A3%E7%A0%81%E6%89%A7%E8%A1%8C%E6%B2%99%E7%AE%B1%E8%AE%BE%E8%AE%A1/"><i class="fas fa-chevron-left" aria-hidden="true"></i><span>上一篇</span></a><a class="series-nav-link series-nav-index" href="/series/agent/">系列目录</a><a class="series-nav-link series-nav-next" href="/2026/01/16/Agent%E5%AE%89%E5%85%A8%E4%B8%8E%E6%9D%83%E9%99%90%E6%8E%A7%E5%88%B6/"><span>下一篇</span><i class="fas fa-chevron-right" aria-hidden="true"></i></a></div></nav><div class="content"><p>沙箱这个词常被理解成”一个隔离单元”，但当智能体平台同时服务几十个租户、每天产生大量真实执行时，真正的难点不在某项隔离技术选得对不对，而在边界如何组合、策略如何下发与灰度、凭据与审计如何治理、出事时如何在几十秒内停用。本文按这个尺度展开，把执行安全当作一套可运维的体系来讨论。适合正在把智能体从部门内部工具推向平台化交付的工程师、架构负责人与安全评审同学。读完可以拿到一份”隔离层 × 动作”的权限矩阵模板、一套逃逸面分类口径，以及一份落地检查清单。</p>
+<h2 id="从一次执行到一套体系"><a href="#从一次执行到一套体系" class="headerlink" title="从一次执行到一套体系"></a>从一次执行到一套体系</h2><p>一个沙箱和一套沙箱体系，交付物完全不同。前者回答”这一次执行放在哪里跑”，答案是一张选型表；后者回答”在几十种租户差异、多个运行时版本、每周都在变更的策略之下，如何让每一次执行都落在被声明、被度量、可回滚的边界里”，答案是一整套治理回路。把这两件事混在一起，是执行安全项目最常见的失败方式：单点评测做得很漂亮，上线半年后留下一堆”这个口子当年谁申请的””这个租户为什么能联网”的悬案。</p>
+<p>体系视角要回答四个问题。第一，边界如何组合而不是一选一：内核特性、容器、用户态内核、微虚机、能力式运行时，它们的关系是叠加与分工，不是并列备选。第二，策略如何下发：谁写、谁批、如何版本化、如何继承、如何只允许收窄。第三，运行状态如何度量：默认拒绝的比例、审批的通过率与到期回收率、边界漂移的检测覆盖、审计事件的完整率，这些指标决定评审能不能做在事前。第四，出事如何止损：一个能在几十秒内按租户、按工具、按全局停用的开关，比事后多写一份复盘文档更有价值。</p>
+<p>治理回路可以画成一个环。</p>
+<pre class="mermaid">flowchart TD
+    A[边界需求与威胁建模] --> B[策略定义与评审]
+    B --> C[签名入基线仓库]
+    C --> D[影子运行：只记录不拦截]
+    D --> E[按租户与版本灰度]
+    E --> F[全量强制]
+    F --> G[观测与漂移检测]
+    G --> H{是否需要收紧}
+    H -->|是| B
+    H -->|否| I[紧急停用开关待命并演练]
+    I --> G</pre>
+
+<p>这个环里有两处容易被省掉。一处是影子运行：新策略先以”只记录不拦截”的模式跑一个完整批次，用来估计误伤率，再决定是否强制；另一处是紧急停用开关的待命状态——它不是故障时才创建的工单，而是随每次策略变更同步刷新、定期演练的一次配置。</p>
+<p>本文与已有讨论的分轴是这样的：单次执行的隔离层次选型、文件系统与出口策略、超时与取消语义，代码执行沙箱设计一文已经给过完整决策表，本文不复述那张表；能力清单、最小权限的授权模型与动作分级，Agent 安全与权限控制一文已经定义过语义，本文只借用它的名词，把矩阵重画成”隔离层 × 动作”的执行侧模板；输入侧注入与输出侧敏感信息检测由 AI 应用安全防护一文覆盖；浏览器与图形界面驱动特有的越权面由浏览器 Agent 与 GUI 自动化一文单独讨论；提示注入的对抗构造由注入防护一文负责。剩下的部分——多租户、边界组合、灰度与停用、逃逸面分类——才是本文的轴。</p>
+<h2 id="威胁模型：模型可影响的执行路径"><a href="#威胁模型：模型可影响的执行路径" class="headerlink" title="威胁模型：模型可影响的执行路径"></a>威胁模型：模型可影响的执行路径</h2><p>威胁模型要写得能被工程师照着做检查，而不是写成风险形容词的清单。本文采用的做法，是先把”模型能影响到的执行路径”一条条列出来，再对每条路径声明边界与残余风险。之所以从路径而不是从攻击者出发，是因为在智能体系统里把意图从模型身上剥掉是必要的纪律：我们不假设模型是恶意的，只假设模型产出的字节最终会变成参数、文件内容、网络请求与系统调用，而这些字节里有相当一部分来自不可信的外部内容。</p>
+<p>列路径时至少要覆盖八条。</p>
+<p>第一条是工具名与参数。这是最显眼的一条，也是最容易只做到”参数格式校验”的一条：格式合法不等于动作合法。</p>
+<p>第二条是模型生成并直接被解释器执行的代码。它的影响面由解释器被授予的能力决定，不会因为”只是一段脚本”而变小。</p>
+<p>第三条是模型生成的配置文件与构建脚本。很多团队给代码执行设了严格边界，却让模型自由写入一个会被宿主进程读取的配置，边界随即被自己的构建流水线绕过。</p>
+<p>第四条是依赖获取。模型写出包名与版本，网络出口把它变成任意第三方代码在隔离域内运行，这是供应链面与出口面的重叠区。</p>
+<p>第五条是被处理内容里携带的指令所驱动的二次调用。这类风险的治理在注入防护一文里展开，本文只关心它在执行侧留下的问题：如果一次工具调用的结果可以诱导下一次调用，那么下一次调用的授权判定不能依赖”上一轮已经审过”。</p>
+<p>第六条是返回值回注后的参数塑形。外部内容经由工具结果进入下一轮上下文，再作为参数流出边界。</p>
+<p>第七条是协议侧提供的工具描述与模式定义。以 MCP 为例，服务端向客户端提供工具名、描述与输入模式，这些文本会直接进入模型上下文，等于服务端在影响模型的决策。2026-07-28 的规范修订在客户端身份与发现方向上做了几处收紧：强制校验 OAuth 的 issuer、以 Client ID Metadata Documents 取代动态注册、增加 server&#x2F;discover 一类的发现方法，并把 HTTP+SSE 与 Roots、Sampling 列入废弃、给出约 12 个月的移除窗口。对执行体系而言，直接结论有两条：工具注册表要能追溯到具体的服务端标识；废弃项的移除窗口要当成一个有截止日的技术债排进迁移计划。</p>
+<p>第八条是长任务里由定时或事件触发的执行。它的特殊之处在于没有人在环，触发一次就等于模型在没有即时审阅的情况下多得到一次影响边界的权利。Anthropic 工程团队在《how we contain Claude》里讨论过把智能体放进受控环境的工程取舍，本文把它当作延伸阅读，不引用其中的任何性能结论。</p>
+<p>把这八条写下来之后，威胁模型的其余部分就变成填表。</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">资产：一次执行可读到的数据、可写入的位置、可代表的身份</span><br><span class="line">边界：模型产出的字节在哪一次调用处变成系统调用或网络请求</span><br><span class="line">能力：显式授予了什么，其余一律默认拒绝</span><br><span class="line">控制：每条路径对应的隔离层、审批点与审计事件</span><br><span class="line">残余风险：本次不覆盖的路径、可接受的判定误差、复审周期</span><br></pre></td></tr></table></figure>
+
+<p>最后一点容易被忽略：路径清单要有版本。模型升级、工具增加、协议修订都会让清单变长，清单变长而边界没变，就是一次隐式的权限扩张。</p>
+<h2 id="隔离边界的四个层次与组合"><a href="#隔离边界的四个层次与组合" class="headerlink" title="隔离边界的四个层次与组合"></a>隔离边界的四个层次与组合</h2><p>先给层次的名字，再说组合规则。</p>
+<p>内核特性层是最薄也最常用的一层：Linux 的 namespaces 决定执行域看得见什么，cgroups 决定用得了多少，seccomp 决定允许哪一类系统调用，Landlock 与 capability 丢弃决定文件与特权能做到什么。容器运行时把这几点打包成了易用形态，但它没有增加新的边界——容器共享宿主内核，所以容器层的隔离强度上限就是内核面的隔离强度。需要提醒的是，不要在任何内部文档里把某个容器项目的默认系统调用过滤清单当作事实抄写：默认策略确实会拦掉一部分系统调用，但清单会随版本变化，具体以当期官方文档为准。</p>
+<p>用户态内核层落在容器与虚机之间。gVisor 公开于 2018 年，它的价值在于把系统调用语义的实现从宿主内核里搬出来，从而收窄内核面；代价是兼容性覆盖面需要按负载逐条验证，不能假定”什么都能跑”。</p>
+<p>微虚机层把边界下沉到虚拟化。Firecracker 在 2017 年公开，用极简设备模型换取快速创建与小内存占用；Kata Containers 在 2017 年末发起，走的是”对上兼容容器与编排接口、对下用轻量虚机”的路线。这一层的实质收益是执行单元不再与别的租户共享同一个内核实例，从而让内核面这一类逃逸面的成立条件显著变强。</p>
+<p>能力式运行时层是第四个层次，它换了个问题：不问”允许哪些系统调用”，而问”授予哪些能力”。WebAssembly 生态里 wasmtime 这类运行时，与 WASI、组件模型的方向，就是把宿主能力显式化为可组合的导入。这套范式对”模型生成一段纯计算”的场景非常合适，但对”必须调用现成原生依赖”的场景仍受生态成熟度限制——WASI 与组件模型截至本文日期仍在演进，本文不给出其某个阶段的发布日期结论。</p>
+<p>组合规则有三条。</p>
+<p>第一条，按不可信度做叠加，不做单选。一段模型的纯计算代码走能力层就够了；要装第三方包、要读写工作区、要联网，就在微虚机之上再叠加出口策略与临时文件系统；要给强隔离的租户独占池，则在微虚机内再套一层容器以获得策略复用。判断公式可以写成一句话：一次执行的有效边界，是所有叠加层允许集合的交集，任何一层被跳过，交集就扩大到那一层的默认值。</p>
+<pre class="mermaid">flowchart TD
+    A[平台宿主与编排控制面] --> B[微虚机层：内核与设备面]
+    B --> C[容器层：namespaces 与 cgroups]
+    C --> D[能力层：导入白名单与系统调用过滤]
+    D --> E[执行域：一次工具调用]
+    E --> F[数据层：只读根与临时层]</pre>
+
+<p>第二条，让每一层只负责它擅长的面。系统调用与设备属于内核面与虚机面；进程数、内存与 IO 配额属于 cgroups 面；读写位置属于数据面；出站目的地属于网络面；身份与令牌属于凭据面。把”能不能访问某个内网服务”这种问题交给容器去解决，最后一定得到一个过宽的出口。</p>
+<p>第三条，边界组合要能被声明与校验，不能只存在于镜像构建脚本里。平台应该对每一次执行记录一份边界快照——用了哪一版策略、叠了哪几层、每层的拒绝计数——评审时看的是快照之间的一致性，而不是镜像的提交号。</p>
+<p>顺带一句：本文刻意不把讨论停在”该用微虚机还是容器”这种单点比较上，那张选型表在代码执行沙箱设计一文里已经给过；体系层面要看的是允许哪些层被跳过、由谁批准、跳过后审计事件长什么样。</p>
+<h2 id="默认拒绝基线的下发与漂移控制"><a href="#默认拒绝基线的下发与漂移控制" class="headerlink" title="默认拒绝基线的下发与漂移控制"></a>默认拒绝基线的下发与漂移控制</h2><p>“默认拒绝”写在文档里是一句口号，落在平台上是一份产物：策略文件。把它当代码管，才有可运维性。</p>
+<p>第一是版本化与签名。基线进版本仓库，任何变更走评审与合入，运行时拉到的是一份带标识与摘要的已签名描述，而不是一串靠口头交接的参数。第二是层级继承。可用的层级是平台基线 → 组织或业务线 → 租户 → 会话或任务，每一层只能收窄父层的允许集合；放宽必须走一次显式审批，且带到期时间。到期时间这个字段比看上去重要：绝大多数”当年开的那个口子”，成因都是口子没有过期语义。</p>
+<p>冲突消解要有唯一确定的规则，否则同一份声明在不同控制器里会得到不同结论。本文采用的规则简单到不需要解释：任何一处未显式授予，结果就是拒绝；子层出现与父层冲突的条目时，取更严格的值并记录一条冲突事件。这条规则的价值不在于安全，而在于可复现——评审时不需要问”哪个控制器赢”。</p>
+<p>第三是漂移检测。运行时按声明生成执行域，再实际观测执行域生效的挂载点、能力集、出口目的地集合与配额，并与声明比对。三类漂移要分别告警：镜像内嵌的默认值覆盖了平台声明；某个兼容模式悄悄放宽了系统调用过滤；租户口径被临时改过后没有按时回收。漂移检测本身要采样上报，而且送出去的是结构化的差异摘要，不是文件内容或提示原文。</p>
+<p>网络基线在体系层面要区分三件事：出口是否允许、允许哪些目的地、开洞由谁审批。目的地用清单而不是通配，清单要能版本化并可追溯到审批记录；需要拉取公共包源的场景，优先在构建期把依赖物化到镜像、运行期只允许访问内部代理——这条”预置还是现拉”的取舍属于单次执行设计，本文不再展开。</p>
+<p>一句划界：应用层的输入输出防护与敏感信息检测，AI 应用安全防护一文已经给了纵深清单，本文只处理执行侧基线本身如何下发、以及如何验证它真的生效了。</p>
+<h2 id="凭据不落上下文"><a href="#凭据不落上下文" class="headerlink" title="凭据不落上下文"></a>凭据不落上下文</h2><p>执行安全里最容易翻车的不是文件与网络，而是身份。原因很直接：模型参与的每一个环节——提示、工具参数、日志、缓存键、错误堆栈——都可能成为一次复制粘贴的载体，而凭据一旦被复制进上下文，就没有任何后续控制能把它请出去。</p>
+<p>因此基线约束应该写成禁止性表述，并且可自动化检查：凭据不得进入模型上下文；不得作为工具参数传入；不得透传进执行域的环境变量；不得写入标准输出与标准错误；不得出现在链路跟踪的属性值里；不得参与缓存键的拼接；不得落进任何示例配置或测试固件。审计与监控侧只记录四样东西：凭据的指纹、指纹算法的版本、过期时间、来源系统标识。需要轮换或撤销时，触发的是代理侧的一次替换，而不是上下文里的一次更正。</p>
+<p>能落地的形态是把”持有身份”这件事从执行链路里移出去。执行域发出的请求先经过一个凭据代理：代理按调用方出示的短时上下文标识找到对应会话的授权，在请求发出前补齐下游需要的认证材料，再把响应交回执行域。执行域看到的是一段已经带上授权的结果，它自己从未拿到过长生命周期的密钥。这套形态的额外好处正好落在本文的轴上：停用可以做得很细——按会话、按租户、按下游系统撤权都是代理侧的一次配置变更，不需要去回收散落在各处的凭据。</p>
+<pre class="mermaid">sequenceDiagram
+    participant M as 编排器
+    participant S as 执行域
+    participant P as 凭据代理
+    participant D as 下游服务
+    M->>S: 下发任务与短时上下文标识
+    S->>P: 发起请求，携带上下文标识
+    P->>P: 校验作用域、有效期、租户归属
+    P->>D: 补全认证材料后以代理身份转发
+    D-->>P: 响应
+    P-->>S: 结果，不含长期凭据
+    S-->>M: 执行输出与审计摘要</pre>
+
+<p>协议侧的变化值得单列。本文日期可用的 MCP 2026-07-28 修订把客户端授权流做得更严：强制校验 OAuth 的 issuer，让”这个令牌是不是这台服务器发的”变成客户端必做的判定；以 Client ID Metadata Documents 取代动态注册，让客户端标识的可信来源从”注册一次长期有效”变成可解析、可过期的元数据。对执行平台的直接影响是：接入一个新服务端时，标识校验失败必须是硬失败，不能降级成一条告警继续放行。</p>
+<h2 id="多租户隔离域与共享池"><a href="#多租户隔离域与共享池" class="headerlink" title="多租户隔离域与共享池"></a>多租户隔离域与共享池</h2><p>单个沙箱只有一个”用户”。平台至少有三个：租户、会话、执行，再加上第四个隐性的——数据。域怎么划，直接决定爆炸半径，也决定成本结构。</p>
+<table>
+<thead>
+<tr>
+<th>域</th>
+<th>生命周期</th>
+<th>典型载体</th>
+<th>主要风险</th>
+<th>体系控制点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>租户域</td>
+<td>长期</td>
+<td>命名空间或虚机池、独立出口清单</td>
+<td>跨租户可见、配额侵占</td>
+<td>独占池、独立凭据作用域、独立审计索引</td>
+</tr>
+<tr>
+<td>会话域</td>
+<td>一段对话或一次作业</td>
+<td>工作区目录、临时层</td>
+<td>会话残留被复用</td>
+<td>会话结束即销毁、缓存键含会话摘要标识</td>
+</tr>
+<tr>
+<td>执行域</td>
+<td>一次工具调用</td>
+<td>进程或微虚机实例</td>
+<td>越界副作用</td>
+<td>边界快照、逐层拒绝计数、时长与配额上限</td>
+</tr>
+<tr>
+<td>数据域</td>
+<td>与产物同寿</td>
+<td>只读根、输出制品</td>
+<td>敏感内容随结果外流</td>
+<td>输出过滤与截断、指纹化留痕</td>
+</tr>
+</tbody></table>
+<p>共享池与独占池的取舍不需要一张万能表，需要的是三个判据：这一批执行是否共享同一个内核实例；是否共享同一份出口清单；是否共享同一份凭据作用域。三个”是”里只要有任何一个落在两个不同租户之间，就要么升级到独占池，要么把该项拆到租户级。冷启动与成本是这套判据的代价项，不是决策项——把它们当决策项，最终得到的往往是”为了省启动时间，把出口清单做成全租户共享”。</p>
+<p>数据回流是多租户里最容易被忽略的通道，三类残留要各自处理。临时文件系统与会话工作区必须在会话结束时销毁，销毁失败要成为一条告警而不是静默重试；平台自身的模板、示例与提示片段不能混入任何真实租户内容，否则它就成了一条跨租户的传输通道；缓存与向量索引的键要包含租户标识，但这个标识本身应该是不可反查的摘要，绝不能把手机号、身份证件号一类的直接标识拼进键里。</p>
+<p>会话隔离与租户边界的授权语义，Agent 安全与权限控制一文已经给过；本节只补执行侧的物理面：域划到多细、什么时候销毁、销毁失败算不算事故。</p>
+<h2 id="逃逸面的分类与控制点"><a href="#逃逸面的分类与控制点" class="headerlink" title="逃逸面的分类与控制点"></a>逃逸面的分类与控制点</h2><p>安全评审里最没用的说法是”存在被逃逸的风险”。有用的做法是把”面”分类，给每一类配上控制点与度量口径，让讨论能落到具体动作上。先声明纪律：本节只描述面与控制点，不涉及任何具体绕过方法、不引用任何漏洞编号、不复述任何案例细节——这些内容对建设方没有增量，对攻击方有。</p>
+<table>
+<thead>
+<tr>
+<th>面</th>
+<th>成立条件（类别描述）</th>
+<th>控制点</th>
+<th>度量口径</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>内核面</td>
+<td>执行单元与宿主共享同一内核实例</td>
+<td>微虚机或用户态内核叠加、系统调用过滤、capability 丢弃</td>
+<td>共享内核的租户对数、被过滤调用的拒绝计数</td>
+</tr>
+<tr>
+<td>容器运行时面</td>
+<td>与守护进程共享管理通道</td>
+<td>特权形态禁绝、套接字不入执行域、运行时版本统一</td>
+<td>特权形态执行次数、版本落后节点数</td>
+</tr>
+<tr>
+<td>虚机与宿主管理面</td>
+<td>设备模型或管理通道暴露</td>
+<td>极简设备模型、宿主加固、管理通道与数据面分离</td>
+<td>设备模型项数、宿主暴露端口数</td>
+</tr>
+<tr>
+<td>运行时与语言层</td>
+<td>解释器、序列化、原生扩展自带的能力</td>
+<td>原生扩展白名单、反序列化边界、第三方包预置</td>
+<td>白名单外加载次数、运行期动态安装次数</td>
+</tr>
+<tr>
+<td>挂载与文件系统面</td>
+<td>写到了边界外的持久位置</td>
+<td>只读根、临时层、白名单挂载</td>
+<td>越界写尝试计数、白名单外路径命中</td>
+</tr>
+<tr>
+<td>网络出口面</td>
+<td>允许到达的地址过宽</td>
+<td>默认拒绝、目的地清单、依赖构建期物化</td>
+<td>出口拒绝率、清单变更未审批次数</td>
+</tr>
+<tr>
+<td>协议与工具面</td>
+<td>外部服务端提供的描述与结果影响模型</td>
+<td>服务端标识校验、注册表可溯源、废弃项迁移计划</td>
+<td>未溯源工具数、废弃项仍在用数量</td>
+</tr>
+<tr>
+<td>身份与凭据面</td>
+<td>凭据进入上下文或被越作用域使用</td>
+<td>代理注入、短时作用域、指纹化审计</td>
+<td>上下文命中凭据模式的次数</td>
+</tr>
+<tr>
+<td>数据回流与残留面</td>
+<td>上一执行的信息进入下一执行或另一租户</td>
+<td>会话即焚、缓存键约束、模板净化</td>
+<td>销毁失败次数、跨会话缓存命中</td>
+</tr>
+<tr>
+<td>运维与配置面</td>
+<td>谁能改基线、改完多久生效</td>
+<td>策略即代码、签名下发、只允许收窄的继承</td>
+<td>未走评审的变更数、过期未回收的放宽数</td>
+</tr>
+</tbody></table>
+<p>这张表的价值在于它能变成仪表盘，仪表盘能变成告警规则。三个跨面的原则值得单拎出来。</p>
+<p>第一，共享程度是最强的自变量。上面几乎所有面的成立条件，最后都能化简成”多少个不可信执行共享了同一份什么东西”。体系设计里凡是遇到”共享以省成本”的决定，都要显式回答这一层的共享方跨了几个租户。</p>
+<p>第二，面与面之间不是独立事件。内核面与网络面同时成立的执行，其影响面是相加关系——一次越界若没有出口，就带不走数据；有出口但没有越界，就只能走合规通道。所以资源应该优先花在切断”越界且可外发”这条链上，具体落点是临时层的持久化限制加出口目的地清单。</p>
+<p>第三，检测要分层心跳。执行域内的拒绝计数、边界快照的哈希、宿主的加固状态、代理侧的撤权事件，四层各自上报且互相印证；任何一层长时间静默本身就是一条告警，而不是”没数据就是没事”。</p>
+<h2 id="资源与时长限制作为安全控制"><a href="#资源与时长限制作为安全控制" class="headerlink" title="资源与时长限制作为安全控制"></a>资源与时长限制作为安全控制</h2><p>配额通常被当成成本工具，但在执行安全体系里，它首先是确定性失败模式的工具。没有上限的执行有两种坏结局：跑不完，或者跑过了。前者让取消与超时语义失去意义，后者让”边界曾经生效过”这件事无法证明。</p>
+<p>要当作控制项写进边界声明的，至少包括：CPU 份额与权重、内存上限以及到达上限时的行为（杀进程还是终止整个执行域，必须显式声明）、进程与线程数、文件描述符数、磁盘写入字节与临时空间上限、出站并发连接与带宽、标准输出与标准错误的字节数、墙钟总时长、步骤数与工具调用次数上限、累计计算成本。这些值本文一个都不给具体数字——它们应该由负载画像决定，任何照抄来的阈值都是假的。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 内部描述格式的示意：字段名由本文自造，不代表任何产品的配置项</span></span><br><span class="line"><span class="keyword">from</span> dataclasses <span class="keyword">import</span> dataclass</span><br><span class="line"></span><br><span class="line"><span class="meta">@dataclass</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Guardrail</span>:</span><br><span class="line">    cpu_share: <span class="built_in">int</span>              <span class="comment"># CPU 份额，示意值</span></span><br><span class="line">    memory_mb: <span class="built_in">int</span>              <span class="comment"># 内存上限</span></span><br><span class="line">    memory_action: <span class="built_in">str</span>          <span class="comment"># kill_domain 或 kill_process</span></span><br><span class="line">    pids_max: <span class="built_in">int</span>               <span class="comment"># 进程与线程数上限</span></span><br><span class="line">    open_files_max: <span class="built_in">int</span>         <span class="comment"># 文件描述符上限</span></span><br><span class="line">    disk_write_mb: <span class="built_in">int</span>          <span class="comment"># 写入字节配额</span></span><br><span class="line">    stdout_bytes: <span class="built_in">int</span>           <span class="comment"># 输出字节配额，超出即截断</span></span><br><span class="line">    wall_clock_s: <span class="built_in">int</span>           <span class="comment"># 墙钟总时长</span></span><br><span class="line">    max_tool_calls: <span class="built_in">int</span>         <span class="comment"># 步骤数上限</span></span><br><span class="line">    budget_units: <span class="built_in">int</span>           <span class="comment"># 累计成本上限</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 团队约定示例：读多写少的分析型执行域，数值为示意值</span></span><br><span class="line">ANALYTIC = Guardrail(<span class="number">256</span>, <span class="number">1024</span>, <span class="string">&quot;kill_domain&quot;</span>, <span class="number">128</span>, <span class="number">512</span>, <span class="number">256</span>,</span><br><span class="line">                     <span class="number">2_000_000</span>, <span class="number">300</span>, <span class="number">12</span>, <span class="number">50</span>)</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">harden</span>(<span class="params">domain, g: Guardrail</span>) -&gt; <span class="literal">None</span>:</span><br><span class="line">    domain.apply_cgroups(g)                          <span class="comment"># 配额落在 cgroups 面</span></span><br><span class="line">    domain.set_timeout(g.wall_clock_s, reason=<span class="string">&quot;wall_clock&quot;</span>)</span><br><span class="line">    domain.set_step_limit(g.max_tool_calls, reason=<span class="string">&quot;steps&quot;</span>)</span><br><span class="line">    domain.set_budget(g.budget_units, reason=<span class="string">&quot;cost&quot;</span>)</span><br><span class="line">    <span class="comment"># 任一上限触发都必须产生一条可查询的审计事件，而不是静默重试</span></span><br></pre></td></tr></table></figure>
+
+<p>取消与超时的语义在体系层面要回答三个问题：由谁发起、如何传播、副作用如何收敛。发起方有三类——平台超时、用户或审批人取消、紧急停用；三者的传播链必须能到达最深层的子执行，否则”取消”只杀掉了父进程。副作用收敛要按动作类型区分：只读动作可以直接丢弃；写动作要有补偿点或幂等标识；外发动作要有”已发出但不确定是否生效”的中间态，并允许后续核对。单次执行里超时怎么设、取消怎么实现，代码执行沙箱设计一文已经展开；本节关心的是所有上限事件是否进了同一个审计流、能不能按租户聚合出分布。</p>
+<p>配额同时是滥用面最直接的控制点。资源耗尽类风险不需要在这里描述细节，只需要一句工程结论：上限的存在，让这类风险从一次可用性事故降级成一条可查询的失败记录。至于额度与动作分级的授权语义属于权限控制一文的范围，本文只把额度当作边界声明里的一个字段处理。</p>
+<h2 id="审计与取证留痕"><a href="#审计与取证留痕" class="headerlink" title="审计与取证留痕"></a>审计与取证留痕</h2><p>审计数据的取舍有个反直觉的前提：留痕不是越多越好。审计流本身就是一个高价值的数据集合，它会被复制、被导出、被下游二次分析，因此它同样要遵守最小必要。本节按”记什么、不记什么”两栏写。</p>
+<p>不得采集、也不得写入审计流的：手机号与身份证件号一类的直接标识、精确地理位置、剪贴板内容、屏幕像素原文、提示与回复的原文（只允许摘要与指纹）、任何凭据或其可还原形式、执行域内读到的业务数据正文。</p>
+<p>应该记录的：执行标识与父执行标识、触发源（人工、会话、定时、事件）、租户与会话的摘要标识、策略版本与边界快照的哈希、镜像与运行时版本摘要、挂载与能力集的结构化摘要、出口清单的摘要、动作序列与工具名及参数指纹、每一次拒绝事件发生在哪一层以及规则标识、结果状态与失败码、资源峰值与截断标记、审批人与审批时间、带时区偏移的时间戳、停用与撤权事件、灰度批次标识。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 示意：审计事件的构造，字段名由本文自造；注意没有任何原文字段</span></span><br><span class="line"><span class="keyword">type</span> <span class="title class_">AuditEvent</span> = &#123;</span><br><span class="line">  <span class="attr">execId</span>: <span class="built_in">string</span>;</span><br><span class="line">  <span class="attr">parentExecId</span>?: <span class="built_in">string</span>;                  <span class="comment">// 子执行的谱系</span></span><br><span class="line">  <span class="attr">trigger</span>: <span class="string">&quot;human&quot;</span> | <span class="string">&quot;session&quot;</span> | <span class="string">&quot;timer&quot;</span> | <span class="string">&quot;event&quot;</span>;</span><br><span class="line">  <span class="attr">tenantRef</span>: <span class="built_in">string</span>;                      <span class="comment">// 不可反查的摘要标识</span></span><br><span class="line">  <span class="attr">policyVersion</span>: <span class="built_in">string</span>;</span><br><span class="line">  <span class="attr">boundaryHash</span>: <span class="built_in">string</span>;                   <span class="comment">// 边界快照的哈希</span></span><br><span class="line">  <span class="attr">action</span>: <span class="built_in">string</span>;                         <span class="comment">// 工具名，不含参数原文</span></span><br><span class="line">  <span class="attr">argsFingerprint</span>: <span class="built_in">string</span>;                <span class="comment">// 参数指纹，截断摘要</span></span><br><span class="line">  <span class="attr">denial</span>?: &#123; <span class="attr">layer</span>: <span class="built_in">string</span>; <span class="attr">ruleRef</span>: <span class="built_in">string</span> &#125;;</span><br><span class="line">  <span class="attr">resourcePeak</span>?: <span class="title class_">Record</span>&lt;<span class="built_in">string</span>, <span class="built_in">number</span>&gt;;  <span class="comment">// 示意值</span></span><br><span class="line">  <span class="attr">outcome</span>: <span class="string">&quot;ok&quot;</span> | <span class="string">&quot;failed&quot;</span> | <span class="string">&quot;timeout&quot;</span> | <span class="string">&quot;cancelled&quot;</span> | <span class="string">&quot;truncated&quot;</span>;</span><br><span class="line">  <span class="attr">approverRef</span>?: <span class="built_in">string</span>;</span><br><span class="line">  <span class="attr">ts</span>: <span class="built_in">string</span>;                             <span class="comment">// 带时区偏移</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">summarize</span>(<span class="params"><span class="attr">value</span>: <span class="built_in">unknown</span></span>): <span class="built_in">string</span> &#123;</span><br><span class="line">  <span class="keyword">const</span> digest = <span class="title function_">fingerprint</span>(value);      <span class="comment">// 指纹算法及其版本随策略走</span></span><br><span class="line">  <span class="keyword">return</span> digest.<span class="title function_">slice</span>(<span class="number">0</span>, <span class="number">12</span>);             <span class="comment">// 只留短摘要，绝不落原文</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>落笔时还有三条纪律。第一，指纹与摘要要带算法版本：审计里出现一个短摘要，两年后没人能判断它是哪种哈希、截了几位，缺版本号的摘要不可比对，因而也不具备可用性。第二，写入与查询权限分离、存储保持追加式。取证场景里最怕”记录能改”，一旦可改，整条链的证据价值归零；常见做法是审计落在与业务库不同的存储里，用哈希链串起相邻记录，校验任务定期跑，校验失败按安全事件处理而不是按数据质量告警处理。第三，留存要分层：热层服务排障、窗口短；合规层服务审计、窗口长但字段更稀；派生指标层服务仪表盘、只留聚合。同一份原文跨三层复制是最糟的形态。</p>
+<p>取证的验收标准可以写成一句话：能在不接触任何业务原文的前提下，重建出这一次执行用了哪一版边界、放行了哪些动作、谁批准的、拒绝了哪些动作、结果被如何处理。能过这句话的系统，通常也能过大部分外部审计。</p>
+<h2 id="灰度、停用与应急"><a href="#灰度、停用与应急" class="headerlink" title="灰度、停用与应急"></a>灰度、停用与应急</h2><p>体系的可控性最终由变更能力定义：能不能小范围先试，能不能在几十秒内停，能不能退回上一版。</p>
+<p>策略变更走四段。第一段是草稿与评审，评审只关注一件事——这条变更是收窄还是放宽，任何放宽都要有到期时间。第二段是影子运行：策略生效但不拦截，只产出”若拦截会发生什么”的事件，用来估计误伤率与规则覆盖；这一段应该覆盖至少一个完整的业务周期，而不是几个小时。第三段是灰度：按租户、区域、运行时版本分批，批次之间留出可观测的窗口；隔离层版本与镜像版本必须跟批次一起走，绝不能出现”新策略在旧运行时上强制”的组合。第四段是全量与回收：上一批的放宽项到期未回收，自动降级为拒绝并留一条事件。</p>
+<pre class="mermaid">stateDiagram-v2
+    [*] --> Draft
+    Draft --> Shadow: 评审通过
+    Shadow --> Canary: 误伤率可接受
+    Canary --> Enforced: 批次全绿
+    Enforced --> RolledBack: 检出回归
+    RolledBack --> Draft
+    Shadow --> Draft: 影子结果不可接受
+    Enforced --> Retired: 被新基线取代
+    Retired --> [*]</pre>
+
+<p>紧急停用要有三种粒度，且每种能独立触发。全局停用是把某类执行形态整体关掉，例如所有运行期动态安装依赖的执行；按服务端或按工具停用是把某个 MCP 服务端或某个工具从注册表里摘掉，新执行立刻不可见，同时在凭据代理侧做一次撤权；按租户停用是冻结该租户的所有新执行。停用还要有一个明确的默认语义，并按动作类型区分：只读类可以直接掐断，写类与外发类默认应当是”拒绝新执行加在途收敛”，因为硬杀在途写比让它做完更危险。这个默认值要写在策略里，不能等到事故现场再决定。</p>
+<p>演练与值班是应急的两条腿。停用的实际生效时延要定期测，测的是从下发到最下游控制器真正拒绝的端到端时长，测完留事件——一个从没演练过的开关不能算存在。变更冻结窗口用在大版本切换与重要节点前后；值班同学手里只需要一张动作卡：谁能批停用、停用影响哪些租户、恢复判据是什么、通知怎么走。</p>
+<h2 id="权限矩阵模板与落地检查"><a href="#权限矩阵模板与落地检查" class="headerlink" title="权限矩阵模板与落地检查"></a>权限矩阵模板与落地检查</h2><p>矩阵的两个轴由本文自己定：行是隔离层，列是动作。它与授权矩阵的差别在语义落点——授权矩阵回答”谁可以做什么”，这张矩阵回答”在哪一层、以什么形态做，被拒时是哪一层拒的”。围栏里给的是可以直接抄改的结构，字段名是本文自造的内部模板，落地时替换成平台自己的描述格式即可。</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 隔离层 × 动作 的权限矩阵模板（内部格式示意，字段名不代表任何产品）</span></span><br><span class="line"><span class="attr">meta:</span></span><br><span class="line">  <span class="attr">version:</span> <span class="string">&quot;policy-2026-08-a&quot;</span>          <span class="comment"># 策略版本，其摘要进审计事件</span></span><br><span class="line">  <span class="attr">inheritance:</span> <span class="string">narrow-only</span>             <span class="comment"># 子层只能收窄，放宽需审批并带到期</span></span><br><span class="line">  <span class="attr">conflict:</span> <span class="string">most-restrictive</span>           <span class="comment"># 冲突取更严格值并记录一条事件</span></span><br><span class="line"><span class="attr">defaults:</span></span><br><span class="line">  <span class="attr">posture:</span> <span class="string">deny-all</span>                    <span class="comment"># 未显式授予即拒绝</span></span><br><span class="line">  <span class="attr">approval:</span> <span class="string">required</span>                   <span class="comment"># 任何 allow 都要有审批记录</span></span><br><span class="line">  <span class="attr">audit:</span> <span class="string">full</span>                          <span class="comment"># 允许与拒绝都产事件</span></span><br><span class="line">  <span class="attr">kill_switch:</span> [<span class="string">global</span>, <span class="string">server</span>, <span class="string">tenant</span>]</span><br><span class="line"><span class="attr">layers:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">layer:</span> <span class="string">host-kernel</span>                 <span class="comment"># 内核面</span></span><br><span class="line">    <span class="attr">actions:</span></span><br><span class="line">      <span class="attr">exec_generated_code:</span> &#123; <span class="attr">mode:</span> <span class="string">forbidden</span>, <span class="attr">reason:</span> <span class="string">&quot;宿主内核面不得直接执行生成代码&quot;</span> &#125;</span><br><span class="line">      <span class="attr">syscall_filter:</span> &#123; <span class="attr">mode:</span> <span class="string">allow</span>, <span class="attr">value:</span> <span class="string">baseline</span>, <span class="attr">drift_check:</span> <span class="string">required</span> &#125;</span><br><span class="line">  <span class="bullet">-</span> <span class="attr">layer:</span> <span class="string">microvm</span>                     <span class="comment"># 微虚机面</span></span><br><span class="line">    <span class="attr">actions:</span></span><br><span class="line">      <span class="attr">exec_generated_code:</span> &#123; <span class="attr">mode:</span> <span class="string">allow</span>, <span class="attr">requires:</span> [<span class="string">policy-signature</span>, <span class="string">boundary-snapshot</span>] &#125;</span><br><span class="line">      <span class="attr">install_native_ext:</span> &#123; <span class="attr">mode:</span> <span class="string">approval</span>, <span class="attr">ttl_hours:</span> <span class="number">24</span>, <span class="attr">audit:</span> <span class="string">full</span> &#125;</span><br><span class="line">      <span class="attr">reboot_guest:</span> &#123; <span class="attr">mode:</span> <span class="string">allow</span>, <span class="attr">audit:</span> <span class="string">full</span> &#125;</span><br><span class="line">  <span class="bullet">-</span> <span class="attr">layer:</span> <span class="string">container</span>                   <span class="comment"># 容器与 cgroups 面</span></span><br><span class="line">    <span class="attr">actions:</span></span><br><span class="line">      <span class="attr">read_workspace:</span> &#123; <span class="attr">mode:</span> <span class="string">allow</span>, <span class="attr">scope:</span> <span class="string">session-workspace</span> &#125;</span><br><span class="line">      <span class="attr">write_workspace:</span> &#123; <span class="attr">mode:</span> <span class="string">allow</span>, <span class="attr">scope:</span> <span class="string">tmp-overlay</span>, <span class="attr">persist:</span> <span class="literal">false</span> &#125;</span><br><span class="line">      <span class="attr">write_outside_scope:</span> &#123; <span class="attr">mode:</span> <span class="string">forbidden</span>, <span class="attr">alarm:</span> <span class="string">denial-event</span> &#125;</span><br><span class="line">      <span class="attr">outbound_http:</span> &#123; <span class="attr">mode:</span> <span class="string">deny-all</span>, <span class="attr">allowlist:</span> <span class="string">egress-v1</span>, <span class="attr">approval:</span> <span class="string">required</span> &#125;</span><br><span class="line">      <span class="attr">pull_artifact_at_runtime:</span> &#123; <span class="attr">mode:</span> <span class="string">approval</span>, <span class="attr">prefer:</span> <span class="string">build-time-materialize</span> &#125;</span><br><span class="line">      <span class="attr">share_daemon_socket:</span> &#123; <span class="attr">mode:</span> <span class="string">forbidden</span> &#125;</span><br><span class="line">  <span class="bullet">-</span> <span class="attr">layer:</span> <span class="string">capability</span>                  <span class="comment"># 能力与系统调用面</span></span><br><span class="line">    <span class="attr">actions:</span></span><br><span class="line">      <span class="attr">wasm_import_call:</span> &#123; <span class="attr">mode:</span> <span class="string">allow</span>, <span class="attr">grants:</span> [<span class="string">args</span>, <span class="string">random</span>, <span class="string">clock</span>], <span class="attr">ttl:</span> <span class="string">exec</span> &#125;</span><br><span class="line">      <span class="attr">access_device:</span> &#123; <span class="attr">mode:</span> <span class="string">forbidden</span> &#125;</span><br><span class="line">      <span class="attr">spawn_process:</span> &#123; <span class="attr">mode:</span> <span class="string">allow</span>, <span class="attr">limit:</span> <span class="string">pids-max</span> &#125;</span><br><span class="line">  <span class="bullet">-</span> <span class="attr">layer:</span> <span class="string">credential</span>                  <span class="comment"># 凭据与身份面</span></span><br><span class="line">    <span class="attr">actions:</span></span><br><span class="line">      <span class="attr">read_secret_value:</span> &#123; <span class="attr">mode:</span> <span class="string">forbidden</span> &#125;</span><br><span class="line">      <span class="attr">request_via_broker:</span> &#123; <span class="attr">mode:</span> <span class="string">allow</span>, <span class="attr">scope:</span> [<span class="string">tenant</span>, <span class="string">downstream</span>, <span class="string">action</span>], <span class="attr">ttl_minutes:</span> <span class="number">15</span> &#125;</span><br><span class="line">      <span class="attr">put_token_in_context:</span> &#123; <span class="attr">mode:</span> <span class="string">forbidden</span>, <span class="attr">alarm:</span> <span class="string">policy-violation</span> &#125;</span><br><span class="line">  <span class="bullet">-</span> <span class="attr">layer:</span> <span class="string">data-egress</span>                 <span class="comment"># 数据与输出面</span></span><br><span class="line">    <span class="attr">actions:</span></span><br><span class="line">      <span class="attr">return_stdout:</span> &#123; <span class="attr">mode:</span> <span class="string">allow</span>, <span class="attr">truncate_bytes:</span> <span class="string">limit</span>, <span class="attr">filter:</span> <span class="string">sensitive-scan</span> &#125;</span><br><span class="line">      <span class="attr">write_artifact:</span> &#123; <span class="attr">mode:</span> <span class="string">allow</span>, <span class="attr">scope:</span> <span class="string">tenant-artifact</span> &#125;</span><br><span class="line">      <span class="attr">emit_raw_prompt_to_audit:</span> &#123; <span class="attr">mode:</span> <span class="string">forbidden</span>, <span class="attr">use:</span> <span class="string">fingerprint-only</span> &#125;</span><br></pre></td></tr></table></figure>
+
+<p>模板用起来有三处要注意。第一，动作模式最好只保留四种，评审成本最低：allow、approval、deny-all（有清单则可申请开洞）、forbidden（不给任何审批路径）。区分 deny-all 与 forbidden 很关键——前者是”默认拒绝但可申请开洞”，后者是”体系不允许这个动作存在”，把 forbidden 一类的动作显式列出来，是平台自我约束的核心。第二，每个 approval 都要有到期时间与回收动作，否则口子只会变多不会变少。第三，每个动作都要指明被拒时由哪一层报事件，否则审计里的拒绝没有归因，漂移检测也无从比对。</p>
+<p>落地检查清单建议按七步走：把模型可影响的执行路径列成清单并版本化，逐条确认有对应控制点；确认平台基线以签名产物下发、继承只允许收窄；确认四种动作模式的划分经过安全与业务共同评审，且 forbidden 清单成文；确认凭据在任何链路上不进上下文，代理侧能做到按会话撤权；确认审计流里没有直接标识、没有原文、摘要带算法版本，存储追加式且读写权限分离；确认停用的三种粒度最近演练过、端到端时延有记录；确认废弃协议项与旧运行时版本有带截止日的迁移计划。</p>
+<p>七步都难以一次做完的团队，建议先做第三步与第六步——一份写明”永不允许”的动作清单，加一个演练过的停用开关，通常比再叠一层隔离更有收益。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>体系与单点的差别，在于前者必须能被下发、被度量、被回收。本文的轴因此定在四处：把模型可影响的执行路径一条条列出来并版本化；把隔离层按面分工叠加，用共享程度而不是启动成本决定池的边界；把策略当代码，只允许收窄地继承，用影子运行与分批灰度换可控性；把停用做成三种随时待命、定期演练的粒度。凭据不进上下文与审计不采直接标识这两条禁止性约束，是整套体系里最不该用”最佳实践”的语气去讲的——它们是硬线。安全纪律方面，本文只描述面与控制点，不给任何绕过方法、漏洞编号或案例细节。若只留一句可执行的建议：先列出永不允许的动作清单，再演练一次紧急停用。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://firecracker-microvm.github.io/">Firecracker 项目主页</a></li>
+<li><a href="https://gvisor.dev/">gVisor 官方文档站</a></li>
+<li><a href="https://katacontainers.io/">Kata Containers 项目主页</a></li>
+<li><a href="https://modelcontextprotocol.io/">Model Context Protocol 规范站点</a></li>
+<li><a href="https://docs.kernel.org/">Linux 内核官方文档</a></li>
+<li><a href="https://kubernetes.io/">Kubernetes 文档站</a></li>
+<li><a href="https://wasi.dev/">WASI 站点</a></li>
+<li><a href="https://wasmtime.dev/">wasmtime 项目主页</a></li>
+<li><a href="https://owasp.org/">OWASP 项目主页</a></li>
+<li><a href="https://docs.docker.com/">Docker 官方文档站</a></li>
+<li><a href="https://www.anthropic.com/engineering">Anthropic 工程栏目主页</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Agent 沙箱与执行安全</p><p><a href="https://987763485.github.io/2026/08/29/Agent沙箱与执行安全/">https://987763485.github.io/2026/08/29/Agent沙箱与执行安全/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2026-08-29</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-21</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="link-muted mr-2" rel="tag" href="/tags/python/">python</a><a class="link-muted mr-2" rel="tag" href="/tags/agent/">agent</a><a class="link-muted mr-2" rel="tag" href="/tags/typescript/">typescript</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2026/09/03/Agent%E5%B7%A5%E5%85%B7%E7%94%9F%E6%80%81%E4%B8%8EMCPServer/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Agent 工具生态与 MCP Server</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2026/08/22/%E9%95%BF%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8E%8B%E7%BC%A9%E6%8A%80%E6%9C%AF/"><span class="level-item">长上下文压缩技术</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>等保 2.0 安全通用要求解读 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="本文面向正在配合等级保护工作的开发者与运维人员，讨论等保 2.0 报批稿中“安全通用要求”这一部分的整体框架：它为什么从等保 1.0 的条款清单转向“一个中心、三重防护”，通用要求与云、移动、物联网、工控四类扩展要求如何叠加，以及一家企业从现状走到测评通过大致要经历哪些步骤。读完之后，你应当能判断自己的系统属于哪类定级对象、需要叠加哪些扩展要求，并能据此列出一份差距评估清单。"><meta property="og:type" content="blog"><meta property="og:title" content="等保 2.0 安全通用要求解读"><meta property="og:url" content="https://987763485.github.io/2018/11/27/%E7%AD%89%E4%BF%9D2.0%E5%AE%89%E5%85%A8%E9%80%9A%E7%94%A8%E8%A6%81%E6%B1%82%E8%A7%A3%E8%AF%BB/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="本文面向正在配合等级保护工作的开发者与运维人员，讨论等保 2.0 报批稿中“安全通用要求”这一部分的整体框架：它为什么从等保 1.0 的条款清单转向“一个中心、三重防护”，通用要求与云、移动、物联网、工控四类扩展要求如何叠加，以及一家企业从现状走到测评通过大致要经历哪些步骤。读完之后，你应当能判断自己的系统属于哪类定级对象、需要叠加哪些扩展要求，并能据此列出一份差距评估清单。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2018-11-27T06:17:41.000Z"><meta property="article:modified_time" content="2026-10-18T12:22:57.892Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="网络安全"><meta property="article:tag" content="等级保护"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2018/11/27/%E7%AD%89%E4%BF%9D2.0%E5%AE%89%E5%85%A8%E9%80%9A%E7%94%A8%E8%A6%81%E6%B1%82%E8%A7%A3%E8%AF%BB/"},"headline":"等保 2.0 安全通用要求解读","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2018-11-27T06:17:41.000Z","dateModified":"2026-10-18T12:22:57.892Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"本文面向正在配合等级保护工作的开发者与运维人员，讨论等保 2.0 报批稿中“安全通用要求”这一部分的整体框架：它为什么从等保 1.0 的条款清单转向“一个中心、三重防护”，通用要求与云、移动、物联网、工控四类扩展要求如何叠加，以及一家企业从现状走到测评通过大致要经历哪些步骤。读完之后，你应当能判断自己的系统属于哪类定级对象、需要叠加哪些扩展要求，并能据此列出一份差距评估清单。"}</script><link rel="canonical" href="https://987763485.github.io/2018/11/27/%E7%AD%89%E4%BF%9D2.0%E5%AE%89%E5%85%A8%E9%80%9A%E7%94%A8%E8%A6%81%E6%B1%82%E8%A7%A3%E8%AF%BB/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2018-11-27T06:17:41.000Z" title="11/27/2018, 2:17:41 PM">2018-11-27</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a></span><span class="level-item">1 小时读完 (大约7375个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">等保 2.0 安全通用要求解读</h1><div class="content"><p>本文面向正在配合等级保护工作的开发者与运维人员，讨论等保 2.0 报批稿中“安全通用要求”这一部分的整体框架：它为什么从等保 1.0 的条款清单转向“一个中心、三重防护”，通用要求与云、移动、物联网、工控四类扩展要求如何叠加，以及一家企业从现状走到测评通过大致要经历哪些步骤。读完之后，你应当能判断自己的系统属于哪类定级对象、需要叠加哪些扩展要求，并能据此列出一份差距评估清单。</p>
+<p>需要先交代写作时点。截至本文写作时，等保 2.0 相关标准尚处报批与试点阶段，以下内容依据公开的报批稿思路整理，正式条款以发布文本为准。文中出现的“要求”“控制点”等说法，指的是报批稿里的表述层次，不针对任何已生效文本的编号；涉及具体条目时，也请以本单位拿到的正式文本和测评机构的口径为准。</p>
+<h2 id="从等保-1-0-到-2-0：为什么必须调整"><a href="#从等保-1-0-到-2-0：为什么必须调整" class="headerlink" title="从等保 1.0 到 2.0：为什么必须调整"></a>从等保 1.0 到 2.0：为什么必须调整</h2><h3 id="1-0-打下了什么底子"><a href="#1-0-打下了什么底子" class="headerlink" title="1.0 打下了什么底子"></a>1.0 打下了什么底子</h3><p>等保 1.0 的核心是一套以 GB&#x2F;T 22239-2008 为主干的标准组合：定级指南回答“系统该定几级”，基本要求回答“每一级要满足什么”，实施指南回答“按什么顺序做”，测评要求回答“怎么判定合格”。这套体系的贡献在于把“安全”从一句口号变成了可以分解、可以检查、可以复测的条目，并且确立了自主定级、专家评审、主管部门审核、公安机关备案、测评与整改这条行政与技术交织的流程。</p>
+<p>但它的问题也同样明显。1.0 的条款是围绕“一个机房、一批服务器、一条边界”的假设写出来的，叙述方式偏重“有没有”，例如有没有防火墙、有没有防病毒软件、有没有审计记录。这套写法在当年是合理的，因为业务系统大多部署在自建机房里，资产边界和网络边界基本重合。</p>
+<p>十年之后，情况已经变了。虚拟化、容器、公有云把“资产”变成了随时生成又随时销毁的东西；移动办公让终端离开了办公室；物联网把成千上万个弱计算能力的设备接进了生产网络；工控系统则要求“不能随便打补丁、不能随便重启”。同一个“边界”，在不同场景下含义完全不同。继续用一份静态清单去套所有系统，结果只能是两头不讨好：真正危险的地方没被问到，无关痛痒的地方反复检查。</p>
+<h3 id="新场景把边界打散了"><a href="#新场景把边界打散了" class="headerlink" title="新场景把边界打散了"></a>新场景把边界打散了</h3><p>云计算带来的第一个变化是责任共担。机房、物理机、虚拟化平台由云服务商负责，操作系统以上的部分由租户负责，中间还有一层由双方约定。1.0 的条款没有为“责任分界”留位置，测评时经常出现“这条到底查谁”的争论。</p>
+<p>移动互联带来的变化是终端不可控。手机可能被 root，可能装了来路不明的应用，可能连的是咖啡店的无线网络。把移动端简单当成“一台瘦客户端”，就会漏掉终端环境可信、应用加固、数据传输保护这些真正要紧的地方。</p>
+<p>物联网带来的变化是设备本身不可信。摄像头、传感器、PLC 的计算能力和安全能力都很有限，很多设备出厂口令就是弱口令，固件几年不更新。对这类设备，靠“装个杀毒软件”是没有意义的，只能在网络侧做隔离、在接入侧做准入、在数据侧做过滤。</p>
+<p>工控带来的变化是可用性优先。工业现场的第一目标是生产不能停，补丁要经过停机窗口，流量要经过白名单，协议往往没有认证机制。把 IT 的“打补丁、装 Agent、做漏洞扫描”直接搬到工控网络上，可能直接造成停产事故。</p>
+<p>把这些变化归纳起来，就是一句话：等保 2.0 要解决的不是“条款够不够多”，而是“同一个框架能不能覆盖不同形态的系统”。这决定了它必须换一种组织方式，也就是后面要讲的“一个中心、三重防护”。</p>
+<h2 id="一个中心、三重防护：2-0-的骨架"><a href="#一个中心、三重防护：2-0-的骨架" class="headerlink" title="一个中心、三重防护：2.0 的骨架"></a>一个中心、三重防护：2.0 的骨架</h2><h3 id="从“设备清单”到“防护结构”"><a href="#从“设备清单”到“防护结构”" class="headerlink" title="从“设备清单”到“防护结构”"></a>从“设备清单”到“防护结构”</h3><p>如果只记住等保 2.0 的一件事，那应该是这个提法：以安全管理中心为核心，构建安全通信网络、安全区域边界、安全计算环境三重防护。它不是四个并列的章节标题，而是一种看待系统的顺序——先问“谁来统一下发策略、统一收审计”，再问“数据在路上、在关口、在机器上分别怎么保护”。</p>
+<pre class="mermaid">flowchart TD
+    MC[安全管理中心：策略统一下发、审计集中收集] --> CN[安全通信网络]
+    MC --> BD[安全区域边界]
+    MC --> CE[安全计算环境]
+    CN --> OBJ[定级对象]
+    BD --> OBJ
+    CE --> OBJ</pre>
+
+<p>这张图刻意画得很简单，因为实际落地时最容易犯的错恰恰是把四个格子当成四类设备去买：管理中心买一套态势感知，通信网络买几台加密机，区域边界买防火墙加入侵防御，计算环境买主机防护。设备齐了，策略却是各管一段，日志各存各的，出了事没人能把一条访问链路串起来。这不是 2.0 想要的结果。</p>
+<h3 id="安全管理中心：先有“大脑”再谈防护"><a href="#安全管理中心：先有“大脑”再谈防护" class="headerlink" title="安全管理中心：先有“大脑”再谈防护"></a>安全管理中心：先有“大脑”再谈防护</h3><p>管理中心的关注点可以概括为四件事：统一身份与授权、统一策略下发、统一日志与审计、统一监测与响应。换成工程语言，就是得有一个能回答下列问题的地方：谁在什么时间用什么账号登录了哪台机器；哪条安全策略是谁改的、什么时候改的、改之前是什么；全网哪些资产偏离了基线；一条可疑连接从哪来、经过了哪些设备、最后落到哪台主机。</p>
+<p>这一层最难的不是买产品，而是把资产清单、账号体系、日志格式、时间同步这四件“脏活”做扎实。资产不清，策略就没有下发对象；账号不统一，审计就串不起人；日志格式各异、时钟不同步，关联分析就只是摆设。很多单位在差距评估阶段被卡住，原因往往不在边界设备，而在这里。</p>
+<h3 id="三重防护各自回答什么问题"><a href="#三重防护各自回答什么问题" class="headerlink" title="三重防护各自回答什么问题"></a>三重防护各自回答什么问题</h3><p>安全通信网络回答的是“数据在路上是否安全”。关注点包括网络架构的划分是否合理（核心区、接入区、DMZ 是否分开）、关键链路是否有冗余、跨广域网的传输是否加密、带宽与并发是否有余量。落地手段通常是网络分段、VLAN 与路由策略、链路加密、流量监控。这一层最容易被忽略的是“架构”而非“设备”：如果一台核心交换机同时承载办公网、生产网和带外管理，后面堆多少防火墙都补不回来。</p>
+<p>安全区域边界回答的是“跨边界的那一步是否受控”。关注点包括边界访问控制规则是否最小化、是否做了入侵防范、是否对进出流量做恶意代码与内容检查、外部接入是否经过身份认证、无线接入是否独立管控。落地手段是防火墙、入侵防御、准入控制、代理与网关。这一层的常见问题是规则长期不清理，几千条“临时放通”堆在策略里，谁也说不清哪条还在用。</p>
+<p>安全计算环境回答的是“机器内部是否可信”。关注点包括身份鉴别与访问控制、入侵防范与恶意代码防范、数据完整性与保密性、剩余信息保护、个人信息保护、可信验证。落地手段是主机基线加固、账户与权限治理、补丁与漏洞管理、主机审计、应用层鉴权与输入校验、数据加密与脱敏。这一层的工作量最大，因为它直接落在业务系统和运维人员每天的操心上；具体的加固命令与操作步骤不属于本文范围。</p>
+<p>三层之间的关系可以这样理解：通信网络决定“路怎么修”，区域边界决定“关口怎么设”，计算环境决定“终点怎么守”，管理中心决定“谁来指挥、谁来记账”。四者缺一，防护就是断的。</p>
+<h2 id="通用要求与扩展要求：底座与叠加"><a href="#通用要求与扩展要求：底座与叠加" class="headerlink" title="通用要求与扩展要求：底座与叠加"></a>通用要求与扩展要求：底座与叠加</h2><h3 id="通用要求是所有人的底座"><a href="#通用要求是所有人的底座" class="headerlink" title="通用要求是所有人的底座"></a>通用要求是所有人的底座</h3><p>通用要求回答的是“任何定级对象都绕不开的那些事”，它与级别挂钩：级别越高，同一条要求下的强度越高，例如身份鉴别从“口令”逐步走到“双因素”，审计从“记录关键事件”逐步走到“集中审计、定期分析”。换句话说，通用要求提供的是分档的底线，而不是一份可以讨价还价的愿望清单。</p>
+<h3 id="扩展要求是针对新形态的补丁"><a href="#扩展要求是针对新形态的补丁" class="headerlink" title="扩展要求是针对新形态的补丁"></a>扩展要求是针对新形态的补丁</h3><p>扩展要求目前主要覆盖四类形态：云计算、移动互联、物联网、工业控制。它们的写法有一个共同点：不重复通用要求里已经说清楚的内容，只补充这种形态下“通用条款问不到”的地方。例如云计算的扩展要求会追问“租户之间的隔离怎么做”“镜像和快照怎么管”“云服务商与租户的责任怎么划”；移动互联会追问“移动终端环境怎么感知”“应用发布渠道怎么管”“无线接入怎么控制”；物联网会追问“感知节点怎么准入”“网关怎么过滤”；工业控制会追问“补丁怎么在停机窗口内验证”“控制协议怎么补偿认证缺失”。</p>
+<p>这就带来一个非常实际的判定问题：我的系统到底要不要叠加扩展要求？实践中可以按三步走。</p>
+<p>第一步，梳理形态。把定级对象拆成“业务应用、支撑平台、终端、网络、数据”五类资产，逐个标注它属于传统自建、云上、移动、物联还是工控。注意一个系统可能同时命中多类，例如一个电商系统跑在公有云上、同时提供手机应用、后台还连着仓库的扫码枪。</p>
+<p>第二步，判断是不是定级对象的组成部分。只有纳入同一个定级对象、承载同一套业务信息的部分，才需要一起考虑。如果某个移动应用只是查询公开信息，不承载业务数据、不与后台账户体系打通，把它硬塞进高等级定级对象里，只会让整改范围失控。这个判断要和业务方一起做，不能由技术团队单方面拍板。</p>
+<p>第三步，叠加而不是替换。用了云，就在通用要求之上加云扩展要求；用了移动，就再加移动扩展要求；两者都用，就两份都加。叠加时如果同一件事在两份要求里都有表述，按更严格的那条执行，这是实践中的通行口径，不是报批稿里的原文表述。</p>
+<p>顺带说一句边界：本文只讨论已经相对成形的四类扩展要求。新技术形态一直在出现，围绕其他形态的增补讨论也在进行，此时把某份草案里的条目当成定论写进方案，风险很大。</p>
+<h2 id="技术要求的五个方面"><a href="#技术要求的五个方面" class="headerlink" title="技术要求的五个方面"></a>技术要求的五个方面</h2><p>通用要求在结构上分为技术部分与管理部分，技术部分又分为五个方面。把这五个方面与前面的“一个中心、三重防护”对照起来看，会发现它们基本是一一映射的关系，只是多了一个物理环境。</p>
+<table>
+<thead>
+<tr>
+<th>方面</th>
+<th>回答的问题</th>
+<th>主要关注点</th>
+<th>常见落地抓手</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>安全物理环境</td>
+<td>机房本身靠不靠得住</td>
+<td>选址与建筑、防盗窃与防破坏、防雷防火防水防潮、温湿度控制、电力供应、电磁防护</td>
+<td>门禁与视频、环境监控、UPS 与双路市电、防水与消防</td>
+</tr>
+<tr>
+<td>安全通信网络</td>
+<td>数据在路上安不安全</td>
+<td>网络架构划分与冗余、通信传输的完整性与保密性、可信验证</td>
+<td>网络分区、链路冗余、链路或通道加密、流量采集</td>
+</tr>
+<tr>
+<td>安全区域边界</td>
+<td>跨边界那一步可不可控</td>
+<td>边界防护、访问控制、入侵防范、恶意代码防范、安全审计、可信验证</td>
+<td>防火墙与访问控制策略、入侵防御、准入控制、边界审计</td>
+</tr>
+<tr>
+<td>安全计算环境</td>
+<td>机器与业务内部可不可信</td>
+<td>身份鉴别、访问控制、安全审计、入侵防范、恶意代码防范、可信验证、数据完整性与保密性、数据备份恢复、剩余信息保护、个人信息保护</td>
+<td>主机基线、账户治理、补丁管理、应用鉴权、加密与脱敏、备份演练</td>
+</tr>
+<tr>
+<td>安全管理中心</td>
+<td>有没有统一的指挥与账本</td>
+<td>系统管理、审计管理、安全管理、集中管控</td>
+<td>堡垒机与统一运维、日志平台、策略下发、态势监测</td>
+</tr>
+</tbody></table>
+<p>表格只是索引，真正的信息在每一格的“为什么”里。以安全区域边界为例，“访问控制”这一条如果只理解成“有防火墙”，就会做出“默认全通、按需加黑名单”的配置；而它真正想约束的是“只放该放的”，也就是默认拒绝、按业务最小化开放、规则有责任人、有到期时间。前者能通过检查，后者才能挡住横向移动。</p>
+<p>再以安全计算环境为例，“身份鉴别”在低级别可能只是“口令要有复杂度、要定期更换”，到了较高级别就会追问“是否双因素”“是否限制登录失败次数”“是否限制登录地址”“是否存在共享账号”。这些追问指向的是同一件事：身份不能被冒用。把这条链路想清楚，比背条款有效得多。</p>
+<p>五个方面之间还有一层隐含关系：物理环境与通信网络决定“地基”，区域边界与计算环境决定“正面防线”，管理中心决定“指挥与追溯”。差距评估时如果预算有限，优先补管理中心与计算环境的短板，通常比再买一台边界设备更能降低实际风险，因为绝大多数真实事件最终都落在主机与账号上。</p>
+<h2 id="管理要求的五个方面"><a href="#管理要求的五个方面" class="headerlink" title="管理要求的五个方面"></a>管理要求的五个方面</h2><p>技术措施要靠人来设计、配置和维护，所以通用要求另有一半篇幅讲管理，同样分为五个方面。</p>
+<table>
+<thead>
+<tr>
+<th>方面</th>
+<th>解决的问题</th>
+<th>关键动作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>安全管理制度</td>
+<td>有没有成文的规矩</td>
+<td>制度体系与发布流程、评审与修订周期、制度传达与培训记录</td>
+</tr>
+<tr>
+<td>安全管理机构</td>
+<td>有没有人负责</td>
+<td>岗位与职责、授权与审批、内部沟通与外部协作、定期审核检查</td>
+</tr>
+<tr>
+<td>安全管理人员</td>
+<td>人靠不靠得住</td>
+<td>录用与离岗、安全意识教育与技能培训、外部人员访问管理</td>
+</tr>
+<tr>
+<td>安全建设管理</td>
+<td>系统从生到交付是否安全</td>
+<td>定级与备案、方案设计、产品采购、外包开发、测试验收、交付、测评、服务商管理</td>
+</tr>
+<tr>
+<td>安全运维管理</td>
+<td>日常运行是否可控</td>
+<td>环境与资产管理、介质与设备维护、漏洞与补丁、配置与密码管理、变更管理、备份恢复、事件处置与应急预案、外包运维</td>
+</tr>
+</tbody></table>
+<p>这张表最容易被误读成“写五套文档”。实际上，管理要求的每一条都应当有一个技术落点，否则就是纸面合规。举例来说，“资产管理”如果没有配置管理库或资产扫描做支撑，一年之后台账必然失真；“变更管理”如果没有工单系统与回滚预案，所谓的审批就只是邮件里的一句“同意”。</p>
+<p>另一个容易忽略的点是记录。管理要求在中高等级上不仅看“有没有制度”，还看“有没有执行痕迹”。应急预案要有演练记录，培训要有签到与考核，外包运维要有保密协议与操作审计，这些记录是测评时最直接的证据。</p>
+<h2 id="五个需要特别关注的新增与强化点"><a href="#五个需要特别关注的新增与强化点" class="headerlink" title="五个需要特别关注的新增与强化点"></a>五个需要特别关注的新增与强化点</h2><p>报批稿里有一些反复被提及的变化，它们既是技术点，也是思路上的转向。</p>
+<h3 id="可信验证"><a href="#可信验证" class="headerlink" title="可信验证"></a>可信验证</h3><p>可信验证的思路是从可信根出发，对设备的引导程序、系统程序、重要配置参数和应用程序做度量，形成一条可以校验的信任链，再把验证结果上报，解决的是“我怎么知道这台机器跑的还是我装的那套东西”。</p>
+<p>落地时要有现实感。2018 年的可信计算生态还在成熟过程中，芯片、固件、操作系统的支持程度参差不齐，全面铺开并不现实。比较稳妥的做法是先在承载关键数据的服务器上试点，把可信启动、程序白名单、度量日志三件事跑通，再逐步扩展到其他设备。</p>
+<h3 id="集中管控"><a href="#集中管控" class="headerlink" title="集中管控"></a>集中管控</h3><p>集中管控是“一个中心”在条款上的具体化，要求对分散在不同位置的设备与资源做集中管理、集中审计、集中监测。它的价值在事件发生时体现得最明显：如果日志分散在几十台设备上、时间还不同步，追溯一次入侵可能要花几天。</p>
+<p>落地顺序建议是：先统一时间源，再统一日志格式与采集通道，然后才是分析与告警。反过来做，先买分析平台却喂进一堆格式混乱、时钟漂移的数据，最后只能得到无法复现的图表。</p>
+<h3 id="个人信息保护"><a href="#个人信息保护" class="headerlink" title="个人信息保护"></a>个人信息保护</h3><p>个人信息保护在 2.0 里被单独提出来，与《网络安全法》以及当时已经实施的 GB&#x2F;T 35273-2017 形成呼应。条款关注的是收集、存储、使用、共享、删除这条全生命周期：收集是否最小必要、是否告知并取得同意、展示是否脱敏、访问是否受控、共享是否留痕、删除是否彻底。</p>
+<p>对开发团队来说，这一条最直接的落点是数据清单。把业务系统里的字段按“是否个人信息、是否敏感、谁能看、存多久、给谁用”过一遍，很多问题会自己浮出来，例如测试库里塞满了生产数据、日志里打印了完整手机号、导出功能没有任何审批。</p>
+<h3 id="日志审计"><a href="#日志审计" class="headerlink" title="日志审计"></a>日志审计</h3><p>日志审计的要求覆盖网络设备、安全设备、主机、数据库与应用，重点在“覆盖全、留得住、防篡改、能分析”。留存时间在实践中通常按不少于六个月来把握，这个口径来自等级保护的一贯要求，具体表述请以正式文本为准。</p>
+<p>落地时的常见短板是应用层。网络设备和服务器的日志往往有人管，业务系统的登录、授权变更、敏感数据查询却常常缺失，而这些恰恰是内部违规最常发生的地方。建议在应用设计阶段就把关键操作日志当成功能需求写进接口规范，而不是上线后再补。</p>
+<h3 id="入侵防范"><a href="#入侵防范" class="headerlink" title="入侵防范"></a>入侵防范</h3><p>入侵防范贯穿边界、主机与应用三个层面：边界侧关注攻击检测与阻断，主机侧关注最小化安装、关闭多余端口与服务、及时修补漏洞、检测异常进程与外联，应用侧关注输入校验、越权访问与上传下载的风险。</p>
+<p>这一条最考验日常功夫。规则买了不等于生效，误报不处理就会导致“告警没人看”。比较务实的做法是先把高危规则调准，建立每周的告警复核机制，再逐步扩大检测面。</p>
+<h2 id="从定级到测评：一条可执行的路径"><a href="#从定级到测评：一条可执行的路径" class="headerlink" title="从定级到测评：一条可执行的路径"></a>从定级到测评：一条可执行的路径</h2><p>理解了框架，还要落到动作上。等保 1.0 确立的流程在 2.0 阶段依然适用，只是每一步的输入变得更细。</p>
+<p>第一步是梳理定级对象。按业务独立性、网络边界和责任主体来切分，一个单位往往有好几个定级对象，而不是“一个机房一个对象”或“整个集团一个对象”。切分过粗，整改范围失控；切分过细，管理成本压垮团队。</p>
+<p>第二步是判定等级。看两个维度：受侵害的客体（公民、法人、社会秩序与公共利益、国家安全）和侵害程度。业务信息安全与系统服务安全要分别判定，再取其中较高者。定高了浪费预算，定低了返工，务必与业务方共同判定并留存依据。</p>
+<p>第三步是备案。自主定级、专家评审、主管部门审核、公安机关备案，这套流程沿用 1.0 的做法。具体材料清单与办理窗口的细节，我在《等级保护定级备案流程实践》里已经写过，这里不重复。</p>
+<p>第四步是差距评估。以目标级别的通用要求为基线，叠加适用的扩展要求，逐条判断符合、部分符合、不符合或不适用，每条结论都要有证据和整改建议。这一阶段最忌“凭印象打分”，最好是两个人交叉复核。</p>
+<p>第五步是整改。按风险高低和实施成本排序，优先处理账号权限、日志缺失、边界策略过宽、补丁长期未打这几类；技术整改与管理整改同步推进，避免出现设备到位而制度空白的情况。</p>
+<p>第六步是测评与复测。由具备资质的测评机构出具结论，未通过的项目整改后复测。</p>
+<h3 id="从-1-0-过渡到-2-0-的准备清单"><a href="#从-1-0-过渡到-2-0-的准备清单" class="headerlink" title="从 1.0 过渡到 2.0 的准备清单"></a>从 1.0 过渡到 2.0 的准备清单</h3><ul>
+<li>盘清资产：业务系统、支撑平台、终端、网络设备、数据各一份台账，标注部署形态与责任主体。</li>
+<li>重画网络：把办公、生产、测试、带外管理分开，画出数据流与信任边界，找出该隔离而未隔离的地方。</li>
+<li>收敛账号：清理共享账号与长期未用的账号，关键系统上双因素，特权操作走堡垒机。</li>
+<li>补齐日志：统一时间源，把网络、主机、数据库、应用的关键日志集中采集，明确留存与分析责任人。</li>
+<li>落地制度：把变更、备份、应急、外包四类流程做成可执行的工单与记录，而不是只写文档。</li>
+<li>判定扩展：对照云、移动、物联、工控四类形态逐项确认是否命中，命中就把对应要求纳入整改范围。</li>
+</ul>
+<h3 id="三个常见误区"><a href="#三个常见误区" class="headerlink" title="三个常见误区"></a>三个常见误区</h3><p>第一个误区是把合规当成一次性项目。测评通过之后制度束之高阁、日志无人查看、账号不再清理，第二年复测时问题原样重现。等级保护本质上是持续运营，不是一次考试。</p>
+<p>第二个误区是只买设备不改流程。边界设备堆了几层，账号仍然共享、变更仍然口头，实际风险并没有下降。</p>
+<p>第三个误区是扩展要求漏判。系统上了云、出了 App，方案却仍按传统机房来写，结果云上的租户隔离、镜像管理、移动端环境感知全部缺位。这一类漏判在测评时往往成片失分，补救成本也最高。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>等保 2.0 的通用要求不是一份更长的清单，而是一次组织方式的调整：用安全管理中心把策略与审计收拢起来，用通信网络、区域边界、计算环境三层把防护落到实处，再用扩展要求去覆盖云、移动、物联、工控这些新形态。对开发者而言，最值得记住的是三条：先盘资产与账号，再谈设备；先想清楚数据流与信任边界，再谈条款；先判断形态是否命中扩展要求，再排整改计划。标准正式发布后应重新核对条款表述，但这套思路不会过时。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="http://www.mps.gov.cn/">公安部</a>：等级保护工作的主管部门，相关政策与部署信息以此为准。</li>
+<li><a href="https://www.tc260.org.cn/">全国信息安全标准化技术委员会</a>：网络安全国家标准的信息发布与查询入口。</li>
+<li><a href="http://www.sac.gov.cn/">国家标准化管理委员会</a>：国家标准公告与标准文本信息查询。</li>
+<li><a href="http://www.cac.gov.cn/">国家互联网信息办公室</a>：网络安全与个人信息保护相关法规政策。</li>
+<li><a href="http://www.gov.cn/">中国政府网</a>：《网络安全法》等法律法规的权威发布渠道。</li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>等保 2.0 安全通用要求解读</p><p><a href="https://987763485.github.io/2018/11/27/等保2.0安全通用要求解读/">https://987763485.github.io/2018/11/27/等保2.0安全通用要求解读/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2018-11-27</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a><a class="link-muted mr-2" rel="tag" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/">等级保护</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2018/11/29/%E5%91%BD%E4%BB%A4%E6%89%A7%E8%A1%8C%E4%B8%8E%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96%E6%BC%8F%E6%B4%9E/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">命令执行与反序列化漏洞</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2018/11/25/Python3%E5%9F%BA%E7%A1%80%E8%AF%AD%E6%B3%95%E5%BF%AB%E9%80%9F%E4%B8%8A%E6%89%8B/"><span class="level-item">Python 3 基础语法快速上手</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

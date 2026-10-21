@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>正则表达式进阶：回溯与性能 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="本文从一次真实的线上事故出发，把 JavaScript 正则表达式的匹配原理、灾难性回溯的成因、量词与断言的回溯行为、分组与捕获的成本、exec&amp;#x2F;test&amp;#x2F;lastIndex 的坑、校验类正则的工程写法，以及 Node 服务端上的同类风险，系统地梳理一遍。适合已经会写基本正则、但在生产环境里被”页面突然卡死”困扰过的前端同学。读完之后，你应当能够一眼认出危险的正则写法，并知道怎"><meta property="og:type" content="blog"><meta property="og:title" content="正则表达式进阶：回溯与性能"><meta property="og:url" content="https://987763485.github.io/2014/04/09/%E6%AD%A3%E5%88%99%E8%A1%A8%E8%BE%BE%E5%BC%8F%E8%BF%9B%E9%98%B6%E5%9B%9E%E6%BA%AF%E4%B8%8E%E6%80%A7%E8%83%BD/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="本文从一次真实的线上事故出发，把 JavaScript 正则表达式的匹配原理、灾难性回溯的成因、量词与断言的回溯行为、分组与捕获的成本、exec&amp;#x2F;test&amp;#x2F;lastIndex 的坑、校验类正则的工程写法，以及 Node 服务端上的同类风险，系统地梳理一遍。适合已经会写基本正则、但在生产环境里被”页面突然卡死”困扰过的前端同学。读完之后，你应当能够一眼认出危险的正则写法，并知道怎"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2014-04-09T02:04:07.000Z"><meta property="article:modified_time" content="2026-10-17T12:37:36.899Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="javascript"><meta property="article:tag" content="web前端"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2014/04/09/%E6%AD%A3%E5%88%99%E8%A1%A8%E8%BE%BE%E5%BC%8F%E8%BF%9B%E9%98%B6%E5%9B%9E%E6%BA%AF%E4%B8%8E%E6%80%A7%E8%83%BD/"},"headline":"正则表达式进阶：回溯与性能","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2014-04-09T02:04:07.000Z","dateModified":"2026-10-17T12:37:36.899Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"本文从一次真实的线上事故出发，把 JavaScript 正则表达式的匹配原理、灾难性回溯的成因、量词与断言的回溯行为、分组与捕获的成本、exec&#x2F;test&#x2F;lastIndex 的坑、校验类正则的工程写法，以及 Node 服务端上的同类风险，系统地梳理一遍。适合已经会写基本正则、但在生产环境里被”页面突然卡死”困扰过的前端同学。读完之后，你应当能够一眼认出危险的正则写法，并知道怎"}</script><link rel="canonical" href="https://987763485.github.io/2014/04/09/%E6%AD%A3%E5%88%99%E8%A1%A8%E8%BE%BE%E5%BC%8F%E8%BF%9B%E9%98%B6%E5%9B%9E%E6%BA%AF%E4%B8%8E%E6%80%A7%E8%83%BD/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2014-04-09T02:04:07.000Z" title="4/9/2014, 10:04:07 AM">2014-04-09</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/">前端开发</a></span><span class="level-item">1 小时读完 (大约8249个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">正则表达式进阶：回溯与性能</h1><div class="content"><p>本文从一次真实的线上事故出发，把 JavaScript 正则表达式的匹配原理、灾难性回溯的成因、量词与断言的回溯行为、分组与捕获的成本、exec&#x2F;test&#x2F;lastIndex 的坑、校验类正则的工程写法，以及 Node 服务端上的同类风险，系统地梳理一遍。适合已经会写基本正则、但在生产环境里被”页面突然卡死”困扰过的前端同学。读完之后，你应当能够一眼认出危险的正则写法，并知道怎么把它改写成线性时间的等价形式。</p>
+<h2 id="一次由校验正则引发的-IE8-卡死事故"><a href="#一次由校验正则引发的-IE8-卡死事故" class="headerlink" title="一次由校验正则引发的 IE8 卡死事故"></a>一次由校验正则引发的 IE8 卡死事故</h2><p>去年 11 月，公司后台系统的”订单备注”字段上线了一个格式校验需求：备注只允许字母、数字、下划线，中间可以用半角逗号或短横线分隔。外包同学交来的代码是这样的：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 外包同学写的&quot;备注格式校验&quot;</span></span><br><span class="line"><span class="keyword">var</span> <span class="variable constant_">RE_REMARK</span> = <span class="regexp">/^(\w+[-,]?\s*)+$/</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">validateRemark</span>(<span class="params">s</span>) &#123;</span><br><span class="line">  <span class="keyword">return</span> <span class="variable constant_">RE_REMARK</span>.<span class="title function_">test</span>(s);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>日常测试一切正常，直到一位运营同事从 Excel 里复制了一段备注粘贴进输入框。原文是 24 位连续数字，末尾跟着一个粘贴时带进来的全角逗号”，”。这个字符既不是 <code>\w</code>，也不是 <code>[-,]</code> 里的半角逗号，校验理应”快速失败”。实际情况是：Chrome 转了好几秒才弹出”页面无响应”的提示，IE8 则直接假死十几秒，鼠标指针变成转圈，最后校验结果 <code>false</code> 才姗姗来迟。</p>
+<p>事后统计，线上有相当一批备注是”长数字串加一个中文标点”的形态，客服页面几乎天天有人误触发。把正则改成 <code>/^[\w-]+(?:,[\w-]+)*$/</code> 之后，同样的输入在 IE8 里不到 50 毫秒就返回了 <code>false</code>，事故就此终结。</p>
+<p>这次事故给笔者上了深刻的一课：正则不是黑盒，<code>test</code> 返回 <code>false</code> 的成本可能是天文本秒，也可能是十几年不返回。”尝试、失败、回退”的回溯机制，是所有基于回溯的正则引擎绕不开的对象。本文就把这个机制讲透，再给出工程上的避险纪律。文中耗时数据均为笔者在不同机器上的实测：部分对照表用当前开发机的 V8 内核跑的稳定数据，事故相关数字则来自当年那台老笔记本上的 Chrome 33 与 IE8，绝对值不可互相换算，但增长量级和曲线形态是一致的。</p>
+<h2 id="先把引擎模型讲清楚：NFA-与回溯"><a href="#先把引擎模型讲清楚：NFA-与回溯" class="headerlink" title="先把引擎模型讲清楚：NFA 与回溯"></a>先把引擎模型讲清楚：NFA 与回溯</h2><p>要理解性能问题，必须先搞清楚 JS 正则跑在什么引擎模型上。正则引擎大体分两类。第一类是 DFA（确定型有限自动机），它把正则编译成一张状态转移表，对输入串只扫描一遍，每个字符推进一次状态，时间复杂度严格线性，永远不会有”回去重试”的概念。grep 的某些快速通道就是 DFA。第二类是 NFA（非确定型有限自动机），它从正则的角度出发，拿着模式串在输入上”试探”：每遇到一个量词、一个分支，就产生一个不确定的选择，先把选择压进栈，沿着当前分支走下去，走不通再弹出上一个选择换一条路。这就是回溯。</p>
+<p>JavaScript 的所有引擎——V8 的 IrRegex、IE8 的 JScript 正则、当时的 SpiderMonkey——全部是带回溯的 NFA，思路接近 Thompson 构造法加一个回溯栈。之所以不用纯 DFA，是因为 NFA 才能记录捕获组的位置、支持反向引用与环视，代价就是可能出现指数级的回溯。</p>
+<pre class="mermaid">flowchart TD
+    A[从位置 0 进入循环组] --> B[分支 1 匹配单个 a 前进 1 格]
+    B --> C{还能继续进组吗}
+    C -->|能| B
+    C -->|不能| D{尾部锚点匹配吗}
+    D -->|匹配| E[返回成功]
+    D -->|不匹配| F[回退到上一层组换分支 2 尝试 aa]
+    F --> C</pre>
+
+<p>图里”回退换分支”的每一条路径都会被完整走完才宣告失败。我们用 <code>/^(a|aa)+$/</code> 匹配 <code>&quot;aaa!&quot;</code> 来看一个完整的尝试表。<code>(a|aa)+</code> 要求把一串 a 恰好铺满，引擎按”分支顺序优先、外层尽早结束”的策略枚举所有铺法：</p>
+<table>
+<thead>
+<tr>
+<th>序号</th>
+<th>分组切割方式（长度序列）</th>
+<th>推进到的位置</th>
+<th>失败点</th>
+<th>引擎动作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>1+1+1</td>
+<td>3</td>
+<td><code>$</code> 处发现 <code>!</code></td>
+<td>尝试再多进一组，<code>!</code> 不匹配，弹出</td>
+</tr>
+<tr>
+<td>2</td>
+<td>1+1+2</td>
+<td>—</td>
+<td>第 3 组取 <code>aa</code> 时字符不足</td>
+<td>回退</td>
+</tr>
+<tr>
+<td>3</td>
+<td>1+2</td>
+<td>3</td>
+<td><code>$</code> 处发现 <code>!</code></td>
+<td>回退</td>
+</tr>
+<tr>
+<td>4</td>
+<td>2+1</td>
+<td>3</td>
+<td><code>$</code> 处发现 <code>!</code></td>
+<td>回退</td>
+</tr>
+<tr>
+<td>5</td>
+<td>2+2</td>
+<td>—</td>
+<td>第 2 组越界</td>
+<td>枚举结束，整体失败</td>
+</tr>
+</tbody></table>
+<p><code>n</code> 个 a 用 1 和 2 铺满的方案数正好是斐波那契数 F(n+1)，<code>n=4</code> 时是 5 种，<code>n=10</code> 时是 89 种，<code>n=20</code> 时是 10946 种，<code>n=40</code> 时是 1.66 亿种。输入每多一个 a，尝试次数约乘以 1.618。这就是回溯引擎的账单：它不会”聪明地”知道 1+2 和 2+1 在同一种字符上等价，它只认状态栈。</p>
+<p>值得补充的一点是，NFA 引擎内部对”当前匹配位置、程序计数器”这样的状态并不做去重记录（没有记忆化），同一个位置配合同一个组进度会被反复重走。理论上把访问过的状态合并成集合去重，就接近 DFA 的线性表现，一些服务端正则库（比如 RE2）就是这么做的，但那样就放弃了捕获组与环视，JS 引擎不会走这条路。所以对我们来说，能做的只有一件事：写出回溯量可控的正则。</p>
+<h2 id="灾难性回溯的三种典型形态"><a href="#灾难性回溯的三种典型形态" class="headerlink" title="灾难性回溯的三种典型形态"></a>灾难性回溯的三种典型形态</h2><p>“灾难性回溯”（Catastrophic Backtracking，这个概念以及后来总结出的 ReDoS 一词，早在 2002 年前后就被安全社区讨论了）不是玄学，它几乎总是来自三类可辨认的模式。下面每种形态都给出能复现的代码和实测耗时，输入统一是”n 个字符再加一个非法尾字符”——因为灾难几乎总是在失败路径上爆发，校验正则恰恰是最容易走到失败路径的场景。</p>
+<h3 id="形态一：嵌套量词，量词套着含量词的组"><a href="#形态一：嵌套量词，量词套着含量词的组" class="headerlink" title="形态一：嵌套量词，量词套着含量词的组"></a>形态一：嵌套量词，量词套着含量词的组</h3><figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">timeTest</span>(<span class="params">re, s</span>) &#123;</span><br><span class="line">  <span class="keyword">var</span> t0 = +<span class="keyword">new</span> <span class="title class_">Date</span>();</span><br><span class="line">  re.<span class="title function_">test</span>(s);</span><br><span class="line">  <span class="keyword">return</span> +<span class="keyword">new</span> <span class="title class_">Date</span>() - t0;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">var</span> re1 = <span class="regexp">/^(a+)+b$/</span>;</span><br><span class="line"><span class="keyword">var</span> re2 = <span class="regexp">/^(\w+)+b$/</span>;</span><br><span class="line"><span class="keyword">var</span> re3 = <span class="regexp">/^(.*)*b$/</span>;</span><br></pre></td></tr></table></figure>
+
+<p><code>(a+)+</code> 里，外层 <code>+</code> 把整串 a 切成若干段，每一种切法在语法上都合法，切法总数是 2^(n-1)。实测（Chrome&#x2F;V8）：</p>
+<table>
+<thead>
+<tr>
+<th>输入长度 n（后跟 <code>!</code>）</th>
+<th><code>^(a+)+b$</code></th>
+<th><code>^(\w+)+b$</code></th>
+<th><code>^(.*)*b$</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>18</td>
+<td>2 ms</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>20</td>
+<td>5 ms</td>
+<td>6 ms</td>
+<td>23 ms</td>
+</tr>
+<tr>
+<td>22</td>
+<td>22 ms</td>
+<td>26 ms</td>
+<td>—</td>
+</tr>
+<tr>
+<td>24</td>
+<td>87 ms</td>
+<td>104 ms</td>
+<td>380 ms</td>
+</tr>
+<tr>
+<td>26</td>
+<td>349 ms</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>28</td>
+<td>约 9 s</td>
+<td>—</td>
+<td>6092 ms</td>
+</tr>
+</tbody></table>
+<p>每加 2 个字符耗时约乘 4，即每加 1 个字符乘 2，标准的 2^n。对照实验：把正则改写成 <code>^a+b$</code>，同样的模式输入 10 万个 a 再跟 <code>!</code>，耗时不到 1 毫秒。作为另一条对照，<code>^(a*)*$</code> 在纯 a 输入上是”成功路径”，耗时随长度只有轻微增长——引擎对空匹配循环有局部防御。这提醒我们：危险的不是嵌套量词这个形状本身，而是”嵌套量词加失败路径”这个组合。</p>
+<h3 id="形态二：重叠交替，多个分支能匹配同一段文本"><a href="#形态二：重叠交替，多个分支能匹配同一段文本" class="headerlink" title="形态二：重叠交替，多个分支能匹配同一段文本"></a>形态二：重叠交替，多个分支能匹配同一段文本</h3><figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> re = <span class="regexp">/^(a|aa)+b$/</span>;</span><br></pre></td></tr></table></figure>
+
+<p>这就是上文讲过的斐波那契形态，实测（V8）：</p>
+<table>
+<thead>
+<tr>
+<th>n</th>
+<th>30</th>
+<th>35</th>
+<th>40</th>
+<th>45</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>耗时</td>
+<td>11 ms</td>
+<td>122 ms</td>
+<td>1349 ms</td>
+<td>14956 ms</td>
+</tr>
+</tbody></table>
+<p>每加 5 个字符耗时约乘 11，折合每个字符约 1.62 倍，与斐波那契比例 1.618 吻合到小数点。判断方法很简单：把各分支能匹配的字符串集合画出来，只要有交集（<code>a</code> 与 <code>aa</code> 共享 <code>a</code>，<code>\w</code> 与 <code>\d</code> 共享数字，<code>.</code> 与一切共享），并且外面套了量词，就在爆炸的候补名单上。</p>
+<h3 id="形态三：量词组配合反向引用，或分支前缀互相覆盖"><a href="#形态三：量词组配合反向引用，或分支前缀互相覆盖" class="headerlink" title="形态三：量词组配合反向引用，或分支前缀互相覆盖"></a>形态三：量词组配合反向引用，或分支前缀互相覆盖</h3><figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> re = <span class="regexp">/^(\d+)+\1$/</span>;   <span class="comment">// 分组量词 + 反向引用</span></span><br><span class="line"><span class="keyword">var</span> re2 = <span class="regexp">/^(ab|a)+b$/</span>;  <span class="comment">// 分支之间存在前缀覆盖</span></span><br></pre></td></tr></table></figure>
+
+<p>反向引用 <code>\1</code> 的加入让引擎不但要枚举切分，还要在每种切分下比对两段捕获内容是否相等，回溯树的节点更贵；实测 <code>^(\d+)+\1$</code> 对 n 个 1 加非法尾字符：n&#x3D;20 时 7 ms，n&#x3D;22 时 27 ms，n&#x3D;24 时 110 ms，仍然是每 2 字符乘 4 的指数曲线。<code>^(ab|a)+b$</code> 则属于分支前缀覆盖：<code>a</code> 是 <code>ab</code> 的前缀，一个 <code>ab</code> 可以拆成”先走 <code>a</code> 分支再补一个 <code>b</code>“，铺法出现二义性，同样触发重叠交替的问题。</p>
+<p>三种形态归纳成一句话：一个可以重复的结构，若其内部存在两种以上方式吃掉同一段输入，整个正则就埋了指数炸弹；输入尾部哪怕只有一个不匹配的字符，也足以让引擎把所有铺法枚举干净才回答”否”。</p>
+<h2 id="贪婪、惰性与”没有原子组”的现实：靠改写消除回溯"><a href="#贪婪、惰性与”没有原子组”的现实：靠改写消除回溯" class="headerlink" title="贪婪、惰性与”没有原子组”的现实：靠改写消除回溯"></a>贪婪、惰性与”没有原子组”的现实：靠改写消除回溯</h2><p>先复习量词的两种消耗策略。贪婪模式（<code>+</code>、<code>*</code>、<code>?</code>、<code>{n,m}</code> 默认）先尽量多吃，失败再一格一格吐出来；惰性模式（量词后加 <code>?</code>，即 <code>+?</code>、<code>*?</code>、<code>??</code>、<code>{n,m}?</code>）先尽量少匹配，不够了再一格一格多吃。<code>?</code> 在 JS 里有双重身份：跟在量词后面是”惰性修饰符”，跟在普通原子后面是”出现 0 次或 1 次”，写在 <code>(?!</code> 或 <code>(?=</code> 里又是环视的一部分，读正则时要格外当心这三者的位置。</p>
+<p>PCRE 和 Java 的 <code>java.util.regex</code> 支持原子组 <code>(?&gt;...)</code> 与占有量词 <code>a++</code>：一旦匹配成功就拒绝交还字符，从而在结构上封死回溯。JS 没有这两个武器，ECMAScript 5.1 规范没有，笔者查了当时 ES6（Harmony）草案的进度，也没有任何要把它们补进来的动向。这意味着在 JS 里对抗灾难性回溯只有一条路：重写正则，让歧义从结构上消失。下面是笔者总结并逐条实测过的几种改写。</p>
+<ol>
+<li>用”排除分隔符的字符类”替代点号。想匹配一个 HTML 标签，<code>&lt;.*?&gt;</code> 的 <code>.</code> 与 <code>&gt;</code> 共享全部字符空间，一旦外层再套量词（如 <code>(&lt;.*?&gt;)+</code> 匹配一串尖括号）就是灾难；改写为 <code>&lt;[^&gt;]*&gt;</code> 或 <code>&lt;[^&gt;]+&gt;</code>，<code>[^&gt;]</code> 与 <code>&gt;</code> 互斥，每个位置至多一种走法，回溯无从发生。注意：单独一个顶层的 <code>&lt;.*?&gt;</code> 并不会爆炸，惰性点号也只需要线性推进，真正危险的是它进入可重复结构的那一刻，所以从书写习惯上就杜绝 <code>.</code> 进循环体。</li>
+<li>让分支两两互斥。<code>(a|aa)+</code> 等价于 <code>a+</code>（长度 1 与长度 2 的铺法合起来就是”至少一个 a”），直接改写成 <code>/^a+$/</code>；<code>(ab|ac|ad)+</code> 这类共享前缀的分支，把前缀提出来变成 <code>a[bcd]</code>，再考察是否还需要重复。凡是能一眼看出”分支并集等于某个字符类”的，都该合并。</li>
+<li>给量词上界。<code>{1,20}</code> 代替 <code>+</code>，把最坏情况的回溯深度锁死在常数内。上界要来自真实业务（备注最长 200 字就写 200），不是为了好看乱加。</li>
+<li>消灭空匹配歧义，把”分隔符结构”写进正则而不是靠通配。<code>(a*)*</code>、<code>(\s*\w+\s*)+</code> 这类模式，段与段之间的空白归属有两种以上分法。<code>/^(\s*\w+\s*)+$/</code> 对 28 个单词（空格分隔）后跟非法字符，笔者实测 15275 ms；改写成 <code>/^\w+(?:\s+\w+)*$/</code>——每个空格只属于唯一一个边界——同一输入耗时小于 1 ms。这是”展开”（unrolling）思想：先匹配必现的原子，再用 <code>(?:(?:必现分隔符)(?:必现原子))*</code> 描述重复，保证重复体内没有可空的部件。</li>
+<li>把必匹配的前缀提到循环外。想匹配 <code>key=value</code> 序列，与其 <code>(?:\w+=\w*;?)+</code>，不如先要求第一段必然出现：<code>\w+=\w*(?:;\w+=\w*)*</code>，锚定住起点，失败时能极早退出。</li>
+</ol>
+<p>这些改写的共同点不是”写得短”，而是让引擎在每个字符位置至多只有一种推进方式，把回溯次数从指数压回线性。</p>
+<h2 id="断言与回溯：零宽的另一面"><a href="#断言与回溯：零宽的另一面" class="headerlink" title="断言与回溯：零宽的另一面"></a>断言与回溯：零宽的另一面</h2><p>环视断言 <code>(?=...)</code>、<code>(?!...)</code> 在 JS 里是零宽的：它们检查当前位置之后能否（或不能）匹配某个模式，但无论成败都不消耗字符，匹配结束的位置还是原来的位置。零宽有双重含义：一是能力，允许在同一位置叠加多个条件；二是陷阱，一个纯由断言组成的正则匹配长度为零。</p>
+<p>断言本身不引入额外的回溯灾难——它们与普通子表达式一样走回溯流程，只是结果被取反或置空。工程上断言最常见的正当用途是”与”条件叠加，比如密码强度：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">/^(?=.*[a-z])(?=.*\d)[a-z\d]&#123;<span class="number">6</span>,<span class="number">16</span>&#125;$/.<span class="title function_">test</span>(pwd)</span><br></pre></td></tr></table></figure>
+
+<p>每个 <code>(?=...)</code> 从当前位置向后扫一遍，代价是常数次线性扫描，总复杂度仍是线性的。这里的关键在于主体 <code>[a-z\d]{6,16}</code> 自带互斥字符类与上界，断言只是门卫，不制造歧义。用 <code>(?!...)</code> 还能优雅地表达”排除某特征”：匹配不在数字前的 abc，写 <code>/abc(?!\d)/</code>；匹配双引号字符串并允许内部转义，经典写法 <code>/\&quot;[^\&quot;\\\\]*(?:\\\\.[^\&quot;\\\\]*)*\&quot;/</code> 的每一段都靠字符类互斥保证线性。</p>
+<p>麻烦在于后顾断言 <code>(?&lt;=...)</code> 与 <code>(?&lt;!...)</code>。按 ECMAScript 标准，JS 从来不支持后顾——当年所有遵循标准的实现（Chrome、Firefox、Safari、Node）都直接抛语法错误；讽刺的是 IE 的 JScript 很早就非标准地支持了 <code>(?&lt;=</code>，但正因为只有它一家支持，业务代码里等于不可用。需要”前面是某字符”的语义时，笔者的两个替代方案：其一，把”前文”吸收进匹配再用捕获组取回，例如想取冒号后的文件名 <code>(?&lt;=:)\s*([^:]+)</code>，改写为 <code>/:\s*([^:]+)/</code> 然后读 <code>$1</code>；其二，用循环加前向断言手工扫描，或者干脆 <code>split</code>：匹配”最后一个逗号之后的内容”，与其纠结后顾，不如 <code>s.slice(s.lastIndexOf(&#39;,&#39;) + 1)</code>，一行代码，零回溯，谁都看得懂。另外切记断言的零宽特性会与全局标志组合出坑：纯断言正则在 <code>g</code> 下每次 exec 都匹配空串，<code>lastIndex</code> 不会自动前进，与下节要讲的死循环是同一颗雷。</p>
+<h2 id="分组与捕获的真实成本"><a href="#分组与捕获的真实成本" class="headerlink" title="分组与捕获的真实成本"></a>分组与捕获的真实成本</h2><p>分组是正则里少数”有内存账单”的构造。每多一个捕获组，引擎就必须在回溯栈的每个节点上多记录一对位置（起点、终点），失败弹栈时还要逐个回滚；匹配成功后还要为每个组创建字符串切片并组装数组。把同一个模式的捕获组全部换成非捕获组 <code>(?:...)</code>，V8 实测（20 万次匹配，模式含 5 个组）从 8 ms 降到 5 ms——差距存在，约三成，但远不是某些帖子宣扬的”快十倍”。非捕获组的主要收益是语义上的：它明确告诉读代码的人”这里不取内容”，同时少占一点内存、避免 <code>arguments</code>&#x2F;数组下标被无关分组打乱。神化它的性能的人，多半从来没测过，建议写组时优先按语义决定捕获与否，再在热点路径上统一降级为非捕获。</p>
+<p>反向引用 <code>\1</code> 的成本则完全不同量级。它要求引擎不但走到某处，还要把”某个捕获组当时吃进了什么文本”随身带着，回到引用点逐字符比对。这带来两个后果：一是每个回溯节点都多了捕获内容的拷贝，内存与时间同步上涨；二是反向引用让语言脱离了正规语言的范畴（<code>a{n}b{n}</code> 这类”计数匹配”正规表达式理论上无法描述），引擎为普通模式准备的快速通道——比如首字符位图过滤、字面量前缀跳转——大多被禁用。前文 <code>^(\d+)+\1$</code> 的实测表已经展示了”分组量词加反向引用”的叠加效果：指数依旧，常数更差。结论：反向引用只在真的需要”前后文本一致”（配对标签名、重复词检测）时使用，纯粹为了分组请用 <code>(?:...)</code>，而 <code>(?&lt;name&gt;...)</code> 这类命名捕获组在 ES5 里不存在，XRegExp 库用扩展语法模拟的命名组底层仍是编号捕获，成本一样。</p>
+<h2 id="exec、test-与-lastIndex：三个复盘过的坑"><a href="#exec、test-与-lastIndex：三个复盘过的坑" class="headerlink" title="exec、test 与 lastIndex：三个复盘过的坑"></a>exec、test 与 lastIndex：三个复盘过的坑</h2><p>第一个坑：全局标志下 <code>lastIndex</code> 跨调用残留。带 <code>g</code> 的正则是有状态的，<code>test</code>&#x2F;<code>exec</code> 从 <code>lastIndex</code> 处起扫，成功后把它推进，失败后归零。当正则被提到模块顶层复用，就会出现”第一次对、第二次错、第三次又对”的间歇性诡异结果：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> <span class="variable constant_">RE_NUM</span> = <span class="regexp">/^\d+$/g</span>;  <span class="comment">// 多写了 g，且被复用</span></span><br><span class="line"><span class="variable constant_">RE_NUM</span>.<span class="title function_">test</span>(<span class="string">&#x27;123&#x27;</span>);      <span class="comment">// true，lastIndex 变成 3</span></span><br><span class="line"><span class="variable constant_">RE_NUM</span>.<span class="title function_">test</span>(<span class="string">&#x27;456&#x27;</span>);      <span class="comment">// false！从位置 3 起扫，什么都不剩</span></span><br><span class="line"><span class="variable constant_">RE_NUM</span>.<span class="title function_">test</span>(<span class="string">&#x27;789&#x27;</span>);      <span class="comment">// true（上一轮失败后 lastIndex 归零）</span></span><br></pre></td></tr></table></figure>
+
+<p>笔者的教训是：<code>test</code> 校验场景永远不加 <code>g</code>；确实需要复用一个”扫描游标”时，用 <code>y</code> 语义手工管理（ES6 草案里有 sticky 标志的提案，2014 年还没有引擎落地，不指望）；最省心的办法是每次 <code>re.lastIndex = 0</code> 或者干脆就地写字面量。</p>
+<p>第二个坑：<code>while (m = re.exec(s))</code> 遇到零宽匹配的死循环。按 ES5 规范，空匹配的循环语义并不前进 <code>lastIndex</code>（草案后来修订了这一细节，但当时主流引擎仍按 5.1 行为实现，防御代码照写不误）：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> re = <span class="regexp">/(a*)*/g</span>, m;</span><br><span class="line"><span class="keyword">while</span> ((m = re.<span class="title function_">exec</span>(<span class="string">&#x27;b&#x27;</span>)) !== <span class="literal">null</span>) &#123;</span><br><span class="line">  <span class="comment">// 每一轮都匹配到空串，m.index 与 lastIndex 都停在 0，死循环</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>标准修复只有一行，且必须放在处理逻辑之前：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> re = <span class="regexp">/(a*)*/g</span>, m;</span><br><span class="line"><span class="keyword">while</span> ((m = re.<span class="title function_">exec</span>(<span class="string">&#x27;b&#x27;</span>)) !== <span class="literal">null</span>) &#123;</span><br><span class="line">  <span class="keyword">if</span> (m.<span class="property">index</span> === re.<span class="property">lastIndex</span>) &#123;</span><br><span class="line">    re.<span class="property">lastIndex</span>++;  <span class="comment">// 强制至少推进一格，杜绝原地踏步</span></span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">// ... 处理 m</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>第三个坑在 <code>replace</code>。字符串替换串里 <code>$1</code> 到 <code>$99</code> 指代捕获组，<code>$&amp;</code> 是整段匹配，<code>$`</code> 是匹配之前的部分，<code>$&#39;</code> 是之后的部分，<code>$$</code> 输出字面 <code>$</code>。实跑一段感受一下：<code>&#39;a1b2&#39;.replace(/(\d)/g, &#39;[$$1-$1]&#39;)</code> 得到 <code>&#39;a[$1-1]b[$1-2]&#39;</code>——<code>$$1</code> 被解释为字面 <code>$</code> 加字符 <code>1</code>，而 <code>$1</code> 才是分组。老引擎对 <code>$`</code> 与 <code>$&#39;</code> 的支持时好时坏，跨浏览器代码请统一改用函数回调。回调签名在 ES5 里是 <code>(匹配串, 分组1, ..., 分组n, 偏移量, 原串)</code>，偏移量一个参数是 ES5 新增的，IE8 缺位，用之前先测：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">s.<span class="title function_">replace</span>(<span class="regexp">/(\w+)=(\w+)/g</span>, <span class="keyword">function</span> (<span class="params">all, k, v, offset, src</span>) &#123;</span><br><span class="line">  <span class="keyword">return</span> k + <span class="string">&#x27;: &#x27;</span> + v;</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>顺带一提 <code>match</code> 与 <code>exec</code> 的分工：<code>g</code> 标志下的 <code>String.prototype.match</code> 一次性返回所有匹配串的数组（不带分组、不带 index，也不涉及 <code>lastIndex</code> 残留），适合”只收集”的场景；需要分组与逐个处理时才值得手写 <code>exec</code> 循环并遵守上面的推进守则。</p>
+<h2 id="锚定、预筛与预编译：把成本花在刀刃上"><a href="#锚定、预筛与预编译：把成本花在刀刃上" class="headerlink" title="锚定、预筛与预编译：把成本花在刀刃上"></a>锚定、预筛与预编译：把成本花在刀刃上</h2><p><code>^</code> 与 <code>$</code> 是免费的加速器，也是灾难的开关。作为加速器，锚点让引擎在错误起点上只花一步就放弃：<code>^</code> 使引擎不必在每个起始位置展开回溯树，未命中首字符即返回；实测同一条含 <code>(a+)+</code> 形态的正则，锚定版本在未命中的输入上毫秒内返回，非锚定版本则在每个偏移重复展开。作为开关，前文的事故也正是因为 <code>$</code> 强制”全串匹配”，尾部一个非法字符把失败信号推到扫描终点才出现，回溯树已经全部展开完了。多行标志 <code>m</code> 会改变 <code>^</code>&#x2F;<code>$</code> 的语义（行首行尾都算），JS 没有 <code>\A</code>&#x2F;<code>\z</code>，校验整串时务必确认没有误开 <code>m</code>，否则”每行合法”会被当成”整体合法”。</p>
+<p>比锚点更廉价的武器是字符串预筛。<code>indexOf</code>、<code>charAt</code>、<code>length</code> 这些操作没有任何回溯成本，把它们放在 <code>test</code> 前面过滤明显不合格的输入：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> <span class="variable constant_">RE_URL</span> = <span class="regexp">/^https?:\/\/[\w-]+(?:\.[\w-]+)+(?::\d&#123;2,5&#125;)?(?:\/[^\s]*)?$/i</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">checkUrl</span>(<span class="params">s</span>) &#123;</span><br><span class="line">  <span class="keyword">if</span> (s.<span class="property">length</span> &gt; <span class="number">2083</span>) <span class="keyword">return</span> <span class="literal">false</span>;              <span class="comment">// 浏览器地址长度上限</span></span><br><span class="line">  <span class="keyword">if</span> (s.<span class="title function_">indexOf</span>(<span class="string">&#x27;http&#x27;</span>) !== <span class="number">0</span>) <span class="keyword">return</span> <span class="literal">false</span>;      <span class="comment">// 廉价前缀筛</span></span><br><span class="line">  <span class="keyword">return</span> <span class="variable constant_">RE_URL</span>.<span class="title function_">test</span>(s);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在笔者统计的后台流量里，前缀筛拦下了约七成非法输入，这些输入根本没机会接触正则引擎。</p>
+<p>预编译指的是别让引擎在循环里反复编译正则。规范上，<code>new RegExp</code> 每次调用都产生新对象并触发一次编译，而字面量是否共享编译结果是引擎的实现细节：V8 对同一处字面量只编译一次，但如果你每次循环都用字符串动态拼出 <code>new RegExp(&#39;^&#39; + key + &#39;=\\d+$&#39;)</code>，编译开销就要自己买单。实测 1 万次动态构造再匹配耗时 15 ms，加一张缓存表（<code>cache[key] || (cache[key] = new RegExp(...))</code>）降到 2 ms；同样的写法搬到 IE8 上差距还要放大一个量级，老 JScript 的编译路径明显更慢。纪律很简单：模式固定的正则提到函数外、模块顶层；模式按关键词拼的，建缓存表。</p>
+<h2 id="正则与字符串方法的取舍"><a href="#正则与字符串方法的取舍" class="headerlink" title="正则与字符串方法的取舍"></a>正则与字符串方法的取舍</h2><p>能用 <code>indexOf</code>&#x2F;<code>slice</code>&#x2F;<code>split</code> 解决的，不要上正则，这不是教条而是账单。实测（V8）：在一条约 10 KB 的长文本里做”是否包含某字面子串”的判断，20 万次 <code>indexOf</code> 共 8 ms，等量 <code>test</code> 共 406 ms——快了五十倍，因为 <code>indexOf</code> 是专门为字面匹配优化的例程，而正则引擎即便匹配一个字面量也要走通用的字节码虚拟机。<code>split(&#39;,&#39;)</code> 与 <code>split(/,/)</code> 在 V8 里几乎打平（50 ms 对 53 ms，5 万次），但老 IE 上字符串分隔符的实现更朴素也更快。笔者的经验划分如下表：</p>
+<table>
+<thead>
+<tr>
+<th>需求</th>
+<th>首选工具</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>包含&#x2F;前缀&#x2F;后缀判断</td>
+<td><code>indexOf</code>、<code>charAt</code></td>
+<td>零回溯成本</td>
+</tr>
+<tr>
+<td>按固定分隔符拆分</td>
+<td><code>split</code>（字符串形式）</td>
+<td>别写成正则</td>
+</tr>
+<tr>
+<td>截取已知结构片段</td>
+<td><code>slice</code>&#x2F;<code>substring</code></td>
+<td>配合 <code>lastIndexOf</code></td>
+</tr>
+<tr>
+<td>模式化提取、批量替换</td>
+<td>正则</td>
+<td>按本文规则改写</td>
+</tr>
+</tbody></table>
+<p>由此延伸出两条解析纪律。其一，URL 参数解析别用正则硬啃，<code>split(&#39;&amp;&#39;)</code> 加 <code>split(&#39;=&#39;)</code> 加 <code>decodeURIComponent</code> 的循环更稳，遇到畸形 URL 还能逐个参数容错。其二，绝不要用正则解析 HTML——标签可以嵌套、属性可以带引号嵌套引号、注释里可以出现伪标签，这些都不是正则能表达的结构；页面内解析请交给 <code>document.createElement</code> 与浏览器自己的解析器，这也是取 URL 各段的可靠办法：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> a = <span class="variable language_">document</span>.<span class="title function_">createElement</span>(<span class="string">&#x27;a&#x27;</span>);</span><br><span class="line">a.<span class="property">href</span> = url;</span><br><span class="line">a.<span class="property">hostname</span>;  <span class="comment">// 浏览器原生 URL 解析，比任何正则都可靠</span></span><br></pre></td></tr></table></figure>
+
+<p>同理，跨端解析 HTML 时宁可引入成熟的解析库，也别相信”一个正则匹配所有 div”。</p>
+<h2 id="常见校验类正则的写法复盘"><a href="#常见校验类正则的写法复盘" class="headerlink" title="常见校验类正则的写法复盘"></a>常见校验类正则的写法复盘</h2><p>前端日常最大量的正则使用是表单校验。复盘几条笔者现在会提交上线的写法。</p>
+<p>URL 校验：上面 <code>checkUrl</code> 里那条已经够用——协议白名单开头、主机名按点分段、端口限定 2 到 5 位数字、路径排除空白。它不校验 punycode、不接受 IPv6 字面量、不区分查询与片段，但工程上”结构合理即可，语义交给请求去验证”。邮箱校验：RFC 5322 的合法地址集连规范作者都承认无法用一条常规正则完整表达（引号形式的本地部分、注释、域名字面量地址都不是字符类能描述的），所以目标应该是”拦住 99% 的手滑，放过所有真实地址”：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> <span class="variable constant_">RE_EMAIL</span> = <span class="regexp">/^[a-z0-9!#$%&amp;&#x27;*+\/=?^_`&#123;|&#125;~-]+(?:\.[a-z0-9!#$%&amp;&#x27;*+\/=?^_`&#123;|&#125;~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]&#123;2,24&#125;$/i</span>;</span><br></pre></td></tr></table></figure>
+
+<p>逐段解释：本地部分由”允许字符的一个串”经”点号加另一个串”重复构成，点号不可能出现在首尾或连续出现，因为它总在两个非空串之间；域名部分要求每个标签以字母数字开头、以字母数字结尾、中间容许连字符，末尾至少一个两级以上的完整后缀。这段没有一处嵌套量词：<code>(?:\.[...]+)*</code> 的循环体必然以一个点号开头、至少吃一个字符，起点唯一，线性。手机号当时这样写就够：<code>/^1[3-9]\d{9}$/</code>（三大运营商号段都落在 13 至 19，逐季再收紧白名单即可）。身份证号：正则只负责”15 位或 18 位的数字串加末位可能的 X”（<code>/^\d{17}[\dXx]$/</code>），真正的校验位必须用代码算——前三行是 17 位加权因子与校验字符表，加权求和后模 11 查表比对，这不是正则该干的活：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> W = [<span class="number">7</span>, <span class="number">9</span>, <span class="number">10</span>, <span class="number">5</span>, <span class="number">8</span>, <span class="number">4</span>, <span class="number">2</span>, <span class="number">1</span>, <span class="number">6</span>, <span class="number">3</span>, <span class="number">7</span>, <span class="number">9</span>, <span class="number">10</span>, <span class="number">5</span>, <span class="number">8</span>, <span class="number">4</span>, <span class="number">2</span>];</span><br><span class="line"><span class="keyword">var</span> C = <span class="string">&#x27;10X98765432&#x27;</span>;</span><br><span class="line"><span class="keyword">function</span> <span class="title function_">validIdCard18</span>(<span class="params">s</span>) &#123;</span><br><span class="line">  <span class="keyword">if</span> (!<span class="regexp">/^\d&#123;17&#125;[\dXx]$/</span>.<span class="title function_">test</span>(s)) <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">  <span class="keyword">var</span> sum = <span class="number">0</span>, i;</span><br><span class="line">  <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; <span class="number">17</span>; i++) sum += s.<span class="title function_">charAt</span>(i) * W[i];</span><br><span class="line">  <span class="keyword">return</span> C.<span class="title function_">charAt</span>(sum % <span class="number">11</span>) === s.<span class="title function_">charAt</span>(<span class="number">17</span>).<span class="title function_">toUpperCase</span>();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>日期时间：<code>/^\d{4}-\d{2}-\d{2}$/</code> 之后必须补数值检查，<code>2013-02-30</code> 能通过结构校验，通不过 <code>new Date(2013, 1, 30)</code> 回读比对；把年月日用捕获组取出转成数字再判断，比写一条八百字的”闰年正则”体面得多。这一节的总原则：正则管”形状”，代码管”含义”，可读性永远优先于炫技的一行流。</p>
+<h2 id="服务端视角：同一条正则能拖死-Node-进程"><a href="#服务端视角：同一条正则能拖死-Node-进程" class="headerlink" title="服务端视角：同一条正则能拖死 Node 进程"></a>服务端视角：同一条正则能拖死 Node 进程</h2><p>这类问题从来不是前端独占。后台用 Node 0.10 的服务里，事件循环是单线程的，一次 <code>test</code> 卡住十秒，这十秒里所有连接、所有请求全部停摆：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> http = <span class="built_in">require</span>(<span class="string">&#x27;http&#x27;</span>);</span><br><span class="line">http.<span class="title function_">createServer</span>(<span class="keyword">function</span> (<span class="params">req, res</span>) &#123;</span><br><span class="line">  <span class="keyword">var</span> remark = req.<span class="property">headers</span>[<span class="string">&#x27;x-remark&#x27;</span>] || <span class="string">&#x27;&#x27;</span>;</span><br><span class="line">  <span class="keyword">if</span> (!<span class="regexp">/^(\w+[-,]?\s*)+$/</span>.<span class="title function_">test</span>(remark)) &#123;  <span class="comment">// 同一条闯祸正则</span></span><br><span class="line">    res.<span class="title function_">writeHead</span>(<span class="number">400</span>);</span><br><span class="line">    res.<span class="title function_">end</span>(<span class="string">&#x27;bad remark&#x27;</span>);</span><br><span class="line">    <span class="keyword">return</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  res.<span class="title function_">writeHead</span>(<span class="number">200</span>);</span><br><span class="line">  res.<span class="title function_">end</span>(<span class="string">&#x27;ok&#x27;</span>);</span><br><span class="line">&#125;).<span class="title function_">listen</span>(<span class="number">8080</span>);</span><br></pre></td></tr></table></figure>
+
+<p>攻击者只需要用一条命令发一个带着 30 个字符加一个全角标点的头部请求，就能以每秒几个请求的节奏把服务器变成砖机——这就是 ReDoS（正则拒绝服务）在服务端的形态，原理与浏览器卡死完全一致，只是受害者从用户变成所有用户。当时的防御手段谈不上优雅但都有效：入口处先限制长度（超过 200 字符直接拒绝，指数炸弹的引信就被剪短了）；能用字符白名单就不要用会回溯的黑名单结构（先 <code>/^[\w-,\s]*$/</code> 粗筛——单层字符类是线性的——再谈格式）；正则本身按前文四条改写，让危险形状根本不出现；实在需要跑用户可控模式的任务，放 <code>child_process.fork</code> 出子进程，主进程挂看门狗超时 <code>kill</code>，代价是延迟与架构复杂度。服务端的同事在评审表单校验逻辑时，请把”最坏输入长度乘以引擎复杂度”当成一条性能指标来对待。</p>
+<h2 id="引擎差异：IE8-的-JScript-与-IE9-之后的-Chakra"><a href="#引擎差异：IE8-的-JScript-与-IE9-之后的-Chakra" class="headerlink" title="引擎差异：IE8 的 JScript 与 IE9 之后的 Chakra"></a>引擎差异：IE8 的 JScript 与 IE9 之后的 Chakra</h2><p>最后聊聊跨引擎的现实差异，尤其是万恶之源 IE8。IE8 及更早版本跑的是 JScript 5.8 的正则实现，与 V8 相比有两类差距。一是量级：同样的回溯次数，JScript 每次尝试的常数成本明显更高，事故里同一条正则同一条输入，Chrome 33 在老笔记本上表现为数秒卡死，IE8 则要十几秒，差出近一个数量级；即便是线性路径，老 IE 的 <code>test</code> 吞吐也普遍慢数倍。二是行为：JScript 非标准地支持后顾断言（前文已述），但它不支持 ES5 的若干字符串与正则细节，比如 <code>String.prototype.trim</code> 要在 JS 层补，<code>split</code> 对捕获组进结果数组这类 ES5 语义在老引擎里行为不一致，空匹配与 <code>lastIndex</code> 的交互在不同版本间偶有偏差，跨 IE 的正则循环务必带上下文提到的防御代码。IE9 起引擎换成重写的 Chakra（JScript 9），正则实现对齐标准并大幅提速，到 IE11 基本可以放心；写兼容代码时，性能预算请以 IE8 为下限做测试，因为灾难性回溯在哪个引擎都会发生，而 IE8 只是把账单放大十倍。字符类方面补充两个易错点：<code>.</code> 不匹配 <code>\n</code>、<code>\r</code>、<code>\u2028</code>、<code>\u2029</code> 是所有引擎一致的，想”匹配除换行外任意字符”就老老实实写 <code>[^\n\r]</code>；<code>\d</code> 在任何引擎里都只指 ASCII 的 0-9，全角数字与 Unicode 十进制数字一个都不匹配，<code>\p{...}</code> 那样的 Unicode 属性类直到今天的草案阶段也没轮到 JS，处理多语言字符请显式罗列码段，比如中日韩文字用 <code>[\u4e00-\u9fa5]</code>。顺带备忘：ES6 草案已经在讨论 <code>u</code>（Unicode 精确模式）与 <code>y</code>（sticky）两个标志，2014 年尚无引擎支持，本文所有代码都不依赖它们。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>这次事故之后，笔者给自己立下几条使用正则的纪律，抄在这里当作全文的收束：一，凡”可重复结构内部的部件可以吃同一段文本”，即嵌套量词、重叠交替、<code>.</code> 与定界符混写，一律视为 bug 而非风格问题，当场改写成互斥字符类或展开形式；二，所有接触用户输入的正则必须先锚定、再限长，校验函数入口带长度粗筛；三，<code>test</code> 不加 <code>g</code>，<code>exec</code> 循环必带零宽推进防御，<code>replace</code> 复杂逻辑一律函数回调；四，正则只描述形状，校验位、范围、语义交给代码，保证每个模式能被下一个接手的人读懂；五，写危险形状的正则之前先构造”超长加非法尾”的失败样例跑一遍计时，把它当成单元测试固化下来。回溯并不可怕，可怕的是不知道自己正在回溯。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://www.oreilly.com/catalog/9780596002888/">Mastering Regular Expressions, 2nd Edition（Jeffrey Friedl，O’Reilly，2004）</a></li>
+<li><a href="https://www.oreilly.com/catalog/9780596524332/">Regular Expressions Cookbook, 1st Edition（Jan Goyvaerts &amp; Steven Levithan，O’Reilly，2009）</a></li>
+<li><a href="https://www.ecma-international.org/ecma-262/5.1/">ECMA-262, 5.1 Edition，Chapter 15.10 Regular Expressions Patterns（2011）</a></li>
+<li><a href="https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Global_Objects/RegExp">MDN：RegExp（JavaScript Reference）</a></li>
+<li><a href="https://www.quirksmode.org/js/regexp.html">Quirksmode：Regular expressions（Peter-Paul Koch）</a></li>
+<li><a href="https://www.regular-expressions.info/">Regular-Expressions.info（Jan Goyvaerts 的正则教程站）</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>正则表达式进阶：回溯与性能</p><p><a href="https://987763485.github.io/2014/04/09/正则表达式进阶回溯与性能/">https://987763485.github.io/2014/04/09/正则表达式进阶回溯与性能/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2014-04-09</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-17</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/javascript/">javascript</a><a class="link-muted mr-2" rel="tag" href="/tags/web%E5%89%8D%E7%AB%AF/">web前端</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2014/04/16/%E7%A7%BB%E5%8A%A8%E7%AB%AF%E8%B0%83%E8%AF%95%E4%B8%8E%E7%9C%9F%E6%9C%BA%E6%B5%8B%E8%AF%95/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">移动端调试与真机测试</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2014/04/07/window%E5%AF%B9%E8%B1%A1%E5%B8%B8%E7%94%A8API%E6%A2%B3%E7%90%86/"><span class="level-item">window 对象常用 API 梳理</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>设计系统与组件化思维入门 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="去年到今年，我陆续接手三条业务线的后台：商家管理、内容审核、数据报表。它们由三个小组分别维护，技术栈一半是 React 15，一半是 Vue 2，样式各写各的。今年夏天做账号打通，用户第一次能在三套后台之间跳转，问题全暴露出来。本文记录我们怎么从“三套弹窗”走到一份能维护的组件清单，适合被重复 UI 拖住、又不想一上来就造组件库的团队。"><meta property="og:type" content="blog"><meta property="og:title" content="设计系统与组件化思维入门"><meta property="og:url" content="https://987763485.github.io/2016/11/06/%E8%AE%BE%E8%AE%A1%E7%B3%BB%E7%BB%9F%E4%B8%8E%E7%BB%84%E4%BB%B6%E5%8C%96%E6%80%9D%E7%BB%B4%E5%85%A5%E9%97%A8/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="去年到今年，我陆续接手三条业务线的后台：商家管理、内容审核、数据报表。它们由三个小组分别维护，技术栈一半是 React 15，一半是 Vue 2，样式各写各的。今年夏天做账号打通，用户第一次能在三套后台之间跳转，问题全暴露出来。本文记录我们怎么从“三套弹窗”走到一份能维护的组件清单，适合被重复 UI 拖住、又不想一上来就造组件库的团队。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2016-11-06T02:17:38.000Z"><meta property="article:modified_time" content="2026-10-18T10:30:35.946Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="web前端"><meta property="article:tag" content="前端工程化"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2016/11/06/%E8%AE%BE%E8%AE%A1%E7%B3%BB%E7%BB%9F%E4%B8%8E%E7%BB%84%E4%BB%B6%E5%8C%96%E6%80%9D%E7%BB%B4%E5%85%A5%E9%97%A8/"},"headline":"设计系统与组件化思维入门","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2016-11-06T02:17:38.000Z","dateModified":"2026-10-18T10:30:35.946Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"去年到今年，我陆续接手三条业务线的后台：商家管理、内容审核、数据报表。它们由三个小组分别维护，技术栈一半是 React 15，一半是 Vue 2，样式各写各的。今年夏天做账号打通，用户第一次能在三套后台之间跳转，问题全暴露出来。本文记录我们怎么从“三套弹窗”走到一份能维护的组件清单，适合被重复 UI 拖住、又不想一上来就造组件库的团队。"}</script><link rel="canonical" href="https://987763485.github.io/2016/11/06/%E8%AE%BE%E8%AE%A1%E7%B3%BB%E7%BB%9F%E4%B8%8E%E7%BB%84%E4%BB%B6%E5%8C%96%E6%80%9D%E7%BB%B4%E5%85%A5%E9%97%A8/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2016-11-06T02:17:38.000Z" title="11/6/2016, 10:17:38 AM">2016-11-06</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/">效率工具</a></span><span class="level-item">27 分钟读完 (大约3999个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">设计系统与组件化思维入门</h1><div class="content"><p>去年到今年，我陆续接手三条业务线的后台：商家管理、内容审核、数据报表。它们由三个小组分别维护，技术栈一半是 React 15，一半是 Vue 2，样式各写各的。今年夏天做账号打通，用户第一次能在三套后台之间跳转，问题全暴露出来。本文记录我们怎么从“三套弹窗”走到一份能维护的组件清单，适合被重复 UI 拖住、又不想一上来就造组件库的团队。</p>
+<h2 id="一个“确认删除”的四种间距"><a href="#一个“确认删除”的四种间距" class="headerlink" title="一个“确认删除”的四种间距"></a>一个“确认删除”的四种间距</h2><p>账号打通上线第二周，客服转来一张截图：同一个商家，在商家后台点“删除商品”弹出的确认框，和跳到内容后台点“删除素材”弹出的框，长得完全不像一家人。我们把这半年的截图翻出来量了一遍，光是“确认删除”这一种交互，就有四种内边距：16px、20px、24px，还有一种上下 24px 左右 16px。按钮文案三种：“确定”、“确认”、“删除”。主按钮颜色两种，一种走品牌蓝，一种走危险红，而两个红还不是同一个红。</p>
+<p>更麻烦的是行为。商家后台点确定后按钮变成“处理中”，禁用但不变文案；内容后台弹一个全屏 loading；报表什么都不做，请求回来才关闭，用户在这两秒里可以连点五次。三条线都觉得自己对，因为各自都接过需求，各自都改过 bug。</p>
+<p>我最初想直接写一个通用 Modal，三条线都换掉。真动手才发现，报表的确认框要求用户手输素材编号才能删，商家后台要提示“该商品有 3 个订单待发货”。这些差异不是谁偷懒，是业务真的不一样。问题不在“没人写组件”，而在三条线没有共同的词汇：同一个东西，有人叫 Modal，有人叫 Dialog，有人叫弹层；同一个“危险操作”，有人用红按钮，有人用红文字。</p>
+<p>这次事故之后我们定了一条规矩：先别写组件，先把大家嘴里的词对齐。组件化的第一步不是抽象，是命名和盘点。</p>
+<h2 id="先盘点，再抽象"><a href="#先盘点，再抽象" class="headerlink" title="先盘点，再抽象"></a>先盘点，再抽象</h2><p>盘点的方法很笨：花一周把三条线近三个月的上线页面截图收集起来，逐个数按钮、输入框、弹窗和提示。数字很难看：按钮 47 种写法，输入框 31 种，弹窗 19 个实现，轻提示 12 种，其中 5 种是用 <code>setTimeout</code> 加绝对定位拼的。47 种按钮里视觉上能区分开的只有 5 类，剩下 42 种是同一类东西在不同页面上的漂移。</p>
+<p>盘点的产出不是代码，是四张清单：出现位置、出现次数、与其他实现的差异点。第三列最关键，它逼我们回答“这个差异是业务需要的，还是历史遗留的”。判断标准有三条：</p>
+<ul>
+<li>差异只影响颜色、尺寸、圆角，归为同一组件，用属性表达；</li>
+<li>差异影响内部结构，比如有没有图标、有没有副标题、有没有额外的输入区，考虑拆成两个组件或加 slot；</li>
+<li>差异只在一个页面出现一次，先不做，留在页面里。</li>
+</ul>
+<p>按这个标准过一遍，19 个弹窗收敛成 3 个：普通确认框、带表单的对话框、纯展示的大图预览。12 种轻提示收敛成 1 个，因为它们的差异全是位置和时长，属于配置。输入框收敛成 2 个：单行文本和带前后缀的组合输入。</p>
+<p>还有一个反直觉的发现：调用频率分布极不均匀。前 6 个组件覆盖了大约八成的调用点，剩下四十多个“组件”每个只被用了一两次。这直接决定了投入顺序——先把这 6 个做扎实，长尾那些宁可继续散落在页面里。抽象一个只用过一次的东西，等于把一次性的偶然固化成长期负债。这份表每季度更新，比设计稿更能说明系统实际长什么样。</p>
+<h2 id="组件的边界：什么该做，什么不该做"><a href="#组件的边界：什么该做，什么不该做" class="headerlink" title="组件的边界：什么该做，什么不该做"></a>组件的边界：什么该做，什么不该做</h2><p>盘点之后最容易走的另一个极端，是把什么都做成组件。我们中间试过一版“商品卡片”，为了兼容三个页面，props 加到 17 个：是否显示价格、是否显示销量、标签最多几个、图片比例、点击跳转方式。新人改它要先读四十行默认值。这不是复用，是把三个页面的差异塞进一个文件里打架。</p>
+<p>后来我们用三个问题判断边界：它在三个以上互不相干的位置出现过吗？它的语义稳定吗——“按钮”“输入框”“对话框”是稳定的，“带角标的横向商品条目”下个版本可能就没了；它有独立于页面的状态吗？有加载、禁用、错误的适合收进组件，纯粹的结构拼接用一个样式类就够了。</p>
+<p>第三条最容易被忽略。我们有个“空状态”区块，做成组件接收图标、标题、描述、按钮文案四个参数。用了半年发现，四个业务的文案和图标各不相同，组件唯一贡献是把 <code>text-align: center</code> 包了一层，最后降级成一个样式类。组件不是越多越好，标准是它有没有消除重复的决策，而不只是重复的标签。</p>
+<p>“可复用”和“必须复用”是两件事。一个组件可以被复用，但当下的页面只有一处用它，硬抽出来只会让读代码的人多跳一次文件。我们现在的做法是：第一次写在页面里，第二次出现时复制，第三次出现时才抽。这个“三次法则”很土，却避免了我们早期最大的浪费——为想象中的复用付设计成本。</p>
+<h2 id="输入、输出与受控的取舍"><a href="#输入、输出与受控的取舍" class="headerlink" title="输入、输出与受控的取舍"></a>输入、输出与受控的取舍</h2><p>组件对外只有两件事：接收什么，发出什么。输入分三类：配置，比如 <code>type</code>、<code>size</code>，组件据此选样式；数据，比如输入框的 <code>value</code>、列表的 <code>dataSource</code>；插槽，用来填补结构上的不确定，比如对话框的正文区、卡片的右上角操作区。React 里是 <code>children</code> 和具名 prop，Vue 2 里是默认 slot 和具名 slot，叫法不同，思路一样：结构交给调用方，样式和交互留在组件里。</p>
+<p>输出统一走事件，不让父级去改子组件的内部状态。对话框关闭、输入变化、分页跳转，都通过回调抛出去。旧代码里就有组件直接改 <code>props</code> 上的对象字段，两个页面共享一份引用，A 页面删一行，B 页面跟着少一行，查了两天。</p>
+<p>真正要讨论的是受控与非受控。输入框完全受控，数据单一来源，但父级忘记回写，输入框就像卡住一样打不出字；每次按键都触发父级重渲染，长表单会变慢。完全非受控则拿不到实时值，联动校验很别扭。</p>
+<p>我们的取舍按“是否需要实时干预”分。搜索框、金额输入这种要即时校验的做受控；普通文本项用非受控加初始值，提交时统一取值。对话框显示与否必须受控，因为开关时机往往由请求结果决定。分页器半受控：当前页可由外部指定，也可自己维护，但切换一定抛事件。这套规则写在组件文档第一屏，比实现细节更重要。</p>
+<h2 id="状态矩阵：一个按钮有八种样子"><a href="#状态矩阵：一个按钮有八种样子" class="headerlink" title="状态矩阵：一个按钮有八种样子"></a>状态矩阵：一个按钮有八种样子</h2><p>今年三月出过一次重复下单：按钮提交后只是“看起来”禁用了，颜色变了，点击处理没动，用户连点三次，后端收到三个请求。这让我们意识到，“禁用”不是一种颜色，而是一组行为与视觉的约定。</p>
+<p>每个交互组件固定列八项状态：默认、悬停、按下、聚焦、禁用、加载、错误、空。不是每个组件都有八项，但只要存在，就必须同时定义视觉和行为。按钮的加载态，视觉上是文案旁边一个转圈、宽度不跳动；行为上拦截点击、不触发第二次提交、保留焦点。输入框的错误态，边框变色加一行说明，说明文字要被读屏软件关联到输入框。</p>
+<table>
+<thead>
+<tr>
+<th>状态</th>
+<th>视觉</th>
+<th>行为</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>默认</td>
+<td>常规底色与边框</td>
+<td>可点击、可聚焦</td>
+</tr>
+<tr>
+<td>悬停</td>
+<td>底色加深一档</td>
+<td>不改布局、不弹提示</td>
+</tr>
+<tr>
+<td>按下</td>
+<td>再深一档并轻微位移</td>
+<td>松开才触发，允许移出取消</td>
+</tr>
+<tr>
+<td>聚焦</td>
+<td>可见轮廓，不能只靠颜色</td>
+<td>键盘可达，Tab 顺序正确</td>
+</tr>
+<tr>
+<td>禁用</td>
+<td>降透明度并去阴影</td>
+<td>不响应点击，不进入 Tab 序列</td>
+</tr>
+<tr>
+<td>加载</td>
+<td>转圈或骨架，尺寸锁定</td>
+<td>拦截重复提交，保留可读文案</td>
+</tr>
+<tr>
+<td>错误</td>
+<td>边框与说明文字同时变化</td>
+<td>说明与控件关联，提交时汇总</td>
+</tr>
+<tr>
+<td>空</td>
+<td>占位说明加一个主操作</td>
+<td>不显示“暂无数据”就完事</td>
+</tr>
+</tbody></table>
+<p>这张表最初只有视觉列，是前端同学坚持加了行为列，理由是“设计稿画不出点击之后发生什么”。后来它成了整份规范里最有价值的一列，把讨论从“灰色好不好看”拉回“用户能不能操作”。</p>
+<h2 id="命名与-API：别为每个业务加开关"><a href="#命名与-API：别为每个业务加开关" class="headerlink" title="命名与 API：别为每个业务加开关"></a>命名与 API：别为每个业务加开关</h2><p>组件 API 比实现更容易留债。我们最早的主按钮用 <code>type</code> 表示外观（<code>primary</code>、<code>danger</code>），又透传原生按钮的 <code>type=“submit”</code>，同一个属性名承担两件事，业务方写 <code>type=“submit”</code> 时按钮变成默认样式。后来外观改成 <code>variant</code>，<code>type</code> 还给原生语义。</p>
+<p>第二类债是布尔开关。为了不改调用方，表格加过 <code>showDelete</code>、<code>showEdit</code>、<code>isOrderDetail</code> 这类属性，半年后攒了九个布尔值，组合五百多种，没人知道哪种对。现在的规矩是：凡是“这个业务要不要某东西”，改成数据驱动或插槽，把判断交给调用方；只有影响组件自身形态的才允许布尔，比如 <code>disabled</code>、<code>loading</code>。</p>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 不推荐：每来一个业务就加一个布尔开关</span></span><br><span class="line">&lt;<span class="title class_">Table</span> showDelete showEdit isOrderDetail /&gt;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 推荐：结构交给调用方，判断留在业务里</span></span><br><span class="line"><span class="language-xml"><span class="tag">&lt;<span class="name">Table</span> <span class="attr">columns</span>=<span class="string">&#123;columns&#125;</span> <span class="attr">rowActions</span>=<span class="string">&#123;renderActions&#125;</span> /&gt;</span></span></span><br></pre></td></tr></table></figure>
+
+<p>尺寸也别用数字。<code>size=“14”</code> 下一个人会问是字号还是高度。我们用 <code>sm</code>、<code>md</code>、<code>lg</code> 三档，文档写死每档像素，不开放任意值。命名尽量用业务无关的词：<code>danger</code> 比 <code>delete</code> 好，删除以外的危险操作也能用；<code>ghost</code> 比 <code>link</code> 好，它描述外观而不是用途。</p>
+<h2 id="文档、示例与版本"><a href="#文档、示例与版本" class="headerlink" title="文档、示例与版本"></a>文档、示例与版本</h2><p>每个组件一页文档，固定四段：用途（何时用、何时不用）、禁止用法（配真实误用截图）、可访问性要求（焦点可见、键盘可操作、读屏文案）、属性与状态表。示例代码不手抄，构建时从 example 目录抓进来编译，示例坏了构建就红，这是文档不腐烂的唯一办法。视觉 token 的消费另有专文，组件只引用，不自己定义色值。</p>
+<p>版本按 SemVer：修 bug 走 patch，加属性走 minor，删属性或改默认行为走 major。废弃不搞突然死亡：文档标“已废弃”，开发环境打一次警告，至少留两个 minor 再移除。升级成本要提前算，我们给 major 配了 codemod 和对照表，三条线分三个月升。指望一次统一，结果通常是某个业务在发版前夜回滚。</p>
+<h2 id="推广与治理：先服务，再抽取"><a href="#推广与治理：先服务，再抽取" class="headerlink" title="推广与治理：先服务，再抽取"></a>推广与治理：先服务，再抽取</h2><p>别先建平台，先服务一个业务。我们选调用点最多的商家后台，把 6 个组件做进去，陪跑两个迭代，坑都在真实排期里修。第二个业务接入时组件已稳，推广从“我们去推”变成“别人来问”。设计评审看结构：有没有用已有组件、差异是否必要；代码评审看实现：有没有绕开组件写私有样式、为业务加开关。两边各一人把关就够，不设委员会。维护人由两位前端轮值，避免组件只属于一个人，也避免谁都不管。</p>
+<h2 id="什么时候不该做设计系统"><a href="#什么时候不该做设计系统" class="headerlink" title="什么时候不该做设计系统"></a>什么时候不该做设计系统</h2><p>三种情况别做：团队不到十人、只服务一个业务、半年内看不到第二个接入方，此时做设计系统只是给自己加一层审批。业务差异极大时，强行统一会把差异挤进 props，得到一个谁都不敢改的巨型组件。维护成本也要算：组件、文档、评审、升级四条线都要人，缺一条就烂尾。小团队更实际的做法是一份 CSS 变量加十来个组件，够用也改得动。</p>
+<h2 id="收尾：一张能贴墙的表"><a href="#收尾：一张能贴墙的表" class="headerlink" title="收尾：一张能贴墙的表"></a>收尾：一张能贴墙的表</h2><p>下面是现在的主干清单，新人入职第一周要背下来。</p>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>状态</th>
+<th>关键属性</th>
+<th>常见误用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>按钮</td>
+<td>默认、悬停、按下、聚焦、禁用、加载</td>
+<td>variant、size、loading</td>
+<td>只把禁用画成灰色，不拦点击</td>
+</tr>
+<tr>
+<td>输入框</td>
+<td>默认、聚焦、禁用、错误</td>
+<td>value、defaultValue、status</td>
+<td>受控却不回写，输入像卡住</td>
+</tr>
+<tr>
+<td>对话框</td>
+<td>打开、加载、错误、关闭</td>
+<td>visible、onOk、onCancel</td>
+<td>关闭时不清表单，下次带旧值</td>
+</tr>
+<tr>
+<td>提示</td>
+<td>出现、消失</td>
+<td>type、duration</td>
+<td>用全局提示代替字段级错误</td>
+</tr>
+<tr>
+<td>表格</td>
+<td>空、加载、错误、选中</td>
+<td>dataSource、rowKey</td>
+<td>用数组下标当 key</td>
+</tr>
+</tbody></table>
+<p>写到这里，我的结论比两年前朴素：设计系统不是一套组件，而是一组被团队共同承认的约定。组件只是载体，真正省时间的是“遇到确认删除时不用再问该用哪个词”。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>设计系统与组件化思维入门</p><p><a href="https://987763485.github.io/2016/11/06/设计系统与组件化思维入门/">https://987763485.github.io/2016/11/06/设计系统与组件化思维入门/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2016-11-06</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/web%E5%89%8D%E7%AB%AF/">web前端</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/">前端工程化</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2016/11/08/%E4%BA%8C%E5%8F%89%E6%A0%91%E9%81%8D%E5%8E%86%E5%89%8D%E4%B8%AD%E5%90%8E%E5%BA%8F/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">二叉树遍历：前中后序</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2016/11/04/PageVisibility%E9%A1%B5%E9%9D%A2%E5%8F%AF%E8%A7%81%E6%80%A7/"><span class="level-item">Page Visibility 页面可见性</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>RAG 进阶：混合检索与重排序 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="到这里已经跑通第一版检索增强生成（Retrieval-Augmented Generation，RAG）系统的团队，多半都有过同一种挫败：文档嵌入进了向量库，语义问答看起来像模像样，可用户一报错误码、一查具体型号，检索就悄悄递上来了”长得像”而不是”对得上”的片段。本文不讨论怎么调嵌入模型，而是把视角往前挪一层：单路检索为什么先天不够，稀疏与稠密两条路怎么合，重排序（rerank，亦称精排）在这条"><meta property="og:type" content="blog"><meta property="og:title" content="RAG 进阶：混合检索与重排序"><meta property="og:url" content="https://987763485.github.io/2025/07/31/RAG%E8%BF%9B%E9%98%B6%E6%B7%B7%E5%90%88%E6%A3%80%E7%B4%A2%E4%B8%8E%E9%87%8D%E6%8E%92%E5%BA%8F/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="到这里已经跑通第一版检索增强生成（Retrieval-Augmented Generation，RAG）系统的团队，多半都有过同一种挫败：文档嵌入进了向量库，语义问答看起来像模像样，可用户一报错误码、一查具体型号，检索就悄悄递上来了”长得像”而不是”对得上”的片段。本文不讨论怎么调嵌入模型，而是把视角往前挪一层：单路检索为什么先天不够，稀疏与稠密两条路怎么合，重排序（rerank，亦称精排）在这条"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2025-07-30T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-20T13:02:52.057Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="大模型"><meta property="article:tag" content="python"><meta property="article:tag" content="typescript"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2025/07/31/RAG%E8%BF%9B%E9%98%B6%E6%B7%B7%E5%90%88%E6%A3%80%E7%B4%A2%E4%B8%8E%E9%87%8D%E6%8E%92%E5%BA%8F/"},"headline":"RAG 进阶：混合检索与重排序","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2025-07-30T16:00:00.000Z","dateModified":"2026-10-20T13:02:52.057Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"到这里已经跑通第一版检索增强生成（Retrieval-Augmented Generation，RAG）系统的团队，多半都有过同一种挫败：文档嵌入进了向量库，语义问答看起来像模像样，可用户一报错误码、一查具体型号，检索就悄悄递上来了”长得像”而不是”对得上”的片段。本文不讨论怎么调嵌入模型，而是把视角往前挪一层：单路检索为什么先天不够，稀疏与稠密两条路怎么合，重排序（rerank，亦称精排）在这条"}</script><link rel="canonical" href="https://987763485.github.io/2025/07/31/RAG%E8%BF%9B%E9%98%B6%E6%B7%B7%E5%90%88%E6%A3%80%E7%B4%A2%E4%B8%8E%E9%87%8D%E6%8E%92%E5%BA%8F/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2025-07-30T16:00:00.000Z" title="7/31/2025, 12:00:00 AM">2025-07-31</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></span><span class="level-item">1 小时读完 (大约10717个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">RAG 进阶：混合检索与重排序</h1><nav class="series-nav" aria-label="系列文章导航"><div class="series-nav-meta"><i class="fas fa-book-open" aria-hidden="true"></i><span>本文属于《<a class="series-nav-title" href="/series/agent/">Agent 智能体开发</a>》第 27/55 篇</span></div><div class="series-nav-links"><a class="series-nav-link series-nav-prev" href="/2023/06/06/RAG%E6%A3%80%E7%B4%A2%E9%87%8D%E6%8E%92%E5%BA%8F%E5%AE%9E%E8%B7%B5/"><i class="fas fa-chevron-left" aria-hidden="true"></i><span>上一篇</span></a><a class="series-nav-link series-nav-index" href="/series/agent/">系列目录</a><a class="series-nav-link series-nav-next" href="/2026/01/09/Agent%E4%BB%BB%E5%8A%A1%E8%A7%84%E5%88%92%E4%B8%8E%E5%88%86%E8%A7%A3/"><span>下一篇</span><i class="fas fa-chevron-right" aria-hidden="true"></i></a></div></nav><div class="content"><p>到这里已经跑通第一版检索增强生成（Retrieval-Augmented Generation，RAG）系统的团队，多半都有过同一种挫败：文档嵌入进了向量库，语义问答看起来像模像样，可用户一报错误码、一查具体型号，检索就悄悄递上来了”长得像”而不是”对得上”的片段。本文不讨论怎么调嵌入模型，而是把视角往前挪一层：单路检索为什么先天不够，稀疏与稠密两条路怎么合，重排序（rerank，亦称精排）在这条链路里站在哪一段。写给想把检索质量再推一个台阶的人，读完你应该能搭出一条”混合检索加重排序”的完整链路，并知道它的延迟预算和实验成本怎么估。</p>
+<h2 id="为什么单路检索不够"><a href="#为什么单路检索不够" class="headerlink" title="为什么单路检索不够"></a>为什么单路检索不够</h2><p>先把两路定义清楚。稠密向量检索（dense vector retrieval）把查询与文档分别编码成一个低维向量，用向量空间里的几何距离近似语义相似度，吃的是”意思接近”——同义改写、近义表述、跨语种的表达都能命中。稀疏检索（sparse retrieval）以词表为单位建立倒排索引，按词项是否出现及其统计权重打分，最常见的代表是 BM25 评分函数，吃的是”字面精确”——哪个词命中了一目了然，得分理由可以逐项列出。</p>
+<p>问题在于，两路各自都有一类”调参数永远补不上”的查询形态。</p>
+<p>纯稠密检索会失手的形态：</p>
+<ul>
+<li>带精确标识符的查询。错误码、料号、合同编号、工单号，对嵌入模型来说几乎不可分辨：E4012 与 E4013 在向量空间里的距离，可能比两段语义相反的文本还近，检索端上来的是”邻居”而不是”本尊”。</li>
+<li>低频词与新造词。内部代号、临时启用的新版本别名、训练语料里从未出现过的术语，它们的向量表示接近噪声，命中全凭运气。</li>
+<li>代码与配置片段的查询。一个逗号的全半角、一个函数名的一个字母之差，语义天差地别，向量距离却近在咫尺。</li>
+<li>否定与限定词决定成败的查询。”禁止直连生产库”与”允许直连生产库”在向量空间里挨得极近，模型把两种说法都当作高相似端上来，等于把相反的答案一起塞进上下文。</li>
+</ul>
+<p>纯稀疏检索会失手的形态恰好是镜像：</p>
+<ul>
+<li>没有词面重叠的自然语言问句。用户问”服务启动太慢怎么办”，文档里写的是”降低冷启动耗时的指引”，词项交集接近空，BM25 得分为零。这是经典的词表鸿沟（vocabulary mismatch）。</li>
+<li>需要概念 bridging 的问题。用户描述现象，文档使用术语，两边没有共同词表，词项匹配永远牵不到一起。</li>
+<li>同义替换与跨语种检索。中文查询英文库、术语与俗称混用，都是词面手段无法跨越的。</li>
+</ul>
+<p>注意两端的失手清单几乎不重叠：一路折在”精确但语义平淡”的查询上，另一路折在”语义丰富但词面无关”的查询上。这才是混合检索（hybrid retrieval）在生产系统里近乎标配的原因——不是”多加一路分数会好看一点”，而是单路存在补不回来的盲区。</p>
+<p>但”混合”不是把两路结果简单加在一起。两路的分数量纲不同、索引成本结构不同、对同一文档的排序可能互相矛盾，把两组排序合成一个需要融合规则；融合只是召回的收尾，候选池头部到底是不是真相关，还得靠重排序说了算。指标口径与评测体系本文直接沿用同期《RAG 检索质量评估》一文，不再重复展开。</p>
+<h2 id="两路的召回特性对照"><a href="#两路的召回特性对照" class="headerlink" title="两路的召回特性对照"></a>两路的召回特性对照</h2><p>在把两路混起来之前，值得把它们的差异按维度摊开——这些维度决定了后文融合方式的选择和运维难度。</p>
+<p>匹配依据上，一路看词项的精确出现与统计权重，一路看向量空间的几何邻近，这是盲区互补的根源。</p>
+<p>对文档长度的敏感度上，BM25 靠长度归一化项抑制长文档的天然优势，但长文档依然有更多”机会包含词项”，容易在词面匹配时被超端；稠密检索在分块均匀的前提下对”文档长度”不敏感，但对”分块长度”敏感——块太长会稀释语义焦点，嵌入质量下降。所以合理的分块策略是两路共同的地板（解析与切块归《RAG 文档解析实践》，一句带过）。</p>
+<p>是否需要训练上，BM25 完全无训练，语料的词频、逆文档频率与长度均值统计即可冷启动；稠密检索依赖嵌入模型在预训练或对比训练里塑造的语义空间，换领域语料时往往还要微调。</p>
+<p>对新词的适应性上，倒排索引天然占优：新文档入库、词典统计更新，新词立即可检索；嵌入模型对词表外新词与新生语义只能等模型迭代，改不了。</p>
+<p>索引体积的来源上，倒排索引的体积由去重词项数与倒排表长度决定，压缩手段成熟；向量索引的体积大致正比于分块数乘以维度乘以每维精度，再叠加近邻索引结构本身的开销（存储布局与近邻算法的选择归往期向量库与索引算法系列，本文只在”索引与缓存的协同”一节衔接一致性问题）。</p>
+<p>可解释性上，BM25 的每次命中都能列出证据词，天然可审计；向量相似度是一个接近黑盒的数值，”为什么端上来这一条”很难向业务方解释。</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>稀疏检索（BM25 一类）</th>
+<th>稠密向量检索</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>匹配依据</td>
+<td>词项出现与统计权重</td>
+<td>向量空间几何邻近</td>
+</tr>
+<tr>
+<td>对文档长度敏感度</td>
+<td>有长度归一化，长文档仍占词面机会</td>
+<td>分块均匀时不敏感，长块稀释语义</td>
+</tr>
+<tr>
+<td>是否需要训练</td>
+<td>不需要，语料统计即可</td>
+<td>需要，依赖模型塑造语义空间</td>
+</tr>
+<tr>
+<td>对新词适应性</td>
+<td>入库即可检索，适应性强</td>
+<td>受模型覆盖限制，新词偏弱</td>
+</tr>
+<tr>
+<td>索引体积来源</td>
+<td>词项数与倒排表长度</td>
+<td>分块数乘维度乘精度，叠加近邻结构</td>
+</tr>
+<tr>
+<td>可解释性</td>
+<td>好，命中词项可枚举</td>
+<td>弱，相似度是黑盒数值</td>
+</tr>
+<tr>
+<td>典型盲区</td>
+<td>词面无关的自然语言问句</td>
+<td>精确实体号与低频新词</td>
+</tr>
+</tbody></table>
+<p>这张表不是用来论证谁更强的，而是提醒三件事：两路的盲区不重叠，所以组合有价值；两路的分数量纲不同，所以融合必须先解决可比性；两路的成本结构不同，所以候选池大小、索引维护费用都要分开算。下一节就从”怎么把两路合起来”讲起。</p>
+<h2 id="混合检索的三种做法"><a href="#混合检索的三种做法" class="headerlink" title="混合检索的三种做法"></a>混合检索的三种做法</h2><p>先看整条链路的位置关系：</p>
+<pre class="mermaid">flowchart TD
+    Q[用户查询] --> N[查询归一化与改写]
+    N --> V[向量召回]
+    N --> S[词项召回]
+    V --> P[权限与元数据过滤]
+    S --> P
+    P --> F[双路结果融合]
+    F --> R[交叉编码器精排取前k条]
+    R --> C[上下文组装]
+    C --> G[生成模型]
+    G --> Cite[答案与引用]</pre>
+
+<p>融合环节有三种典型做法，它们对系统的前提要求各不相同。</p>
+<h3 id="做法一：并集去重，统一交给精排"><a href="#做法一：并集去重，统一交给精排" class="headerlink" title="做法一：并集去重，统一交给精排"></a>做法一：并集去重，统一交给精排</h3><p>两路各取前若干条，按分块 ID 并集去重形成候选池，然后同一个重排模型对全池打分定序。它的前提是：你有一个可靠的重排模型，并且承担得起它的推理成本。好处是融合层完全不需要处理两路分数的可比性——只做集合运算，排序权力整个交给重排模型，行为最容易解释、最容易审计。在有精排的链路里，这是最干净的做法，也是本文推荐的默认骨架。</p>
+<h3 id="做法二：分数加权融合"><a href="#做法二：分数加权融合" class="headerlink" title="做法二：分数加权融合"></a>做法二：分数加权融合</h3><p>把两路分数各自归一化到同一区间，再按权重相加，用新分数排序。为什么不能直接相加？因为 BM25 的分数是无上界的正实数，随词项权重、查询长度、文档统计浮动；而向量相似度通常有界，余弦相似度落在负一到一之间。两个不同量纲的数直接相加，数值范围大的那一路会事实性地统治排序，权重形同虚设。所以必须先归一化——常见手段有池内最小最大归一、按查询做 z 分数标准化、把分数映射为排名再转换等。归一化的代价也要说清楚：它保留了”分数之间的间距”，丢掉了”分数的绝对含义”；当候选池只有几十条时，一个异常高的分数会扭曲整个池的分布，原本不差的结果被压扁。另一头是权重本身：固定权重隐含”查询分布稳定”的假设，更细的做法按查询形态调权——标识符密集查询提高稀疏路，自然语言问句提高向量路。适用于重排成本敏感、且两路分数分布相对稳定的场景。</p>
+<h3 id="做法三：排名融合，重点是倒数排名融合"><a href="#做法三：排名融合，重点是倒数排名融合" class="headerlink" title="做法三：排名融合，重点是倒数排名融合"></a>做法三：排名融合，重点是倒数排名融合</h3><p>排名融合（rank fusion）完全不看分数，只用文档在各路列表中的名次。最常用的是倒数排名融合（Reciprocal Rank Fusion，RRF），其分数定义为：</p>
+<p>score(d) &#x3D; Σ_p 1 &#x2F; (k + rank_p(d))</p>
+<p>其中 p 遍历参与融合的每一路，rank_p(d) 是文档 d 在第 p 路结果里的名次（从 1 起算），d 未出现的路段贡献为零。</p>
+<p>RRF 的第一个好性质是对分数尺度不敏感：它根本不消费分数，名次对所有检索引擎都是同一个”正整数”，BM25 与余弦相似度的量纲差异被天然抹平。参数 k 是平滑常数，原始论文使用 60 作为示意取值。k 的含义方向是：k 越小，名次之间的权重落差越陡，各路第一名的优势被放大，一路头部出错时噪声被全额吃进；k 越大，权重曲线越平，头部优势被稀释，行为趋向”各路平等投票”。以 k 取 60 为例，一路第三名贡献 1&#x2F;63，两路第四十名合计贡献 2&#x2F;100，后者反而更大——“两路互相印证”胜过”一路孤高”，这个方向通常符合我们的直觉。</p>
+<p>一个不依赖具体库的实现骨架：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">reciprocal_rank_fusion</span>(<span class="params">result_lists, k=<span class="number">60</span>, id_key=<span class="string">&quot;chunk_id&quot;</span></span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;按 RRF 融合多路检索结果，只依赖各路列表的有序性。&quot;&quot;&quot;</span></span><br><span class="line">    fused = &#123;&#125;</span><br><span class="line">    <span class="keyword">for</span> results <span class="keyword">in</span> result_lists:</span><br><span class="line">        <span class="keyword">for</span> rank, doc <span class="keyword">in</span> <span class="built_in">enumerate</span>(results, start=<span class="number">1</span>):</span><br><span class="line">            entry = fused.setdefault(doc[id_key],</span><br><span class="line">                                     &#123;<span class="string">&quot;score&quot;</span>: <span class="number">0.0</span>, <span class="string">&quot;doc&quot;</span>: doc, <span class="string">&quot;ranks&quot;</span>: []&#125;)</span><br><span class="line">            entry[<span class="string">&quot;score&quot;</span>] += <span class="number">1.0</span> / (k + rank)   <span class="comment"># 只累加倒数名次，不看原始分数</span></span><br><span class="line">            entry[<span class="string">&quot;ranks&quot;</span>].append(rank)          <span class="comment"># 保留各路名次，供坏例归因</span></span><br><span class="line">    <span class="keyword">return</span> <span class="built_in">sorted</span>(fused.values(), key=<span class="keyword">lambda</span> x: x[<span class="string">&quot;score&quot;</span>], reverse=<span class="literal">True</span>)</span><br></pre></td></tr></table></figure>
+
+<p>代码里的 ranks 字段不是装饰：融合层可解释性的一半来自”这条结果各路排第几”，排查坏例时直接看这份证据，不用重放查询。</p>
+<p>RRF 的局限同样要讲：丢弃分数意味着无法区分”两路头部都是高分真命中”与”两路头部都是低分陪跑”；当某一路整体跑偏（路由错误、查询被送错索引）时，它的噪声名次照样入池。所以生产系统常见的组合是 RRF 粗融合加一层重排——把排序的最终裁决权交给交叉编码器。</p>
+<p>三种做法的前提各一句话：有重排预算选做法一；想省推理、分数分布稳定选做法二；要对分数尺度鲁棒、少调参，选做法三，且做法二、三都可以与做法一、四节叠加使用。</p>
+<h2 id="融合层的工程细节"><a href="#融合层的工程细节" class="headerlink" title="融合层的工程细节"></a>融合层的工程细节</h2><p>候选池大小怎么定。每路取进融合的条数与最终送给用户的条数解耦，判断标准是”答案块在并集池中的覆盖率”：拿一批带标注的真实查询离线回放，统计标准答案块在两路列表里的名次分布，把每路截取深度设到能把绝大多数答案块纳入并集为止（具体覆盖阈值属于团队约定示例，须由你自己的回放数据决定，而不是照抄任何外部数字）。池子太深，后面每一环都为陪跑候选付费；太浅，重排无从翻案。</p>
+<p>去重按什么粒度。默认按分块 ID 去重，前提是两路的分块窗口一致；若同一文本以不同偏移出现在不同块里，可用文本哈希做归一。按文档去重只适合”按文档输出”的场景；否则还要限制同一文档在池中的块数，不然后一个文档的连续几段就把头部占满，用户看到的是复读机而不是多样性。</p>
+<p>两路结果冲突时的优先级。同一个块在两路名次差距悬殊时，谁说了算？按查询形态裁决：含标识符、型号、编号的查询信稀疏路；语义问句信向量路。没有分类器时，RRF 的”互证优先”行为本身是中性选择。无论裁决规则是什么，冲突证据都要记入日志——后续坏例归因时要能区分”融合规则错了”还是”某一路召回本身错了”。</p>
+<p>权限过滤必须在融合之前。这是安全硬边界，不是性能优化。每一路召回后先各自按访问控制过滤，无权内容不得进入任何候选池、缓存键与日志。若把过滤放到融合之后甚至上下文组装时，越权文档已经参与了打分与排序，它的存在与相对位次通过结果顺序泄露了出去，反复探测还能把无权内容的边界摸出来；过滤前置之后，融合与重排面对的天然是合法集合，越权风险被掐死在池外。</p>
+<p>元数据加权的边界。更新时间、来源信誉、官方标识这类信号可以作为融合层的辅助权重或并列打破规则，但边界必须明确：它们不能盖过相关性——“新而不相关”压过”旧而相关”是新闻类语料最常见的事故；来源信誉加权会把低质量的官方口径顶到高质量社区解答之上。合理做法是按文档类型设定各自的权重上限、或仅在最终排序的尾部环节生效，并且权重函数可配置、可审计、可一键关闭回退。</p>
+<h2 id="重排序为什么需要"><a href="#重排序为什么需要" class="headerlink" title="重排序为什么需要"></a>重排序为什么需要</h2><p>召回与精排两段，分工泾渭分明：召回是”粗而快”的近似，负责别漏；精排是”慢而对答案相关负责”的一步，负责候选池头部真的能支撑回答。</p>
+<p>两段的本质差别在于查询与文档何时”见面”。双塔编码（bi-encoder）把查询与文档各自独立编码，唯一的交互是最后那个内积：文档侧可以离线预计算，在线只需编码一次查询、跑一次近邻检索，成本几乎与语料规模无关，所以便宜；但也正因为查询与文档从未在模型内部相遇，它们的”相关”只是两个压缩向量之间的近似。交叉编码器（cross-encoder）把查询与候选段落拼接后同时送进同一个模型做一次完整前向，词级注意力让两者在每一层充分交互——否定、限定、指代、跨段落的细节约束都能被模型看到，所以准。但代价也在这里：每一个”查询加候选”组合都要重新前向一次，文档侧的预计算毫无意义，所以贵。</p>
+<p>贵多少？这里有一条必须刻在预算表上的成本结构：精排成本正比于进入精排的候选条数。条数翻倍，前向次数翻倍，精排段耗时近似翻倍；它与语料总量无关，只与漏斗在这一层的开口宽度有关。这正是整条链路设计成漏斗形的原因——召回从全库收到数百，融合裁到数十，精排只认真评估最后的十条上下，上下文组装再裁到个位数。每一层的开口宽度，都是下一层成本的乘数。</p>
+<p>精排值不值得上，不要引用任何外部结论，自己测：固定一批带标注的查询，在”融合后直接按召回顺序组装上下文”与”精排后再组装”两种配置下回放，比较同一生成模型的端到端答案质量；再扫一遍精排条数从少到多的边际收益曲线，找到”再加候选也不换排序”的拐点。本文不给出通用的毫秒数与百分比，因为它们与模型大小、批量、硬件、文本长度强相关，抄来的数字只会误导。往期《重排序实践》记录的是单路检索时代的早期用法，本文聚焦的是它与混合检索组合后的预算与工程问题，二者不重复展开。</p>
+<h2 id="重排模型的选型口径"><a href="#重排模型的选型口径" class="headerlink" title="重排模型的选型口径"></a>重排模型的选型口径</h2><p>多语言与中文场景下的选型方向：优先确认模型家族的训练与微调数据覆盖中文，其次覆盖你的领域语料（法律、运维、医疗的措辞分布差异很大）。就定位而言，bge 系列的重排家族是中文与多语言场景常见的本地部署候选，mxbai 的重排家族也是常被评估的多语言方向，Cohere Rerank 一类则是外部服务的代表。按本文口径，模型家族只提名称与定位，不写参数量、版本与榜单名次——这类信息半衰期很短，你的离线评测才是唯一可靠的选型来源。</p>
+<p>本地部署与外部服务两条路的差别集中在延迟与隐私。本地推理没有网络往返，延迟由自己的推理资源决定，但要承担 GPU 成本与并发下的排队与冷启动；最关键的是查询文本与候选内容不出域，隐私与合规压力最小。外部服务开通即用、弹性扩容，但查询原文连同样端上来的候选片段都要发给第三方——那是把检索日志和语料内容一起交出去，必须过合规评估；延迟受公网抖动影响，所以超时回退机制是必选项而不是优化项。</p>
+<p>一条铁律：换重排模型必须重跑离线评测。相关性判定是模型行为而不是配置项——同一个候选池，换模型后进入前几名的可能就是完全不同的块，而你的提示词模板、上下文块数、引用位置约定，全是对着旧模型的输出分布调出来的。评测指标沿用《RAG 检索质量评估》的口径，评测集的切分与泄漏检测见《微调数据集构建》，都只此一句。</p>
+<h2 id="延迟预算怎么分配"><a href="#延迟预算怎么分配" class="headerlink" title="延迟预算怎么分配"></a>延迟预算怎么分配</h2><p>一次查询的端到端时间可以拆成六段：解析（归一化、改写、路由分类）、召回（向量路与稀疏路并行，取较慢者）、融合、精排、上下文组装、生成。方向性结论很清楚：生成要逐 token 输出，在典型对话式 RAG 里占走总时间的大头；检索侧全部工作的时间加起来应当只占少数。这条方向决定了分配原则——不要抠融合环节的微秒级开销，那里几乎不是瓶颈；要抠的是精排条数与生成前的一切等待，因为精排每多评一条，用户看到第一个字的时间就往后挪一点。</p>
+<p>三种预算档，各自的取值策略不同（本节所有数值一律是团队约定示例，必须按自己的语料规模、模型速度与线上服务协议重新校准，不存在放之四海皆准的毫秒数）：</p>
+<ul>
+<li>低延迟在线档，适合嵌在业务页面里的即时问答：每路召回截取窄、融合池小、进精排的条数压到最小，上下文块数个位数；宁可精排超时直接退回融合顺序，也不让用户等第二次。</li>
+<li>常规问答档，适合企业知识助手：召回、融合、精排三段都取中等值，给精排留出正常完成的时间窗，配合缓存消化热点查询。</li>
+<li>离线批处理档，适合夜间批量重建语料问答对或跑实验：没有实时约束，召回池放宽、候选全量进精排，甚至叠加两个重排模型互相校验。</li>
+</ul>
+<p>预算配置的骨架如下，字段与档位都可以映射到自己的配置中心：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> dataclasses <span class="keyword">import</span> dataclass</span><br><span class="line"></span><br><span class="line"><span class="meta">@dataclass</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">SearchBudget</span>:</span><br><span class="line">    <span class="string">&quot;&quot;&quot;检索链路预算档位。数值均为团队约定示例，不是实测结论。&quot;&quot;&quot;</span></span><br><span class="line">    name: <span class="built_in">str</span>                 <span class="comment"># 档位名</span></span><br><span class="line">    per_route_candidates: <span class="built_in">int</span> <span class="comment"># 每路召回进入融合的条数</span></span><br><span class="line">    fusion_pool_size: <span class="built_in">int</span>     <span class="comment"># 融合去重后候选池上限</span></span><br><span class="line">    rerank_input: <span class="built_in">int</span>         <span class="comment"># 进入交叉编码器的条数，成本正比于此</span></span><br><span class="line">    max_context_chunks: <span class="built_in">int</span>   <span class="comment"># 最终写入上下文的块数</span></span><br><span class="line">    rerank_timeout_ms: <span class="built_in">int</span>    <span class="comment"># 精排超时阈值，超时退回融合顺序</span></span><br><span class="line">    use_cache: <span class="built_in">bool</span>           <span class="comment"># 是否启用缓存，键必须含权限维度</span></span><br><span class="line"></span><br><span class="line">BUDGETS = &#123;</span><br><span class="line">    <span class="comment"># 低延迟在线 / 常规问答 / 离线批处理，三档递进</span></span><br><span class="line">    <span class="string">&quot;online&quot;</span>: SearchBudget(<span class="string">&quot;online&quot;</span>, per_route_candidates=<span class="number">20</span>, fusion_pool_size=<span class="number">30</span>,</span><br><span class="line">                           rerank_input=<span class="number">10</span>, max_context_chunks=<span class="number">3</span>,</span><br><span class="line">                           rerank_timeout_ms=<span class="number">150</span>, use_cache=<span class="literal">True</span>),</span><br><span class="line">    <span class="string">&quot;qa&quot;</span>: SearchBudget(<span class="string">&quot;qa&quot;</span>, per_route_candidates=<span class="number">50</span>, fusion_pool_size=<span class="number">80</span>,</span><br><span class="line">                       rerank_input=<span class="number">20</span>, max_context_chunks=<span class="number">6</span>,</span><br><span class="line">                       rerank_timeout_ms=<span class="number">500</span>, use_cache=<span class="literal">True</span>),</span><br><span class="line">    <span class="string">&quot;batch&quot;</span>: SearchBudget(<span class="string">&quot;batch&quot;</span>, per_route_candidates=<span class="number">200</span>, fusion_pool_size=<span class="number">400</span>,</span><br><span class="line">                          rerank_input=<span class="number">100</span>, max_context_chunks=<span class="number">15</span>,</span><br><span class="line">                          rerank_timeout_ms=<span class="number">5000</span>, use_cache=<span class="literal">False</span>),</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>预算不是配完就完事，要为六个段各建一条常开的埋点：每次查询记录每段耗时与每段进出条数，某一段的分位数漂移时你能立刻看到是哪一段在退化——是向量索引膨胀、外部重排服务抖动，还是查询改写把词拉长了。你怎么自己测出来？固定一组查询、固定硬件、按档位回放，对比六段各自的分布即可，不需要任何外部基准。</p>
+<h2 id="精排的裁剪与加速"><a href="#精排的裁剪与加速" class="headerlink" title="精排的裁剪与加速"></a>精排的裁剪与加速</h2><p>精排贵，所以钱要花在刀刃上。以下手段只讲方向，不给数字。</p>
+<p>候选分级。模型精排之前先加一层几乎免费的启发式过滤：词项覆盖率低于阈值、标识符校验不通过、元数据明显过期、与已入选块高度重复的候选，先裁掉再送模型。便宜的预筛直接削减”候选条数”这个乘数，是性价比最高的一档加速。</p>
+<p>只对前若干条精排。精排结果只服务于上下文组装，没有必要把整个池全排列；按预算截断送入条数即可。但截断位置要记录进日志——坏例分析时要回答”它到底是被精排压低了，还是根本没被送到精排”。</p>
+<p>批量推理与状态复用。同一查询的多个候选天然是同一批次，批量前向的吞吐远高于逐条串行；部分实现与生成式重排器还能复用查询侧的长前缀或键值缓存状态，省掉重复计算。能不能用、省多少，取决于模型结构与推理框架，上线前自己压测，不要轻信宣传口径。</p>
+<p>精排结果缓存。缓存键的设计是重点：绝不能把用户查询原文直接放进键——那是把敏感原文抄进了缓存系统。可用查询指纹加候选池指纹加模型版本加权限组指纹的组合。新鲜度同样要评估：文档版本变更、权限组变更都要能令相关缓存失效；更新频繁的语料用短过期时间或版本号失效，静态语料才配得上长缓存。缓存命中率的口径要单独监控，防止”缓存救延迟、失效拖质量”的隐性震荡。</p>
+<p>并行与超时。两路召回并行发起已经默认；精排阶段要与上下文组装流水线衔接，并为外部重排服务设独立超时。精排超时或报错时的正确行为是退回融合顺序继续回答，同时把这次退回记录成指标上报——否则质量波动会被误读成”检索退化了”，坏例归因直接跑偏。</p>
+<h2 id="索引与缓存的协同"><a href="#索引与缓存的协同" class="headerlink" title="索引与缓存的协同"></a>索引与缓存的协同</h2><p>混合检索意味着同一份语料同时维护倒排索引与向量索引两套结构，一致性成本随之而来。存储结构与近邻算法本身归往期向量库与索引算法系列，本节只谈检索链路层面的协同。</p>
+<p>更新顺序与失败补偿。稳妥的顺序是：分块变更先写主存储（对象存储或数据库）作为唯一事实源，确认成功后再分别更新两路索引；任一路失败就进入补偿队列重试，并为每个分块记录”索引版本号”供定期对账。补偿不能无限重试：反复失败的分块应从候选池摘除，而不是留着旧表示继续服务——“能检出错的内容”比”检不到”更伤信任。双索引视图不一致时，融合层的行为最隐蔽：同一个块在新版倒排里高分、在旧版向量里低分，RRF 会把这种”自己和自己打架”当作中性证据照单全收。</p>
+<p>存储布局。正确姿势是”一份正文、两份索引”：分块原文与元数据集中存一份，倒排与向量结构里只存词项、向量和分块 ID，命中后按 ID 回表取正文。把正文各自复制进两份索引的做法，会让每次更新都要改写两遍原文，一致性成本直接翻倍。</p>
+<p>缓存命中判定要包含权限维度。融合结果缓存、精排结果缓存都一样：同一个查询对不同权限组的用户，合法答案本来就不同。缓存键若不含权限指纹，命中本身就是越权泄露通道——这与”权限过滤放在融合之前”是同一条纪律的两个截面。</p>
+<p>重建期间的读侧策略。更换嵌入模型或调整分块策略都意味着索引重建，此时用影子索引方案：新索引在后台构建，旧索引照常服务全部读流量，期间增量写入同时打到两边；新索引就绪后先抽样对账——用固定查询集回放、对比新旧结果的差异分布，确认符合预期再原子切换，并保留整段回滚能力。”重建期间旧索引继续服务”应当是常态承诺，而不是切换当天的临场决定。</p>
+<h2 id="召回与精排的实验设计"><a href="#召回与精排的实验设计" class="headerlink" title="召回与精排的实验设计"></a>召回与精排的实验设计</h2><p>所有关于”混合检索提升了多少、精排值不值”的结论，都必须是你自己测出来的。测法有纪律，否则测了也白测。</p>
+<p>一次只改一轴。最有信息量的四组单轴实验：只加稀疏路（其余不动，对比纯向量）、只改融合参数（比如只调 RRF 的平滑常数或加权方案的权重）、只加精排（候选池不变，对比有无尽排）、只改候选数（精排送入条数扫描，看边际收益曲线）。同时改两轴，结果就归因不了一件事。</p>
+<p>对照组必须有，而且对照组是”当时的线上配置快照”，不是记忆里模糊的基线。</p>
+<p>评估集与泄漏。评测查询集与标注的切分方法归《微调数据集构建》，一句带过；本文只强调实验侧的一个动作：换新嵌入模型或新重排模型时，检查评测查询与其训练语料的近似重复——泄漏会让所有分数虚高，且专挑你最得意的轴虚高。</p>
+<p>分维度看结果。总体平均分掩盖结构性问题，至少拆出四类查询各自评估：精确实体类（错误码、型号）、长文档类（答案跨越多个块）、表格与结构化内容类、否定与限定类。混合检索对前两类的改善通常最直观，对后两类未必，平均分涨了两点的配置完全可能把否定类查询做坏了。</p>
+<p>不能只看总体平均分，要看分维度指标与坏例集合。每次配置变更都保存”坏例查询列表”（答错或引用缺失的查询），与上一轮对比：修复了几个旧坏例、做坏了几个原来对的、有没有”平均改善但坏例更多”的伪装。实验记录模板如下，直接复制使用：</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="section"># 实验记录（一次一卡，改多轴就记多张）</span></span><br><span class="line"><span class="bullet">-</span> 实验名与日期、执行人</span><br><span class="line"><span class="bullet">-</span> 改动的轴（只选一个）：加稀疏路 / 融合方式或参数 / 加精排 / 候选数 / 换模型</span><br><span class="line"><span class="bullet">-</span> 对照组配置快照：（当时线上配置原文）</span><br><span class="line"><span class="bullet">-</span> 实验组配置：（只写与对照的差异，禁止全量复制）</span><br><span class="line"><span class="bullet">-</span> 评测集版本与查询条数：</span><br><span class="line"><span class="bullet">-</span> 分维度结果：总体 / 精确实体类 / 长文档类 / 表格类 / 否定类</span><br><span class="line"><span class="bullet">-</span> 坏例集 diff：修复 _ 条，新增坏例 _ 条，各列查询 ID</span><br><span class="line"><span class="bullet">-</span> 线上观察项：精排超时退回率、缓存命中率、六段耗时分布</span><br><span class="line"><span class="bullet">-</span> 结论与理由：保留 / 回滚 / 追加实验（一句话）</span><br></pre></td></tr></table></figure>
+
+<h2 id="坏例分析流程"><a href="#坏例分析流程" class="headerlink" title="坏例分析流程"></a>坏例分析流程</h2><p>答不对的查询要怎么归因？本文建议固定一棵判定树，从下游往上游走，每一步只看该步的中间产物，避免”凭感觉改配置”。</p>
+<p>第一步，是没召回吗？拿标注中应命中的分块 ID，在两路原始召回列表里逐个搜索。两路都没有，是召回问题：精确标识符类查询先看分词与词表覆盖，语义类查询看向量近邻里排前的是谁、为什么压过答案。</p>
+<p>第二，召回了但没进融合池？出现在某一路列表里、却不在并集池中，查三样：该路的截取深度、去重归一的记录、权限过滤日志——尤其注意权限过滤误伤，合法用户看着无权内容被”凭空消失”往往就是这一步。</p>
+<p>第三，在池中但没进精排？融合输出有它、精排输入没有它，看截断位置与精排超时退回记录。超时退回的查询会整体按融合顺序出结果，这批查询要单独圈出来看。</p>
+<p>第四，进了精排但被压低？在全量精排打分记录里找它的名次与分数，与最终入选的块对比：是模型判错，还是块本身被切坏——答案句恰好被分块边界拦腰截断，重排模型再强也无从下手。</p>
+<p>第五，进了上下文但模型没用？检查组装后提示词里它的位置与标记：被截断了、被引用标记埋没了、还是与其他块矛盾导致生成模型弃之不用。这一步的产物是组装日志，不是检索日志，很多团队缺的恰好是这份。</p>
+<p>每一步能走通的前提是中间产物被完整留存：各路原始列表与名次、融合池快照、精排全量打分（不只是前几名）、组装后的最终上下文。只存最终 top-k 的系统，坏例分析等于蒙眼。</p>
+<p>以下清单可直接贴进工单模板：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">坏例归因清单</span><br><span class="line">[ ] 查询原文与系统版本可复现（检索日志能按请求 ID 回放）</span><br><span class="line">[ ] 标注应命中的分块 ID：</span><br><span class="line">[ ] 稠密路召回列表中出现？名次与相似度：</span><br><span class="line">[ ] 稀疏路召回列表中出现？命中词项与得分：</span><br><span class="line">[ ] 融合并集池中存在？缺席原因：去重 / 深度截断 / 权限过滤</span><br><span class="line">[ ] 进入精排输入？缺席原因：池截断 / 超时退回（查退回指标）</span><br><span class="line">[ ] 精排打分与名次？与入选块的分差和可能原因：</span><br><span class="line">[ ] 出现在组装上下文？位置、是否截断、引用标记状态：</span><br><span class="line">[ ] 生成模型回答与引用的实际内容：</span><br><span class="line">[ ] 归因结论：召回缺失 / 融合缺失 / 精排压低 / 生成未用 / 上下文组装问题</span><br><span class="line">[ ] 修复动作落在哪一轴，登记进实验记录：</span><br></pre></td></tr></table></figure>
+
+<h2 id="与其他技术路线的边界"><a href="#与其他技术路线的边界" class="headerlink" title="与其他技术路线的边界"></a>与其他技术路线的边界</h2><p>本文的链路不是唯一解，与两条邻近路线划清边界，各一句。基于知识图谱的多跳检索（详见本批《GraphRAG 知识图谱增强》）适合”谁负责什么、依赖链传导到哪”这类跨文档关系型问题，代价是图谱构建与维护管线，它是对本文链路的定向补强而非替代；长上下文直接塞入适合小语料或强连贯需求的场景，语料规模可控时常常比检索更省心，但生产规模下上下文窗口与延迟都不允许把它当默认主力。混合检索加精排仍是默认主力路线，因为查询分布广、语料规模大、延迟敏感这三个约束同时存在时，只有它能同时满足。</p>
+<h2 id="配置形态对照"><a href="#配置形态对照" class="headerlink" title="配置形态对照"></a>配置形态对照</h2><p>把全文收拢成一张决策表。表中”延迟成本”与”工程量”都是方向性比较而非测量值：</p>
+<table>
+<thead>
+<tr>
+<th>配置形态</th>
+<th>适合什么查询分布</th>
+<th>延迟与成本</th>
+<th>工程量</th>
+<th>最容易出现的问题</th>
+<th>必须监控什么</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>仅稠密召回</td>
+<td>语义问句为主，精确实体极少</td>
+<td>检索段最轻，成本在向量索引维护</td>
+<td>最小</td>
+<td>错误码、型号、新词类查询整批失手</td>
+<td>零命中与低置信查询占比、嵌入模型版本</td>
+</tr>
+<tr>
+<td>仅稀疏召回</td>
+<td>查资料式查询为主，词面可控</td>
+<td>检索段最轻，倒排体积可压缩</td>
+<td>较小</td>
+<td>词表鸿沟，自然语言问句大面积落空</td>
+<td>零命中率、高频未命中词项分布</td>
+</tr>
+<tr>
+<td>混合、无精排</td>
+<td>查询分布杂，重排预算为零</td>
+<td>双路并行，融合开销几乎免费</td>
+<td>中等</td>
+<td>两路名次漂移，头部排序忽冷忽热</td>
+<td>各路单独命中占比、融合参数变更记录</td>
+</tr>
+<tr>
+<td>混合、精排前 k</td>
+<td>质量优先的通用生产形态</td>
+<td>精排成本正比候选数，是预算主变量</td>
+<td>较大</td>
+<td>候选池过浅或精排超时退回，质量跌回召回序</td>
+<td>精排退回率、精排前后名次变动幅度</td>
+</tr>
+<tr>
+<td>混合、精排、缓存</td>
+<td>热点查询明显，更新节奏可控</td>
+<td>命中时端到端最短，未命中同上一行</td>
+<td>最大</td>
+<td>缓存键缺权限维度酿成越权，新鲜度失守</td>
+<td>缓存命中率、权限指纹正确性、失效延迟</td>
+</tr>
+</tbody></table>
+<p>这张表的读法是”按约束选形态”，不是”按行号排资历”：查询分布单一且确认无精确实体需求的场景，仅稠密召回加轻量过滤就可能够用；反过来，把最后一行当终点的团队，往往先在缓存一致性和权限指纹上付出超出收益的运维代价。形态之间应当可以降级运行——精排服务抖动退回融合序，缓存故障退回直检，每一层降级都保住主链路可用。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>混合检索的价值来源不是”分数更高”，而是两路盲区不重叠：稠密向量管语义近似，稀疏词项管精确与可解释，任何一路单走都会在特定查询形态上系统性失手。三种融合做法的取舍可以浓缩成一句话：有重排预算就用并集加统一精排做骨架，想省推理且分数分布稳定就做加权融合，要对尺度鲁棒、少调参就从 RRF 起步。</p>
+<p>重排序是召回无法替代的一段：双塔便宜但只能近似，交叉编码器准确但成本正比于候选条数。所以链路是漏斗，预算按解析、召回、融合、精排、组装、生成六段分配，生成占大头、检索侧从紧；三档预算的数值全部是团队约定示例，唯一可信的数字来自你自己的回放与埋点。</p>
+<p>两条不能退让的纪律：权限过滤必须在融合之前，越权内容不得进入任何候选池与缓存键；换任何检索或重排模型，必须重跑离线评测，并按单轴实验与坏例集合来确认变更的真实影响——总体平均分永远不是终点，分维度与坏例才是。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li>Cormack、Clarke、Buettcher 关于倒数排名融合（RRF）的公开论文，Reciprocal Rank Fusion outperforms Condorcet and individual Rank Learning Methods，SIGIR 2009（只记主题与场合，不提供链接）。</li>
+<li>Robertson 与 Jones 关于检索词相关性加权（term weighting）的早期公开论文，BM25 评分函数的学术脉络源头之一（只记主题，不提供链接）。</li>
+<li>Robertson 等人围绕 OKAPI 系统与 BM25 评分函数发表的系列公开论文（只记主题，不提供链接）。</li>
+<li><a href="https://arxiv.org/abs/1901.04085">Passage Re-ranking with BERT（Nogueira &amp; Cho，交叉编码器重排的起点性工作）</a></li>
+<li><a href="https://arxiv.org/abs/1908.10081">Sentence-BERT（Reimers &amp; Gurevych，双塔句向量嵌入的代表工作）</a></li>
+<li>Khattab 与 Zaharia 提出 ColBERT 晚期交互（late interaction）检索的公开论文（只记主题，不提供链接）。</li>
+<li><a href="https://en.wikipedia.org/wiki/BM25">BM25 词条，维基百科</a></li>
+<li><a href="https://github.com/elastic/elasticsearch">Elasticsearch 开源仓库</a></li>
+<li><a href="https://github.com/opensearch-project/OpenSearch">OpenSearch 开源仓库</a></li>
+<li><a href="https://github.com/milvus-io/milvus">Milvus 开源仓库</a></li>
+<li><a href="https://github.com/qdrant/qdrant">Qdrant 开源仓库</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>RAG 进阶：混合检索与重排序</p><p><a href="https://987763485.github.io/2025/07/31/RAG进阶混合检索与重排序/">https://987763485.github.io/2025/07/31/RAG进阶混合检索与重排序/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2025-07-31</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-20</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="link-muted mr-2" rel="tag" href="/tags/python/">python</a><a class="link-muted mr-2" rel="tag" href="/tags/typescript/">typescript</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2025/08/07/AutoGPT%E8%87%AA%E4%B8%BB%E6%99%BA%E8%83%BD%E4%BD%93%E8%A7%A3%E6%9E%90/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">AutoGPT 自主智能体解析</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2025/07/24/%E6%9C%AC%E5%9C%B0%E7%9F%A5%E8%AF%86%E5%BA%93%E9%97%AE%E7%AD%94%E7%B3%BB%E7%BB%9F%E5%AE%9E%E8%B7%B5/"><span class="level-item">本地知识库问答系统实践</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

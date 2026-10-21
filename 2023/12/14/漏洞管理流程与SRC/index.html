@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>漏洞管理流程与 SRC - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="本文梳理一条能够长期运转的漏洞管理流程：漏洞从哪里进来、如何定级、按什么顺序修复、怎样确认它真的修好了，以及安全应急响应中心（SRC）应当按什么规则运营。它适合已经做过几次应急响应、却发现漏洞总是“只进不出”的团队负责人与安全工程师。本文只讨论流程与治理，不涉及漏洞成因细节与可直接执行的验证方法；涉及外部报告的部分以授权测试为前提。"><meta property="og:type" content="blog"><meta property="og:title" content="漏洞管理流程与 SRC"><meta property="og:url" content="https://987763485.github.io/2023/12/14/%E6%BC%8F%E6%B4%9E%E7%AE%A1%E7%90%86%E6%B5%81%E7%A8%8B%E4%B8%8ESRC/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="本文梳理一条能够长期运转的漏洞管理流程：漏洞从哪里进来、如何定级、按什么顺序修复、怎样确认它真的修好了，以及安全应急响应中心（SRC）应当按什么规则运营。它适合已经做过几次应急响应、却发现漏洞总是“只进不出”的团队负责人与安全工程师。本文只讨论流程与治理，不涉及漏洞成因细节与可直接执行的验证方法；涉及外部报告的部分以授权测试为前提。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2023-12-13T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-19T05:57:41.740Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="网络安全"><meta property="article:tag" content="等级保护"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2023/12/14/%E6%BC%8F%E6%B4%9E%E7%AE%A1%E7%90%86%E6%B5%81%E7%A8%8B%E4%B8%8ESRC/"},"headline":"漏洞管理流程与 SRC","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2023-12-13T16:00:00.000Z","dateModified":"2026-10-19T05:57:41.740Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"本文梳理一条能够长期运转的漏洞管理流程：漏洞从哪里进来、如何定级、按什么顺序修复、怎样确认它真的修好了，以及安全应急响应中心（SRC）应当按什么规则运营。它适合已经做过几次应急响应、却发现漏洞总是“只进不出”的团队负责人与安全工程师。本文只讨论流程与治理，不涉及漏洞成因细节与可直接执行的验证方法；涉及外部报告的部分以授权测试为前提。"}</script><link rel="canonical" href="https://987763485.github.io/2023/12/14/%E6%BC%8F%E6%B4%9E%E7%AE%A1%E7%90%86%E6%B5%81%E7%A8%8B%E4%B8%8ESRC/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2023-12-13T16:00:00.000Z" title="12/14/2023, 12:00:00 AM">2023-12-14</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a></span><span class="level-item">26 分钟读完 (大约3898个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">漏洞管理流程与 SRC</h1><div class="content"><p>本文梳理一条能够长期运转的漏洞管理流程：漏洞从哪里进来、如何定级、按什么顺序修复、怎样确认它真的修好了，以及安全应急响应中心（SRC）应当按什么规则运营。它适合已经做过几次应急响应、却发现漏洞总是“只进不出”的团队负责人与安全工程师。本文只讨论流程与治理，不涉及漏洞成因细节与可直接执行的验证方法；涉及外部报告的部分以授权测试为前提。</p>
+<h2 id="漏洞的三个入口与统一受理"><a href="#漏洞的三个入口与统一受理" class="headerlink" title="漏洞的三个入口与统一受理"></a>漏洞的三个入口与统一受理</h2><p>多数组织的漏洞入口可以收敛成三类。第一类是内部扫描与测试：主机与中间件漏扫、Web 应用扫描、渗透测试、代码审计，以及流水线门禁的产出，量大、重复率高、误报也多。门禁属于 DevSecOps 的范畴，本文只把它当作上游水源：拦下来的问题没有变成工单，第二天就会重新出现。第二类是外部报告与 SRC，来自白帽子、第三方漏洞平台与客户安全团队，价值常常最高，因为外部视角能看到内部盲区。第三类是供应商与情报：厂商公告、组件通告、CERT 与情报源推送的条目，它先于检测出现，因此对台账依赖最强。组件如何盘点、如何用 SCA 应对，是开源组件治理那篇文章的范围，本文只把它当作一类输入。</p>
+<p>入口可以有三个，队列只能有一个。所有来源必须汇入同一张工单表，字段、编号与责任人格式统一，否则只剩三套互不相认的清单。受理记录的最小字段如下：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">id:</span> <span class="string">VULN-2023-004182</span>      <span class="comment"># 全局唯一编号，示意值</span></span><br><span class="line"><span class="attr">source:</span> <span class="string">src</span>               <span class="comment"># internal / src / vendor / intel</span></span><br><span class="line"><span class="attr">asset:</span> <span class="string">order-api-prod</span>     <span class="comment"># 台账中的资产标识，不是 IP 字面量</span></span><br><span class="line"><span class="attr">locator:</span> <span class="string">&quot;/api/orders 接口的排序参数&quot;</span>   <span class="comment"># 位置线索，用于去重</span></span><br><span class="line"><span class="attr">component:</span> <span class="string">order-api:2.4.1</span></span><br><span class="line"><span class="attr">severity:</span> <span class="string">high</span>            <span class="comment"># 定级结果</span></span><br><span class="line"><span class="attr">owner:</span> <span class="string">交易平台研发组</span>       <span class="comment"># 由台账解析得到</span></span><br><span class="line"><span class="attr">sla_due:</span> <span class="number">2023-12-21</span>       <span class="comment"># 按分级时限推算</span></span><br><span class="line"><span class="attr">status:</span> <span class="string">confirmed</span>         <span class="comment"># new/triaged/confirmed/fixing/verifying/closed</span></span><br></pre></td></tr></table></figure>
+
+<p>汇入之后紧接着是去重。键不能只用漏洞名称，同名问题会落在不同资产上；也不能只用资产，同一资产可能有几个问题。可用的指纹是“资产标识 + 漏洞类别 + 位置线索 + 组件与版本”这四元组，命中即合并，多来源的上报记录挂在同一条主工单上。这一步做不好，重复上报率就会把缺口写进指标。整条链路如下图。</p>
+<pre class="mermaid">flowchart TD
+    A[内部扫描与测试] --> E[统一受理队列]
+    B[外部报告与 SRC] --> E
+    C[供应商与情报] --> E
+    E --> F[去重与合并]
+    F --> G[定级]
+    G --> H[台账解析责任人]
+    H --> I[排优先级]
+    I --> J[修复与 SLA 计时]
+    J --> K[复测验证]
+    K -->|通过| L[关闭与沉淀]
+    K -->|不通过| J
+    L --> M[披露与致谢]</pre>
+
+<h2 id="定级：技术严重性与业务可达性一起看"><a href="#定级：技术严重性与业务可达性一起看" class="headerlink" title="定级：技术严重性与业务可达性一起看"></a>定级：技术严重性与业务可达性一起看</h2><p>定级最容易犯的错，是把扫描器给出的分数直接抄成等级。CVSS v3.1 的基础分度量的是漏洞自身的技术属性——攻击向量、复杂度、所需权限、用户交互、影响范围，它并不认识你的业务。同样 9.8 分，只监听内网的运维工具和处理用户订单的公网服务，风险不是一回事。分数是输入，不是结论。</p>
+<p>本文推荐两级判断：先由基础分结合时间与环境因子给出技术初档，再用四个业务问题修正——资产是否对外暴露；利用是否需要攻击者先具备前置条件；受影响的数据或功能有多重要；是否存在代价很低的临时缓解。四条都指向风险确实高就维持或上调，任何一条明确指向打不到就下调。下调要记录理由并可复查。</p>
+<table>
+<thead>
+<tr>
+<th>业务可达性</th>
+<th>技术严重性高</th>
+<th>技术严重性中</th>
+<th>技术严重性低</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>公网直接可达，承载核心数据</td>
+<td>严重</td>
+<td>高</td>
+<td>中</td>
+</tr>
+<tr>
+<td>公网可达，但需已认证会话</td>
+<td>高</td>
+<td>中</td>
+<td>低</td>
+</tr>
+<tr>
+<td>仅内网可达，且有分段与准入</td>
+<td>中</td>
+<td>中</td>
+<td>低</td>
+</tr>
+<tr>
+<td>隔离环境或已下线资产</td>
+<td>低</td>
+<td>低</td>
+<td>不受理</td>
+</tr>
+</tbody></table>
+<p>这张表的读法是取两个维度的交集，而不是把分数相加，否则高技术分会把早已没有业务意义的资产抬到严重。另一类偏差是等级通胀：全都定成高危，高危就失去优先级含义，治理办法是定为严重的工单必须由第二人复核，只看上面四个问题有没有证据。</p>
+<h2 id="责任人从台账里来"><a href="#责任人从台账里来" class="headerlink" title="责任人从台账里来"></a>责任人从台账里来</h2><p>工单要落到具体的人身上，这一步几乎完全取决于资产台账。漏洞长在资产上，而工单系统认识的是域名、IP、证书通用名、组件名这些碎片；要把碎片翻译成可以对话的研发组，台账至少得提供四类映射：入口到应用、应用到归属团队、团队到负责人与备份人、组件版本到引入它的服务。台账本身怎么建属于资产台账那篇文章，本文只关心解析这个动作。</p>
+<p>解析要允许失败，失败要有出口。建议把“责任人未确定”单独做成一个状态，由安全团队挂起并限期指派，而不是先派给不相干的人凑数：前者让缺口在指标里显形，后者只会制造无人处理的僵尸工单。</p>
+<p>外部报告常先落到网络层，一个域名可能指向早已迁移的旧系统。受理时用台账做一次归一，归不上的进入影子资产清单单独跟踪，它是治理问题而非漏洞问题。</p>
+<h2 id="修复-SLA：分级时限与例外审批"><a href="#修复-SLA：分级时限与例外审批" class="headerlink" title="修复 SLA：分级时限与例外审批"></a>修复 SLA：分级时限与例外审批</h2><p>SLA 的作用不是施压，而是让风险有一个可预期的暴露窗口。时限太长意味着风险长期裸露，太短意味着团队只能用敷衍的方式交付，最终由复测买单。下面框架里的数字全是示意值，应按自身业务节奏重新标定。</p>
+<table>
+<thead>
+<tr>
+<th>等级</th>
+<th>确认到修复的示意时限</th>
+<th>临时缓解时限</th>
+<th>例外审批层级</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>严重</td>
+<td>3 个工作日</td>
+<td>24 小时内给出缓解措施</td>
+<td>安全与业务负责人共同签署</td>
+</tr>
+<tr>
+<td>高</td>
+<td>10 个工作日</td>
+<td>5 个工作日</td>
+<td>安全负责人</td>
+</tr>
+<tr>
+<td>中</td>
+<td>30 个自然日</td>
+<td>随迭代排期</td>
+<td>安全经理</td>
+</tr>
+<tr>
+<td>低</td>
+<td>随版本计划合并处理</td>
+<td>不单独要求</td>
+<td>无需审批</td>
+</tr>
+</tbody></table>
+<p>两个细节比数字更重要。第一，计时起点应当是确认而不是上报：收到邮件到完成定级之间的时间不该算进研发时限，否则受理越慢、研发看起来越超期。第二，临时缓解与最终修复要分开计量：严重级漏洞难以在三天内完成代码修复，但访问控制、临时下线功能这类手段能在几小时内落地。</p>
+<p>例外必须有出口。无法按期修复时走例外审批，材料写清三件事：客观原因、补偿控制、下一次复审日期。例外只允许续期一次且需重新审批，否则例外会变成默认，SLA 就退化成装饰字段。</p>
+<h2 id="优先级：同等级内部再排一次序"><a href="#优先级：同等级内部再排一次序" class="headerlink" title="优先级：同等级内部再排一次序"></a>优先级：同等级内部再排一次序</h2><p>同等级的一批工单仍要分先后，本文按顺序问四个问题。第一是暴露面：资产能否从公网可达，是否只需一个普通账号就能触达，还是必须先获得内网位置。第二是可达性与绕过成本：已经上了临时缓解的漏洞，要问的不是缓解有没有，而是绕开它需要对方付出多大代价——需要交互、需要已认证会话、需要特定配置的代价高，可以适当后移；门槛很低的，不能因为已缓解就挪出视野。第三是利用是否已公开：公告是否附有说明材料、是否进入公开的检测条目，都会改变风险窗口。第四是业务权重：同一条链路上，涉及资金、涉及他人数据、涉及身份认证的优先。这四条只决定顺序，不改变等级本身。</p>
+<h2 id="复测与关闭：不要把“已修复”当成事实"><a href="#复测与关闭：不要把“已修复”当成事实" class="headerlink" title="复测与关闭：不要把“已修复”当成事实"></a>复测与关闭：不要把“已修复”当成事实</h2><p>复测是最容易被跳过、也最能决定可信度的一步。研发回复已修复，只说明他做了某个动作，并不说明问题状态发生了变化。复测的前提是交付物：发布版本号、变更单号、配置差异、依赖清单的前后对比，至少有一样能被复查；随后在等价环境里确认问题不再成立，确认的对象是问题本身而不是修复说明。环境怎么搭、补丁怎么比对，属于漏洞复现与修复验证那篇文章的范围，本文只强调三条约束：复测不由修复方自己完成；结论写回同一条主工单；未复测的工单不能计入已关闭。</p>
+<p>还要防两种回退：配置漂移，即修复所依赖的配置在后续变更中被覆盖；版本回退，即回滚把旧版本重新带回生产。对付它们的手段不是更频繁的人工复测，而是把已修复项变成可持续检查的规则。</p>
+<h2 id="SRC：把外部报告变成可运营的通道"><a href="#SRC：把外部报告变成可运营的通道" class="headerlink" title="SRC：把外部报告变成可运营的通道"></a>SRC：把外部报告变成可运营的通道</h2><p>SRC 表面上是一个提交入口，实质是一份对外契约，至少有四条。</p>
+<p>第一条是范围声明与授权边界。哪些域名、应用与接口在受理范围内，哪些明确不在，要写成正面清单，而不是本公司全部资产这样的表述。边界模糊会造成两种损失：有人在不该测的系统上花了时间，有人在授权之外做了不该做的事。范围之外的问题不作为漏洞受理，这一点要事先公告。</p>
+<p>第二条是报告规范与复现要求。表单应强制几个字段：资产与位置、影响描述、可复现的步骤要点、是否涉及真实数据。这里要划一条硬线：只受理授权范围内的测试，验证限于最小范围，禁止下载或留存业务数据与个人信息，禁止顺着同一入口横向延伸到其他系统，提交材料也不得包含批量扫描的结果清单。触碰这条线的报告，无论问题多严重，都先按规范退回并书面说明理由。</p>
+<p>第三条是奖金分级与评审公平。分级依据用前面那套定级结果，而不是报告者的名气或提交量。同一问题多源上报只奖励第一份有效报告，重复者按去重结果判定，规则要写在显眼处。评审建议双人背靠背定级，分歧由第三人裁决，并每季度回看一次申诉记录。</p>
+<p>第四条是沟通时效。收到即确认、定级后告知、修复后致谢，三个节点都要有时限承诺并且对外可见。报告者最强烈的不满通常不来自奖金数额，而来自漫长的沉默。</p>
+<h2 id="披露协调"><a href="#披露协调" class="headerlink" title="披露协调"></a>披露协调</h2><p>对内修复与对外披露是两条时间线，节奏要对齐。涉及厂商或组件的问题，在修复版本可用之前不公开细节，期限要事先约定并留档，示意值为九十天共同确认；到期仍未修复时，公开内容也应限于影响范围与规避建议。自有产品则与版本发布节奏对齐，公告说明受影响版本与升级路径，不写可用于定位验证条件的内容。对外口径只有一份，由同一角色签发。</p>
+<h2 id="度量与常见失败"><a href="#度量与常见失败" class="headerlink" title="度量与常见失败"></a>度量与常见失败</h2><p>指标不必多，四个够用。平均修复时长按从确认到复测通过计算并分来源统计。超期率只看例外之外的真实逾期，如果例外占了一半，问题在流程而不在研发。重复上报率同时衡量去重能力与资产覆盖度，同一问题被外部反复上报而内部从未发现，通常是扫描范围或台账有缺口。来源分布用来判断三条入口是否均衡：外部长期显著多于内部，说明的是检测能力不足。再加一个重开率，盯配置漂移与版本回退。</p>
+<p>常见失败模式都能在前面找到对应。只进不出，是队列缺少关闭标准；无人认领，是台账解析失败却没人把工单挂起；把所有漏洞定成高危，是定级缺少第二人复核，结果严重级的资源永远不够；最隐蔽的是把指标当成目标，靠改写计时起点、合并大工单、批量走例外清空超期，数字好看，风险原地不动。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>漏洞管理的核心不是把漏洞找全，而是让每个被发现的漏洞都能走到有归属、有时限、有复测结论的终点：入口归一、去重后定级，定级同时看技术严重性与业务可达性，责任人靠台账解析并给解析失败留出挂起出口，SLA 分级并让例外带上补偿控制与复审日期，同级之间按暴露面、绕过成本与利用公开程度排序，关闭前必须复测且不由修复方自证。SRC 的可靠性来自范围清晰、规则前置、评审公平与沟通及时，而不是奖金高低。先把这几件事写成一页纸跑通，再谈平台化。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>漏洞管理流程与 SRC</p><p><a href="https://987763485.github.io/2023/12/14/漏洞管理流程与SRC/">https://987763485.github.io/2023/12/14/漏洞管理流程与SRC/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2023-12-14</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-19</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a><a class="link-muted mr-2" rel="tag" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/">等级保护</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2023/12/21/HuggingFaceTransformers%E5%AE%9E%E8%B7%B5/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Hugging Face Transformers 实践</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2023/12/09/%E5%A8%81%E8%83%81%E6%83%85%E6%8A%A5%E4%B8%8EIOC%E5%88%86%E6%9E%90/"><span class="level-item">威胁情报与 IOC 分析</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

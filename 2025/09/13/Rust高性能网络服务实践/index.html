@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Rust 高性能网络服务实践 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="本文面向已经能用 Rust 写出一个能跑起来的网络服务、但还在被 CPU、内存与尾延迟困扰的工程师。我们不追逐跑分数字，而是沿着一条连接从建立到关闭的完整轨迹，逐处检查哪里在浪费 CPU 与内存，以及怎么用可复现的方法把它发现并消除。读完你应当建立一套服务层的工程直觉：accept 环路、每连接任务、缓冲、背压、超时、解析与观测点各自要守住什么底线。网络库的用法与选型归本批《Rust 网络编程实战"><meta property="og:type" content="blog"><meta property="og:title" content="Rust 高性能网络服务实践"><meta property="og:url" content="https://987763485.github.io/2025/09/13/Rust%E9%AB%98%E6%80%A7%E8%83%BD%E7%BD%91%E7%BB%9C%E6%9C%8D%E5%8A%A1%E5%AE%9E%E8%B7%B5/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="本文面向已经能用 Rust 写出一个能跑起来的网络服务、但还在被 CPU、内存与尾延迟困扰的工程师。我们不追逐跑分数字，而是沿着一条连接从建立到关闭的完整轨迹，逐处检查哪里在浪费 CPU 与内存，以及怎么用可复现的方法把它发现并消除。读完你应当建立一套服务层的工程直觉：accept 环路、每连接任务、缓冲、背压、超时、解析与观测点各自要守住什么底线。网络库的用法与选型归本批《Rust 网络编程实战"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2025-09-12T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-20T14:08:55.880Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="rust"><meta property="article:tag" content="后端开发"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2025/09/13/Rust%E9%AB%98%E6%80%A7%E8%83%BD%E7%BD%91%E7%BB%9C%E6%9C%8D%E5%8A%A1%E5%AE%9E%E8%B7%B5/"},"headline":"Rust 高性能网络服务实践","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2025-09-12T16:00:00.000Z","dateModified":"2026-10-20T14:08:55.880Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"本文面向已经能用 Rust 写出一个能跑起来的网络服务、但还在被 CPU、内存与尾延迟困扰的工程师。我们不追逐跑分数字，而是沿着一条连接从建立到关闭的完整轨迹，逐处检查哪里在浪费 CPU 与内存，以及怎么用可复现的方法把它发现并消除。读完你应当建立一套服务层的工程直觉：accept 环路、每连接任务、缓冲、背压、超时、解析与观测点各自要守住什么底线。网络库的用法与选型归本批《Rust 网络编程实战"}</script><link rel="canonical" href="https://987763485.github.io/2025/09/13/Rust%E9%AB%98%E6%80%A7%E8%83%BD%E7%BD%91%E7%BB%9C%E6%9C%8D%E5%8A%A1%E5%AE%9E%E8%B7%B5/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2025-09-12T16:00:00.000Z" title="9/13/2025, 12:00:00 AM">2025-09-13</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></span><span class="level-item">1 小时读完 (大约11001个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Rust 高性能网络服务实践</h1><nav class="series-nav" aria-label="系列文章导航"><div class="series-nav-meta"><i class="fas fa-book-open" aria-hidden="true"></i><span>本文属于《<a class="series-nav-title" href="/series/rust/">Rust 学习路线</a>》第 59/68 篇</span></div><div class="series-nav-links"><a class="series-nav-link series-nav-prev" href="/2025/03/12/Rust%E7%BD%91%E7%BB%9C%E7%BC%96%E7%A8%8B%E5%AE%9E%E6%88%98/"><i class="fas fa-chevron-left" aria-hidden="true"></i><span>上一篇</span></a><a class="series-nav-link series-nav-index" href="/series/rust/">系列目录</a><a class="series-nav-link series-nav-next" href="/2025/10/30/Rust%E5%AE%9E%E7%8E%B0%E9%AB%98%E6%80%A7%E8%83%BD%E4%BB%A3%E7%90%86/"><span>下一篇</span><i class="fas fa-chevron-right" aria-hidden="true"></i></a></div></nav><div class="content"><p>本文面向已经能用 Rust 写出一个能跑起来的网络服务、但还在被 CPU、内存与尾延迟困扰的工程师。我们不追逐跑分数字，而是沿着一条连接从建立到关闭的完整轨迹，逐处检查哪里在浪费 CPU 与内存，以及怎么用可复现的方法把它发现并消除。读完你应当建立一套服务层的工程直觉：accept 环路、每连接任务、缓冲、背压、超时、解析与观测点各自要守住什么底线。网络库的用法与选型归本批《Rust 网络编程实战》，本文只谈服务层工程。</p>
+<h2 id="accept-环路：扩展性的第一道坎"><a href="#accept-环路：扩展性的第一道坎" class="headerlink" title="accept 环路：扩展性的第一道坎"></a>accept 环路：扩展性的第一道坎</h2><p>accept 环路（accept loop）负责从监听套接字的完成队列里取出已经握手成功的新连接。它看似只有几行代码，却常常是单进程服务的第一处扩展瓶颈：所有新连接都要穿过同一个循环、同一把锁、同一个任务。当新建连接速率升高，accept 环路会先于业务饱和，表现为连接握手明明已经完成、应用却迟迟不把套接字取走，最终监听队列溢出。</p>
+<p>要理解瓶颈，先分清两件事。内核维护的监听队列与用户态取走连接的速度是两回事：如果用户态取走得慢，队列会在内核侧堆满并丢弃新连接，而丢弃对调用方几乎不可见。多监听文件描述符（multi listening fd）与端口复用类做法——让多个进程或线程各自持有一个监听句柄，把新连接按内核哈希分散到不同队列——缓解的正是“单点取走”这件事，它们把 accept 的并行度铺开，让不同的取走者互不阻塞。这里只谈机制与代价：多监听句柄的好处是 accept 不再排队，代价是每个句柄要独立管理、失败要分别计数、不同句柄间的可观测性被打散；平台参数本文不展开。</p>
+<p>accept 失败必须被显式处理，而不是被忽略。队列满、系统资源不足、监听句柄被信号打断这几类失败，机制不同、后果也不同，一定要按类别分别计数并打上低基数标签：把 accept 失败当成“偶尔返回一个错误、循环继续”是最危险的，它会让一次资源枯竭在指标上完全隐身。遇到资源不足类的失败，正确姿态是退避后重试或直接拒绝并把计数暴露出去，而不是空转把 CPU 打满。</p>
+<p>最后一个高频错误是“accept 之后立即在同一处做重活”。accept 环路应当只做最少的动作：取出连接、做一次轻量登记、把连接交给下游任务。一旦在 accept 之后同步做 TLS 握手、读首包、查配置、连接下游，accept 环路就被这一条连接的慢操作拖住，其余新连接排队、监听队列溢出。把“取出”和“处理”解耦，让 accept 环路始终保持高周转，是服务层的第一原则。</p>
+<h2 id="每连接一个任务的所有权模型"><a href="#每连接一个任务的所有权模型" class="headerlink" title="每连接一个任务的所有权模型"></a>每连接一个任务的所有权模型</h2><p>在 Rust 的异步服务里，“一条连接对应一个任务”几乎是默认形态。原因不在语法糖，而在所有权：每个任务独占一条连接、一组缓冲和一个取消句柄，生命周期边界与任务边界重合，连接结束时资源随任务退出而释放，不需要跨任务共享那套可变状态。任务从哪来要交代清楚——通常由一个受控的 spawn 点（accept 环路或一个专门的派发任务）创建，并且要放在一个有并发上限的运行时上，避免连接数被直接翻译成内存与调度开销——这正是下文缓冲一节要防的事故。</p>
+<p>连接不是简单的开与关，而是一台状态机（state machine）：新建、握手、就绪、处理若干请求、关闭中、结束。把它写成显式的状态集合与允许的迁移，而不是散落各处的布尔标志，是避免 bug 的关键。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">状态（State）    进入条件                允许的动作                  退出条件</span><br><span class="line">新建 New         accept 取回一条连接     分配缓冲、登记计数          进入握手或直接解析首帧</span><br><span class="line">握手 Handshaking 协议协商进行中          只读、不写业务响应          协商成功 / 协商超时</span><br><span class="line">就绪 Ready       握手完成                读写业务请求与响应          收到关闭 / 空闲超时</span><br><span class="line">处理中 Processing 请求已接收             执行业务与等待下游          响应写完 / 处理超时</span><br><span class="line">关闭中 Closing   主动或被动发起关闭      停止读、尽力冲刷已排队的写出 冲刷完成或到达强制期限</span><br><span class="line">结束 Done        写出与缓冲都已释放      从活跃表移除                ——</span><br></pre></td></tr></table></figure>
+
+<p>状态机没写好的服务，会反复出现三类 bug。第一类是半关闭泄漏（half-close leak）：对端已经不再发送、我方也读到了结束，但因为只关闭了读方向、写方向的缓冲与任务没有回收，连接既不活跃也不消失，活跃表越积越大。第二类是重复关闭（double close）：多处代码各自判断“该关了”，分别去关同一条连接，轻则计数翻倍，重则第二次关闭操作落在已经释放的资源上。第三类是“关闭中仍在写”：进入关闭状态后，仍有排队任务往一个已经不可写的连接里塞数据，写出失败被吞掉，缓冲越堆越多。三类 bug 的共同根因是没有单一所有者与显式终态——谁都能关、没人保证只关一次、终态不可辨认。把状态机与“结束”这一终态显式化，这三类问题都能收敛。</p>
+<h2 id="优雅关闭：先摘流量，再收在途"><a href="#优雅关闭：先摘流量，再收在途" class="headerlink" title="优雅关闭：先摘流量，再收在途"></a>优雅关闭：先摘流量，再收在途</h2><p>优雅关闭（graceful shutdown）的顺序不能颠倒：先停止 accept，让存量连接不受影响但不再放新连接进来；再通知每个连接任务进入关闭中、停止读取新请求；然后在一段最长等待期限内等在途请求自然结束；对到达期限仍未结束的连接做强制收尾——取消任务、释放缓冲、从活跃表移除；最后才关闭监听资源。取消语义本身归本批《Rust 异步取消与取消安全》，这里只谈关闭流程怎么组织。</p>
+<figure class="highlight rust"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 示意骨架：只表达控制流与顺序，方法均为本文自写类型，不代表任何运行时的真实 API</span></span><br><span class="line"><span class="keyword">async</span> <span class="keyword">fn</span> <span class="title function_">graceful_shutdown</span>(state: &amp;ServerState) &#123;</span><br><span class="line">    state.<span class="title function_ invoke__">stop_accepting</span>();                 <span class="comment">// 1. 先停止 accept，不再接收新连接</span></span><br><span class="line">    <span class="keyword">for</span> <span class="variable">handle</span> <span class="keyword">in</span> state.<span class="title function_ invoke__">iter_active</span>() &#123;     <span class="comment">// 2. 逐条连接进入关闭中，停止读新请求</span></span><br><span class="line">        handle.<span class="title function_ invoke__">mark_closing</span>();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">let</span> <span class="variable">drained</span> = state.<span class="title function_ invoke__">wait_until_idle</span>(state.<span class="title function_ invoke__">grace_deadline</span>()).<span class="keyword">await</span>; <span class="comment">// 3. 有期限地等在途</span></span><br><span class="line">    <span class="keyword">if</span> !drained &#123;</span><br><span class="line">        state.<span class="title function_ invoke__">force_close_remaining</span>();      <span class="comment">// 4. 超期的强制收尾：取消任务、释放缓冲</span></span><br><span class="line">    &#125;</span><br><span class="line">    state.<span class="title function_ invoke__">close_listeners</span>();                <span class="comment">// 5. 最后关闭监听；同步清理，不放进 Drop</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>有两个常见误区值得说清楚。第一，不要在 <code>Drop</code> 里做异步清理。<code>Drop::drop</code> 是同步的、不能 <code>await</code>，而“把缓冲冲刷出去、把关闭帧发给对端”恰恰是需要调度的异步动作——在 <code>Drop</code> 里既等不到它完成，又可能在运行时已经开始拆卸的窗口里把一个无法继续的任务丢进调度器，结果不是清理没做，而是进程在退出路径上挂死。第二，“退出时统一 flush”不可靠。进程退出与操作系统回收之间没有你想象中那么宽的一道缓冲，信号到达、退出码返回、内核关闭文件描述符这一连串动作并不保证你排在最后的写出真的落到了线上；把可靠性寄托在退出时 flush，等于把最后一段响应交给运气。</p>
+<p>还有一点常被忽略：优雅关闭要配合上游负载均衡先把流量摘掉。服务端停止 accept 只是不再接受新连接，上游若仍按原权重把新连接打过来，客户端看到的就是连接被拒。正确顺序是先让上游把这个实例的权重降为零或摘除，给它一段传播时间，再执行上面的关闭流水线。</p>
+<h2 id="线程与任务模型：并行度不是越高越好"><a href="#线程与任务模型：并行度不是越高越好" class="headerlink" title="线程与任务模型：并行度不是越高越好"></a>线程与任务模型：并行度不是越高越好</h2><p>先只讲方向，不给具体数值：把并行度设得高于物理核数，带来的不是更多吞吐，而是上下文切换与缓存抖动（cache thrashing）。当可运行任务数远大于核数，线程在核间来回迁移，工作集反复被挤出各级缓存，CPU 时间被搬运与失效吃掉，尾延迟先变差。worker 数与核数的关系是贴着核数，而不是越多越好，超出的部分买到的往往是调度开销。</p>
+<p>单线程运行时（single-threaded runtime）在特定形态下反而是更好的选择：连接数巨大但每条连接很轻、任务在核间没有可观测的迁移收益、又希望减少跨线程同步与缓存一致性的抖动时，把并行度收敛到一，能省下一整类并发 bug 与调度成本。它的适用边界是“一个实例一个核”的部署方式，而不是“整个服务只用一个核”。</p>
+<p>工程上常见的形态有两种：按核分进程（每个进程绑定到一组核，进程内各自跑一个运行时），以及一进程多运行时。按核分进程把隔离做到进程边界，一个进程出问题不牵连其他进程，代价是共享状态要靠外部、连接在进程间的分配要在 accept 层提前决定。一进程多运行时共享同一地址空间、协调更便宜，代价是单个坏任务可能影响同进程内其他运行时，内存也彼此可见、更难设隔离上限。选哪种取决于你更看重故障隔离还是共享成本，本文不预设结论。</p>
+<h2 id="缓冲策略与内存放大"><a href="#缓冲策略与内存放大" class="headerlink" title="缓冲策略与内存放大"></a>缓冲策略与内存放大</h2><p>这是本文两条主线之一：每一处会悄悄吃掉内存的地方怎么被发现并消除。先说读写缓冲分别在哪。读缓冲在“从套接字取到的字节还没被解析层消费完”这段时间里存在；写缓冲在“业务已经生成响应、但还没被内核全部取走”这段时间里存在。两者都挂在连接上，因而都与连接数成正比。</p>
+<p>第一种后果来自分配策略。如果每条连接一建立就按“最大可能”预分配读写缓冲——按协议允许的最大头、最大请求体、最大响应各留一份——那么连接的空与忙不再影响占用，占满的是最坏情况。按需增长（grow on demand）把占用改成“随实际用量爬升”，代价是增长本身要拷贝旧数据、要有一块可增长结构的开销。正确的取向是按需增长配合一个小起步容量，而不是二选一地极端预分配。</p>
+<p>第二种后果是把两者相乘：单连接缓冲 × 连接数。假设每条连接读写各占一个“团队约定示例”量级的上限，当连接数从几千爬到几万、几十万，内存占用不是线性变陡而是直接失控——服务还没开始处理业务，光是挂在连接上的缓冲就把内存吃穿，触发交换或 OOM。这就是典型的内存事故：事故现场看不出是哪条连接的问题，因为每条都“合规”，问题是乘出来的。治理它靠两件事：给单连接缓冲设硬上限，给全进程连接数设硬上限，两者的乘积才是真正的内存预算，必须显式对齐到实例可用内存。</p>
+<p>慢客户端是缓冲堆积最常见的触发者。对端读取很慢、或干脆连上不收，我方不断往里写，写缓冲只能越堆越长——如果实现选择“总能收下业务生成的响应”，缓冲就无上限地增长。策略是反过来：写缓冲到上限就停止接收新的写出，要么让处理它的任务被背压挡住，要么在超过一个约定阈值时主动断开这条连接。主动断开不是粗暴，而是把“一条不合作的连接”占用的内存还给整个进程。</p>
+<figure class="highlight toml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 团队约定示例：数值只是把&quot;必须设上限&quot;这件事写出来，不代表任何实测结论</span></span><br><span class="line"><span class="section">[connection.buffer]</span></span><br><span class="line"><span class="attr">grow_strategy</span> = <span class="string">&quot;on_demand&quot;</span>     <span class="comment"># 按需增长，而不是按最大可能预分配</span></span><br><span class="line"><span class="attr">read_max_bytes</span> = <span class="number">262_144</span>        <span class="comment"># 单连接读缓冲上限（示例）</span></span><br><span class="line"><span class="attr">write_max_bytes</span> = <span class="number">1_048_576</span>     <span class="comment"># 单连接写缓冲上限（示例）</span></span><br><span class="line"><span class="attr">server.max_connections</span> = <span class="number">8_000</span>  <span class="comment"># 全进程连接上限，与上面相乘得到内存预算</span></span><br><span class="line"></span><br><span class="line"><span class="section">[connection.policy]</span></span><br><span class="line"><span class="attr">on_write_overflow</span> = <span class="string">&quot;close&quot;</span>     <span class="comment"># 写缓冲堆积超过上限时主动断开慢客户端</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="零拷贝的真实边界"><a href="#零拷贝的真实边界" class="headerlink" title="零拷贝的真实边界"></a>零拷贝的真实边界</h2><p>另一条主线是 CPU。先讲清楚一次普通读写到底把时间花在哪：数据从内核的套接字缓冲区到用户态，至少要经过一次“内核态与用户态之间的搬运”，以及一次进入内核、一次离开内核的开销。所谓拷贝代价，主要就落在这一进一出与中间那次内存搬运上；数据量越大、次数越频繁，这部分越显眼。</p>
+<p>分散&#x2F;聚合写（scatter&#x2F;gather write，也就是 vectored I&#x2F;O 那一类机制）能省的是系统调用次数与中间的拼接拷贝：当一段响应由头、体、尾几块不连续的内存组成，与其先把它们 <code>memcpy</code> 到一个临时大缓冲再发一次，不如让内核一次把多块缓冲区按顺序取走。它减少的是“为了凑成连续而做的额外拷贝”和“多次系统调用”，不改变内核到用户态方向上那一次不可避免的搬运。边界要说清楚：聚合写在数据本来就要发、且不连续时才划算；如果拼接本身比重发还贵，它就不成立。</p>
+<p>真正接近“绕开用户态搬运”的手段，只有在“内容不变、且来源就是一段文件”时才成立——把文件内容原样送到套接字、中间不解析不改写，内核可以在自己的缓冲区之间完成搬运。一旦这条路径上要插入改写——压缩、模板渲染、加解密，尤其是 TLS 之后的密文——文件到套接字的旁路就基本不成立了：密文是在用户态生成、再交给内核的，不存在“从文件直接搬到线上”这回事。所以 TLS 服务谈零拷贝要格外谨慎。</p>
+<p>“零拷贝”这个词被误用有三种常见含义，分开看才不会被骗：一是省掉用户态到用户态的中间拷贝（聚合写那一类），确实能省但有限；二是省掉内核与用户态之间的那一次搬运（文件旁路那一类），只在特定路径成立；三是干脆只是“少拷贝了一次临时缓冲”的营销说法，跟跨内核边界无关。本文只讲每一类在为什么、什么时候成立，不给任何收益数字——真实收益取决于负载形状，得你自己按下一节的剖析方法去测。</p>
+<h2 id="背压要分层"><a href="#背压要分层" class="headerlink" title="背压要分层"></a>背压要分层</h2><p>背压（backpressure）不是一刀切的开关，它至少要分三层，每层的动作不同。连接级关心的是“这条连接还能不能再收、还能不能再写”，动作是暂停读取对端、或拒绝继续写出；请求级关心的是“当前在途请求是否超过这条连接允许的排队深度”，动作是让排队超限的请求快速失败；业务队列级关心的是“后端处理能力是否已经被打满”，动作是把整条流水线变慢，从入口就开始挡。三层各管一段，把它们混成一个全局开关，就会既挡不住细水长流的单连接，也在真过载时来不及降级。</p>
+<p>只在入口限流挡不住单连接里的慢消费，这一点要讲透。入口限流数的是“新请求的到达速率”，可一条已经建立、正在被慢客户端一点点读走的连接，它的危险不在请求速率，而在写出方向排不上队。对端读取很慢，我方内核发送缓冲区先满，接着 <code>write</code> 返回“暂时不能写”，如果你的实现把“暂时不能写”处理成“把响应继续攒进内存等下再试”，那么这条连接会一边攒一边继续从上游取新请求——单条慢连接就能把内存抬起来，而它的请求速率在入口限流眼里完全正常。</p>
+<p>关键结论是：写不出去的时候，必须停止继续读上游。当一条连接的写出被堵住、写缓冲到顶，正确姿态是暂停从这条连接继续读取、暂停从下游继续取数据喂给它，把“消费不过来”这个信号往上游传，而不是继续接收、继续生产、继续攒。就绪与完成模型、<code>poll</code> 契约的细节归本批《Rust 异步 IO 模型解析》，本文只在“写不出去就要停止读”这一点与它衔接，不重讲那套协议。停止读不是可选优化，而是把内存占用与真实消费能力绑在一起的必要约束。</p>
+<p>有了这个约束，有界队列（bounded queue）就成了自然的落点：每个环节用有界容量把“上游生产快过下游消费”这件事显式表达出来。有界就有取舍——队列满了怎么办？一种选择是丢弃：对新请求直接返回繁忙，保住已经在途的请求不被拖累；另一种是降级：把非核心功能（额外校验、富化、埋点细节）先关掉，保住核心路径。丢弃简单可预测但把失败推给了调用方，降级保住体验但要多写一条退化路径。没有免费的方案，只有你能不能把选择讲清楚、并让它可观测。</p>
+<h2 id="超时要分层"><a href="#超时要分层" class="headerlink" title="超时要分层"></a>超时要分层</h2><p>很多服务出问题时才发现：全链路只有一个三十秒超时。这不是超时策略，是没有策略。连接建立、握手、首字节、请求整体、空闲保活是五种不同的超时，各自守着一段不同的风险。连接建立超时管的是“对方多久之内必须把三次握手完成”；握手超时管的是“加密协商多久之内必须谈完”；首字节超时管的是“连接好了之后，对方多久之内必须开始说话”——它专门用来踢掉那些连上却一言不发的连接；请求整体超时管的是“一个请求从进来到响应写完，最多允许多久”；空闲保活超时管的是“一条长期没有读写的连接多久被回收”。它们作用在不同阶段，一个都替代不了另一个。</p>
+<p>一条硬规则是：内层之和不能超过外层。下游调用、序列化、排队各自有超时，它们的和如果大于请求整体的超时，那么外层总是先动手，内层的超时形同虚设——你会看到请求整体超时把还在等下游的任务粗暴切断。反过来配才成立：给请求整体一个预算，再把预算按阶段拆给内层，让内层之和留出余量。下游连接池的取用与排队归本批《Rust 数据库连接池实现》，本文只在超时预算怎么叠加这一处与它衔接。</p>
+<p>超时叠加重试会造成放大，这是隐性流量的主要来源之一。用一张预算表把它摊开，数值都是团队约定示例、只为说明关系：</p>
+<table>
+<thead>
+<tr>
+<th>层级</th>
+<th>团队约定示例（示意值）</th>
+<th>作用阶段</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>连接建立超时</td>
+<td>最短，秒级以内</td>
+<td>三次握手完成前</td>
+</tr>
+<tr>
+<td>握手超时</td>
+<td>略大于连接建立</td>
+<td>加密协商进行中</td>
+</tr>
+<tr>
+<td>首字节超时</td>
+<td>独立设定</td>
+<td>连上到收到第一个字节</td>
+</tr>
+<tr>
+<td>单次下游调用超时</td>
+<td>明显小于请求整体</td>
+<td>一次下游往返</td>
+</tr>
+<tr>
+<td>请求整体超时</td>
+<td>内层各段之和再加余量</td>
+<td>从进入处理到响应写完</td>
+</tr>
+<tr>
+<td>空闲保活超时</td>
+<td>远大于任何单个请求</td>
+<td>长期无读写的连接回收</td>
+</tr>
+</tbody></table>
+<p>放大是这样发生的：请求整体超时内允许重试若干次，每次重试又各自带下游超时，最坏情况下一个“用户以为只有一次”的请求会占用多次下游预算与多条下游连接。所以重试必须计入超时预算，而不是每次重新起表；没有预算的重试，等价于给自己制造尖峰。</p>
+<h2 id="限流与配额的落点"><a href="#限流与配额的落点" class="headerlink" title="限流与配额的落点"></a>限流与配额的落点</h2><p>限流算法本身归往期那几篇限流类文章，本文不重讲，只谈一件事：限流器落在服务层的哪个位置。落点不同，保护的资源和付出的代价完全不同，大致有四类。连接级落点在 accept 环路附近，控制的是“新建连接的速率”与“活跃连接总数”，它挡的是连接洪水，保护的是每连接缓冲那份内存预算。每租户落点在鉴权之后、业务之前，控制的是“某个调用方占用的额度”，它需要拿到租户标识才能计数，保护的是公平性，防止一个大户吃掉所有人。每接口落点在路由分发之后，控制的是“某个昂贵接口被调用的速率”，保护的是后端脆弱依赖。全局落点在入口最外层，控制的是“整个实例承受的总请求速率”，是最后一道保险。四类落点各守一段，通常要同时存在，而不是只留全局那一个。</p>
+<p>限流器自身不能是全局锁热点，否则你用一个新瓶颈换掉了一个旧瓶颈。如果每来一个请求都要抢同一把锁去更新同一个计数器，那么在多核并行度铺开的服务里，这把锁就成了所有任务的必经窄口，CPU 时间被串行化吃掉。做法是分片（sharding）：把额度按连接、按线程、按租户切成许多互不竞争的子桶，各自本地计数，只有在需要重新分配额度时才做低频的汇总。分片换来并行，代价是精度——子桶之间的额度分配是近似的，突发时可能短暂偏离设定值，这是限流场景通常可以接受的取舍。</p>
+<p>被限流之后怎么表达同样重要。限流命中不应该伪装成内部错误，也不应该悄悄丢弃让调用方以为请求成功了：要返回一个语义明确、可区分的响应，让调用方知道“这是被限流、可以稍后重试”，并尽量带上重试相关的提示。计数要暴露出去：被限流命中次数、被拒绝速率，按接口、按租户、按落点分别打低基数指标，否则你根本分不清“变慢”是被限流挡住的还是后端真的撑不住。没有计数与标签的限流器，等于一个装了却看不见仪表盘的开关。</p>
+<h2 id="协议解析的硬限制"><a href="#协议解析的硬限制" class="headerlink" title="协议解析的硬限制"></a>协议解析的硬限制</h2><p>解析层是内存放大与恶意输入的第一道防线，原则只有一句：在解析任何长度信息之前，先把大小限制死。头部每一行要有最大字节数，所有头部加起来要有总量上限，请求体哪怕协议声明允许很大也要设一个业务可接受的上限。这些限制必须在“读到长度就开始按长度分配”之前生效——如果信任了对方声称的长度再照着分配缓冲，一个恶意的大长度就直接把你的连接变成内存炸弹，这正是解析前限制要防的内存放大。</p>
+<p>按长度读与按分隔符读是两种不同的风险面。按长度读（read-by-length）相信头里写的字节数，风险是“声明的长度”被夸大，所以要把它和硬上限绑定，超限直接判非法；按分隔符读（read-by-delimiter）靠边界符切出一条完整消息，风险是“永远等不到分隔符”——对方发一半就停住，于是这条连接长期占着缓冲和任务，所以按分隔符读必须同时受单次读取的时间上限与缓冲字节上限约束。两者都要有，取决于协议本身属于哪一类。</p>
+<p>半包与粘包在状态机里怎么表达，是解析层是否可靠的试金石。半包是一条消息只到了前缀、还没到齐，正确表达是“当前处于某种读满为止的中间状态，把已到达的字节留在该连接的读缓冲里，等待下一次可读事件”，而不是每次把不完整的数据丢弃重来。粘包是一次可读事件里到达了两条甚至多条消息的拼接，正确表达是“每解析完一条就推进一次游标，只要缓冲里还剩一个完整帧就继续解析”，而不是假设“一次读恰好一条”。把游标与剩余字节当成状态机的一部分显式持有，这两个问题就都归位了。</p>
+<p>解析层与业务层解耦不只是为了清晰，更是为了能单测：解析器应当是一段“给一段字节、返回若干完整消息或一个非法判定”的纯逻辑，不碰网络、不碰业务。这样半包、粘包、超限、非法字符这些边界，都能在单元测试里用构造好的字节序列逐条覆盖，而不必真的去搭一条连接。下面这份清单把解析前就必须生效的硬限制列全。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">解码硬限制清单（每条都必须在解析之前生效，越晚加越危险）：</span><br><span class="line">1. 单行最大字节数：限制头部每行长度，超过即判非法并断开。</span><br><span class="line">2. 头部总量上限：限制所有头部之和，防止头字段爆炸造成内存放大。</span><br><span class="line">3. 请求体上限：即便协议允许大请求体，也要设一个业务可接受的上限。</span><br><span class="line">4. 单次读取时间上限：解析中途空闲即超时，避免半条连接长期占着缓冲。</span><br><span class="line">5. 非法字节与协议违例：遇到不属于当前状态合法集合的字节，立即失败。</span><br><span class="line">6. 每连接未完成请求上限：管线化（pipelining）场景限制排队深度。</span><br></pre></td></tr></table></figure>
+
+<h2 id="观测点可抄清单"><a href="#观测点可抄清单" class="headerlink" title="观测点可抄清单"></a>观测点可抄清单</h2><p>服务层的性能问题大多不是“突然崩”，而是“某一段悄悄变坏”。观测点的价值，就是让每一条连接从生到死的每个阶段都留下可对账的足迹。下面这份清单可以直接抄进实现，指标名是示意，落到系统里要保持低基数。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">观测点可抄清单（指标名示意，标签一律低基数）：</span><br><span class="line">- 活跃连接数、连接新建速率、连接关闭速率</span><br><span class="line">- accept 失败次数，并按类别打标签（队列满 / 资源不足 / 其它）</span><br><span class="line">- 读错误与写错误分类计数</span><br><span class="line">- 在途请求数（已进入处理但响应未写完）</span><br><span class="line">- 每阶段耗时分布：排队等待 / 本地处理 / 等下游</span><br><span class="line">- 读写缓冲占用总量与每连接占用</span><br><span class="line">- 被限流次数、被超时切断次数、被主动断开次数</span><br><span class="line">- 未结束任务数（spawn 了但未走到终态）</span><br></pre></td></tr></table></figure>
+
+<p>这些点分别对应前文的风险：新建速率与活跃连接数告诉你内存预算是否被乘出来；accept 失败分类告诉你瓶颈在不在监听侧；在途请求数与每阶段耗时告诉你慢是慢在排队、本地还是等下游；缓冲占用直接盯着内存放大；被限流、被超时、被断开三类计数让你分得清“变差”是主动保护还是被动故障；未结束任务是任务泄漏的前哨。</p>
+<p>两条纪律必须钉牢。第一，低基数原则：标签的取值集合必须是有限且可枚举的，比如错误类别、接口名、阶段名，绝不能用请求体、完整 URL、用户标识、连接编号这类高基数值做标签——那会把指标系统本身变成内存事故，也让排查成本失控。第二，脱敏与最小必要：任何要落盘留痕的字段都要先问一句“这条排障真的需要它吗、它是否含敏感信息”，能不记就不记，必须记的先脱敏。</p>
+<h2 id="剖析方法：怎么把“实测”兑现"><a href="#剖析方法：怎么把“实测”兑现" class="headerlink" title="剖析方法：怎么把“实测”兑现"></a>剖析方法：怎么把“实测”兑现</h2><p>有了观测点，下一步是在真实负载形状下采样，而不是只跑一个压测脚本就下结论。一条恒定并发、恒定请求大小的压测曲线，测不出慢客户端堆积、测不出大小请求混排时的缓冲抖动、也测不出连接长短不一带来的调度差异。要逼近真实，得让采样负载形状还原生产的统计特征：连接存活时长分布、请求大小分布、到达是否成突发、下游是否偏斜。只有在这种形状下采到的数据才谈得上实测。</p>
+<p>拿到 CPU 时间之后，要能区分它被哪一类活动吃掉：拷贝、序列化、锁、系统调用是四笔性质完全不同的账。拷贝与系统调用往往成对出现在 I&#x2F;O 密集处；序列化是纯用户态的 CPU，堆在响应生成的路径上；锁的代价常常不体现在“持锁计算”而在“等锁空转”，它会让火焰图变宽但每项都薄。把它们分清楚，才知道该动缓冲策略、该减拷贝、该换数据结构，还是该把计数器分片。</p>
+<p>在异步服务里读火焰图有一个必须知道的局限：火焰图反映的是线程在某时刻在执行什么，而一个异步任务的“时间片”并不等于一条线程的占用。同一个线程会在不同任务的就绪片段之间来回，于是火焰图上你看到的一格，可能来自任意一条连接的某一段处理；任务在生命周期里跨越了很长时间与很多线程，火焰图却把它打散。用火焰图定位“哪类 CPU 活动多”是有效的，用它推断“某条连接慢在哪”会误导。</p>
+<p>因此本文最看重的一条方法是纪律本身：每次只改一轴，看同一指标的分布变化，禁止用不同负载之间的对比下结论。同时动了缓冲和并发，你无法知道指标变化归谁；换了负载又换了实现，你看到的差异可能只是负载不同。改一轴、盯同一个指标、比较同一种分布在改动前后的形状，这是把优化变成可复现实验的唯一可靠路径。下面这份剖析前检查清单，建议逐条过一遍再动手。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">剖析前检查清单：</span><br><span class="line">1. 负载形状是否贴近真实：连接长短、请求大小分布、到达是否成突发。</span><br><span class="line">2. 采样窗口是否覆盖高峰与回落，而不是只采到预热阶段。</span><br><span class="line">3. 指标口径是否固定：改动前后只看同一个指标的同一种分布。</span><br><span class="line">4. 是否只改了一轴：拷贝、缓冲、并发、序列化一次只动一个。</span><br><span class="line">5. 运行参数是否与线上一致：worker 数、缓冲上限、各类超时。</span><br><span class="line">6. 火焰图读法：记住它反映线程占用，不等于任务生命周期。</span><br></pre></td></tr></table></figure>
+
+<h2 id="常见性能杀手清单"><a href="#常见性能杀手清单" class="headerlink" title="常见性能杀手清单"></a>常见性能杀手清单</h2><p>这一节把散在各处的坑收拢成一份可查的清单，每条给一句机制与一句定位法。第一条，每请求新建连接或句柄：机制是每个请求都付一次建连与握手的钱，连接复用形同虚设；定位法是看连接新建速率是否紧跟请求速率、握手耗时在阶段分布里是否占比过高。第二条，克隆大块数据：机制是 <code>clone</code> 一份大缓冲就是实打实的分配加拷贝，常发生在把请求体随手传给多个环节；定位法是拷贝类开销在剖析里是否成团出现。第三条，把字节 <code>Vec</code> 当默认缓冲：机制是默认用它往往意味着反复扩容加搬运，而不是复用一块有上限的缓冲；定位法是看分配与增长是否落在热路径。第四条，热路径上拼日志字段：机制是每条请求都在日志里临时拼一串字段，字符串与格式化开销被乘以请求数，日志写路径本身归本批《Rust 高性能日志库实现》，这里只算它的调用方开销；定位法是看序列化与字符串构造是否只在高吞吐路径上变宽。</p>
+<p>第五条，全局锁保护的计数器：机制是共享计数器让所有任务在锁上排队，把并行度收敛成串行；定位法是等锁空转是否让火焰图整体变宽而每项都薄。第六条，阻塞调用混进异步任务：机制是一个同步阻塞调用霸占着工作线程，同线程上别的就绪任务一起被拖住；定位法是看某类任务的延迟是否与某个下游或系统调用同步出现。第七条，频繁小写入：机制是一块一块地发，每次都要进一次内核，调用开销远大于数据本身；定位法是系统调用计数是否与写出次数成正比而字节数很小。第八条，每请求重做序列化：机制是同一份稳定内容每个请求都重新编码一遍，本可以只算一次；定位法是序列化开销是否与请求数线性相关却不随内容复用而下降。第九条，任务泄漏导致内存缓涨：机制是连接结束了但它的任务没走到终态，资源与缓冲被一直持有，表现为不发作、只慢涨；定位法就是那个“未结束任务数”指标是否随时间单调爬升。</p>
+<h2 id="一张优化对照表"><a href="#一张优化对照表" class="headerlink" title="一张优化对照表"></a>一张优化对照表</h2><p>下表把全文的九类优化对象按“默认值有什么问题、怎么改、改的副作用、看什么验收”排在一起，作为落地时的速查。表里的验收指标一律来自前文观测点，不含任何跑分数字。</p>
+<table>
+<thead>
+<tr>
+<th>优化对象</th>
+<th>常见默认值的问题</th>
+<th>改造手段</th>
+<th>改造副作用</th>
+<th>看什么指标验收</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>accept 环路</td>
+<td>单点取走、取出后立刻做重活</td>
+<td>取出与处理解耦、必要时多监听句柄</td>
+<td>失败要分别计数、可观测被打散</td>
+<td>accept 失败分类、新建速率</td>
+</tr>
+<tr>
+<td>每连接任务</td>
+<td>无限 spawn、状态散落</td>
+<td>受控 spawn、显式状态机与终态</td>
+<td>要维护活跃表与并发上限</td>
+<td>活跃连接数、未结束任务数</td>
+</tr>
+<tr>
+<td>缓冲</td>
+<td>按最大可能预分配、无上限</td>
+<td>按需增长加硬上限、超限主动断开</td>
+<td>慢连接被断开、增长有搬运</td>
+<td>缓冲占用、被断开次数</td>
+</tr>
+<tr>
+<td>拷贝</td>
+<td>为凑连续先拼临时大缓冲</td>
+<td>分散聚合写、文件旁路（限不变内容）</td>
+<td>TLS 后不成立、拼接可能更贵</td>
+<td>拷贝类 CPU 占比</td>
+</tr>
+<tr>
+<td>背压</td>
+<td>只在入口限流、写不出去仍继续读</td>
+<td>分层、有界队列、写堵即停读</td>
+<td>排队满要丢弃或降级</td>
+<td>在途请求数、被限流次数</td>
+</tr>
+<tr>
+<td>超时</td>
+<td>全链路只有一个粗超时</td>
+<td>分层超时、内层之和小于外层</td>
+<td>配置复杂、需预算对齐</td>
+<td>被超时切断次数</td>
+</tr>
+<tr>
+<td>限流</td>
+<td>只有一个全局桶、或限流器是锁热点</td>
+<td>四落点分片、命中返回可区分响应</td>
+<td>分片精度近似</td>
+<td>被限流计数按接口与租户</td>
+</tr>
+<tr>
+<td>日志</td>
+<td>热路径拼字段、高基数标签</td>
+<td>记必要字段、标签低基数并脱敏</td>
+<td>排障信息变少</td>
+<td>序列化字符串开销、标签基数</td>
+</tr>
+<tr>
+<td>序列化</td>
+<td>每请求重做、内容可复用却不复用</td>
+<td>稳定内容缓存编码结果</td>
+<td>缓存一致性与失效</td>
+<td>序列化 CPU 占比</td>
+</tr>
+</tbody></table>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>本文沿着一条连接从建立到关闭走了一遍，把“每一处会浪费 CPU 与内存的地方”逐个指出来，再给出发现与消除它的方法。服务层的性能不是靠某一次跑分赢来的，而是靠 accept 环路保持高周转、每连接任务守住单一所有权与显式终态、缓冲与拷贝管住“每连接 × 连接数”这笔乘积、背压把消费不过来的信号往上游传、超时按阶段各设一份并留出余量、限流分片落到正确落点、观测点让每一段都可对账。</p>
+<p>把这些串起来的方法论只有两句：先按真实负载形状采样再谈优化，每次只改一轴并看同一个指标的分布变化。禁止用不同负载之间的对比下结论，也禁止在数字上找台阶——本文刻意没有给出任何 QPS、并发、吞吐或内存的具体数值，因为那些属于你自己的环境，只能由你自己测出来。能测出来、能归因、能验收，才是服务层工程真正可复现的收益。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li>Rust 标准库文档主题：<code>std::net::TcpListener</code> 与 <code>accept</code> 关于监听与新连接获取的行为说明（<a href="https://doc.rust-lang.org/std/net/struct.TcpListener.html%EF%BC%89">https://doc.rust-lang.org/std/net/struct.TcpListener.html）</a></li>
+<li>Tokio 异步运行时与网络框架的官方项目仓库根（<a href="https://github.com/tokio-rs/tokio%EF%BC%89">https://github.com/tokio-rs/tokio）</a></li>
+<li>操作系统手册页主题：<code>listen</code> 关于监听队列长度（backlog）与溢出的公开说明、<code>accept</code> 关于从队列取出连接的公开说明（本文只引用主题名，具体页码与措辞随平台与版本不同，不给链接以避免误导）</li>
+<li>Rust 官方文档主题：所有权（ownership）、<code>Drop</code> 与 RAII 资源清理语义（本文只引用主题名）</li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Rust 高性能网络服务实践</p><p><a href="https://987763485.github.io/2025/09/13/Rust高性能网络服务实践/">https://987763485.github.io/2025/09/13/Rust高性能网络服务实践/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2025-09-13</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-20</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/rust/">rust</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2025/09/20/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E6%8E%A8%E7%90%86%E6%9C%8D%E5%8A%A1%E5%8C%96%E5%AE%9E%E8%B7%B5/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">大模型推理服务化实践</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2025/09/11/%E5%AF%B9%E9%BD%90%E8%AF%84%E4%BC%B0%E4%B8%8E%E7%BA%A2%E9%98%9F%E6%B5%8B%E8%AF%95/"><span class="level-item">对齐评估与红队测试</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>多 Agent 分工与协商 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="多智能体的困难常常被归因成”模型不够聪明”，但工程上真正咬人的是协作本身：消息会迟到，状态会被两个人同时改，预算会在没人负责的地方烧完，而系统始终回答不出”现在到底进行到哪一步”。本文把这套问题当作一次分布式系统的重演来处理——谁拥有哪份状态、交接消息该带什么、什么时候算做完、什么时候必须熔断、以及最重要的，什么时候根本不该拆。机制层尽量写透，示例一律用角色命名与伪码，不绑定任何具体产品。"><meta property="og:type" content="blog"><meta property="og:title" content="多 Agent 分工与协商"><meta property="og:url" content="https://987763485.github.io/2026/05/28/%E5%A4%9AAgent%E5%88%86%E5%B7%A5%E4%B8%8E%E5%8D%8F%E5%95%86/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="多智能体的困难常常被归因成”模型不够聪明”，但工程上真正咬人的是协作本身：消息会迟到，状态会被两个人同时改，预算会在没人负责的地方烧完，而系统始终回答不出”现在到底进行到哪一步”。本文把这套问题当作一次分布式系统的重演来处理——谁拥有哪份状态、交接消息该带什么、什么时候算做完、什么时候必须熔断、以及最重要的，什么时候根本不该拆。机制层尽量写透，示例一律用角色命名与伪码，不绑定任何具体产品。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2026-05-27T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-20T16:47:01.678Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="大模型"><meta property="article:tag" content="python"><meta property="article:tag" content="agent"><meta property="article:tag" content="typescript"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2026/05/28/%E5%A4%9AAgent%E5%88%86%E5%B7%A5%E4%B8%8E%E5%8D%8F%E5%95%86/"},"headline":"多 Agent 分工与协商","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2026-05-27T16:00:00.000Z","dateModified":"2026-10-20T16:47:01.678Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"多智能体的困难常常被归因成”模型不够聪明”，但工程上真正咬人的是协作本身：消息会迟到，状态会被两个人同时改，预算会在没人负责的地方烧完，而系统始终回答不出”现在到底进行到哪一步”。本文把这套问题当作一次分布式系统的重演来处理——谁拥有哪份状态、交接消息该带什么、什么时候算做完、什么时候必须熔断、以及最重要的，什么时候根本不该拆。机制层尽量写透，示例一律用角色命名与伪码，不绑定任何具体产品。"}</script><link rel="canonical" href="https://987763485.github.io/2026/05/28/%E5%A4%9AAgent%E5%88%86%E5%B7%A5%E4%B8%8E%E5%8D%8F%E5%95%86/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2026-05-27T16:00:00.000Z" title="5/28/2026, 12:00:00 AM">2026-05-28</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></span><span class="level-item">1 小时读完 (大约10723个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">多 Agent 分工与协商</h1><nav class="series-nav" aria-label="系列文章导航"><div class="series-nav-meta"><i class="fas fa-book-open" aria-hidden="true"></i><span>本文属于《<a class="series-nav-title" href="/series/agent/">Agent 智能体开发</a>》第 38/55 篇</span></div><div class="series-nav-links"><a class="series-nav-link series-nav-prev" href="/2026/01/02/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%BB%8F%E6%B5%8E%E4%B8%8E%E5%8D%8F%E4%BD%9C%E5%8D%8F%E8%AE%AE/"><i class="fas fa-chevron-left" aria-hidden="true"></i><span>上一篇</span></a><a class="series-nav-link series-nav-index" href="/series/agent/">系列目录</a><a class="series-nav-link series-nav-next" href="/2026/06/17/%E5%A4%9AAgent%E7%B3%BB%E7%BB%9F%E5%8F%AF%E8%A7%82%E6%B5%8B%E6%80%A7/"><span>下一篇</span><i class="fas fa-chevron-right" aria-hidden="true"></i></a></div></nav><div class="content"><p>多智能体的困难常常被归因成”模型不够聪明”，但工程上真正咬人的是协作本身：消息会迟到，状态会被两个人同时改，预算会在没人负责的地方烧完，而系统始终回答不出”现在到底进行到哪一步”。本文把这套问题当作一次分布式系统的重演来处理——谁拥有哪份状态、交接消息该带什么、什么时候算做完、什么时候必须熔断、以及最重要的，什么时候根本不该拆。机制层尽量写透，示例一律用角色命名与伪码，不绑定任何具体产品。</p>
+<h2 id="把协作当成一个分布式问题"><a href="#把协作当成一个分布式问题" class="headerlink" title="把协作当成一个分布式问题"></a>把协作当成一个分布式问题</h2><p>多数关于多智能体的讨论从能力出发：一个模型读不完长文、盯不住十个变量、同时跨两个系统会出错，于是再拉一个模型来分担。这个推理本身没错，但它掩盖了性质转换。一旦系统里存在两个以上会自主决定下一步做什么的执行者，问题就不再是”谁更聪明”，而是”如何在一个没有全局时钟、消息会乱序、任何一环都可能悄悄失败的世界里，让若干执行者对一个结果负责”。这正是分布式系统研究了几十年的那批问题，只是这回节点会用自然语言争辩，而消息载荷没有 schema。</p>
+<p>写实的说法是：把五个智能体连起来，你得到的不是五个智能体合成的一个更强智能体，而是五个独立的部分失败源、五份各自独立的预算、五个互不相见的上下文窗口，外加它们之间一条会抖动的信道。老问题至少以四种形式重演。</p>
+<p>部分失败。第一个执行者跑完了，第二个卡在第三步，第三个因为工具报错把”没做成”翻译成了”已妥善完成”。整条链路如果没统一的失败语义，就没人能回答”系统现在处于什么状态”这类问题，而所有下游决策都依赖这个问题的答案。</p>
+<p>消息乱序与重复。异步调度下，一条”约束已经变更”的通知可能晚于基于旧约束产出的结论到达；重试机制会把同一个动作提交两遍；接收方若不认幂等，外部副作用就发生了两次。传统系统靠序列号与幂等键解决，智能体系统里常常被”它自己会看上下文时间”这一乐观假设替代，然后出事。</p>
+<p>共享状态。两个执行者各自修改同一份方案，都只看到对方的旧版本；或者一个执行者把推断写进了公共便签，另一个把它当作外部事实引用回来——同一个错误被自我强化了一遍，看起来还像有两条独立证据。</p>
+<p>没有全局时钟。谁先谁后靠消息里那句”我这边已经完成了”来判断，而这句话本身可能是错的。于是截止时间、租约有效期、步数上限这些机制必须存在，并且必须由系统维护而不是由模型维护。</p>
+<p>第五个问题不算老问题，却最致命：成本没有天然上界。模型推理按用量计费，而一次讨论没有内建的收敛速度，两个执行者可以互相追问到预算烧光。传统循环的开销由资源决定，语言模型循环的开销只由你写下的上限决定。</p>
+<p>一句划界：编排层的话题是”谁在什么时候被调用”，本文关心调用之后如何对账；候选生成、回溯与剪枝属于规划方法，不在这里重复，下文只假定任务已经被切成可分派的单元。</p>
+<h2 id="角色划分：静态切分与动态竞价"><a href="#角色划分：静态切分与动态竞价" class="headerlink" title="角色划分：静态切分与动态竞价"></a>角色划分：静态切分与动态竞价</h2><p>分工有两种基本姿态。静态划分按领域或权限边界切，角色在建制时就固定下来；动态竞价式分配把任务发布成待认领的条目，各候选执行者提交出价（自估难度、要多少预算、多久交件），由分配器按规则择一。两者不是风格偏好，判据是可查的三项性质。</p>
+<p>可验证性指结果能否被产出者之外的机制判定。能写成外部检查的任务适合分派，因为分派的风险被判定兜住了；写不出检查的任务不适合，因为分派只是把错误推到更远的地方、更贵地取回来。权限异质性指不同执行单元是否需要不同凭证。只要存在不可逆副作用，权限边界就必须先于能力边界被切开，这一条压过其他所有理由。任务耦合度指一次交接要搬运多少上下文。耦合度高时，分派等于把上下文搬运换成了网络流量搬运，成本不会消失，只会换个位置出现。</p>
+<p>静态划分的优点是责任清楚、权限最小化容易做、交接内容可以提前写成契约；典型失败模式是边界处堆积——一个跨两个领域的任务谁都不接，或者两边各做一半并都以为对方做了另一半。动态竞价的优点是负载均衡，并且能把同构任务派给当下最便宜或最空闲的执行者；三处坑很具体：出价来自模型自估，而自估难度系统性偏乐观；难任务无人认领、简单任务被抢；竞价本身要消耗推理预算，一个没设上限的认领循环会先把钱花在讨论”谁去做”上。至于按成本与能力在执行者之间挑选的信号从哪来、模型之间如何级联升降，是路由话题，这里只借用结论不展开。</p>
+<table>
+<thead>
+<tr>
+<th>分配方式</th>
+<th>适用形态</th>
+<th>典型失败模式</th>
+<th>需要配套什么</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>静态按领域切</td>
+<td>领域边界天然清晰，接口可提前写成契约</td>
+<td>跨领域任务无人认领，边界处堆积</td>
+<td>一条显式的”边界争议”上报通道</td>
+</tr>
+<tr>
+<td>静态按权限切</td>
+<td>存在不可逆副作用，需要最小权限</td>
+<td>权限组越切越粗，最后人人可写</td>
+<td>角色与凭证分离的清单审计</td>
+</tr>
+<tr>
+<td>动态竞价</td>
+<td>任务同构、可并行、执行者异构</td>
+<td>自估乐观、难任务没人接、竞价烧预算</td>
+<td>出价上限、保底认领、竞价成本入账</td>
+</tr>
+<tr>
+<td>混合：权限静态、执行者动态</td>
+<td>多数生产系统的默认形态</td>
+<td>分配器自身成为单点与串行瓶颈</td>
+<td>分配器无状态化，可降级为轮询</td>
+</tr>
+</tbody></table>
+<p>生产上我更倾向混合形态：权限归属是静态的，谁可能拿到哪份凭证在设计期就要定死；具体执行人是动态的，在权限域内部可以轮转或竞标。这样竞价的灵活性不会突破安全边界，静态划分的堆积问题也能被域内轮转消解。下面的伪码把判据的顺序写清楚，顺序本身就是结论——权限先于成本。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 示意伪码：分配决策。角色名、字段名均为本项目自定义示例，不映射任何真实产品的接口。</span></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">decide_assignment</span>(<span class="params">task, candidates, policy</span>):</span><br><span class="line">    <span class="comment"># 1. 权限异质性：先做静态过滤，越界候选直接出局</span></span><br><span class="line">    eligible = [c <span class="keyword">for</span> c <span class="keyword">in</span> candidates <span class="keyword">if</span> c.scope_covers(task.required_scope)]</span><br><span class="line">    <span class="keyword">if</span> <span class="keyword">not</span> eligible:</span><br><span class="line">        <span class="keyword">return</span> Assignment(holder=<span class="literal">None</span>, reason=<span class="string">&quot;no_eligible_scope&quot;</span>, escalate=<span class="literal">True</span>)</span><br><span class="line"></span><br><span class="line">    <span class="comment"># 2. 任务耦合度：搬运上下文超过阈值就不分派，留给持有完整上下文的那个执行者</span></span><br><span class="line">    <span class="keyword">if</span> task.handoff_cost(eligible) &gt; policy.max_handoff_cost:</span><br><span class="line">        <span class="keyword">return</span> Assignment(holder=task.context_owner, reason=<span class="string">&quot;handoff_too_expensive&quot;</span>)</span><br><span class="line"></span><br><span class="line">    <span class="comment"># 3. 可验证性：写不出外部判定的任务不允许竞价，只允许指派给默认负责人</span></span><br><span class="line">    <span class="keyword">if</span> <span class="keyword">not</span> task.has_external_check():</span><br><span class="line">        <span class="keyword">return</span> Assignment(holder=policy.default_owner, reason=<span class="string">&quot;unverifiable&quot;</span>)</span><br><span class="line"></span><br><span class="line">    <span class="comment"># 4. 三道判据都过，才进入动态竞价；出价含预算、时限与自估难度</span></span><br><span class="line">    bids = [b <span class="keyword">for</span> b <span class="keyword">in</span> task.collect_bids(eligible) <span class="keyword">if</span> b.budget &lt;= policy.bid_cap]</span><br><span class="line">    <span class="keyword">if</span> <span class="keyword">not</span> bids:</span><br><span class="line">        <span class="keyword">return</span> Assignment(holder=<span class="literal">None</span>, reason=<span class="string">&quot;no_bid&quot;</span>, escalate=<span class="literal">True</span>)</span><br><span class="line"></span><br><span class="line">    winner = <span class="built_in">min</span>(bids, key=<span class="keyword">lambda</span> b: (b.overdue_risk, b.budget))</span><br><span class="line">    <span class="keyword">return</span> Assignment(holder=winner.owner, bid=winner, lease=policy.lease_ttl)</span><br></pre></td></tr></table></figure>
+
+<p>还有一个容易被忽略的角色：分配器自己。它必须知道每个候选执行者当前持有什么租约、剩余多少预算、正在做什么，而这份信息只能来自状态上报。上报一旦滞后，分配就会变成”把任务交给一个已经挂了但没人知道”的执行者。所以分配决策的依据必须是带有效期的租约，而不是内存里的角色表。</p>
+<h2 id="共享状态：什么必须唯一，什么尽可复制"><a href="#共享状态：什么必须唯一，什么尽可复制" class="headerlink" title="共享状态：什么必须唯一，什么尽可复制"></a>共享状态：什么必须唯一，什么尽可复制</h2><p>状态划分只有一条判据：复制一份之后，”谁说的话算数”会不会变含糊。会变含糊的，必须唯一所有权；不会的，尽量复制，因为复制是消除耦合最直接的手段。</p>
+<p>必须唯一所有的有三类。写操作与外部副作用——一次提交、一次转账、一条发给外部人员的通知、一次配置变更，任何时刻只能有一个执行者持有发起权，否则重试和并发会把同一个动作变成两次现实。预算池的扣减权——每个额度只能有一个记账点，多个执行者各自”记在自己的账上”等于没有账。终局判定权——“这件事算不算完成”必须只有一个出口，两个判定器给出的答案不同时会把整条链路拖进二次协商。</p>
+<p>可以尽情复制的也有三类：只读上下文（目标描述、约束清单、术语表、领域资料）、检索片段与工具说明、已经定版的接口契约。它们复制多少份都不改变事实的来源。</p>
+<p>协作姿态分乐观与悲观两种，在智能体语境下含义与传统系统略有差别。乐观姿态是允许多个执行者并行提案，冲突留到判定与合并阶段处理；它的真实代价不是回滚，而是”两份各自都成立、但互不兼容”的方案在最后一刻对撞，返工发生在成本已经付完之后。悲观姿态是一个执行者持有写权，其余执行者只能读与评论；它的代价是串行度与等待，写权变成排队点，评论者会因为等不到窗口而退化成沉默。选择依据是很朴素的一条：合并代价与等待代价谁更大。方案彼此独立、事后合并便宜，就乐观；方案互相牵制、任何一处改动会牵动全局，就悲观。</p>
+<p>租约是这两种姿态共同的地基。写权以带有效期的形式发放，到期不续就自动失效；每次执行动作时带上申请时拿到的序号，服务端只接受序号不小于当前已知值的要求——这条老规矩能挡住”一个已经掉线但以为自己还有权的执行者”，而多智能体系统里这种角色非常常见：它的推理还在继续，只是心跳没上去。</p>
+<pre class="mermaid">flowchart TD
+    A[执行者提交写入请求] --> B{当前写权租约是否仍有效}
+    B -- 无效 --> R[拒绝并回执拒绝原因]
+    B -- 有效 --> C{序号是否不小于已知值}
+    C -- 否 --> R
+    C -- 是 --> D{是否与另一份未定版提案冲突}
+    D -- 否 --> E[落库并回执副作用标识]
+    D -- 是 --> F[登记冲突并交给仲裁者]
+    F --> G{仲裁是否需要重做一次执行}
+    G -- 是 --> H[暂停并上报：上游判定条件缺失]
+    G -- 否 --> I[裁定保留版本并记录理由]
+    I --> J[只把结论广播给依赖方]</pre>
+
+<p>仲裁者这个角色值得单独说清职责边界：接收冲突声明、比对双方证据指针、决定保留哪一版、把裁定理由留在记录里而不是广播出去、通知依赖方。最后一条常被搞反——仲裁者的输出是结论加出处，不是它的完整思考过程，否则每一次冲突都会给全系统增加一份新的长上下文。</p>
+<p>仲裁者在三个时刻会变成瓶颈，而且每一个都指向上游设计有问题。冲突声明率长期偏高，说明切分本身切错了，本该是一个执行者的事情被拆成了两个；仲裁者为了判断不得不重做一次执行，说明任务的判定条件写不出来，问题在可验证性而不是仲裁者能力；仲裁队列成了全系统唯一的串行点，此时无论加多少执行者，加速比都被这条队列钉住。看到第三种情况时的正确动作不是给仲裁者加额度，而是重新划分所有权。一句划界：长期记忆的写入与召回策略是记忆系统的话题，本文只谈一次运行期内状态归谁。</p>
+<h2 id="通信预算：从广播到契约化交接"><a href="#通信预算：从广播到契约化交接" class="headerlink" title="通信预算：从广播到契约化交接"></a>通信预算：从广播到契约化交接</h2><p>上下文传递有两种极端。全量广播是把所有已知内容发给所有执行者，契约化交接是只传结论、证据指针、预算与期限。前者写起来省事，代价按人数乘：每个执行者的上下文窗口都被别人的草稿占满，同一件事在不同窗口里被反复重述并逐步漂移，责任边界也糊掉了——所有人都收到过全部信息，于是没有人对任何一段结论负专门责任。后者要求你在切分时就想清楚接口，好处是可归因、可重放、可算成本。</p>
+<p>一份交接消息里三个字段各有不可替代的作用。结论必须写成可判定的断言，不能是”已完成初步分析”这类无法证伪的表述。证据指针优于文本复制，前提是被指向的东西有稳定标识、版本固定、复核入口可达；把别人的原文抄进自己的消息，等于把一次读取变成一次传输再加一次幻觉改写的可能。预算与期限是接收方的硬约束，其中时间戳必须由系统给出绝对值——不接受”下周三之前”这种由模型解释的自然语言时间，理由见前文没有全局时钟那一段。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"># 本项目自定义示例字段，不映射任何官方协议的 schema</span><br><span class="line">handoff:</span><br><span class="line">  intent_ref        # 目标条目的稳定引用，不复制目标全文</span><br><span class="line">  claim             # 一句话结论，必须是可判定的断言</span><br><span class="line">  evidence_refs     # 证据指针：标识 + 版本 + 复核入口</span><br><span class="line">  assumptions       # 本次产出所依赖的前提，逐条列，允许为空</span><br><span class="line">  open_questions    # 明确交给对方的问题，条数上限由团队约定示例给出</span><br><span class="line">  budget_grant      # 随本次交接授予的额度上限与已用量</span><br><span class="line">  deadline          # 系统时钟给出的绝对截止时间</span><br><span class="line">  idempotency_key   # 接收方据此去重，防止重试造成二次副作用</span><br><span class="line">  reject_when       # 什么情况下接收方应直接拒绝而不是继续处理</span><br></pre></td></tr></table></figure>
+
+<p>进度消息另有一套要求：只写”已完成什么、当前在做什么、还需要什么”三件事，不要写成叙述体。进度消息的作用是支撑分配与租约续期，不是为了让人读起来安心。自由体的进度汇报会诱导其他执行者根据叙述推测状态，而推测出来的状态从来都不是真状态。</p>
+<p>“消息越多越像讨论，越少越像流水线”这个取舍要写实。讨论形态的价值在于错误被早期发现，隐含假设会被别人追问出来，这对不可验证的任务确实有效；它的毛病是没有终止条件，责任被稀释，成本无法归因到某个具体决策。流水线形态的价值在于每一步可审计、可计费、可重放；毛病是错误要到最后才暴露，而那时返工最贵。可靠的折中不是各取一半，而是默认流水线、在指定检查点上开放有限轮次的讨论：讨论轮次有明确上限（团队约定示例数值，别把它当性能承诺），讨论产生的消息单独记账，超过轮次仍未消解的分歧自动升级为冲突声明交给仲裁者，而不是继续聊。</p>
+<h2 id="终止条件与收敛判据"><a href="#终止条件与收敛判据" class="headerlink" title="终止条件与收敛判据"></a>终止条件与收敛判据</h2><p>多智能体系统最先坏掉的地方通常是”没人宣布结束”。终止机制要四件套齐全，缺任何一件都能被绕过去。</p>
+<p>第一件是达成判定。判定条件必须在立项时固化，且判定动作由产出者之外的机制执行——这条属于前提，不展开论证。真正需要强调的是运行期纪律：不允许执行者重写或放宽判定标准。最常见的失控形态就是这样：一个执行者连续几步无法通过判定，于是它在自己的输出里把判定条件”重新解释”了一遍，然后宣布通过。判定器的输入应该是固化版本的判定条件加上证据指针，不接受任何来自被执行方的解释稿。</p>
+<p>第二件是三重上限：步数、预算、时间。三者挡住的失败模式不同，所以必须同时存在。步数上限挡无限拆解——每一步都合理地”再细分一层”，永远做不完；预算上限挡昂贵讨论——用最强的模型反复讨论一个不需要判断力的问题；时间上限挡外部依赖卡死——某个执行者在等一个既不失败也不返回的调用，此时步数和预算都没到顶，系统看着健康。三个上限的数值都是团队约定示例，唯一要紧的是它们存在、可观测、触发时会被记录。</p>
+<p>第三件是无效重复检测。要区分两种重复。幂等层面的重复是同一请求因为回执丢失而重发，靠交接消息里的幂等键去重就够了。语义层面的重复是执行者重新决定去做一件已经做过的事——它会生成一个新的请求标识，幂等键挡不住。挡它是给动作算指纹：目标对象、操作类型、参数摘要三项组合，命中即计数。重复次数到达阈值时正确动作是停机而不是重试，因为连续出现语义重复基本意味着上下文里缺少了”我已经做过这件事”的信息，再多跑一轮只会重复第三遍。</p>
+<p>第四件是承认失败并降级。降级是一条台阶而不是一个开关：缩小范围（保住主要求，显式放弃次要项并记录）、更换执行者（这一步涉及模型之间怎么选与怎么升，属于路由与级联话题，此处只用结论）、转人工、放弃并回滚。放弃必须走回滚路径，且回滚后的状态要能被外部核对，否则”我们放弃了”和”我们悄悄留下了一半副作用”在观测上看不出区别。</p>
+<pre class="mermaid">stateDiagram-v2
+    state "已立项" as Planned
+    state "执行中" as Running
+    state "交接中" as Handing
+    state "判定中" as Judging
+    state "重复检测" as DupCheck
+    state "暂停" as Paused
+    state "降级中" as Degrading
+    state "回滚中" as RollingBack
+    state "已终止" as Terminated
+    [*] --> Planned: 目标与判定条件固化并写入三重上限
+    Planned --> Running: 授予额度与租约
+    Running --> Handing: 产出结论与证据指针
+    Running --> DupCheck: 提交动作指纹
+    DupCheck --> Running: 未命中阈值
+    DupCheck --> Paused: 命中重复阈值
+    Handing --> Judging: 判定器接收交接件
+    Judging --> Terminated: 判定通过并记录达成
+    Judging --> Running: 判定不通过且三重上限仍有余额
+    Judging --> Degrading: 判定不通过且上限已触顶
+    Paused --> Running: 策略或人工放行
+    Paused --> Degrading: 不放行
+    Degrading --> Terminated: 降级目标达成
+    Degrading --> RollingBack: 放弃
+    RollingBack --> Terminated: 副作用已撤销或已登记待撤销
+    Terminated --> [*]: 终止原因必须为非空枚举值</pre>
+
+<p>最后一行是整套机制里最便宜也最容易被省略的收口：终止原因必须是显式枚举，不允许为空、不允许写成自由文本。运行一段时间之后把终止原因分布拉出来看，能直接告诉你上游设计哪里错了——“预算触顶”多说明分配给得太小或讨论太多，”重复阈值”多说明上下文搬运有问题，”判定不通过且无法降级”多说明立项时的判定条件本来就不成立。</p>
+<h2 id="成本上限与熔断"><a href="#成本上限与熔断" class="headerlink" title="成本上限与熔断"></a>成本上限与熔断</h2><p>预算在多智能体系统里的正确形状是一棵树，不是一池水。全局额度先扣除保留池，剩下的才是可分派的；每个节点的上限恒小于其父节点的可用余额；子节点没用完的额度在回收周期后回到父节点；派生深度有上限，因为派生链无限延长时预算分配会自然失控——每一层都觉得”我只给孩子留了一点点”，加起来远超父节点剩余。回收要有主动机制，不能指望执行者报告剩余，因为它报告时的动机是保住额度。</p>
+<p>记账至少三个维度：哪个执行者花的、哪个决策花的、花在推理还是花在工具调用上。缺第二维时，成本归因只能定位到”某个角色很贵”，定位不到”某一次判定反复失败导致整条链路重跑”，而后者才是真正要改的东西。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 示意类型定义：预算视图。字段名均为本项目自定义示例，不对应任何官方配置键名。</span></span><br><span class="line"><span class="keyword">type</span> <span class="title class_">Grant</span> = &#123;</span><br><span class="line">  <span class="attr">nodeId</span>: <span class="built_in">string</span>;      <span class="comment">// 节点在预算树上的位置</span></span><br><span class="line">  <span class="attr">ceiling</span>: <span class="built_in">number</span>;     <span class="comment">// 本节点可用上限，恒小于父节点可用余额</span></span><br><span class="line">  <span class="attr">spent</span>: <span class="built_in">number</span>;</span><br><span class="line">  <span class="attr">reserved</span>: <span class="built_in">number</span>;    <span class="comment">// 已预扣但未结清的额度</span></span><br><span class="line">  <span class="attr">ttlMs</span>: <span class="built_in">number</span>;       <span class="comment">// 有效期，由系统时钟维护而非模型推断</span></span><br><span class="line">  <span class="attr">depth</span>: <span class="built_in">number</span>;       <span class="comment">// 派生深度</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">type</span> <span class="title class_">Policy</span> = &#123;</span><br><span class="line">  <span class="attr">maxDepth</span>: <span class="built_in">number</span>;</span><br><span class="line">  <span class="attr">reserveRatio</span>: <span class="built_in">number</span>;      <span class="comment">// 保留池比例，团队约定示例</span></span><br><span class="line">  <span class="attr">perHopCap</span>: <span class="built_in">number</span>;         <span class="comment">// 单次交接可授予的最大额度，团队约定示例</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">canGrant</span>(<span class="params"><span class="attr">parent</span>: <span class="title class_">Grant</span>, <span class="attr">ask</span>: <span class="built_in">number</span>, <span class="attr">policy</span>: <span class="title class_">Policy</span></span>): <span class="built_in">boolean</span> &#123;</span><br><span class="line">  <span class="keyword">const</span> available = parent.<span class="property">ceiling</span> - parent.<span class="property">spent</span> - parent.<span class="property">reserved</span>;</span><br><span class="line">  <span class="keyword">return</span> ask &lt;= <span class="title class_">Math</span>.<span class="title function_">min</span>(available, policy.<span class="property">perHopCap</span>) &amp;&amp;</span><br><span class="line">    parent.<span class="property">depth</span> + <span class="number">1</span> &lt;= policy.<span class="property">maxDepth</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>超预算的处置分三档：暂停（保留状态，等待额度或人工，适合”外部依赖还没就绪所以没产出”的情形）、降级（缩范围或换更便宜的执行者，适合”主要求还没达成但次要项可以放弃”的情形）、转人工（适合”继续跑下去只会重复烧钱”的情形）。选档依据应该是剩余价值而不是剩余额度：额度还剩很多但产出已经不再变化，比额度见底但仍在收敛更值得停。</p>
+<p>熔断是另一件事，它守的是速率而不是总量。三条常用触发条件：单位时间花费超过阈值、连续失败次数超过阈值、外部依赖不可达。熔断后必须支持半开——放一小笔额度过去试探，成功则恢复，失败则继续关闸，否则系统会在”全开”和”全关”之间反复横跳。所有阈值都写成团队约定示例，本文刻意不给任何看起来像结论的数字：多智能体的成本行为跟任务分布强相关，任何从别处抄来的阈值都是别人的经验。真正有工程价值的是这一条纪律：任何额度授予都必须能被追溯到一个具体决策，任何熔断都要留下触发时正在执行的条目清单，不然恢复时你只能选择全部重跑。</p>
+<h2 id="人工介入点与审批门槛"><a href="#人工介入点与审批门槛" class="headerlink" title="人工介入点与审批门槛"></a>人工介入点与审批门槛</h2><p>哪些动作必须有人批，判据不是”重要不重要”，而是”错了能不能自己撤回来”。有五类动作默认应该设门槛。不可逆的外部副作用——支出、对外发布、向系统之外的人发送通知、删除数据、上线变更。权限提升与凭证签发——执行者申请超出当前租约的范围，必须走人。跨越隔离边界——请求访问本来不该够到的资源；隔离本身怎么做是沙箱话题，本文只负责一句话：越界的请求要有人批，而不是由系统自动放行。代表第三方做承诺——凡是别人会据此改变行为的结果，都不该由模型单独决定。最后一类最少被设限但最要命：修改判定标准。判定条件由人定、由机器执行，一旦允许执行者在运行期调整它，前面所有机制都形同虚设。</p>
+<p>审批请求的价值取决于它能不能被核对。把一段分析结论拿去请求批准，审批者其实无从判断，只能凭气质签字；把一个动作拿去请求批准——对哪些对象、执行什么操作、参数是什么、影响面多大、怎么撤回——审批者才真的在做决定。所以审批单要按副作用组织而不是按意图组织，字段至少包括：目标引用、准备执行的具体动作、影响清单、回滚方案、证据指针、到期时间，以及显式写出的默认策略。默认策略必须写在单子上，让请求方一开始就知道”到期没人理会自动等于拒绝”，而不是到了那一步才发现自己在等一个不会来的回复。</p>
+<p>超时未批的默认动作只有一个选项值得坚持：不执行。理由是沉默不等于同意，而默认执行会把审批从”事前门槛”降格成”事后通知”，事后没有人真的会去撤回已经发生的副作用。这一条在成本压力下很容易被团队悄悄改掉——改成”超时视为小额放行”——改掉之后审批链路就成了装饰，因为超时恰恰发生在审批者最忙、判断最不靠谱的时间窗里。</p>
+<p>审批的粒度也要设计。按消息审批会产生海量请求，海量请求的结果是盲批，盲批等于没有门槛。可行做法是批一次授权一段范围：一个动作类别、一个额度上限、一个有效期（数值均为团队约定示例），范围内的执行不再单独询问，但每一次执行都要留下回执，范围用完或有效期到点自动失效。</p>
+<pre class="mermaid">sequenceDiagram
+    participant PL as planner
+    participant WK as worker
+    participant GT as approver
+    participant HU as human
+    participant EX as external_system
+    PL->>GT: 登记审批门槛（动作类别、额度、有效期）
+    WK->>GT: 提交审批单（动作、影响清单、回滚方案、证据指针、到期时间）
+    GT->>HU: 呈现可核对的动作而非结论
+    alt 到期前明确批准
+        HU-->>GT: 批准，附范围与额度
+        GT->>WK: 发放一次性执行许可
+        WK->>EX: 执行并记录副作用标识
+        EX-->>WK: 回执
+        WK-->>PL: 结论与证据指针
+    else 到期未批
+        GT->>GT: 判定为不批准
+        GT-->>WK: 拒绝，回收额度并终止该分支
+        WK-->>PL: 上报终止原因为审批超时
+    end</pre>
+
+<h2 id="观测一个多智能体系统"><a href="#观测一个多智能体系统" class="headerlink" title="观测一个多智能体系统"></a>观测一个多智能体系统</h2><p>观测的目标只有一个：能在事后重建”这次钱是怎么花的、这次停是停在哪一步的”。为此跨执行者的链路标识必须贯穿传递——派生关系要形成有向图，谁由谁召唤、谁在等谁、谁把交接件交给了谁，缺了这一层，你看到的是若干条彼此无关的独立链路，任何全局结论都拼不出来。每条链路至少要留下：入口的关联标识、每个节点的输入摘要与输出摘要、工具调用与外部副作用的落点、成本、终止原因。摘要加指针的组合优于全文复制，理由和交接契约一样——全文既贵又会被逐跳改写。</p>
+<p>需要说明的口径问题：智能体之间链路上下文的属性命名、跨进程传播的约定，语义层面仍在演进，各家实现给出的键名并不一致，本文刻意不硬编码任何一组键名，也不给出看起来像规范的字段表。更靠前的一步是：跨组织、跨主机、跨信任域的智能体之间可观测数据如何互通，目前没有已经落地的通行口径，这属于还没成型的话题，本节讨论范围仅限同一系统内部。</p>
+<p>成本归因需要”决策标识”这个概念。把成本挂在角色上只能得到”这个执行者很贵”，把成本挂在决策上才能得到”这一笔重复是因为判定不通过后整条分支重跑”。做法很朴素：每次授予额度时记下授予它的那个决策的标识，重跑时把子树的成本汇总回该标识，看板上按标识排序而不是按角色排序。</p>
+<p>还有两条纪律值得单独写出来。观测数据的写入路径必须与被观测者隔离：执行者不应该能读到自己的评价数据，更不应该能写回——一旦它能读到，优化对象就从结果变成指标，而指标比结果好骗得多。时间要两套：给人看的来源时间戳，和给系统排序用的单调序号。没有全局时钟这件事在观测端同样成立，只看时间戳你无法判断两条几乎同时写入的记录谁先谁后，而”谁先改动了这份状态”恰恰是最常要问的问题。</p>
+<p>最后要能回答的三个问题，可以作为观测是否合格的自检：这一笔花费对应哪一次决策；这件事为什么被做了三遍；终止时系统实际停在哪一个状态、三重上限里先撞到的是哪一个。回答不出第三个的系统，通常靠人肉翻日志，而翻日志这件事会在系统上线第二个月被彻底放弃。</p>
+<h2 id="什么时候不该拆成多个智能体"><a href="#什么时候不该拆成多个智能体" class="headerlink" title="什么时候不该拆成多个智能体"></a>什么时候不该拆成多个智能体</h2><p>这一节是全文最该被读的部分，因为绝大多数失败的多智能体系统从一开始就不该是多智能体的。下面每一条命中都构成”不拆”的强理由。</p>
+<p>一个上下文窗口装得下全部必要信息，而且信息量增长可控。拆分的第一个正当理由是装不下，如果装得下，拆分带来的所有消息搬运和状态对账都是纯成本。</p>
+<p>任务之间是串行依赖，没有真实并行。多智能体的收益有很大一块来自并行执行，纯依赖链上的拆分只是把一次推理切成若干次带等待的推理，而每一跳都要付一个完整推理周期。</p>
+<p>不需要权限隔离。只要没有任何不可逆副作用、没有任何”这个执行者不该看到那份数据”的要求，拆分就换不来安全收益，只剩下协调开销。</p>
+<p>判定者与被判定者同源。如果”复核者”和”产出者”共享同一份上下文、同一个提示、同一份预算池，那它不是一个独立检查点，只是同一个判断的第二遍朗读。伪独立性是多智能体设计里最常见的一种错觉——它让人放心，却不带来任何新信息。真要独立，至少要独立到证据层面：复核者自己取证据，而不是接收产出者的转述。</p>
+<p>任务耦合度超过接口能表达的范围。有些工作的关键信息是隐性的、难以写成字段。这时拆分等于把共享上下文换成网络流量，而流量表达不了没说出口的前提——两边会各自补全假设，且补得都不一样。</p>
+<p>需要的是更谨慎而不是更多人。如果失败模式集中在同一个环节（比如工具参数写错、检索命中差），加执行者不会改变那个环节的出错率，只会增加围绕它的讨论。这类问题应该用同一个执行者的多轮自检、更强的工具校验或更硬的判定条件解决。</p>
+<p>运维成本承担不起。多智能体系统要求幂等、租约、预算树、终止原因枚举、跨链路观测这一整套东西。没有这套东西的多智能体系统，故障时只能靠猜，而猜出来的结论会引导你去做错误的重构。</p>
+<p>延迟敏感。任何一次跨执行者交接都意味着多等一个完整推理周期，用户在线等待的路径上尤其不该有这个。</p>
+<p>反过来，真正值得拆的理由其实很少而且很硬：凭证与权限必须分开；工作可以并行且彼此独立；需要独立复核且复核者不能与产出者共享上下文或预算；某个环节需要与外部世界打交道因而必须被单独设门槛。如果这四个理由一个都套不上，而你又想拆，那动机通常是”看起来更像一个系统”，这时候最划算的动作是把已拆的角色合并回去。</p>
+<table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>一个上下文装得下</td>
+<td>不拆</td>
+</tr>
+<tr>
+<td>纯串行依赖，无并行收益</td>
+<td>不拆</td>
+</tr>
+<tr>
+<td>无不可逆副作用，无权限差异</td>
+<td>不拆</td>
+</tr>
+<tr>
+<td>复核者与产出者同源同预算</td>
+<td>拆了也不独立，属伪拆分</td>
+</tr>
+<tr>
+<td>关键前提写不成接口字段</td>
+<td>不拆，改了再说</td>
+</tr>
+<tr>
+<td>失败集中在单一环节</td>
+<td>修那个环节，不加人</td>
+</tr>
+<tr>
+<td>至少命中一条硬理由（权限、并行、真独立复核、外部副作用）</td>
+<td>可以拆，并补齐治理机制</td>
+</tr>
+</tbody></table>
+<h2 id="协议层的现实位置"><a href="#协议层的现实位置" class="headerlink" title="协议层的现实位置"></a>协议层的现实位置</h2><p>到本文写作的时间点，跨智能体协作协议已经出现可讨论的稳定口径。A2A 在 2026-03-12 发布了 v1.0.0，可以按”1.0 口径”看待它：它规定的是不透明智能体之间如何被发现、任务生命周期如何流转、交接件的线格式是什么，并有意不规定参与者内部怎么推理、怎么拆任务、怎么调工具。MCP 处在另一层，管的是工具与上下文的接入，其 2025-11-25 修订可以作为工具层的参照；与之配套的注册表仍在预览状态，可以用来做发现机制的试验，不宜当成成熟基础设施来依赖。AGNTCY 在 2025-07-29 公布，重心是偏底层的开放基础设施与身份、发现侧的行业协作。治理侧还有 2025-12-09 关于 Agentic AI Foundation 的公告，属于托管与治理容器的变化；2025-10-16 的 Agent Skills 则是能力打包维度的事件，和协作协议不在同一层，不该混为一谈。除此之外，若干组织各自提出过协作协议，尚未收敛，本文不点名任何未经核实的名称与代号。</p>
+<p>框架侧的位置也要交代一句：LangGraph 已进入 1.x（1.0 与 1.1 一线），LangChain 是 1.x 到 1.2 的接口稳定期，OpenAI Agents SDK 仍是 0.x；CrewAI、AutoGen、Eino 三者的差异主要体现在项目定位与组织方式上，本文不写它们的版本与接口签名。部署侧的参照口径是 Kubernetes 1.35、Go 1.26、Node.js 24 LTS，这一层对协作语义没有影响，只影响你把上面那套治理机制跑在哪。智能体之间的身份发现、结算与责任划分在专门讨论多智能体经济的文章里已经有过展开，这里不重复，只谈协议在工程决策里该占的位置。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>把多智能体当成一个分布式问题来看，结论会突然变得朴素：分工的判据是可验证性、权限异质性与任务耦合度，而权限永远排在成本前面；状态要按”复制之后谁说的话还算数”来划分所有权；交接只传结论、证据指针、预算与期限，讨论要在指定检查点上限量开放；终止由达成判定、三重上限、重复检测与降级台阶共同保证，终止原因必须是非空枚举；预算是树不是池，超支处置看剩余价值而不是剩余额度；不可逆动作必须有审批门槛，超时一律不执行；观测要能回答”这笔钱花在哪个决策上、为什么做了三遍、停在哪一个状态”。</p>
+<p>最该被记住的却是反面那条：拆分的正当理由很少，只有权限必须分开、真能并行、复核者能与产出者彻底独立、某一支必须单独对接外部世界这四种。其余情况下，单智能体配好工具、配好判定条件，比一群互相转述的智能体更容易对账。协议解决发现与交接，不解决可验证性——把这句话当成选型时的第一道筛子。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li>A2A Protocol 官方文档站点（a2a-protocol.org），协议规范与版本发布说明</li>
+<li>Model Context Protocol 官方文档（modelcontextprotocol.io），工具与上下文接入层规范</li>
+<li>AGNTCY 项目主页（agntcy.org），智能体互操作基础设施的开放项目</li>
+<li>Linux Foundation 公告栏目（linuxfoundation.org），开放项目管理与治理相关公告</li>
+<li>LangChain 与 LangGraph 官方站点（langchain.com），框架文档与发布说明栏目</li>
+<li>OpenAI 官方站点（openai.com）与 GitHub 组织主页（github.com&#x2F;openai），Agents SDK 项目入口</li>
+<li>Anthropic 官方站点（anthropic.com），工程博客与公告栏目（能力打包相关主题）</li>
+<li>CrewAI 项目主页（crewai.com）、AutoGen 项目主页（github.com&#x2F;microsoft&#x2F;autogen）、Eino 项目主页（github.com&#x2F;cloudwego&#x2F;eino），三类多智能体框架定位参照</li>
+<li>Kubernetes 文档（kubernetes.io）、Go 发布说明（go.dev）、Node.js 发布说明（nodejs.org），部署侧版本口径参照</li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>多 Agent 分工与协商</p><p><a href="https://987763485.github.io/2026/05/28/多Agent分工与协商/">https://987763485.github.io/2026/05/28/多Agent分工与协商/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2026-05-28</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-21</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="link-muted mr-2" rel="tag" href="/tags/python/">python</a><a class="link-muted mr-2" rel="tag" href="/tags/agent/">agent</a><a class="link-muted mr-2" rel="tag" href="/tags/typescript/">typescript</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2026/05/30/Go%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E6%9C%8D%E5%8A%A1%E4%B8%AD%E7%9A%84%E5%AE%9E%E8%B7%B5/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Go 在大模型服务中的实践</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2026/05/21/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E6%9C%8D%E5%8A%A1%E5%8C%96%E4%B8%8E%E7%BD%91%E5%85%B3%E8%AE%BE%E8%AE%A1/"><span class="level-item">大模型服务化与网关设计</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

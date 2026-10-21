@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Redis 持久化与高可用方案 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="Redis 把数据放在内存里，读写快得让人放心，可一旦进程退出或者机器断电，这些数据就只剩下最后一次落盘的样子。本文要回答两个相邻但不同的问题：数据怎么安全地落到磁盘，以及单台机器倒下时服务怎么继续。读者需要已经熟悉 Redis 的基本命令与配置，读完之后应当能为一套业务选出合适的持久化组合、设计出可演练的恢复流程，并且知道哪些“高可用”其实只是心理安慰。"><meta property="og:type" content="blog"><meta property="og:title" content="Redis 持久化与高可用方案"><meta property="og:url" content="https://987763485.github.io/2020/08/17/Redis%E6%8C%81%E4%B9%85%E5%8C%96%E4%B8%8E%E9%AB%98%E5%8F%AF%E7%94%A8%E6%96%B9%E6%A1%88/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="Redis 把数据放在内存里，读写快得让人放心，可一旦进程退出或者机器断电，这些数据就只剩下最后一次落盘的样子。本文要回答两个相邻但不同的问题：数据怎么安全地落到磁盘，以及单台机器倒下时服务怎么继续。读者需要已经熟悉 Redis 的基本命令与配置，读完之后应当能为一套业务选出合适的持久化组合、设计出可演练的恢复流程，并且知道哪些“高可用”其实只是心理安慰。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2020-08-17T05:32:47.000Z"><meta property="article:modified_time" content="2026-10-18T15:00:16.633Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="devops"><meta property="article:tag" content="docker"><meta property="article:tag" content="linux"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2020/08/17/Redis%E6%8C%81%E4%B9%85%E5%8C%96%E4%B8%8E%E9%AB%98%E5%8F%AF%E7%94%A8%E6%96%B9%E6%A1%88/"},"headline":"Redis 持久化与高可用方案","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2020-08-17T05:32:47.000Z","dateModified":"2026-10-18T15:00:16.633Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"Redis 把数据放在内存里，读写快得让人放心，可一旦进程退出或者机器断电，这些数据就只剩下最后一次落盘的样子。本文要回答两个相邻但不同的问题：数据怎么安全地落到磁盘，以及单台机器倒下时服务怎么继续。读者需要已经熟悉 Redis 的基本命令与配置，读完之后应当能为一套业务选出合适的持久化组合、设计出可演练的恢复流程，并且知道哪些“高可用”其实只是心理安慰。"}</script><link rel="canonical" href="https://987763485.github.io/2020/08/17/Redis%E6%8C%81%E4%B9%85%E5%8C%96%E4%B8%8E%E9%AB%98%E5%8F%AF%E7%94%A8%E6%96%B9%E6%A1%88/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2020-08-17T05:32:47.000Z" title="8/17/2020, 1:32:47 PM">2020-08-17</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/">容器与运维</a></span><span class="level-item">1 小时读完 (大约8448个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Redis 持久化与高可用方案</h1><div class="content"><p>Redis 把数据放在内存里，读写快得让人放心，可一旦进程退出或者机器断电，这些数据就只剩下最后一次落盘的样子。本文要回答两个相邻但不同的问题：数据怎么安全地落到磁盘，以及单台机器倒下时服务怎么继续。读者需要已经熟悉 Redis 的基本命令与配置，读完之后应当能为一套业务选出合适的持久化组合、设计出可演练的恢复流程，并且知道哪些“高可用”其实只是心理安慰。</p>
+<h2 id="持久化与高可用：两个问题，两套答案"><a href="#持久化与高可用：两个问题，两套答案" class="headerlink" title="持久化与高可用：两个问题，两套答案"></a>持久化与高可用：两个问题，两套答案</h2><p>很多人第一次给 Redis 做运维方案时，会把“开了持久化”和“做了高可用”当成同一件事。这两件事的目标、失败模式与验证方法都不一样，混在一起谈，最后往往两头都不到位。</p>
+<h3 id="持久化解决的是“重启之后还在不在”"><a href="#持久化解决的是“重启之后还在不在”" class="headerlink" title="持久化解决的是“重启之后还在不在”"></a>持久化解决的是“重启之后还在不在”</h3><p>持久化（persistence）把内存中的数据结构写到磁盘，回答的是：进程崩溃、机器重启后，数据能恢复到哪个时刻。它衡量的指标是 RPO（Recovery Point Objective，恢复点目标），即业务最多能接受丢多长时间的数据。RDB 十分钟落一次盘，RPO 就是十分钟；AOF 每秒刷一次，RPO 约一秒。但它保护不了机器本身：磁盘坏了、断电超过 UPS 支撑时间，落盘的文件一样读不出来。</p>
+<h3 id="高可用解决的是“节点倒下之后服务还能不能连上”"><a href="#高可用解决的是“节点倒下之后服务还能不能连上”" class="headerlink" title="高可用解决的是“节点倒下之后服务还能不能连上”"></a>高可用解决的是“节点倒下之后服务还能不能连上”</h3><p>高可用（high availability）关心的是服务的连续性：主节点挂掉之后，有没有别的节点接替它，客户端多久能重新连上。它衡量的指标是 RTO（Recovery Time Objective，恢复时间目标），也就是业务能容忍多长的不可用时间。</p>
+<p>复制、Sentinel、Cluster 都属于这一类，它们把数据放在多台机器上，并在主节点失联时提升某个副本。但复制是异步的，主节点确认写入后还没同步就宕机，这部分写入就永久丢了；更糟的是，误删一条 key 也会被毫秒级同步到所有副本，高可用会把错误一起高可用。</p>
+<h3 id="用-RPO-与-RTO-给业务分类"><a href="#用-RPO-与-RTO-给业务分类" class="headerlink" title="用 RPO 与 RTO 给业务分类"></a>用 RPO 与 RTO 给业务分类</h3><p>选型之前，先给数据分类，比背配置项有用得多。下表是笔者常用的起点，具体数字是设计目标，需要按业务实际压测和评审。</p>
+<table>
+<thead>
+<tr>
+<th>数据角色</th>
+<th>丢失的后果</th>
+<th>目标 RPO</th>
+<th>目标 RTO</th>
+<th>推荐组合</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>纯缓存</td>
+<td>回源重建，只是数据库压力上升</td>
+<td>全量可丢</td>
+<td>秒级到分钟级</td>
+<td>可不开持久化，主从或 Cluster</td>
+</tr>
+<tr>
+<td>会话与验证码</td>
+<td>用户重新登录</td>
+<td>分钟级</td>
+<td>秒级</td>
+<td>RDB 加主从，或交给外部存储</td>
+</tr>
+<tr>
+<td>排行榜、计数器</td>
+<td>可以重算，但要花时间</td>
+<td>秒级</td>
+<td>秒级</td>
+<td>AOF everysec 加主从</td>
+</tr>
+<tr>
+<td>队列、去重标记</td>
+<td>任务丢失、重复投递</td>
+<td>接近 0</td>
+<td>秒级</td>
+<td>AOF everysec 加 Sentinel</td>
+</tr>
+<tr>
+<td>主存储（无其他副本）</td>
+<td>业务数据永久丢失</td>
+<td>接近 0</td>
+<td>分钟级</td>
+<td>AOF everysec 或混合持久化，加副本与异地备份</td>
+</tr>
+</tbody></table>
+<p>一个常见的误判是“我们只是缓存，丢了没关系”，但缓存里往往混着分布式锁、限流计数、幂等标记，这些数据丢了直接变成正确性问题。</p>
+<pre class="mermaid">flowchart TD
+    A[内存中的数据] --> B{怎么落盘}
+    B --> C[RDB 快照]
+    B --> D[AOF 命令日志]
+    C --> E[混合持久化: RDB 做底 AOF 做增量]
+    D --> E
+    E --> F{机器坏了怎么办}
+    F --> G[主从复制]
+    G --> H[Sentinel 自动切换]
+    G --> I[Cluster 分片与切换]
+    H --> J[恢复演练与监控]
+    I --> J</pre>
+
+<h2 id="RDB：时间点快照与-fork-的代价"><a href="#RDB：时间点快照与-fork-的代价" class="headerlink" title="RDB：时间点快照与 fork 的代价"></a>RDB：时间点快照与 fork 的代价</h2><p>RDB 是 Redis 最早、也最直观的持久化方式：把某一时刻的整个数据集序列化成一个二进制文件，默认叫 <code>dump.rdb</code>。它保存的是数据本身，不是操作过程，所以文件紧凑、加载快，非常适合做备份和跨环境搬运。</p>
+<h3 id="快照是怎么产生的"><a href="#快照是怎么产生的" class="headerlink" title="快照是怎么产生的"></a>快照是怎么产生的</h3><p>触发一次快照有三条路径：配置里的 <code>save</code> 规则、客户端显式执行 <code>BGSAVE</code>、以及主从复制时主节点为全量同步生成 RDB。<code>SAVE</code> 命令也能生成快照，但它在前台执行，会阻塞整个事件循环，生产环境基本只用于调试和关机前。</p>
+<p><code>save</code> 规则的语义是“N 秒内至少有 M 个 key 变化，就触发一次后台保存”。Redis 不为每条规则起定时器，而是用每 100 毫秒执行一次的定时任务，检查距上次保存的时间与脏 key 计数是否同时满足某条规则。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"># 示例：三档 save 规则，任一满足即触发 BGSAVE</span><br><span class="line">save 900 1</span><br><span class="line">save 300 10</span><br><span class="line">save 60 10000</span><br><span class="line"></span><br><span class="line"># 关闭自动快照（仍可手动 BGSAVE），注意是空字符串而不是注释掉</span><br><span class="line"># save &quot;&quot;</span><br><span class="line"></span><br><span class="line">dbfilename dump.rdb</span><br><span class="line">dir /var/lib/redis</span><br><span class="line">rdbcompression yes</span><br><span class="line">rdbchecksum yes</span><br><span class="line">stop-writes-on-bgsave-error yes</span><br></pre></td></tr></table></figure>
+
+<p>规则之间是“或”的关系，最细的一档决定了最坏情况下的 RPO：写入安静时最多丢十五分钟，写得很热闹时最多丢一分钟。想让 RPO 更小，就把 <code>save 60 10000</code> 调得更激进，代价是更频繁的 fork。</p>
+<h3 id="fork-与写时复制"><a href="#fork-与写时复制" class="headerlink" title="fork 与写时复制"></a>fork 与写时复制</h3><p><code>BGSAVE</code> 的核心是 <code>fork()</code>。子进程拿到一份和父进程几乎一样的内存页表，然后从这份“冻结”的视图里把数据写进临时文件，写完再原子地重命名为 <code>dump.rdb</code>。与此同时，父进程继续处理客户端请求，不做任何阻塞式等待。</p>
+<p>父子进程共享物理内存页，父进程一旦要修改某一页，内核必须先把这一页复制给子进程，这就是写时复制（copy-on-write，COW）。于是快照期间的内存开销与“被修改的数据量”成正比：写得越猛、快照拖得越久，复制的页越多；极端情况下父子各占一份完整数据集，瞬时内存接近翻倍。</p>
+<pre class="mermaid">flowchart TD
+    A[父进程收到 BGSAVE] --> B[fork 子进程]
+    B --> C[父子共享内存页, 页表只读]
+    C --> D[子进程顺序写临时 RDB 文件]
+    C --> E[父进程继续处理写请求]
+    E --> F{写入的页是否共享}
+    F -->|是| G[内核复制该页, 父进程改副本]
+    F -->|否| H[直接写入]
+    D --> I[写完 rename 为 dump.rdb]
+    G --> D
+    H --> D</pre>
+
+<p>所以“内存用了 60%，机器还剩 40% 余量”这种估算会翻车：真正要算的是 <code>used_memory</code> 加上快照期间可能被复制的页，再留出碎片余量。</p>
+<h3 id="fork-的延迟从哪来"><a href="#fork-的延迟从哪来" class="headerlink" title="fork 的延迟从哪来"></a>fork 的延迟从哪来</h3><p><code>fork()</code> 本身不复制数据，但要复制页表，耗时与进程的虚拟内存规模成正比，而不是与当前数据量成正比。几十 GB 的实例，fork 花掉几百毫秒并不稀奇，这段时间主线程被挂起，客户端命令排队，表现为明显的延迟毛刺。几个可以动手的缓解手段：</p>
+<ul>
+<li>控制单实例内存，别把一台机器堆到上百 GB，宁可多分几个实例。</li>
+<li>确认 <code>vm.overcommit_memory = 1</code>，否则内存紧张时 <code>fork</code> 可能直接失败，日志里会出现 <code>Can&#39;t save in background: fork: Cannot allocate memory</code>。</li>
+<li>关闭透明大页（THP）。THP 会让 COW 的复制单位从 4 KB 变成 2 MB，放大延迟和内存开销，官方文档明确建议关闭。</li>
+<li>把 <code>save</code> 规则调稀疏一些，或者把快照时间点错开到业务低峰。</li>
+</ul>
+<h3 id="stop-writes-on-bgsave-error-的两难"><a href="#stop-writes-on-bgsave-error-的两难" class="headerlink" title="stop-writes-on-bgsave-error 的两难"></a>stop-writes-on-bgsave-error 的两难</h3><p>这个选项默认为 <code>yes</code>：最近一次后台保存失败后，主节点拒绝所有写命令，返回 <code>MISCONF Redis is configured to save RDB snapshots, but it is currently not able to persist on disk</code>。理由很直接：磁盘写不进去了，继续接受写入只会让内存与磁盘的差距越来越大。</p>
+<p>但对纯缓存来说这是个陷阱：磁盘满了，Redis 拒绝写入，业务把所有请求打到数据库，一次磁盘告警演变成一次全站故障。笔者的做法是按角色分开：主存储保持 <code>yes</code>，纯缓存改成 <code>no</code>，同时把 <code>rdb_last_bgsave_status</code> 接入告警。</p>
+<h3 id="RDB-的优缺点"><a href="#RDB-的优缺点" class="headerlink" title="RDB 的优缺点"></a>RDB 的优缺点</h3><p>优点是文件紧凑，体积通常远小于 AOF；加载时按序反序列化，恢复速度快；单个文件便于归档和异地拷贝；日常只在 fork 与 COW 时才有抖动。缺点是两次快照之间的数据全部丢失；fork 的延迟毛刺随实例变大而变严重；没法只备份某几个 key；文件格式与版本相关，低版本 Redis 读不了高版本生成的 RDB。</p>
+<h2 id="AOF：把每条写命令记下来"><a href="#AOF：把每条写命令记下来" class="headerlink" title="AOF：把每条写命令记下来"></a>AOF：把每条写命令记下来</h2><p>RDB 记的是“结果”，AOF（append only file）记的是“过程”：每一条会修改数据的命令，执行完之后按 RESP 协议追加到文件末尾。恢复时把文件里的命令从头重放一遍，就能得到和崩溃前一致的数据集。</p>
+<h3 id="写入路径与三种-fsync-策略"><a href="#写入路径与三种-fsync-策略" class="headerlink" title="写入路径与三种 fsync 策略"></a>写入路径与三种 fsync 策略</h3><p>一次写请求在 AOF 模式下的路径是：命令在内存中执行，结果追加到 <code>aof_buf</code> 缓冲区；事件循环在进入休眠前把缓冲区 <code>write()</code> 到文件；最后按 <code>appendfsync</code> 决定何时调用 <code>fsync()</code> 把页缓存刷到磁盘。</p>
+<p><code>write()</code> 只是把数据交给操作系统，断电后仍在页缓存里的部分会丢；<code>fsync()</code> 才是真正的落盘点，而它很贵。三档策略就是在这个成本上做取舍：</p>
+<table>
+<thead>
+<tr>
+<th>取值</th>
+<th>行为</th>
+<th>崩溃时最多丢</th>
+<th>代价</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>always</code></td>
+<td>每条命令都 fsync 后才回复客户端</td>
+<td>一条命令</td>
+<td>吞吐下降明显，延迟受磁盘摆布</td>
+</tr>
+<tr>
+<td><code>everysec</code></td>
+<td>后台线程每秒 fsync 一次</td>
+<td>约 1 秒</td>
+<td>默认值，绝大多数场景的平衡点</td>
+</tr>
+<tr>
+<td><code>no</code></td>
+<td>交给操作系统自己刷</td>
+<td>数十秒，取决于内核</td>
+<td>最快，但不可控</td>
+</tr>
+</tbody></table>
+<p><code>everysec</code> 的 fsync 由后台线程执行，正常情况下不阻塞主线程。但如果某次 fsync 卡住超过一秒（磁盘抖动、云盘限流、快照任务抢 I&#x2F;O），主线程为了不超过“最多丢两秒”的承诺，会主动等待上一次 fsync 完成，这段时间写请求一起排队。这种毛刺在监控上表现为周期性的延迟尖峰，排查时要看磁盘写延迟而不是 Redis 本身。<code>no-appendfsync-on-rewrite</code> 可以在重写期间暂停 fsync，代价是重写持续多久，丢失窗口就有多久，对主存储通常不划算。</p>
+<h3 id="文件为什么会无限增长"><a href="#文件为什么会无限增长" class="headerlink" title="文件为什么会无限增长"></a>文件为什么会无限增长</h3><p>AOF 记录的是操作，不是状态。对一个计数器连续执行一百万次 <code>INCR</code>，文件里就有一百万条命令，而数据集里只有一个整数；<code>DEL</code> 同样会被追加，旧数据不会因此从文件里消失。</p>
+<p>所以 AOF 必须定期重写（rewrite）。重写不是压缩原文件，而是按当前数据集重新生成最小命令集：一个有一万条记录的 hash，重写后是几条 <code>HSET</code>，而不是它历史上经历过的所有 <code>HSET</code> 与 <code>HDEL</code>。</p>
+<pre class="mermaid">sequenceDiagram
+    participant P as 主进程
+    participant C as 子进程
+    participant O as 旧 AOF
+    participant N as 新 AOF 临时文件
+    P->>C: fork
+    C->>N: 按 fork 时刻的数据集写最小命令集
+    P->>O: 继续追加新命令
+    P->>P: 同时缓存到重写缓冲区
+    C-->>P: 写完并退出
+    P->>N: 追加缓冲区中的增量命令
+    P->>N: rename 覆盖旧 AOF
+    P->>N: 后续命令直接追加</pre>
+
+<p>重写期间旧 AOF 仍在正常追加，所以子进程中途失败也不影响恢复能力；只有 rename 成功，新旧文件才完成交接。</p>
+<h3 id="自动重写阈值与手工触发"><a href="#自动重写阈值与手工触发" class="headerlink" title="自动重写阈值与手工触发"></a>自动重写阈值与手工触发</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">appendonly yes</span><br><span class="line">appendfilename &quot;appendonly.aof&quot;</span><br><span class="line">appendfsync everysec</span><br><span class="line">no-appendfsync-on-rewrite no</span><br><span class="line"></span><br><span class="line"># 当前 AOF 比上次重写后的大小增长 100% 且超过 64 MB 时触发</span><br><span class="line">auto-aof-rewrite-percentage 100</span><br><span class="line">auto-aof-rewrite-min-size 64mb</span><br><span class="line"></span><br><span class="line"># 尾部被截断时容忍启动，并打印警告</span><br><span class="line">aof-load-truncated yes</span><br><span class="line"># 大文件重写时按块 fsync，降低延迟毛刺</span><br><span class="line">aof-rewrite-incremental-fsync yes</span><br></pre></td></tr></table></figure>
+
+<p>需要立刻整理时可以手工执行 <code>BGREWRITEAOF</code>。如果已有子进程在重写，命令不会失败，而是被排进队列；运维脚本里循环调用它，只会排出一长串任务，每个都要 fork 一次。</p>
+<h3 id="文件损坏与修复"><a href="#文件损坏与修复" class="headerlink" title="文件损坏与修复"></a>文件损坏与修复</h3><p>AOF 最常见的损坏是尾部截断：写到一半机器断电，最后一条命令不完整。启动时读到不完整命令，<code>aof-load-truncated yes</code> 会截掉尾部继续启动并打印警告，设为 <code>no</code> 则直接拒绝启动。更麻烦的是文件中间出现无法解析的内容，比如磁盘坏块或人为编辑，这时需要 <code>redis-check-aof</code>：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 先停掉实例并备份原文件，修复是有损操作</span></span><br><span class="line"><span class="built_in">cp</span> /var/lib/redis/appendonly.aof /backup/appendonly.aof.$(<span class="built_in">date</span> +%F-%H%M)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 只检查不修改</span></span><br><span class="line">redis-check-aof /var/lib/redis/appendonly.aof</span><br><span class="line"></span><br><span class="line"><span class="comment"># 从第一处不合法命令开始截断</span></span><br><span class="line">redis-check-aof --fix /var/lib/redis/appendonly.aof</span><br><span class="line"></span><br><span class="line"><span class="comment"># RDB 文件也有对应的检查工具</span></span><br><span class="line">redis-check-rdb /var/lib/redis/dump.rdb</span><br></pre></td></tr></table></figure>
+
+<p><code>--fix</code> 的策略是从头扫描，遇到第一条读不通的命令就把后面全部截掉，不会猜测那条命令原本是什么，所以修复点之后的数据确定丢失。这也是为什么修复前必须备份：截断位置可能比预期早，届时还能改用更早的 RDB 拼接 AOF。</p>
+<h3 id="AOF-的优缺点"><a href="#AOF-的优缺点" class="headerlink" title="AOF 的优缺点"></a>AOF 的优缺点</h3><p>AOF 的最大价值是把 RPO 从分钟级压到秒级，而且不依赖数据量：一百万个 key 和一百个 key，<code>everysec</code> 下丢的都是最近一秒。追加写对磁盘友好，文件是文本协议，出问题时能直接看见命令序列。</p>
+<p>代价是文件更大、加载更慢、fsync 有固定开销，重写同样要 fork。还有一个教训：重写逻辑出 bug 时可能生成“看起来正常但语义错误”的文件，任何方案都不能只靠“文件存在”证明数据完好。</p>
+<h2 id="混合持久化与策略选型"><a href="#混合持久化与策略选型" class="headerlink" title="混合持久化与策略选型"></a>混合持久化与策略选型</h2><p>RDB 快但丢得多，AOF 丢得少但加载慢，两者的短板恰好互补。Redis 4.0 起提供了把二者拼起来的做法，到 5.0 之后成为默认行为。</p>
+<h3 id="RDB-做底、AOF-做增量"><a href="#RDB-做底、AOF-做增量" class="headerlink" title="RDB 做底、AOF 做增量"></a>RDB 做底、AOF 做增量</h3><p>开启 <code>aof-use-rdb-preamble yes</code> 后，AOF 重写生成的文件不再全是命令，而是“前半段是 RDB 快照，后半段是重写期间的增量命令”。文件仍叫 <code>appendonly.aof</code>，Redis 通过文件头判断前半段是 RDB 还是纯命令，加载时先反序列化快照，再重放尾部。这让加载速度回到 RDB 的量级，而 RPO 仍是秒级：几十 GB 的实例，纯 AOF 重放可能要几分钟，混合模式通常能压到十几秒到几十秒，具体取决于尾部增量，需要在目标环境实测。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"># 5.0 及以后默认开启</span><br><span class="line">aof-use-rdb-preamble yes</span><br></pre></td></tr></table></figure>
+
+<p>代价是文件不再是纯文本，人工排查命令序列的能力没了；低于 4.0 的 Redis 读不了这种文件，回滚时要先关闭该选项并触发重写。混合模式也不改变写入路径，<code>appendfsync</code> 的取舍依然存在。</p>
+<h3 id="按数据角色选组合"><a href="#按数据角色选组合" class="headerlink" title="按数据角色选组合"></a>按数据角色选组合</h3><p>把前面的分析落到具体业务上，笔者推荐这几组搭配：</p>
+<ul>
+<li>纯缓存：可以完全关闭持久化，也可以只留 RDB 做冷启动加速。重点不在磁盘，而在主从或 Cluster 提供读扩展与故障转移。<code>maxmemory</code> 与淘汰策略要配好，否则重启后缓存为空的瞬间会把数据库打穿。</li>
+<li>会话存储：RDB 加主从即可。丢一分钟的会话，用户重新登录一次就能接受；不想让用户感知，就把会话放到带持久化的外部存储。</li>
+<li>计数器、排行榜、队列标记：AOF <code>everysec</code> 或混合持久化。这类数据贵在准确，丢一秒的计数可能意味着对账差异。</li>
+<li>事实上的主存储：混合持久化加副本，加 Sentinel 或 Cluster，再加异地备份。前提是业务能容忍秒级丢失，并且有独立的对账或补偿机制。</li>
+</ul>
+<h3 id="磁盘怎么估"><a href="#磁盘怎么估" class="headerlink" title="磁盘怎么估"></a>磁盘怎么估</h3><p>估算分三块。数据文件本身：RDB 通常比内存小；AOF 在两次重写之间持续增长，稳态大小近似于重写后大小乘以增长阈值。重写临时文件：重写在同目录写新文件再 rename，峰值时新旧两份并存，保守按数据集的两倍预留。最后是日志与系统本身，量不大，但磁盘打满时它就是最后一根稻草。持久化目录应放在独立数据盘，与日志盘分开。</p>
+<h3 id="备份不等于持久化"><a href="#备份不等于持久化" class="headerlink" title="备份不等于持久化"></a>备份不等于持久化</h3><p>持久化保证“本机重启能起来”，备份保证“本机彻底没了还能重建”。这两件事经常被合成一句话，然后在机房搬迁或者误删实例时一起失效。</p>
+<p>一个可执行的策略：每天低峰期在主节点执行 <code>BGSAVE</code>，等 <code>rdb_bgsave_in_progress</code> 回到 0 后把 <code>dump.rdb</code> 拷到对象存储或另一台机器；保留 7 天日备份与 4 周周备份，需要精确回滚时额外保留 AOF。拷完必须用 <code>redis-check-rdb</code> 验证可读，否则备份的可能只是一个大小正确的空壳。从节点的 RDB 也能用来备份，前提是 <code>replica-read-only</code> 没被改成可写、偏移量确实追上了主节点。</p>
+<h2 id="主从复制：把数据多放几份"><a href="#主从复制：把数据多放几份" class="headerlink" title="主从复制：把数据多放几份"></a>主从复制：把数据多放几份</h2><p>持久化解决单机重启，复制解决单机消失。Redis 的复制是异步的、基于命令流重放：从节点连上主节点，先拿一份全量数据，之后持续接收转发的写命令。</p>
+<h3 id="从-replicaof-到-PSYNC"><a href="#从-replicaof-到-PSYNC" class="headerlink" title="从 replicaof 到 PSYNC"></a>从 replicaof 到 PSYNC</h3><p>在从节点配置 <code>replicaof 10.0.0.12 6379</code> 即可建立复制关系。这个名字在 5.0 之前叫 <code>slaveof</code>，旧命令仍可用，但新配置一律建议用 <code>replicaof</code>。主节点开了密码时，从节点要配 <code>masterauth</code>；6.0 引入 ACL 后，多用户场景用 <code>masteruser</code> 指定用户名。</p>
+<p>第一次同步由从节点发起 <code>PSYNC ? -1</code>，意思是“我没有历史，请给我全量”。主节点在后台生成 RDB，同时攒下这段时间的新写入，等传完再补发。从节点收到 RDB 会先清空自己的数据集再加载，这是很多人第一次做主从时被吓到的地方。</p>
+<h3 id="断线重连与部分同步"><a href="#断线重连与部分同步" class="headerlink" title="断线重连与部分同步"></a>断线重连与部分同步</h3><p>网络抖一下就要全量重传，代价太大。所以从节点会记住主节点的复制 ID（40 位十六进制串）和自己已处理的偏移量，重连时发 <code>PSYNC &lt;replid&gt; &lt;offset&gt;</code>。主节点检查偏移量是否还在复制积压缓冲区（repl backlog）里：在，就回 <code>+CONTINUE</code> 补发缺失命令；不在，就退化成全量同步。积压缓冲区是固定大小的环形缓冲，由 <code>repl-backlog-size</code> 控制，默认只有 1 MB，按写入速率算可能只够覆盖几秒的断线。经验做法是按“平均写入速率乘以期望容忍的断线时长”设置，几个 MB 到几十 MB 都常见。</p>
+<pre class="mermaid">sequenceDiagram
+    participant R as 从节点
+    participant M as 主节点
+    R->>M: PSYNC replid offset
+    alt offset 在积压缓冲区内
+        M-->>R: +CONTINUE
+        M->>R: 补发缺失命令
+    else offset 已被覆盖或 replid 不匹配
+        M-->>R: +FULLRESYNC 新 replid offset
+        M->>M: BGSAVE 生成 RDB
+        M->>R: 传输 RDB
+        M->>R: 补发期间累积的写入
+    end</pre>
+
+<p>Redis 4.0 起还引入了第二个复制 ID（<code>replid2</code>），记录上一次主节点变更前的 ID。这样在 Sentinel 完成切换后，尚未被重新配置的从节点仍有机会和新主节点做部分同步，而不是全部推倒重来。</p>
+<h3 id="异步复制的丢数据窗口"><a href="#异步复制的丢数据窗口" class="headerlink" title="异步复制的丢数据窗口"></a>异步复制的丢数据窗口</h3><p>复制是异步的：主节点执行完写命令、回复客户端成功，之后才把命令发给从节点。从“主节点确认”到“从节点收到”之间存在一个窗口，主节点在这个窗口内宕机，这部分写入就永远丢了。窗口大小等于复制延迟，业务写得越猛、网络越差、从节点越忙，窗口越大。</p>
+<p><code>WAIT numreplicas timeout</code> 可以阻塞当前连接，直到指定数量的副本确认收到之前的写入，或者超时。它能把窗口压小，但不是强一致：返回成功只代表那一刻副本收到了，主节点随后崩溃，新主节点仍可能没有这条数据。真正的一致性需要 Raft 这类共识协议，Redis 的定位不是那个方向。</p>
+<h3 id="全量同步的两种传输方式"><a href="#全量同步的两种传输方式" class="headerlink" title="全量同步的两种传输方式"></a>全量同步的两种传输方式</h3><p>主节点生成 RDB 后，可以写到磁盘再传给从节点，也可以把字节流直接通过 socket 发出去，后者叫无盘复制。<code>repl-diskless-sync yes</code> 在磁盘慢或者容器里没有持久卷时很有用，省掉一次落盘和一次读盘，代价是传输期间网络中断就得从头再来；它配合 <code>repl-diskless-sync-delay</code> 把同时来请求的多个从节点合并到同一次传输，避免为每个从节点各 fork 一次。从节点仍然要在内存里加载 RDB，省掉的只是主节点的磁盘 I&#x2F;O。</p>
+<h3 id="几个必须想清楚的配置"><a href="#几个必须想清楚的配置" class="headerlink" title="几个必须想清楚的配置"></a>几个必须想清楚的配置</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">replicaof 10.0.0.12 6379</span><br><span class="line">masterauth &quot;从节点连主节点用的密码&quot;</span><br><span class="line">replica-read-only yes</span><br><span class="line">replica-serve-stale-data yes</span><br><span class="line"></span><br><span class="line">repl-backlog-size 16mb</span><br><span class="line">repl-diskless-sync no</span><br><span class="line">repl-diskless-sync-delay 5</span><br><span class="line">repl-ping-replica-period 10</span><br><span class="line"></span><br><span class="line"># 至少 1 个副本的延迟不超过 10 秒，否则主节点拒绝写入</span><br><span class="line">min-replicas-to-write 1</span><br><span class="line">min-replicas-max-lag 10</span><br></pre></td></tr></table></figure>
+
+<p><code>replica-read-only yes</code> 是默认值，几乎不该改：从节点可写不会与主节点冲突，但数据会分叉，切换时不知道该信谁。</p>
+<p><code>min-replicas-to-write</code> 与 <code>min-replicas-max-lag</code> 是一对组合，作用是在副本都不健康时让主节点主动拒绝写入：副本全挂时业务写不进来，但也不会产生一批注定要丢的数据。主存储建议开启，纯缓存不要开。</p>
+<h2 id="Sentinel-与-Cluster：概览与边界"><a href="#Sentinel-与-Cluster：概览与边界" class="headerlink" title="Sentinel 与 Cluster：概览与边界"></a>Sentinel 与 Cluster：概览与边界</h2><p>复制只解决了“数据有几份”，没解决“谁来宣布主节点死了、谁来接替”。Redis 生态里有两条路线：Sentinel 负责对主从结构做自动故障转移，Cluster 负责分片加故障转移。</p>
+<h3 id="Sentinel-做的事情"><a href="#Sentinel-做的事情" class="headerlink" title="Sentinel 做的事情"></a>Sentinel 做的事情</h3><p>Sentinel 是一组独立进程，定期 ping 主从节点，按 <code>down-after-milliseconds</code> 判定主观下线；足够多的 Sentinel 都认为某节点下线，才升级为客观下线，这个数量就是 quorum。随后 Sentinel 之间选出领导者，由它从副本里挑数据最新的一个提升为主节点，其余副本改挂过去。</p>
+<p>客户端不直接连 Sentinel，而是先问当前主节点地址，再连真正的 Redis；切换发生时，Sentinel 通过 <code>+switch-master</code> 频道发布消息，客户端收到后刷新连接。这套机制要求客户端库支持 Sentinel 协议，这是选型时要确认的第一件事。</p>
+<p>部署有两条硬要求：数量取奇数且至少三个，分布在不同故障域；quorum 不超过总数的一半。三个 Sentinel 挂掉两个，剩下的一个既形不成多数，也完不成切换。切换耗时写进预案并在演练中测量，不要凭空写一个数字。</p>
+<p>选举细节、<code>failover-timeout</code> 的各个阶段与脑裂的完整处理属于另一篇的主题，这里只强调一点：自动切换会放大异步复制丢数据的问题，<code>min-replicas-to-write</code> 是目前最直接的缓解手段。</p>
+<h3 id="Cluster-做的事情"><a href="#Cluster-做的事情" class="headerlink" title="Cluster 做的事情"></a>Cluster 做的事情</h3><p>Cluster 把数据按 16384 个槽位分片到多个主节点，每个主节点可以带副本。客户端按 key 计算槽位，算错了收到 <code>MOVED</code> 重定向，槽位迁移过程中还会出现 <code>ASK</code> 临时重定向。主节点失联且其副本获得多数主节点认可后，副本被提升，槽位随之转移。</p>
+<p>它的约束比 Sentinel 强：多 key 命令要求 key 落在同一个槽（可用 hash tag 强制），事务与 Lua 脚本同样受限，客户端必须支持 Cluster 协议。分片、Gossip、迁移与扩容的细节留给集群专题，这里只记定位：需要横向扩容写能力时选 Cluster，只想要自动切换时 Sentinel 更简单。</p>
+<h2 id="恢复演练：备份只有恢复成功才算数"><a href="#恢复演练：备份只有恢复成功才算数" class="headerlink" title="恢复演练：备份只有恢复成功才算数"></a>恢复演练：备份只有恢复成功才算数</h2><p>持久化和备份的最终验收标准只有一个：真的能从文件里把数据读回来。这一步没法靠读文档获得信心，只能靠演练。</p>
+<h3 id="启动时到底加载了哪个文件"><a href="#启动时到底加载了哪个文件" class="headerlink" title="启动时到底加载了哪个文件"></a>启动时到底加载了哪个文件</h3><p>启动时的加载顺序是固定的：<code>appendonly yes</code> 且 AOF 文件存在就加载 AOF，混合模式下先读 RDB 前导再重放尾部；否则才读 <code>dump.rdb</code>。两个文件都不存在，实例以空数据集启动，日志里只有一句轻描淡写的提示。</p>
+<p>这里有个很常见的坑：原本只开 RDB 的实例，磁盘上留着几天前的 <code>dump.rdb</code>；某次把 <code>appendonly</code> 打开却没有触发重写，重启后 AOF 文件不存在，Redis 仍会回退读 RDB，看起来一切正常，实际数据停在几天前。判断依据不要靠猜，看启动日志里是 <code>DB loaded from append only file</code> 还是 <code>DB loaded from disk</code>。</p>
+<pre class="mermaid">flowchart TD
+    A[实例启动] --> B{appendonly 是否为 yes}
+    B -->|是| C{AOF 文件是否存在}
+    C -->|是| D[加载 AOF, 混合模式先读 RDB 前导]
+    C -->|否| E[回退读 dump.rdb]
+    B -->|否| E
+    E --> F{RDB 是否存在}
+    F -->|是| G[加载 RDB]
+    F -->|否| H[空数据集启动并打印警告]</pre>
+
+<h3 id="一次完整的恢复流程"><a href="#一次完整的恢复流程" class="headerlink" title="一次完整的恢复流程"></a>一次完整的恢复流程</h3><p>假设主节点磁盘损坏，要从昨天的备份重建，可以按下面的顺序操作，每一步都留出验证点：</p>
+<ol>
+<li>确认目标时间点与 RPO 预期，避免恢复完才发现少了一天数据却没人说清。</li>
+<li>停掉故障实例，把原数据目录整体改名保留。现场不要删，AOF 尾部有时还能抢救出最后几秒的数据。</li>
+<li>在干净目录里放入选定的文件，并确认配置与类型匹配：放 RDB 就要确保 <code>appendonly no</code>，否则 Redis 会忽略它。</li>
+<li>启动实例，检查日志里的加载来源、耗时，以及有没有 <code>Bad file format</code> 之类的报错。</li>
+<li>校验数据：<code>DBSIZE</code> 与备份记录对比，<code>INFO keyspace</code> 看各库 key 数量，再抽查几个关键 key，对不上就别急着切流量。</li>
+<li>用 <code>DEBUG RELOAD</code> 把当前数据集重新落盘再加载回来，提前暴露文件层面的问题。</li>
+<li>重新挂载副本，等全量同步完成、偏移量追平，再逐步放量。</li>
+</ol>
+<h3 id="演练要演练到什么程度"><a href="#演练要演练到什么程度" class="headerlink" title="演练要演练到什么程度"></a>演练要演练到什么程度</h3><p>建议至少每季度做一次，随机抽一份备份，在隔离环境里完整走一遍上面的流程，记录实际耗时。演练的价值不在“能不能起来”，而在暴露文档里没写的依赖：备份放在哪、谁有权限取、恢复后连接串怎么改、Sentinel 要不要重新配置。</p>
+<p>如果用了 Sentinel，演练还要包含一次真实切换：手动 <code>SHUTDOWN</code> 主节点，观察切换是否在预期时间内完成、客户端是否自动重连、切换后丢了哪些写入。把“切换会丢最后若干条写入”变成团队共识，比在故障当天争论要不要接受丢失有用得多。</p>
+<h2 id="监控、决策矩阵与常见坑"><a href="#监控、决策矩阵与常见坑" class="headerlink" title="监控、决策矩阵与常见坑"></a>监控、决策矩阵与常见坑</h2><h3 id="该盯哪些指标"><a href="#该盯哪些指标" class="headerlink" title="该盯哪些指标"></a>该盯哪些指标</h3><p><code>INFO persistence</code> 是最直接的一屏：<code>rdb_last_bgsave_status</code> 与 <code>aof_last_write_status</code> 一旦不是 <code>ok</code>，说明落盘已经出问题；<code>rdb_last_bgsave_time_sec</code> 与 <code>rdb_last_cow_size</code> 反映快照成本；<code>aof_current_size</code> 与 <code>aof_base_size</code> 的比值能看出重写是否跟得上。<code>INFO stats</code> 里的 <code>latest_fork_usec</code> 是预测下一次延迟毛刺的最好依据。</p>
+<p>复制侧看 <code>INFO replication</code> 的 <code>master_link_status</code>、<code>master_last_io_seconds_ago</code>，以及主从 <code>master_repl_offset</code> 的差值。延迟持续增大通常不是网络问题，而是从节点在跑慢命令或者磁盘在排队。</p>
+<p>延迟本身用 <code>latency-monitor-threshold</code> 打开内置监控，再用 <code>LATENCY HISTORY</code> 与 <code>LATENCY DOCTOR</code> 看事件分布。它记录的是超过阈值的阻塞事件，比客户端侧的平均延迟更能定位 fork、fsync、过期键删除这类内部抖动。</p>
+<h3 id="一张选型矩阵"><a href="#一张选型矩阵" class="headerlink" title="一张选型矩阵"></a>一张选型矩阵</h3><p>下表按业务形态给出对照，数字是设计目标，不是承诺。</p>
+<table>
+<thead>
+<tr>
+<th>业务形态</th>
+<th>持久化</th>
+<th>拓扑</th>
+<th>必须配套的动作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>纯缓存，可回源</td>
+<td>可关闭，或只留 RDB</td>
+<td>主从或 Cluster</td>
+<td>淘汰策略、回源限流、缓存预热</td>
+</tr>
+<tr>
+<td>会话、验证码</td>
+<td>RDB</td>
+<td>主从加 Sentinel</td>
+<td>客户端支持 Sentinel、登录态可重建</td>
+</tr>
+<tr>
+<td>计数、排行榜、队列标记</td>
+<td>AOF everysec 或混合</td>
+<td>主从加 Sentinel</td>
+<td>对账任务、幂等消费、积压监控</td>
+</tr>
+<tr>
+<td>事实上的主存储</td>
+<td>混合持久化</td>
+<td>Cluster 或主从加 Sentinel</td>
+<td>异地备份、恢复演练、写入端补偿</td>
+</tr>
+</tbody></table>
+<h3 id="六个反复出现的坑"><a href="#六个反复出现的坑" class="headerlink" title="六个反复出现的坑"></a>六个反复出现的坑</h3><ul>
+<li>把复制当备份。副本上的数据是主节点写坏的、误删的，复制只会让错误多几份。</li>
+<li>主存储不开持久化。理由通常是“反正是内存数据库”，等重启后面对空实例才发现没有第二条路。</li>
+<li>忽略 fork 的内存峰值。快照期间 COW 把内存推到上限，触发 OOM Killer 杀掉 Redis。</li>
+<li>放任 AOF 增长。重写阈值调得过高，或者重写一直失败没人看，最后磁盘先满。</li>
+<li>以为切换不会丢数据。异步复制的窗口永远存在，切换只是把窗口内的写入变成永久丢失。</li>
+<li>从没做过恢复演练。文件大小正常、checksum 正常，却没人验证过它能不能加载，也没人量过恢复要多久。</li>
+</ul>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>持久化与高可用是两道不同的题：前者用 RDB、AOF 或混合持久化把 RPO 压到业务能接受的范围，后者用复制、Sentinel、Cluster 把 RTO 压到业务能接受的范围，任何一道题都不能替另一道题作答。RDB 适合备份与冷启动，AOF 适合把丢失窗口压到秒级，混合持久化在两者之间取得工程上最实用的平衡。选型时先给数据分角色，再定持久化方式与拓扑，最后用备份、监控和定期演练把承诺变成可验证的事实。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://redis.io/topics/persistence">Redis Persistence</a></li>
+<li><a href="https://redis.io/topics/replication">Redis Replication</a></li>
+<li><a href="https://redis.io/topics/sentinel">Redis Sentinel</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Redis 持久化与高可用方案</p><p><a href="https://987763485.github.io/2020/08/17/Redis持久化与高可用方案/">https://987763485.github.io/2020/08/17/Redis持久化与高可用方案/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2020-08-17</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/devops/">devops</a><a class="link-muted mr-2" rel="tag" href="/tags/docker/">docker</a><a class="link-muted mr-2" rel="tag" href="/tags/linux/">linux</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2020/08/22/%E7%BD%91%E7%BB%9C%E6%8A%93%E5%8C%85Wireshark%E5%AE%9E%E6%88%98/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">网络抓包：Wireshark 实战</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2020/08/15/Kubernetes%E6%9E%B6%E6%9E%84%E4%B8%8E%E7%BB%84%E4%BB%B6%E8%A7%A3%E6%9E%90/"><span class="level-item">Kubernetes 架构与组件解析</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

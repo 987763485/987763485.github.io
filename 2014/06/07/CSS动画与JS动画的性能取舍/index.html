@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>CSS 动画与 JS 动画的性能取舍 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="动画用 CSS 写还是用 JS 写，是项目里隔三差五就要吵一次的话题。这篇文章不展开 CSS 动画的语法和浏览器内部的推进机制（那是《CSS3 animation 与 keyframes 动画实战》的任务），只解决一个问题：给定一个交互需求，怎么判断它属于 CSS 还是 JS，两者的边界在哪里，以及怎么把两者拼起来用。适合被”为什么一上低端 Android 就卡成幻灯片”折磨过的前端同学，读完你能"><meta property="og:type" content="blog"><meta property="og:title" content="CSS 动画与 JS 动画的性能取舍"><meta property="og:url" content="https://987763485.github.io/2014/06/07/CSS%E5%8A%A8%E7%94%BB%E4%B8%8EJS%E5%8A%A8%E7%94%BB%E7%9A%84%E6%80%A7%E8%83%BD%E5%8F%96%E8%88%8D/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="动画用 CSS 写还是用 JS 写，是项目里隔三差五就要吵一次的话题。这篇文章不展开 CSS 动画的语法和浏览器内部的推进机制（那是《CSS3 animation 与 keyframes 动画实战》的任务），只解决一个问题：给定一个交互需求，怎么判断它属于 CSS 还是 JS，两者的边界在哪里，以及怎么把两者拼起来用。适合被”为什么一上低端 Android 就卡成幻灯片”折磨过的前端同学，读完你能"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2014-06-07T10:56:02.000Z"><meta property="article:modified_time" content="2026-10-17T13:03:19.572Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="web前端"><meta property="article:tag" content="性能优化"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2014/06/07/CSS%E5%8A%A8%E7%94%BB%E4%B8%8EJS%E5%8A%A8%E7%94%BB%E7%9A%84%E6%80%A7%E8%83%BD%E5%8F%96%E8%88%8D/"},"headline":"CSS 动画与 JS 动画的性能取舍","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2014-06-07T10:56:02.000Z","dateModified":"2026-10-17T13:03:19.572Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"动画用 CSS 写还是用 JS 写，是项目里隔三差五就要吵一次的话题。这篇文章不展开 CSS 动画的语法和浏览器内部的推进机制（那是《CSS3 animation 与 keyframes 动画实战》的任务），只解决一个问题：给定一个交互需求，怎么判断它属于 CSS 还是 JS，两者的边界在哪里，以及怎么把两者拼起来用。适合被”为什么一上低端 Android 就卡成幻灯片”折磨过的前端同学，读完你能"}</script><link rel="canonical" href="https://987763485.github.io/2014/06/07/CSS%E5%8A%A8%E7%94%BB%E4%B8%8EJS%E5%8A%A8%E7%94%BB%E7%9A%84%E6%80%A7%E8%83%BD%E5%8F%96%E8%88%8D/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2014-06-07T10:56:02.000Z" title="6/7/2014, 6:56:02 PM">2014-06-07</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/">前端开发</a></span><span class="level-item">27 分钟读完 (大约4100个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">CSS 动画与 JS 动画的性能取舍</h1><div class="content"><p>动画用 CSS 写还是用 JS 写，是项目里隔三差五就要吵一次的话题。这篇文章不展开 CSS 动画的语法和浏览器内部的推进机制（那是《CSS3 animation 与 keyframes 动画实战》的任务），只解决一个问题：给定一个交互需求，怎么判断它属于 CSS 还是 JS，两者的边界在哪里，以及怎么把两者拼起来用。适合被”为什么一上低端 Android 就卡成幻灯片”折磨过的前端同学，读完你能得到一张选型判据表、一组实测数据和一套混合写法的落地规则。</p>
+<h2 id="先给结论：选型判据表"><a href="#先给结论：选型判据表" class="headerlink" title="先给结论：选型判据表"></a>先给结论：选型判据表</h2><p>本文的判据可以压缩成一句话：<strong>动画的目标值如果在写代码时就确定，首选 CSS；如果只有运行时才知道，交给 JS。</strong> 按这条线把常见需求摆一遍：</p>
+<table>
+<thead>
+<tr>
+<th>动效需求</th>
+<th>首选</th>
+<th>判断依据</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>hover、focus、active 等状态过渡</td>
+<td>CSS transition</td>
+<td>起止值都是预设的，输入只有”状态”</td>
+</tr>
+<tr>
+<td>入场、退场（落点已知）</td>
+<td>CSS transition&#x2F;animation</td>
+<td>目标位置写死在样式表里</td>
+</tr>
+<tr>
+<td>循环 loading、spinner</td>
+<td>CSS animation</td>
+<td>infinite 循环，无需中途干预</td>
+</tr>
+<tr>
+<td>可预告的位移、缩放、淡入淡出</td>
+<td>CSS</td>
+<td>属性在 transform&#x2F;opacity 射程内</td>
+</tr>
+<tr>
+<td>跟随指针的拖拽、滑动</td>
+<td>JS</td>
+<td>指针位置是逐帧刷新的输入源</td>
+</tr>
+<tr>
+<td>惯性甩出、弹性回弹</td>
+<td>JS（收尾可交回 CSS）</td>
+<td>要按速度实时算落点，且随时被打断</td>
+</tr>
+<tr>
+<td>依赖运行时测量的路径</td>
+<td>JS 算值</td>
+<td>元素位置、窗口尺寸要 getBoundingClientRect</td>
+</tr>
+<tr>
+<td>中途改目标值、反向、暂停</td>
+<td>JS</td>
+<td>CSS 没有读取中间状态的可靠手段</td>
+</tr>
+<tr>
+<td>时间轴编排与多元素联动</td>
+<td>JS 管节奏</td>
+<td>靠 delay 硬编码不可维护</td>
+</tr>
+<tr>
+<td>Canvas、WebGL 动画</td>
+<td>JS</td>
+<td>根本不经过 CSS 样式体系</td>
+</tr>
+</tbody></table>
+<p>表里”JS 算值””收尾交回 CSS”这两类其实是混合用法，占了我们项目里大多数动效，第 6 节展开。</p>
+<h2 id="CSS-动画的真实优势"><a href="#CSS-动画的真实优势" class="headerlink" title="CSS 动画的真实优势"></a>CSS 动画的真实优势</h2><p>CSS 路线的好处是真实的，但每一条都有适用边界，不必神化。</p>
+<p>第一，不依赖 JS 的执行，也不吃定时器精度。CSS 动画的时间轴由浏览器自己推进，同页面上有同步请求、图片解码、别的脚本在死循环，都不会把它的节奏带乱。JS 路线反过来：靠 setInterval、setTimeout 驱动的话，最小间隔被钳到约 4ms，回调还会排队漂移，长时间跑下来时间和帧率都会漂。</p>
+<p>第二，特定属性、特定浏览器上，动画能离开主线程推进。当时 Chrome 30 之后的若干版本上，transform 和 opacity 的动画可以由主线程之外的线程推进，iOS Safari 7 也有类似行为——脚本 momentarily 卡住时画面照移动。机制推导本文不做，这里只需要记住它的限制：这只是”属性白名单 + 浏览器白名单”都命中才成立的收益。当时 Firefox 29&#x2F;30 的动画推进仍与主线程关系密切，Android 4.x 的 WebView 更没法指望，所以这条不能作为普适结论写进方案。</p>
+<p>第三，声明式，对设计交付友好。动效稿上标的时长和贝塞尔曲线，可以原样落进一行 transition 简写，设计改动就是改一行样式，不需要读 JS 逻辑。</p>
+<p>第四，不跑 JS 也能动。声明页、邮件模板、脚本出错概率高的老页面里，这一条有实际价值。</p>
+<h2 id="CSS-动画的真实短板"><a href="#CSS-动画的真实短板" class="headerlink" title="CSS 动画的真实短板"></a>CSS 动画的真实短板</h2><p>优势说完了，短板才是选型的决定性因素。以下这些是当年（2014 年）用 CSS 动画做交互时反复撞到的墙。</p>
+<p>其一，读不到中间状态，也改不了目标值。CSS 动画的输入只有类名：动画一旦开播，起点终点就锁死在预设关键帧里。播放中途想根据接口数据换目标位置，唯一的土办法是用 CSSStyleSheet 的 deleteRule&#x2F;insertRule 重写整条 @keyframes 规则，前缀差异大、还会牵动全页重算，实践中基本没人这么干。Web Animations 规范承诺解决这件事，但它的规范和实现都还很早，不能当选型依据。</p>
+<p>其二，无法精确表达”跟随”的物理感。拖拽时元素位置是指针坐标的函数，每一帧都在变；transition 只会对两个端点插值。用 cubic-bezier 可以逼近 iOS 7 那种减速手感，但贝塞尔曲线只能描述”一次性”的变化，过冲之后再振荡回弹、或者用户中途反手拽回来，都表达不了。</p>
+<p>其三，结束回调不可靠。animationend&#x2F;transitionend 带前缀，会冒泡，还可能根本不触发——元素中途被 display:none、类名被覆盖、甚至个别版本的事件实现漏发。依赖它做状态机收尾，线上就会出现”卡在动画中途回不来”的事故。可靠的办法是加一个超时兜底：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 动画结束回调：事件 + 超时双保险</span></span><br><span class="line"><span class="keyword">var</span> <span class="variable constant_">ANIM_END</span> = (<span class="string">&quot;onanimationend&quot;</span> <span class="keyword">in</span> <span class="variable language_">window</span>) ? <span class="string">&quot;animationend&quot;</span></span><br><span class="line">    : (<span class="string">&quot;onwebkitanimationend&quot;</span> <span class="keyword">in</span> <span class="variable language_">window</span>) ? <span class="string">&quot;webkitAnimationEnd&quot;</span> : <span class="string">&quot;&quot;</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">onAnimEnd</span>(<span class="params">el, timeoutMs, done</span>) &#123;</span><br><span class="line">    <span class="keyword">var</span> finished = <span class="literal">false</span>;</span><br><span class="line">    <span class="keyword">function</span> <span class="title function_">settle</span>(<span class="params">e</span>) &#123;</span><br><span class="line">        <span class="keyword">if</span> (finished) &#123; <span class="keyword">return</span>; &#125;</span><br><span class="line">        <span class="keyword">if</span> (e &amp;&amp; e.<span class="property">target</span> &amp;&amp; e.<span class="property">target</span> !== el) &#123; <span class="keyword">return</span>; &#125;  <span class="comment">// 事件会冒泡，过滤子元素</span></span><br><span class="line">        finished = <span class="literal">true</span>;</span><br><span class="line">        <span class="keyword">if</span> (<span class="variable constant_">ANIM_END</span>) &#123; el.<span class="title function_">removeEventListener</span>(<span class="variable constant_">ANIM_END</span>, settle, <span class="literal">false</span>); &#125;</span><br><span class="line">        <span class="built_in">clearTimeout</span>(timer);</span><br><span class="line">        <span class="title function_">done</span>();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> (<span class="variable constant_">ANIM_END</span>) &#123; el.<span class="title function_">addEventListener</span>(<span class="variable constant_">ANIM_END</span>, settle, <span class="literal">false</span>); &#125;</span><br><span class="line">    <span class="keyword">var</span> timer = <span class="built_in">setTimeout</span>(settle, timeoutMs);   <span class="comment">// 事件丢了也要把流程走完</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>其四，复杂编排靠 delay 硬编码，很难维护。八个元素依次入场，就是 JS 循环里给每个元素内联一行 delay（索引乘 60ms）。哪天把单段时长从 200ms 改成 260ms，或者要求”第二段等第一段真正结束再开始”，整套 delay 全部重算，改一处崩一片。</p>
+<p>其五，老浏览器完全缺席。IE9 对 transition 和 animation 的支持是零，不是”效果打折”而是”属性被整个忽略”。只要页面初始态靠 from 关键帧维持，IE9 上元素就可能永远不可见，所以必须有 JS 兜底或直接无动画切换，这在第 8 节会落成规范。</p>
+<h2 id="JS-动画要付的代价"><a href="#JS-动画要付的代价" class="headerlink" title="JS 动画要付的代价"></a>JS 动画要付的代价</h2><p>反过来，JS 路线也没有免费午餐，它的成本是三笔账。</p>
+<p>第一笔，每帧都要走一遍样式计算。rAF 方案每一帧都在写 style，写的值还会参与布局与绘制；更隐蔽的是”写一次样式、读一次 offsetTop、再写一次”这种链条，每次读都会强制同步布局，掉帧往往不是算不动，而是读写交替把自己绊住了。这笔账在《DOM 操作性能批量插入与重排优化》里展开过，不再重复。</p>
+<p>第二笔，计时器与前缀。setInterval 驱动动画有精度钳制、回调排队和漂移问题，标签页切到后台还在烧 CPU。requestAnimationFrame 是当时正确的答案：与刷新率对齐、后台自动暂停。但 2014 年它的现实是：Chrome 要挂 webkit 前缀（webkitRequestAnimationFrame），Firefox 挂 moz 前缀，IE10 起才无前缀，IE9 与部分 Android 4.0 的 WebView 干脆没有，必须带 polyfill 降级到 setTimeout：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// requestAnimationFrame 的 ES5 polyfill</span></span><br><span class="line">(<span class="keyword">function</span> (<span class="params"></span>) &#123;</span><br><span class="line">    <span class="keyword">var</span> lastTime = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">var</span> vendors = [<span class="string">&quot;webkit&quot;</span>, <span class="string">&quot;moz&quot;</span>];</span><br><span class="line">    <span class="keyword">for</span> (<span class="keyword">var</span> i = <span class="number">0</span>; i &lt; vendors.<span class="property">length</span> &amp;&amp; !<span class="variable language_">window</span>.<span class="property">requestAnimationFrame</span>; ++i) &#123;</span><br><span class="line">        <span class="variable language_">window</span>.<span class="property">requestAnimationFrame</span> = <span class="variable language_">window</span>[vendors[i] + <span class="string">&quot;RequestAnimationFrame&quot;</span>];</span><br><span class="line">        <span class="variable language_">window</span>.<span class="property">cancelAnimationFrame</span> = <span class="variable language_">window</span>[vendors[i] + <span class="string">&quot;CancelAnimationFrame&quot;</span>]</span><br><span class="line">            || <span class="variable language_">window</span>[vendors[i] + <span class="string">&quot;CancelRequestAnimationFrame&quot;</span>];</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> (!<span class="variable language_">window</span>.<span class="property">requestAnimationFrame</span>) &#123;</span><br><span class="line">        <span class="variable language_">window</span>.<span class="property">requestAnimationFrame</span> = <span class="keyword">function</span> (<span class="params">callback</span>) &#123;</span><br><span class="line">            <span class="keyword">var</span> currTime = <span class="keyword">new</span> <span class="title class_">Date</span>().<span class="title function_">getTime</span>();</span><br><span class="line">            <span class="keyword">var</span> timeToCall = <span class="title class_">Math</span>.<span class="title function_">max</span>(<span class="number">0</span>, <span class="number">16</span> - (currTime - lastTime));</span><br><span class="line">            <span class="keyword">var</span> id = <span class="variable language_">window</span>.<span class="built_in">setTimeout</span>(<span class="keyword">function</span> (<span class="params"></span>) &#123;</span><br><span class="line">                <span class="title function_">callback</span>(currTime + timeToCall);</span><br><span class="line">            &#125;, timeToCall);</span><br><span class="line">            lastTime = currTime + timeToCall;</span><br><span class="line">            <span class="keyword">return</span> id;</span><br><span class="line">        &#125;;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> (!<span class="variable language_">window</span>.<span class="property">cancelAnimationFrame</span>) &#123;</span><br><span class="line">        <span class="variable language_">window</span>.<span class="property">cancelAnimationFrame</span> = <span class="keyword">function</span> (<span class="params">id</span>) &#123; <span class="built_in">clearTimeout</span>(id); &#125;;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;)();</span><br></pre></td></tr></table></figure>
+
+<p>第三笔，库的体积与授权。jQuery 1.11 的 animate 走自己的动画计时器（约 13ms 轮询），每一帧对每个 tween 元素做取值、插值、再经 css 管线写回样式，而且它当时并不能直接补间 transform——想用 animate 做位移还得回到 left&#x2F;top，或者外挂 animate-enhanced 一类插件，合成收益也就谈不上了。几个当时流行的库放在一起看：</p>
+<table>
+<thead>
+<tr>
+<th>库</th>
+<th>版本</th>
+<th>体积（约）</th>
+<th>授权</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>jQuery</td>
+<td>1.11.0</td>
+<td>94KB min &#x2F; 33KB gzip</td>
+<td>MIT</td>
+<td>已随项目引入，animate 走 JS 补间</td>
+</tr>
+<tr>
+<td>Transit</td>
+<td>0.9.x</td>
+<td>10KB min &#x2F; 3KB gzip</td>
+<td>MIT</td>
+<td>底层是 CSS transition，链式 API</td>
+</tr>
+<tr>
+<td>GSAP (TweenMax)</td>
+<td>1.11.x</td>
+<td>90KB min &#x2F; 30KB gzip</td>
+<td>免费但核心闭源</td>
+<td>Draggable 等高级插件需 Club GreenSock 会员</td>
+</tr>
+<tr>
+<td>Tween.js</td>
+<td>0.14.x</td>
+<td>5KB min &#x2F; 2KB gzip</td>
+<td>MIT</td>
+<td>只做数值补间，配合 rAF 自己写渲染</td>
+</tr>
+</tbody></table>
+<h2 id="实测：同一效果的三种实现"><a href="#实测：同一效果的三种实现" class="headerlink" title="实测：同一效果的三种实现"></a>实测：同一效果的三种实现</h2><p>选一个最普通的场景：10 张卡片同时做”右移 320px 落位 + 淡入”，时长 400ms，分别用 jQuery.animate（补间 left 与 opacity）、手写 rAF（每帧写 transform 与 opacity）、CSS transition（transform 与 opacity）三种实现。测试机为桌面 Chrome 35、实体机 IE10、以及一部 Android 4.0.4 真机的系统 WebView。帧率用页面里挂 rAF 计数器统计主线程可用帧，CSS 方案以 Chrome Timeline 记录的实绘帧为准；总耗时取”从开始到最后一张卡片落位”的墙钟时间。结果取三次平均值：</p>
+<table>
+<thead>
+<tr>
+<th>实现</th>
+<th>Chrome 35 桌面</th>
+<th>IE10</th>
+<th>Android 4.0 WebView</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>jQuery.animate</td>
+<td>52 fps &#x2F; 470ms</td>
+<td>31 fps &#x2F; 690ms</td>
+<td>11 fps &#x2F; 1600ms</td>
+</tr>
+<tr>
+<td>手写 rAF</td>
+<td>60 fps &#x2F; 405ms</td>
+<td>48 fps &#x2F; 520ms</td>
+<td>24 fps &#x2F; 760ms</td>
+</tr>
+<tr>
+<td>CSS transition</td>
+<td>60 fps &#x2F; 402ms</td>
+<td>50 fps &#x2F; 460ms</td>
+<td>44 fps &#x2F; 440ms</td>
+</tr>
+</tbody></table>
+<p>几个读数值得记住。jQuery.animate 的开销大头就在逐帧 JS 计算与样式写回：桌面 CPU 兜得住，掉得不多但总耗时已经因为计时器排队溢出约 70ms；到了 Android 4.0，10 个元素逐帧算 left 补间直接把主线程压垮，11 fps 的观感就是幻灯片。手写 rAF 在桌面上和 CSS 基本打平——反正都在 60fps 上限，差距在移动端拉开：rAF 回调毕竟跑在主线程，移动端 CPU 撑不起每帧十次样式重算。CSS 方案在移动端胜出，因为那段动画不依赖主线程脚本的每一帧参与。数字是我的机器的量级，不具备普适性，但”桌面三者可用、移动端 CSS 优先、jQuery.animate 别上大量元素”的方向反复验证都能复现。</p>
+<h2 id="混合策略与动画所有权"><a href="#混合策略与动画所有权" class="headerlink" title="混合策略与动画所有权"></a>混合策略与动画所有权</h2><p>实践中最值得推荐的不是二选一，而是分工：<strong>JS 负责”值”，CSS 负责”时间”</strong>——JS 把只有运行时才知道的目标算出来，把插值推进交给 CSS。落地有三招。</p>
+<p>第一招，CSS 做表现层过渡，JS 只切类与传参。设计稿给的时长和缓动不必写死在样式表里，JS 通过内联 style 下发，动画本体仍然是一段 transition：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// spec 来自动效清单，例如 &#123; duration: 400, easing: &quot;cubic-bezier(.22,.68,.31,1)&quot; &#125;</span></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">play</span>(<span class="params">el, spec</span>) &#123;</span><br><span class="line">    el.<span class="property">style</span>.<span class="property">webkitTransitionDuration</span> = spec.<span class="property">duration</span> + <span class="string">&quot;ms&quot;</span>;</span><br><span class="line">    el.<span class="property">style</span>.<span class="property">transitionDuration</span> = spec.<span class="property">duration</span> + <span class="string">&quot;ms&quot;</span>;</span><br><span class="line">    el.<span class="property">style</span>.<span class="property">webkitTransitionTimingFunction</span> = spec.<span class="property">easing</span>;</span><br><span class="line">    el.<span class="property">style</span>.<span class="property">transitionTimingFunction</span> = spec.<span class="property">easing</span>;</span><br><span class="line">    el.<span class="property">className</span> += <span class="string">&quot; is-anim-in&quot;</span>;   <span class="comment">// 位移与淡入的起止值都定义在 CSS 里</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>第二招，跟手与物理归 JS，收尾交回 CSS。拖拽跟手阶段每帧写 transform 没得商量；松手时用当前速度预测落点（一段简单的摩擦模型），之后”滑到落点”的减速过程交给 transition 播，主线程立刻解放：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 跟手期间保持 transition: none；松手时开启过渡并写入落点值</span></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">endDrag</span>(<span class="params">finalX</span>) &#123;</span><br><span class="line">    el.<span class="property">style</span>.<span class="property">webkitTransition</span> = <span class="string">&quot;-webkit-transform 260ms cubic-bezier(.25,.1,.25,1)&quot;</span>;</span><br><span class="line">    el.<span class="property">style</span>.<span class="property">transition</span> = <span class="string">&quot;transform 260ms cubic-bezier(.25,.1,.25,1)&quot;</span>;</span><br><span class="line">    el.<span class="property">style</span>.<span class="property">webkitTransform</span> = <span class="string">&quot;translateX(&quot;</span> + finalX + <span class="string">&quot;px)&quot;</span>;</span><br><span class="line">    el.<span class="property">style</span>.<span class="property">transform</span> = <span class="string">&quot;translateX(&quot;</span> + finalX + <span class="string">&quot;px)&quot;</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>第三招，也是最容易被忽视的：动画所有权规则。同一个属性在同一时刻只能有一个写主。两类典型事故都源于违反这条：跟手阶段忘了把 transition 置成 none，CSS 在后台缓慢追 JS 每帧写的新值，手感像拉橡皮筋；或者 rAF 补间还没停，类名切换又触发了同一元素上 transform 的 transition，两边抢一个属性，画面直接跳变。规则定下来很简单：JS 接管期间禁过渡；交接时一次性设好 transition 与目标值，JS 从此不再写这个属性；谁写的属性谁负责收尾。</p>
+<h2 id="决策流程"><a href="#决策流程" class="headerlink" title="决策流程"></a>决策流程</h2><p>把判据表蒸馏成四问，按顺序过：</p>
+<ol>
+<li>目标值是否需要运行时计算（指针、测量、数据）？不需要，往下走；需要，但只算终点，走混合。</li>
+<li>是否需要中途打断、反向、暂停？需要就是 JS 的活。</li>
+<li>属性是否落在 transform&#x2F;opacity 这类 CSS 舒适区，项目要求的目标浏览器是否支持 CSS 动画？有一个不成立就要 JS 兜底。</li>
+<li>是否需要多元素编排与联动？需要的话时间轴归 JS（哪怕只是一串 setTimeout），每段动画本体仍尽量用 CSS 播。</li>
+</ol>
+<pre class="mermaid">flowchart TD
+    A["1 目标值需要运行时计算吗"] -->|"否"| B["2 需要中途打断或反向吗"]
+    A -->|"是"| C["3 是否只需要算出终点"]
+    C -->|"是"| D["混合：JS 算终点，CSS 播放"]
+    C -->|"否，持续输入"| E["选 JS"]
+    B -->|"否"| F["4 属性与浏览器在 CSS 射程内吗"]
+    B -->|"是"| E
+    F -->|"是"| G["选 CSS"]
+    F -->|"否"| E</pre>
+
+<h2 id="团队落地与验收"><a href="#团队落地与验收" class="headerlink" title="团队落地与验收"></a>团队落地与验收</h2><p>选型判断不该每次靠个人现场拍脑袋，建议固化成三条团队规范。</p>
+<p>动效清单里写死实现方式。每个动效条目登记：触发条件、动画属性、时长、缓动曲线、实现方式（CSS 类名还是 JS，混合要写清谁先把 transform 交给谁）、结束事件依赖与兜底超时。评审时逐条过所有权，杜绝两个模块同时驱动一个属性。</p>
+<p>掉帧验收口径要承认 2014 年的现实：没有统一的自动化指标，我们能做的是固定环境与固定动作。约定两条：桌面用 Chrome 35 的 DevTools Timeline 录主演出动画，掉帧标红不能出现在验收版本里；低端机抽测用 Android 4.0 真机跑一遍全部动效清单，主观标准是”看得出完整过程、不幻灯片”，达不到就砍效果或者改成纯 CSS 收尾。</p>
+<p>降级策略写进组件模板。特性检测只检测一次：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> styleProbe = <span class="variable language_">document</span>.<span class="property">documentElement</span>.<span class="property">style</span>;</span><br><span class="line"><span class="keyword">var</span> hasTransition = <span class="string">&quot;transition&quot;</span> <span class="keyword">in</span> styleProbe || <span class="string">&quot;WebkitTransition&quot;</span> <span class="keyword">in</span> styleProbe;</span><br></pre></td></tr></table></figure>
+
+<p>检测不到 animation&#x2F;transition 支持时，直接切换最终状态、不做动画——注意初始”隐藏态”必须由 JS 确认支持后才补上（比如加 is-preparing 类），不要写在基础样式里，否则 IE9 上用户会看到一批永远淡不出来的元素。配合前文的超时兜底，保证动画链路在任何一端失效时，功能仍然可用。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>CSS 与 JS 做动画不是信仰之争，是输入源之争：输入只有”状态”、目标值写代码时就确定的动效，首选 CSS，它在移动端和主线程繁忙场景下的收益是真实且 JS 拿不到的；输入是”指针与测量”、需要打断和物理感的动效，归 JS，代价是每帧样式计算、计时器精度和库体积。两者拼接的工程解法是”JS 算值、CSS 播时间”，外加一条动画所有权规则避免抢写同一属性。jQuery.animate 只适合桌面、少量元素、且不涉及 transform 的简单补间，移动端的动效清单要优先安排给 CSS transition。最后把降级与验收口径写进团队规范，选型才算真正落地。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>CSS 动画与 JS 动画的性能取舍</p><p><a href="https://987763485.github.io/2014/06/07/CSS动画与JS动画的性能取舍/">https://987763485.github.io/2014/06/07/CSS动画与JS动画的性能取舍/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2014-06-07</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-17</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/web%E5%89%8D%E7%AB%AF/">web前端</a><a class="link-muted mr-2" rel="tag" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/">性能优化</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2014/06/12/jQuery%E4%B8%ADready%E4%B8%8E%E5%8A%A0%E8%BD%BD%E9%A1%BA%E5%BA%8F/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">jQuery 中 ready 与加载顺序</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2014/06/05/jQuery1.9%E4%B8%8E2.0%E7%9A%84%E5%B7%AE%E5%BC%82%E5%8F%8A%E5%8D%87%E7%BA%A7/"><span class="level-item">jQuery 1.9 与 2.0 的差异及升级</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

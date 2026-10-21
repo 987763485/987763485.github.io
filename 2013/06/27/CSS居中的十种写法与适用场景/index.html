@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>CSS 居中的十种写法与适用场景 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="居中大概是 CSS 里被问得最多的问题，也是新手最容易栽跟头的地方。同一个「把盒子放中间」的需求，能写出十几种写法，而每一种都有自己的前提条件和浏览器边界。本文把这十种做法按「水平、垂直、双向」分类讲透，每种都给出适用场景、优缺点和当时的浏览器兼容情况。需要提前说明的是，本文写于 2013 年，Flexbox 刚有现代语法、calc() 刚刚铺开，文中所有结论都以那个年代的环境为准。"><meta property="og:type" content="blog"><meta property="og:title" content="CSS 居中的十种写法与适用场景"><meta property="og:url" content="https://987763485.github.io/2013/06/27/CSS%E5%B1%85%E4%B8%AD%E7%9A%84%E5%8D%81%E7%A7%8D%E5%86%99%E6%B3%95%E4%B8%8E%E9%80%82%E7%94%A8%E5%9C%BA%E6%99%AF/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="居中大概是 CSS 里被问得最多的问题，也是新手最容易栽跟头的地方。同一个「把盒子放中间」的需求，能写出十几种写法，而每一种都有自己的前提条件和浏览器边界。本文把这十种做法按「水平、垂直、双向」分类讲透，每种都给出适用场景、优缺点和当时的浏览器兼容情况。需要提前说明的是，本文写于 2013 年，Flexbox 刚有现代语法、calc() 刚刚铺开，文中所有结论都以那个年代的环境为准。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2013-06-27T03:46:18.000Z"><meta property="article:modified_time" content="2026-10-17T09:51:48.850Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="web前端"><meta property="article:tag" content="css3"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2013/06/27/CSS%E5%B1%85%E4%B8%AD%E7%9A%84%E5%8D%81%E7%A7%8D%E5%86%99%E6%B3%95%E4%B8%8E%E9%80%82%E7%94%A8%E5%9C%BA%E6%99%AF/"},"headline":"CSS 居中的十种写法与适用场景","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2013-06-27T03:46:18.000Z","dateModified":"2026-10-17T09:51:48.850Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"居中大概是 CSS 里被问得最多的问题，也是新手最容易栽跟头的地方。同一个「把盒子放中间」的需求，能写出十几种写法，而每一种都有自己的前提条件和浏览器边界。本文把这十种做法按「水平、垂直、双向」分类讲透，每种都给出适用场景、优缺点和当时的浏览器兼容情况。需要提前说明的是，本文写于 2013 年，Flexbox 刚有现代语法、calc() 刚刚铺开，文中所有结论都以那个年代的环境为准。"}</script><link rel="canonical" href="https://987763485.github.io/2013/06/27/CSS%E5%B1%85%E4%B8%AD%E7%9A%84%E5%8D%81%E7%A7%8D%E5%86%99%E6%B3%95%E4%B8%8E%E9%80%82%E7%94%A8%E5%9C%BA%E6%99%AF/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2013-06-27T03:46:18.000Z" title="6/27/2013, 11:46:18 AM">2013-06-27</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/">前端开发</a></span><span class="level-item">1 小时读完 (大约7067个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">CSS 居中的十种写法与适用场景</h1><nav class="series-nav" aria-label="系列文章导航"><div class="series-nav-meta"><i class="fas fa-book-open" aria-hidden="true"></i><span>本文属于《<a class="series-nav-title" href="/series/html-css/">HTML 与 CSS</a>》第 25/62 篇</span></div><div class="series-nav-links"><a class="series-nav-link series-nav-prev" href="/2015/05/29/CSS%E5%91%BD%E5%90%8D%E8%A7%84%E8%8C%83%E4%B8%8EBEM%E6%80%9D%E6%83%B3%E5%AE%9E%E8%B7%B5/"><i class="fas fa-chevron-left" aria-hidden="true"></i><span>上一篇</span></a><a class="series-nav-link series-nav-index" href="/series/html-css/">系列目录</a><a class="series-nav-link series-nav-next" href="/2013/12/04/CSS%E5%AE%9E%E7%8E%B0%E8%87%AA%E9%80%82%E5%BA%94%E7%AD%89%E9%AB%98%E5%88%97%E5%B8%83%E5%B1%80/"><span>下一篇</span><i class="fas fa-chevron-right" aria-hidden="true"></i></a></div></nav><div class="content"><p>居中大概是 CSS 里被问得最多的问题，也是新手最容易栽跟头的地方。同一个「把盒子放中间」的需求，能写出十几种写法，而每一种都有自己的前提条件和浏览器边界。本文把这十种做法按「水平、垂直、双向」分类讲透，每种都给出适用场景、优缺点和当时的浏览器兼容情况。需要提前说明的是，本文写于 2013 年，Flexbox 刚有现代语法、<code>calc()</code> 刚刚铺开，文中所有结论都以那个年代的环境为准。</p>
+<h2 id="为什么居中这么麻烦"><a href="#为什么居中这么麻烦" class="headerlink" title="为什么居中这么麻烦"></a>为什么居中这么麻烦</h2><p>CSS 的盒模型决定了：默认情况下，块级元素撑满父容器的宽度，行内元素跟随内容流动。所谓居中，本质上是在打破这种默认的流动方向，让元素在某个轴上回到中点。</p>
+<p>水平居中相对简单，因为块级元素有确定的宽度基准（父容器的 content box），<code>margin: auto</code> 就是为这个设计的。垂直居中麻烦得多，因为 CSS 2.1 的垂直布局是基于行盒与 <code>vertical-align</code> 的，而 <code>vertical-align</code> 只在表格单元格和行内上下文里有效，对普通块级元素无能为力。这个设计上的不对称，是垂直居中方案特别多的根本原因。</p>
+<p>另一个背景是浏览器碎片化。2013 年的现实是 IE6 到 IE10 并存，Firefox 与 Chrome 迭代迅速，一套代码要在四五种内核里都对，很多理论上优雅的方案就被兼容性卡死了。所以本文的每一种写法都会附上兼容表，选型时先看表，再看优劣。</p>
+<p>还有一个容易被忽略的前提：居中对象的类型。同样是「把一个 div 放中间」，这个 div 可能是定宽的、可能是自适应的、可能是脱离文档流的浮层、也可能只是一个行内元素，前提不同，可选方案立即少掉一半。本文的组织方式就是先按「水平、垂直、双向」把问题域切开，再在每个子域里按「是否要求定宽」细分，读者遇到具体需求时可以直接跳到对应小节。</p>
+<h2 id="一、text-align-center（水平居中）"><a href="#一、text-align-center（水平居中）" class="headerlink" title="一、text-align: center（水平居中）"></a>一、text-align: center（水平居中）</h2><p>最古老的方案，只对行内内容有效。给父容器设置 <code>text-align: center</code>，其中的文本、行内元素、<code>inline-block</code> 元素就会水平居中。</p>
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="selector-class">.parent</span> &#123;</span><br><span class="line">    <span class="attribute">text-align</span>: center;      <span class="comment">/* 作用于行内级别的内容 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>适用场景：段落文本居中、按钮组（多个 <code>inline-block</code> 的按钮并排且整体居中）、图标与文字混排的居中。</p>
+<p>优点是零成本、全兼容、不影响布局流。缺点是会继承，父容器里所有的行内内容都被居中，如果内部还有左对齐的模块需要逐个 <code>text-align: left</code> 覆盖；另外它无法让块级子元素自身居中。</p>
+<p>兼容表：</p>
+<table>
+<thead>
+<tr>
+<th>浏览器</th>
+<th>支持情况</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>IE 6&#x2F;7&#x2F;8</td>
+<td>支持</td>
+</tr>
+<tr>
+<td>IE 9</td>
+<td>支持</td>
+</tr>
+<tr>
+<td>Firefox</td>
+<td>支持</td>
+</tr>
+<tr>
+<td>Chrome</td>
+<td>支持</td>
+</tr>
+</tbody></table>
+<p>注意 IE6 到 IE8 对 <code>text-align: center</code> 的处理有一致性，但 <code>text-align: justify</code> 等值在老 IE 上有 bug，与本题无关。</p>
+<h2 id="二、margin-0-auto（水平居中）"><a href="#二、margin-0-auto（水平居中）" class="headerlink" title="二、margin: 0 auto（水平居中）"></a>二、margin: 0 auto（水平居中）</h2><p>这是块级元素水平居中的标准做法。给元素自身设置左右外边距为 <code>auto</code>，浏览器会自动平分剩余空间。</p>
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="selector-class">.child</span> &#123;</span><br><span class="line">    <span class="attribute">width</span>: <span class="number">320px</span>;            <span class="comment">/* 必须有确定宽度，否则 auto 计算为 0 */</span></span><br><span class="line">    <span class="attribute">margin</span>: <span class="number">0</span> auto;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>适用场景：定宽的内容区块，如文章正文、固定宽度的侧边栏、居中的表单。</p>
+<p>关键前提是元素必须有明确宽度。如果 <code>width: auto</code>，块级元素本来就会撑满父容器，剩余空间为 0，<code>auto</code> 无意义。另一个前提是父容器的宽度要大于子元素，否则 auto 同样算不出正值。</p>
+<p>优点是完全标准、全兼容、性能好。缺点是只能做水平，且需要预先知道宽度。对于需要响应式的内容，宽度不能用固定值，此时要配合 <code>max-width</code> 使用。</p>
+<p>兼容表：</p>
+<table>
+<thead>
+<tr>
+<th>浏览器</th>
+<th>支持情况</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>IE 6&#x2F;7&#x2F;8</td>
+<td>支持（IE6 需确认没有触发 hasLayout 问题）</td>
+</tr>
+<tr>
+<td>IE 9</td>
+<td>支持</td>
+</tr>
+<tr>
+<td>Firefox</td>
+<td>支持</td>
+</tr>
+<tr>
+<td>Chrome</td>
+<td>支持</td>
+</tr>
+</tbody></table>
+<p>这里有一个经典的 IE6 坑：当元素同时设置了 <code>margin: 0 auto</code> 且触发了 IE6 的双倍外边距 bug（通常是元素同时被浮动或设置了 margin），居中会失效并伴随边距翻倍。规避办法是给元素加 <code>zoom: 1</code> 触发 hasLayout，或者改用外层再包一层定宽容器。</p>
+<h2 id="三、position-负-margin（双向居中）"><a href="#三、position-负-margin（双向居中）" class="headerlink" title="三、position + 负 margin（双向居中）"></a>三、position + 负 margin（双向居中）</h2><p>在 Flexbox 之前，这是双向居中兼容性最好的方案。子元素绝对定位，<code>top: 50%; left: 50%</code>，再用负的 <code>margin-top</code> 与 <code>margin-left</code> 把元素往回拉自身宽高的一半。</p>
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="selector-class">.parent</span> &#123;</span><br><span class="line">    <span class="attribute">position</span>: relative;      <span class="comment">/* 建立定位上下文 */</span></span><br><span class="line">    <span class="attribute">height</span>: <span class="number">400px</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="selector-class">.child</span> &#123;</span><br><span class="line">    <span class="attribute">position</span>: absolute;</span><br><span class="line">    <span class="attribute">top</span>: <span class="number">50%</span>;</span><br><span class="line">    <span class="attribute">left</span>: <span class="number">50%</span>;</span><br><span class="line">    <span class="attribute">width</span>: <span class="number">200px</span>;</span><br><span class="line">    <span class="attribute">height</span>: <span class="number">120px</span>;</span><br><span class="line">    <span class="attribute">margin-top</span>: -<span class="number">60px</span>;       <span class="comment">/* 自身高度的一半 */</span></span><br><span class="line">    <span class="attribute">margin-left</span>: -<span class="number">100px</span>;     <span class="comment">/* 自身宽度的一半 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>适用场景：需要支持 IE6 的弹窗、居中浮层、图片灯箱的居中容器。</p>
+<p>优点是全兼容，IE6 也能正常工作，且不依赖父元素的内容高度。缺点是必须知道元素的宽高，一旦内容是动态的，负 margin 就得用 JS 量；另外绝对定位会使元素脱离文档流，父容器如果没有其他内容，高度会塌陷，需要额外撑高。</p>
+<p>兼容表：</p>
+<table>
+<thead>
+<tr>
+<th>浏览器</th>
+<th>支持情况</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>IE 6&#x2F;7&#x2F;8</td>
+<td>支持</td>
+</tr>
+<tr>
+<td>IE 9</td>
+<td>支持</td>
+</tr>
+<tr>
+<td>Firefox</td>
+<td>支持</td>
+</tr>
+<tr>
+<td>Chrome</td>
+<td>支持</td>
+</tr>
+</tbody></table>
+<h2 id="四、position-margin-auto（top-right-bottom-left-0-margin-auto）"><a href="#四、position-margin-auto（top-right-bottom-left-0-margin-auto）" class="headerlink" title="四、position + margin: auto（top&#x2F;right&#x2F;bottom&#x2F;left: 0 + margin: auto）"></a>四、position + margin: auto（top&#x2F;right&#x2F;bottom&#x2F;left: 0 + margin: auto）</h2><p>这是上一个方案的改良版，也是很多人不知道的技巧。CSS 2.1 规定：当一个绝对定位元素四个方向偏移量都为 0 且宽高确定、<code>margin</code> 为 <code>auto</code> 时，浏览器会把剩余空间平分给四个方向的 margin，元素自然落在正中间。</p>
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="selector-class">.parent</span> &#123;</span><br><span class="line">    <span class="attribute">position</span>: relative;</span><br><span class="line">    <span class="attribute">height</span>: <span class="number">400px</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="selector-class">.child</span> &#123;</span><br><span class="line">    <span class="attribute">position</span>: absolute;</span><br><span class="line">    <span class="attribute">top</span>: <span class="number">0</span>;</span><br><span class="line">    <span class="attribute">right</span>: <span class="number">0</span>;</span><br><span class="line">    <span class="attribute">bottom</span>: <span class="number">0</span>;</span><br><span class="line">    <span class="attribute">left</span>: <span class="number">0</span>;</span><br><span class="line">    <span class="attribute">width</span>: <span class="number">200px</span>;</span><br><span class="line">    <span class="attribute">height</span>: <span class="number">120px</span>;</span><br><span class="line">    <span class="attribute">margin</span>: auto;            <span class="comment">/* 四边平分剩余空间 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>适用场景：与负 margin 方案相同，但元素宽高动态时更优——不需要写死一半的数值，用 JS 改 <code>width</code>&#x2F;<code>height</code> 即可，margin 保持 <code>auto</code> 不用动。</p>
+<p>优点是代码更简洁、宽高变化时无需同步修改 margin。缺点是 IE6 与 IE7 不支持这种平分行为，它们会把 <code>margin: auto</code> 计算为 0，元素贴在左上角。所以 2013 年如果客户要求兼容 IE6，这个方案只能作为增强。</p>
+<p>兼容表：</p>
+<table>
+<thead>
+<tr>
+<th>浏览器</th>
+<th>支持情况</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>IE 6&#x2F;7</td>
+<td>不支持（居中失效，贴左上角）</td>
+</tr>
+<tr>
+<td>IE 8</td>
+<td>支持</td>
+</tr>
+<tr>
+<td>IE 9</td>
+<td>支持</td>
+</tr>
+<tr>
+<td>Firefox</td>
+<td>支持</td>
+</tr>
+<tr>
+<td>Chrome</td>
+<td>支持</td>
+</tr>
+</tbody></table>
+<h2 id="五、display-table-cell-vertical-align-middle（垂直居中）"><a href="#五、display-table-cell-vertical-align-middle（垂直居中）" class="headerlink" title="五、display: table-cell + vertical-align: middle（垂直居中）"></a>五、display: table-cell + vertical-align: middle（垂直居中）</h2><p>利用表格单元格的垂直对齐能力。把父容器设为 <code>display: table-cell</code>，<code>vertical-align: middle</code> 就能让其中的行内内容和 <code>inline-block</code> 子元素垂直居中。</p>
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="selector-class">.parent</span> &#123;</span><br><span class="line">    <span class="attribute">display</span>: table-cell;</span><br><span class="line">    <span class="attribute">vertical-align</span>: middle;  <span class="comment">/* 表格单元格特性 */</span></span><br><span class="line">    <span class="attribute">width</span>: <span class="number">400px</span>;</span><br><span class="line">    <span class="attribute">height</span>: <span class="number">300px</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="selector-class">.child</span> &#123;</span><br><span class="line">    <span class="attribute">display</span>: inline-block;   <span class="comment">/* 或保持行内内容 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>适用场景：不定高的文字块垂直居中、导航项、需要同时支持 IE6 的垂直居中。</p>
+<p>优点是兼容性极好，IE6 到 IE8 都支持 <code>display: table-cell</code>，且不需要知道子元素高度。缺点是父容器变成表格单元格后会丢失一些块级特性：不能同时使用 <code>margin: auto</code> 做水平居中（要用 <code>text-align: center</code> 替代），宽度行为变得像表格一样收缩，且 <code>table-cell</code> 元素不能设置 <code>position: relative</code> 之外的某些属性。另外，如果不加 <code>display: table</code> 的外层包裹，单元格宽度会依赖上下文。</p>
+<p>实践中通常写成三层结构：</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">div</span> <span class="attr">class</span>=<span class="string">&quot;wrapper&quot;</span>&gt;</span>        <span class="comment">&lt;!-- display: table --&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">div</span> <span class="attr">class</span>=<span class="string">&quot;cell&quot;</span>&gt;</span>       <span class="comment">&lt;!-- display: table-cell; vertical-align: middle --&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">div</span> <span class="attr">class</span>=<span class="string">&quot;content&quot;</span>&gt;</span>内容<span class="tag">&lt;/<span class="name">div</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;/<span class="name">div</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">div</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="selector-class">.wrapper</span> &#123;</span><br><span class="line">    <span class="attribute">display</span>: table;</span><br><span class="line">    <span class="attribute">width</span>: <span class="number">100%</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="selector-class">.cell</span> &#123;</span><br><span class="line">    <span class="attribute">display</span>: table-cell;</span><br><span class="line">    <span class="attribute">vertical-align</span>: middle;</span><br><span class="line">    <span class="attribute">text-align</span>: center;      <span class="comment">/* 配合做水平居中 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>关于 <code>vertical-align</code> 的取值需要多说几句，因为它决定了居中的参照。<code>middle</code> 的含义是「元素的垂直中点与父容器基线加上父容器 x-height 一半的位置对齐」，而不是与父容器的几何中心对齐。这个区别在文字场景下几乎看不出来，但在子元素是一个有明确高度的盒子时，会出现「看起来偏了几个像素」的现象。此时可以改用 <code>vertical-align: bottom</code> 配合负 margin，或者干脆换 Flexbox，避免在语义模糊的对齐方式上反复试。</p>
+<p>表格方案还有一个少有人用的衍生技巧：把 <code>display: table-cell</code> 换成 <code>display: table-row</code>，或者利用表格的 <code>caption-side</code>，可以做出一些特殊的对齐效果。但这些都属于表格模型的边角，实际项目里不如直接记 <code>table-cell</code> 一个值。</p>
+<p>兼容表：</p>
+<table>
+<thead>
+<tr>
+<th>浏览器</th>
+<th>支持情况</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>IE 6&#x2F;7&#x2F;8</td>
+<td>支持</td>
+</tr>
+<tr>
+<td>IE 9</td>
+<td>支持</td>
+</tr>
+<tr>
+<td>Firefox</td>
+<td>支持</td>
+</tr>
+<tr>
+<td>Chrome</td>
+<td>支持</td>
+</tr>
+</tbody></table>
+<h2 id="六、line-height-等于容器高度（单行文本垂直居中）"><a href="#六、line-height-等于容器高度（单行文本垂直居中）" class="headerlink" title="六、line-height 等于容器高度（单行文本垂直居中）"></a>六、line-height 等于容器高度（单行文本垂直居中）</h2><p>如果只是单行文字垂直居中，最简单的办法是让 <code>line-height</code> 等于父容器高度。行盒的高度由 <code>line-height</code> 决定，文字基线落在行盒中部，视觉上就是垂直居中。</p>
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="selector-class">.parent</span> &#123;</span><br><span class="line">    <span class="attribute">height</span>: <span class="number">40px</span>;</span><br><span class="line">    <span class="attribute">line-height</span>: <span class="number">40px</span>;       <span class="comment">/* 与高度相等 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>适用场景：按钮文字、单行的标题栏、导航项、表格里的单行单元格文字。</p>
+<p>优点是极其简单、全兼容、性能最好。缺点是只适用于单行文本，一旦文字换行就会溢出；另外这个方案让行盒和容器等高，如果后续要加 <code>padding</code>，需要同步调整 <code>line-height</code>，维护起来略别扭。对中文还有一点要注意：不同字体的基线与 ascent&#x2F;descent 比例不同，同样 <code>line-height</code> 下文字的视觉中心可能有 1px 到 2px 的偏差，要求像素级精确时建议用Flexbox 或表格方案兜底。</p>
+<p>这里补充一个变体：如果容器高度不确定但希望单行文字垂直居中，可以把 <code>height</code> 换成 <code>padding</code>，用上下内边距撑开容器，此时 <code>line-height</code> 保持一个固定值（比如 20px）即可。这种做法在表单控件和按钮里极其常见，因为它不依赖任何 magic number 之外的高度。</p>
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="selector-class">.btn</span> &#123;</span><br><span class="line">    <span class="attribute">padding</span>: <span class="number">9px</span> <span class="number">16px</span>;          <span class="comment">/* 用 padding 撑高度，不写死 height */</span></span><br><span class="line">    <span class="attribute">line-height</span>: <span class="number">20px</span>;          <span class="comment">/* 文字行高固定，容器随 padding 伸缩 */</span></span><br><span class="line">    <span class="attribute">text-align</span>: center;         <span class="comment">/* 水平居中 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>兼容表：</p>
+<table>
+<thead>
+<tr>
+<th>浏览器</th>
+<th>支持情况</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>IE 6&#x2F;7&#x2F;8</td>
+<td>支持</td>
+</tr>
+<tr>
+<td>IE 9</td>
+<td>支持</td>
+</tr>
+<tr>
+<td>Firefox</td>
+<td>支持</td>
+</tr>
+<tr>
+<td>Chrome</td>
+<td>支持</td>
+</tr>
+</tbody></table>
+<h2 id="七、inline-block-after-撑高（垂直居中）"><a href="#七、inline-block-after-撑高（垂直居中）" class="headerlink" title="七、inline-block + ::after 撑高（垂直居中）"></a>七、inline-block + ::after 撑高（垂直居中）</h2><p>这是一个非常巧妙的技巧，在 2013 年的实际项目里用得很多。思路是：给父容器加一个 <code>::after</code> 伪元素，设为 <code>display: inline-block; height: 100%; vertical-align: middle</code>，它会在行内排布中占据整行高度并把基线拉到中间，前面的子元素只要也是 <code>inline-block</code> 且 <code>vertical-align: middle</code>，就会跟着居中对齐。</p>
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="selector-class">.parent</span> &#123;</span><br><span class="line">    <span class="attribute">height</span>: <span class="number">300px</span>;</span><br><span class="line">    <span class="attribute">text-align</span>: center;      <span class="comment">/* 顺带解决水平居中 */</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/* 关键：用伪元素撑起一个全高的行内块 */</span></span><br><span class="line"><span class="selector-class">.parent</span><span class="selector-pseudo">::after</span> &#123;</span><br><span class="line">    <span class="attribute">content</span>: <span class="string">&quot;&quot;</span>;</span><br><span class="line">    <span class="attribute">display</span>: inline-block;</span><br><span class="line">    <span class="attribute">height</span>: <span class="number">100%</span>;</span><br><span class="line">    <span class="attribute">vertical-align</span>: middle;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="selector-class">.child</span> &#123;</span><br><span class="line">    <span class="attribute">display</span>: inline-block;</span><br><span class="line">    <span class="attribute">vertical-align</span>: middle;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>适用场景：不定高内容的垂直居中，同时需要水平居中，且要兼容 IE8。商品卡片、图文混排的媒体对象都常用这个写法。</p>
+<p>优点是不需要知道子元素高度、能同时处理水平与垂直、IE8 支持 <code>::after</code>（IE6&#x2F;7 不行）。缺点是依赖行内排布，子元素之间的空白节点（HTML 里的换行与空格）会产生间隙，需要处理；另外 <code>::after</code> 的内容不能为空字符串之外的形式，且父容器不能有 <code>overflow: hidden</code> 干扰。</p>
+<p>空白间隙的处理办法是给父容器设置 <code>font-size: 0</code>，子元素再单独设置字号，这是当时的标准做法。</p>
+<p>这个方案的完整骨架如下，包含外层包裹与内容层：</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">div</span> <span class="attr">class</span>=<span class="string">&quot;box&quot;</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">div</span> <span class="attr">class</span>=<span class="string">&quot;box-inner&quot;</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">img</span> <span class="attr">src</span>=<span class="string">&quot;logo.png&quot;</span> <span class="attr">alt</span>=<span class="string">&quot;&quot;</span> /&gt;</span>   <span class="comment">&lt;!-- inline-block 的图片 --&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">span</span> <span class="attr">class</span>=<span class="string">&quot;box-text&quot;</span>&gt;</span>产品名称<span class="tag">&lt;/<span class="name">span</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;/<span class="name">div</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">div</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="selector-class">.box</span> &#123;</span><br><span class="line">    <span class="attribute">height</span>: <span class="number">180px</span>;</span><br><span class="line">    <span class="attribute">text-align</span>: center;</span><br><span class="line">    <span class="attribute">font-size</span>: <span class="number">0</span>;               <span class="comment">/* 消除 inline-block 之间的空白节点 */</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="selector-class">.box</span><span class="selector-pseudo">::after</span> &#123;</span><br><span class="line">    <span class="attribute">content</span>: <span class="string">&quot;&quot;</span>;</span><br><span class="line">    <span class="attribute">display</span>: inline-block;</span><br><span class="line">    <span class="attribute">height</span>: <span class="number">100%</span>;</span><br><span class="line">    <span class="attribute">vertical-align</span>: middle;</span><br><span class="line">&#125;</span><br><span class="line"><span class="selector-class">.box-inner</span> &#123;</span><br><span class="line">    <span class="attribute">display</span>: inline-block;</span><br><span class="line">    <span class="attribute">vertical-align</span>: middle;</span><br><span class="line">    <span class="attribute">font-size</span>: <span class="number">14px</span>;            <span class="comment">/* 子元素内部恢复正常字号 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>注意 <code>font-size: 0</code> 要加在直接产生空白的层级上，而不是最外层；如果外层还有其他行内文字，会被一并影响。另一种更稳妥的替代做法是把 HTML 里的标签写成不换行的形式，从源头去掉空白节点，但会牺牲模板的可读性，团队里要统一风格。</p>
+<p>兼容表：</p>
+<table>
+<thead>
+<tr>
+<th>浏览器</th>
+<th>支持情况</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>IE 6&#x2F;7</td>
+<td>不支持（无 <code>::after</code>，需补真实元素）</td>
+</tr>
+<tr>
+<td>IE 8</td>
+<td>支持</td>
+</tr>
+<tr>
+<td>IE 9</td>
+<td>支持</td>
+</tr>
+<tr>
+<td>Firefox</td>
+<td>支持（<code>::after</code> 写作 <code>:after</code> 亦可）</td>
+</tr>
+<tr>
+<td>Chrome</td>
+<td>支持</td>
+</tr>
+</tbody></table>
+<h2 id="八、Flexbox（justify-content-align-items）"><a href="#八、Flexbox（justify-content-align-items）" class="headerlink" title="八、Flexbox（justify-content + align-items）"></a>八、Flexbox（justify-content + align-items）</h2><p>Flexbox 是 CSS3 里为这类问题准备的正解。2013 年的情况是：现代语法在 2012 年定稿，Chrome 与 Firefox 需要 <code>-webkit-</code> 前缀，IE10 支持现代语法但仍有少量 bug，IE9 及以下完全不支持。</p>
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="selector-class">.parent</span> &#123;</span><br><span class="line">    <span class="attribute">display</span>: -webkit-flex;       <span class="comment">/* Chrome 21 之前需要 -webkit- 前缀 */</span></span><br><span class="line">    <span class="attribute">display</span>: flex;</span><br><span class="line">    -webkit-<span class="attribute">justify-content</span>: center;   <span class="comment">/* 主轴（默认水平）居中 */</span></span><br><span class="line">            <span class="attribute">justify-content</span>: center;</span><br><span class="line">    -webkit-<span class="attribute">align-items</span>: center;       <span class="comment">/* 交叉轴（垂直）居中 */</span></span><br><span class="line">            <span class="attribute">align-items</span>: center;</span><br><span class="line">    <span class="attribute">height</span>: <span class="number">300px</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>适用场景：现代浏览器项目、移动端页面、后台管理系统的组件居中、需要同时处理多个子元素间距的场景。</p>
+<p>优点是代码最简洁，且语义清晰；不需要知道子元素尺寸；多个子元素时自动分配空间，配合 <code>flex-wrap</code> 能处理换行。缺点是兼容性在当时受限，且 Flexbox 规范本身经历过 2009 草案、2011 年重构、2012 年现代语法三个阶段，网上大量教程的语法互相冲突，需要特别注意自己抄的是哪一代。</p>
+<p>当时的三代语法大致是这样：2009 年的草案是 <code>display: box</code>，2011 年的中间版是 <code>display: flexbox</code>，2012 年的现代版才是 <code>display: flex</code>。IE10 只认现代语法，所以不需要为它写 <code>-ms-</code> 前缀。</p>
+<p>稳妥的写法是特性检测加渐进增强：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 用 JS 判断是否支持 Flexbox，不支持则退回传统方案</span></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">supportsFlexbox</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="keyword">var</span> el = <span class="variable language_">document</span>.<span class="title function_">createElement</span>(<span class="string">&#x27;div&#x27;</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="string">&#x27;flexBasis&#x27;</span> <span class="keyword">in</span> el.<span class="property">style</span> ||</span><br><span class="line">           <span class="string">&#x27;webkitFlexBasis&#x27;</span> <span class="keyword">in</span> el.<span class="property">style</span> ||</span><br><span class="line">           <span class="string">&#x27;msFlexBasis&#x27;</span> <span class="keyword">in</span> el.<span class="property">style</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">var</span> box = <span class="variable language_">document</span>.<span class="title function_">getElementById</span>(<span class="string">&#x27;box&#x27;</span>);</span><br><span class="line"><span class="keyword">if</span> (<span class="title function_">supportsFlexbox</span>()) &#123;</span><br><span class="line">    box.<span class="property">classList</span>.<span class="title function_">add</span>(<span class="string">&#x27;flex-center&#x27;</span>);   <span class="comment">// 走 Flexbox</span></span><br><span class="line">&#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    box.<span class="property">classList</span>.<span class="title function_">add</span>(<span class="string">&#x27;legacy-center&#x27;</span>); <span class="comment">// 走 table-cell 或负 margin</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>兼容表：</p>
+<table>
+<thead>
+<tr>
+<th>浏览器</th>
+<th>支持情况</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>IE 6&#x2F;7&#x2F;8&#x2F;9</td>
+<td>不支持</td>
+</tr>
+<tr>
+<td>IE 10</td>
+<td>支持现代语法（<code>display: flex</code>，有少量已知 bug）</td>
+</tr>
+<tr>
+<td>Firefox</td>
+<td>支持，需 <code>-webkit-</code> 前缀直到 Firefox 20 左右</td>
+</tr>
+<tr>
+<td>Chrome</td>
+<td>支持，需 <code>-webkit-</code> 前缀直到 Chrome 21 之后逐步去掉</td>
+</tr>
+</tbody></table>
+<p>需要说明的是，Firefox 与 Chrome 去掉前缀的版本号在 2013 年中还处于变动中，实际项目里 safest 的做法是同时保留带前缀与不带前缀两份声明。</p>
+<p>Flexbox 居中还有两个高频变体。第一个是只做垂直、不做水平，此时省略 <code>justify-content</code> 即可，但 <code>align-items</code> 的默认值 <code>stretch</code> 会把子元素沿交叉轴拉满，必须显式改成 <code>center</code>。第二个是子元素需要保持自身宽高，此时要给子元素明确尺寸，否则会被 <code>stretch</code> 拉伸。</p>
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="selector-class">.parent</span> &#123;</span><br><span class="line">    <span class="attribute">display</span>: -webkit-flex;</span><br><span class="line">    <span class="attribute">display</span>: flex;</span><br><span class="line">    <span class="attribute">height</span>: <span class="number">300px</span>;</span><br><span class="line">    -webkit-<span class="attribute">align-items</span>: center;    <span class="comment">/* 只做垂直居中 */</span></span><br><span class="line">            <span class="attribute">align-items</span>: center;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="selector-class">.child</span> &#123;</span><br><span class="line">    <span class="attribute">width</span>: <span class="number">200px</span>;                   <span class="comment">/* 显式给宽，避免被 stretch 拉满 */</span></span><br><span class="line">    <span class="attribute">height</span>: <span class="number">120px</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>多个子元素之间的间距分布交给 <code>justify-content</code> 的其他取值：<code>space-between</code> 把空隙分到元素之间，<code>space-around</code> 让每个元素两侧都有空隙。这几个值在 2013 年的 Flexbox 里都可用，也是它相对传统方案最大的增量价值。</p>
+<h2 id="九、transform-translate-50-50-（双向居中）"><a href="#九、transform-translate-50-50-（双向居中）" class="headerlink" title="九、transform: translate(-50%, -50%)（双向居中）"></a>九、transform: translate(-50%, -50%)（双向居中）</h2><p>CSS3 的 <code>transform</code> 在 2012 年后现代语法稳定，这个方案的核心是利用 <code>translate</code> 的百分比是相对元素自身尺寸这一特性，把绝对定位到 50% 的元素往回拉自身的一半。</p>
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="selector-class">.parent</span> &#123;</span><br><span class="line">    <span class="attribute">position</span>: relative;</span><br><span class="line">    <span class="attribute">height</span>: <span class="number">400px</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="selector-class">.child</span> &#123;</span><br><span class="line">    <span class="attribute">position</span>: absolute;</span><br><span class="line">    <span class="attribute">top</span>: <span class="number">50%</span>;</span><br><span class="line">    <span class="attribute">left</span>: <span class="number">50%</span>;</span><br><span class="line">    <span class="attribute">transform</span>: <span class="built_in">translate</span>(-<span class="number">50%</span>, -<span class="number">50%</span>);   <span class="comment">/* 相对自身宽高回拉一半 */</span></span><br><span class="line">    <span class="comment">/* 老语法兼容：-webkit-transform: translate(-50%, -50%); */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>适用场景：内容宽高不固定的居中浮层、tooltip、模态框、图片在容器里的居中。</p>
+<p>最大的优点是不需要知道元素宽高，百分比基于自身计算，内容变化时自动居中。这也让它成为 2013 年内容动态场景下的首选方案。</p>
+<p>缺点是 IE8 及以下不支持 <code>transform</code>（IE9 开始支持，但早期版本对 <code>translate</code> 百分比的支持有争议，实际项目建议在 IE9 上验证）。另外 <code>transform</code> 会影响元素的渲染层级与模糊处理，某些场景下需要配合 <code>z-index</code> 调整。还有一点：<code>transform</code> 会让元素创建一个包含块，影响内部 <code>position: fixed</code> 子元素的定位基准，嵌套浮层时要留意。</p>
+<p>兼容表：</p>
+<table>
+<thead>
+<tr>
+<th>浏览器</th>
+<th>支持情况</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>IE 6&#x2F;7&#x2F;8</td>
+<td>不支持</td>
+</tr>
+<tr>
+<td>IE 9</td>
+<td>基本支持（建议实测）</td>
+</tr>
+<tr>
+<td>Firefox</td>
+<td>支持</td>
+</tr>
+<tr>
+<td>Chrome</td>
+<td>支持（2012 年后现代语法 <code>transform: translate(...)</code>）</td>
+</tr>
+</tbody></table>
+<h2 id="十、绝对定位-calc"><a href="#十、绝对定位-calc" class="headerlink" title="十、绝对定位 + calc()"></a>十、绝对定位 + calc()</h2><p><code>calc()</code> 在 IE9 与 Chrome 19 之后开始支持，2013 年已经可以用于生产环境，但需要评估兼容成本。思路与负 margin 类似，只是用 <code>calc()</code> 把「一半宽度」算出来，从而不需要写死具体数值。</p>
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="selector-class">.parent</span> &#123;</span><br><span class="line">    <span class="attribute">position</span>: relative;</span><br><span class="line">    <span class="attribute">height</span>: <span class="number">400px</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="selector-class">.child</span> &#123;</span><br><span class="line">    <span class="attribute">position</span>: absolute;</span><br><span class="line">    <span class="attribute">top</span>: <span class="built_in">calc</span>(<span class="number">50%</span> - <span class="number">30px</span>);          <span class="comment">/* 50% 减自身高度的一半 */</span></span><br><span class="line">    <span class="attribute">left</span>: <span class="built_in">calc</span>(<span class="number">50%</span> - <span class="number">100px</span>);        <span class="comment">/* 50% 减自身宽度的一半 */</span></span><br><span class="line">    <span class="attribute">width</span>: <span class="number">200px</span>;</span><br><span class="line">    <span class="attribute">height</span>: <span class="number">60px</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>适用场景：宽高已知、但希望减少硬编码的固定宽度场景；在需要与其他 <code>calc()</code> 计算（比如宽度减去固定 padding）组合时尤其方便。</p>
+<p>优点是语法直观，能与响应式布局的百分比宽度配合计算。缺点是兼容性比前几种方案窄，IE8 及以下、Firefox 4 之前的版本不支持；另外老版本浏览器对 <code>calc()</code> 内部空格有严格解析要求，<code>calc(50%-30px)</code> 不写空格会直接解析失败，这是当时很常见的一个坑。</p>
+<p>如果元素宽高不定，还可以用负 margin 与 <code>calc()</code> 之外的另一种思路——<code>margin</code> 百分比：垂直方向的 <code>margin</code> 百分比是相对父容器高度计算的，因此也可以用 <code>margin-top: 25%</code> 之类的百分比，但要求父容器有确定高度，且百分比必须是相对值的一半，实际使用受限，这里只作为补充提及。</p>
+<p>最后补充一种老派但至今仍在用的思路：padding 撑挤法。如果不需要元素相对父容器居中，而只是希望「左右留白相等」，可以直接用百分比或 auto 的左右 padding 把内容挤到中间，语义上比绝对定位干净得多。</p>
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="selector-class">.container</span> &#123;</span><br><span class="line">    <span class="attribute">padding</span>: <span class="number">0</span> <span class="number">10%</span>;         <span class="comment">/* 左右各留 10%，内容自然居中 */</span></span><br><span class="line">    <span class="attribute">max-width</span>: <span class="number">1200px</span>;      <span class="comment">/* 配合 max-width 防止超宽屏被拉散 */</span></span><br><span class="line">    <span class="attribute">margin</span>: <span class="number">0</span> auto;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这种写法的关键是 <code>max-width</code> 与 <code>margin: 0 auto</code> 必须同时出现：只有百分比 padding 而没有宽度上限，超宽屏下内容会被拉到屏幕边缘；有了 <code>max-width</code>，<code>margin: auto</code> 才重新接管剩余空间的分摊。它是 2013 年做「内容区限宽居中」事实上的标准答案，也是十种方案之外最常用的一种。</p>
+<p>兼容表：</p>
+<table>
+<thead>
+<tr>
+<th>浏览器</th>
+<th>支持情况</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>IE 6&#x2F;7&#x2F;8</td>
+<td>不支持</td>
+</tr>
+<tr>
+<td>IE 9</td>
+<td>支持</td>
+</tr>
+<tr>
+<td>Firefox</td>
+<td>Firefox 4 起支持，需 <code>-moz-calc</code> 前缀直到 Firefox 16</td>
+</tr>
+<tr>
+<td>Chrome</td>
+<td>Chrome 19 起支持</td>
+</tr>
+</tbody></table>
+<h2 id="十种方案的选型决策"><a href="#十种方案的选型决策" class="headerlink" title="十种方案的选型决策"></a>十种方案的选型决策</h2><p>把上面十种放进一张总表，按「是否需要知道宽高」「是否双向」「兼容下限」三个维度对照，选型就是查表的过程。</p>
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>方向</th>
+<th>需知宽高</th>
+<th>IE 兼容下限</th>
+<th>推荐指数</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>text-align: center</td>
+<td>水平</td>
+<td>否</td>
+<td>IE6</td>
+<td>必备</td>
+</tr>
+<tr>
+<td>margin: 0 auto</td>
+<td>水平</td>
+<td>是</td>
+<td>IE6</td>
+<td>必备</td>
+</tr>
+<tr>
+<td>position + 负 margin</td>
+<td>双向</td>
+<td>是</td>
+<td>IE6</td>
+<td>高</td>
+</tr>
+<tr>
+<td>position + margin: auto</td>
+<td>双向</td>
+<td>是</td>
+<td>IE8</td>
+<td>中</td>
+</tr>
+<tr>
+<td>table-cell + vertical-align</td>
+<td>垂直</td>
+<td>否</td>
+<td>IE6</td>
+<td>高</td>
+</tr>
+<tr>
+<td>line-height</td>
+<td>垂直</td>
+<td>否</td>
+<td>IE6</td>
+<td>单行专用</td>
+</tr>
+<tr>
+<td>inline-block + ::after</td>
+<td>垂直</td>
+<td>否</td>
+<td>IE8</td>
+<td>高</td>
+</tr>
+<tr>
+<td>Flexbox</td>
+<td>双向</td>
+<td>否</td>
+<td>IE10</td>
+<td>现代首选</td>
+</tr>
+<tr>
+<td>transform: translate</td>
+<td>双向</td>
+<td>否</td>
+<td>IE9</td>
+<td>动态内容首选</td>
+</tr>
+<tr>
+<td>calc()</td>
+<td>双向</td>
+<td>是</td>
+<td>IE9</td>
+<td>低</td>
+</tr>
+</tbody></table>
+<p>实际的决策路径可以画成一张流程图：</p>
+<pre class="mermaid">flowchart TD
+    A[需要居中] --> B{水平还是垂直}
+    B -->|水平| C{块级且定宽}
+    C -->|是| D[margin 0 auto]
+    C -->|否| E[text-align center]
+    B -->|垂直| F{内容是单行文本吗}
+    F -->|是| G[line-height 法]
+    F -->|否| H{需要支持 IE9 以下吗}
+    H -->|是| I[table-cell 或 inline-block 撑高]
+    H -->|否| J[Flexbox 或 transform]</pre>
+
+<p>几条经验性的结论：</p>
+<p>如果项目 2013 年还需兼容 IE7，垂直居中的主力只能是 <code>table-cell</code> 方案与 <code>line-height</code> 方案，双向居中用负 margin。Flexbox 再好也只能作为渐进增强。</p>
+<p>如果只面向 Chrome 与 Firefox，无脑用 Flexbox，代码量与可维护性都最优。</p>
+<p>如果元素内容高度不固定且需要支持 IE9，<code>transform: translate(-50%, -50%)</code> 是综合最优解，它不需要 JS 介入，也不需要维护一份宽高的副本。</p>
+<p>如果同时需要水平和垂直，且父容器高度也是动态的，建议优先考虑 Flexbox，其次是 <code>inline-block + ::after</code>，因为负 margin 与 <code>calc()</code> 都要求父容器高度确定。</p>
+<h2 id="坑与调试"><a href="#坑与调试" class="headerlink" title="坑与调试"></a>坑与调试</h2><p>坑一：<code>margin: auto</code> 失效。绝大多数情况是因为没有给元素设宽度，或者父容器没有形成格式化上下文。用开发者工具看计算后的 <code>margin-left</code> 是否真的是 <code>auto</code>，如果显示为具体像素值，说明宽度没约束住。</p>
+<p>坑二：<code>vertical-align: middle</code> 不生效。这个属性只对表格单元格与行内级别元素有效，给一个普通块级 <code>div</code> 设置它毫无作用。误用的根源是把 HTML 里默认的行内行为当成了块级行为。</p>
+<p>坑三：百分比 <code>top</code> 与 <code>margin</code> 的基准不同。<code>top: 50%</code> 相对父容器高度，而 <code>margin-top: 50%</code> 同样相对父容器高度，但 <code>translateY(-50%)</code> 相对元素自身。混用时容易算错，写之前先确认基准。</p>
+<p>坑四：Flexbox 的 <code>align-items</code> 与 <code>align-content</code> 混淆。单行居中用 <code>align-items</code>，多行且换行时才需要 <code>align-content</code>。2013 年不少教程把两者混着讲，抄错属性名会导致静默失效。</p>
+<p>坑五：<code>calc()</code> 的空格。<code>calc(50% - 30px)</code> 的加减号两侧必须有空格，乘除可以不留。早期浏览器对这一点解析不一致，属于纯粹的手写规范问题。</p>
+<p>坑六：负 margin 方案在元素高度超过父容器一半时的反向溢出。当子元素高度大于父容器高度的一半，<code>top: 50%</code> 加负 margin 会把元素中心推到父容器中心，元素两端都会溢出，视觉上「偏了」。这种情况下要么给父容器加 <code>overflow: auto</code>，要么改用 Flexbox 的 <code>align-items: center</code>，后者在内容超高时会向上溢出但中心仍然正确。</p>
+<p>坑七：<code>inline-block</code> 的基线间隙。第七种方案里子元素是 <code>inline-block</code>，而行内块的基线对齐规则会让它和伪元素之间产生额外的行盒高度，导致父容器实际内容高度大于 <code>height: 100%</code> 的预期。解决办法除了 <code>font-size: 0</code>，还可以给子元素加 <code>vertical-align: top</code> 并调整伪元素的 <code>vertical-align</code>，具体取值需要按实际结构试。</p>
+<p>坑八：Flexbox 里的 <code>margin: auto</code> 与 <code>justify-content</code> 混用。在 Flex 容器里给子元素设 <code>margin: auto</code> 会自动吸收剩余空间，效果等价于居中，但此时再设置 <code>justify-content</code> 就不会再生效，两者混用容易产生「改了没反应」的困惑。建议在一个组件里只用一种机制。</p>
+<p>调试这些问题的通用办法：先用浏览器的开发者工具（Chrome DevTools 的 Elements 面板或 Firebug）查看元素的计算样式与盒模型，确认每个属性的实际生效值；再用 Timeline 面板排除掉重排导致的居中抖动；最后在真实的目标浏览器里验证，不要只在 Chrome 里看效果。</p>
+<p>调试时还有两个小技巧值得记住。第一，临时给居中的元素加一个鲜艳的 <code>outline</code>（IE8+ 支持，不影响布局），可以直接看出元素盒子与视口的相对位置，比反复猜要快得多。第二，把父容器的高度临时改成一个极端值（比如 10px 或 2000px），观察元素是否仍然居中，可以快速区分「方案本身错了」和「父容器高度没有传递下去」。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>居中的十种写法本质上是三代思路的叠加：CSS 2.1 时代靠 <code>margin</code> 与 <code>text-align</code> 处理水平，靠 <code>line-height</code> 与表格单元格处理垂直，双向居中只能靠绝对定位加负 margin 手工回拉；CSS3 时代 <code>transform</code> 与 <code>calc()</code> 让「相对自身回拉」成为可能，Flexbox 则把居中变成容器属性。2013 年的选型不是「哪个最好」，而是「兼容底线在哪里」：底线 IE7 时主力是表格与负 margin，底线 IE9 时可以引入 <code>transform</code>，底线 IE10 才能放心用 Flexbox。理解每一种方案的前提条件（是否定宽、父容器是否有高度、是否脱离文档流）比记住代码更重要，因为这些前提正是它们失效的原因。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li>W3C，CSS 2.1 规范，第 10 章 visual formatting model（含 margin auto 与 vertical-align 的定义）：<a href="https://www.w3.org/TR/CSS21/visudet.html">https://www.w3.org/TR/CSS21/visudet.html</a></li>
+<li>W3C，CSS 2.1 规范，第 9 章 visual formatting model：<a href="https://www.w3.org/TR/CSS21/visuren.html">https://www.w3.org/TR/CSS21/visuren.html</a></li>
+<li>W3C，CSS Values and Units Module Level 3（calc() 的定义）：<a href="https://www.w3.org/TR/css3-values/">https://www.w3.org/TR/css3-values/</a></li>
+<li>W3C，CSS Transforms Module Level 1（transform 与 translate 的定义）：<a href="https://www.w3.org/TR/css-transforms-1/">https://www.w3.org/TR/css-transforms-1/</a></li>
+<li>W3C，CSS Flexible Box Layout Module Level 1（justify-content 与 align-items）：<a href="https://www.w3.org/TR/css-flexbox-1/">https://www.w3.org/TR/css-flexbox-1/</a></li>
+<li>MDN，margin 属性参考：<a href="https://developer.mozilla.org/en-US/docs/Web/CSS/margin">https://developer.mozilla.org/en-US/docs/Web/CSS/margin</a></li>
+<li>MDN，vertical-align 属性参考：<a href="https://developer.mozilla.org/en-US/docs/Web/CSS/vertical-align">https://developer.mozilla.org/en-US/docs/Web/CSS/vertical-align</a></li>
+<li>MDN，text-align 属性参考：<a href="https://developer.mozilla.org/en-US/docs/Web/CSS/text-align">https://developer.mozilla.org/en-US/docs/Web/CSS/text-align</a></li>
+<li>MDN，position 属性参考：<a href="https://developer.mozilla.org/en-US/docs/Web/CSS/position">https://developer.mozilla.org/en-US/docs/Web/CSS/position</a></li>
+<li>MDN，transform 属性参考：<a href="https://developer.mozilla.org/en-US/docs/Web/CSS/transform">https://developer.mozilla.org/en-US/docs/Web/CSS/transform</a></li>
+<li>MDN，calc() 取值说明：<a href="https://developer.mozilla.org/en-US/docs/Web/CSS/calc">https://developer.mozilla.org/en-US/docs/Web/CSS/calc</a></li>
+<li>MDN，Using CSS flexible boxes：<a href="https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Flexible_Box_Layout">https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Flexible_Box_Layout</a></li>
+<li>Can I use，Flexbox 兼容性数据：<a href="https://caniuse.com/flexbox">https://caniuse.com/flexbox</a></li>
+<li>Can I use，CSS3 calc 兼容性数据：<a href="https://caniuse.com/calc">https://caniuse.com/calc</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>CSS 居中的十种写法与适用场景</p><p><a href="https://987763485.github.io/2013/06/27/CSS居中的十种写法与适用场景/">https://987763485.github.io/2013/06/27/CSS居中的十种写法与适用场景/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2013-06-27</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-17</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/web%E5%89%8D%E7%AB%AF/">web前端</a><a class="link-muted mr-2" rel="tag" href="/tags/css3/">css3</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2013/06/29/JavaScript%E5%8D%95%E7%BA%BF%E7%A8%8B%E4%B8%8E%E5%BC%82%E6%AD%A5%E7%BC%96%E7%A8%8B%E6%A8%A1%E5%9E%8B/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">JavaScript 单线程与异步编程模型</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2013/06/20/CSS%E5%AE%9E%E7%8E%B0%E7%AE%AD%E5%A4%B4%E4%B8%89%E8%A7%92%E4%B8%8E%E5%AF%B9%E8%AF%9D%E6%A1%86%E6%B0%94%E6%B3%A1/"><span class="level-item">CSS 实现箭头、三角与对话框气泡</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

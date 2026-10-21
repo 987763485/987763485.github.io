@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Redis 集群与哨兵模式 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="单机 Redis 一旦承载核心业务，内存上限、故障恢复与扩容就会同时变成问题。本文从复制协议讲起，依次拆解 Sentinel 的仲裁与故障转移、Cluster 的槽位与重定向，再落到客户端、运维与安全配置。读完本文，你应当能为自己的业务选出一条可落地的高可用路径，并知道每条路径的失效边界。"><meta property="og:type" content="blog"><meta property="og:title" content="Redis 集群与哨兵模式"><meta property="og:url" content="https://987763485.github.io/2020/07/07/Redis%E9%9B%86%E7%BE%A4%E4%B8%8E%E5%93%A8%E5%85%B5%E6%A8%A1%E5%BC%8F/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="单机 Redis 一旦承载核心业务，内存上限、故障恢复与扩容就会同时变成问题。本文从复制协议讲起，依次拆解 Sentinel 的仲裁与故障转移、Cluster 的槽位与重定向，再落到客户端、运维与安全配置。读完本文，你应当能为自己的业务选出一条可落地的高可用路径，并知道每条路径的失效边界。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2020-07-07T12:14:20.000Z"><meta property="article:modified_time" content="2026-10-18T14:51:57.007Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="devops"><meta property="article:tag" content="docker"><meta property="article:tag" content="linux"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2020/07/07/Redis%E9%9B%86%E7%BE%A4%E4%B8%8E%E5%93%A8%E5%85%B5%E6%A8%A1%E5%BC%8F/"},"headline":"Redis 集群与哨兵模式","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2020-07-07T12:14:20.000Z","dateModified":"2026-10-18T14:51:57.007Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"单机 Redis 一旦承载核心业务，内存上限、故障恢复与扩容就会同时变成问题。本文从复制协议讲起，依次拆解 Sentinel 的仲裁与故障转移、Cluster 的槽位与重定向，再落到客户端、运维与安全配置。读完本文，你应当能为自己的业务选出一条可落地的高可用路径，并知道每条路径的失效边界。"}</script><link rel="canonical" href="https://987763485.github.io/2020/07/07/Redis%E9%9B%86%E7%BE%A4%E4%B8%8E%E5%93%A8%E5%85%B5%E6%A8%A1%E5%BC%8F/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2020-07-07T12:14:20.000Z" title="7/7/2020, 8:14:20 PM">2020-07-07</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/">容器与运维</a></span><span class="level-item">1 小时读完 (大约8256个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Redis 集群与哨兵模式</h1><div class="content"><p>单机 Redis 一旦承载核心业务，内存上限、故障恢复与扩容就会同时变成问题。本文从复制协议讲起，依次拆解 Sentinel 的仲裁与故障转移、Cluster 的槽位与重定向，再落到客户端、运维与安全配置。读完本文，你应当能为自己的业务选出一条可落地的高可用路径，并知道每条路径的失效边界。</p>
+<h2 id="单机-Redis-的四个天花板"><a href="#单机-Redis-的四个天花板" class="headerlink" title="单机 Redis 的四个天花板"></a>单机 Redis 的四个天花板</h2><p>很多团队引入 Redis 时，只把它当作“比数据库快的内存缓存”。当它开始承载会话、计数器、排行榜甚至库存扣减时，单机形态就会在四个维度同时露出上限。</p>
+<p>第一是内存。一台机器的物理内存总有边界，Redis 的 maxmemory 只能在这个边界内做淘汰；更麻烦的是持久化与主从全量同步都会 fork 子进程，页表复制和写时复制（copy-on-write）会放大内存占用。数据量越大，fork 的停顿越明显，单机就越难同时兼顾容量与延迟。</p>
+<p>第二是故障恢复。进程崩溃、宿主机宕机、磁盘损坏，任何一种故障都意味着要人工从 RDB 或 AOF 恢复，再重建服务。恢复时间取决于数据量和备份方式，业务只能被动等待；这还没有计算 DNS 切换、连接重建和缓存预热。</p>
+<p>第三是写入扩展。Redis 6.0 于 2020 年 5 月正式发布，引入了可选的多线程 I&#x2F;O，但命令执行仍然由单线程完成，单个主节点的写入能力有明确上限。增加副本只能扩展读，不能分摊写；把同一个 key 拆到多个实例又会把分片逻辑推给应用。</p>
+<p>第四是维护窗口。升级版本、打内核补丁、迁移机房，都需要停机或至少一次主从切换；单机没有可用的切换对象，只能接受停机。</p>
+<p>这四件事指向两个不同的答案：如果数据能放进一台机器，缺的是“故障时自动顶上”的能力，Sentinel 就够了；如果数据或写入已经超过单机，才需要 Cluster 这样的分片方案。两者都不是凭空实现的，它们共享同一套复制地基。</p>
+<h2 id="复制：两种方案共同的地基"><a href="#复制：两种方案共同的地基" class="headerlink" title="复制：两种方案共同的地基"></a>复制：两种方案共同的地基</h2><p>Sentinel 和 Cluster 都把“主从复制”当作原料：Sentinel 负责在主节点挂掉后换一个副本上来，Cluster 负责把槽位分配给多个主节点，并在主节点挂掉后让它的副本接管。理解复制的异步本质，后面所有“会不会丢数据”的问题才有答案。</p>
+<h3 id="全量同步与部分同步"><a href="#全量同步与部分同步" class="headerlink" title="全量同步与部分同步"></a>全量同步与部分同步</h3><p>副本启动时执行 REPLICAOF（旧命令是 SLAVEOF）指向主节点，然后发送 <code>PSYNC ? -1</code>，表示“我没有复制历史，请给我一份全量数据”。主节点执行 BGSAVE 生成 RDB，同时把这段时间的写命令缓存在内存里；RDB 传完后，再把缓冲区里的命令发给副本。副本清空旧数据、加载 RDB、回放缓冲命令，复制就此建立。</p>
+<p>复制建立后，双方维护两个关键量：复制 ID（replication ID）和复制偏移量（offset）。主节点把写命令发给副本的同时，也写进一个固定大小的环形缓冲区，称为复制积压缓冲区（replication backlog）。副本断线重连时发送 <code>PSYNC &lt;replid&gt; &lt;offset&gt;</code>；如果 offset 仍在 backlog 覆盖范围内，主节点只补发缺失的部分，这叫部分重同步；否则退回全量同步。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 在主节点查看复制状态</span></span><br><span class="line">redis-cli INFO replication</span><br><span class="line"><span class="comment"># role:master</span></span><br><span class="line"><span class="comment"># connected_slaves:2</span></span><br><span class="line"><span class="comment"># master_replid:3f1c...</span></span><br><span class="line"><span class="comment"># master_repl_offset:918273</span></span><br><span class="line"><span class="comment"># slave0:ip=10.0.0.12,port=6379,state=online,offset=918270,lag=0</span></span><br></pre></td></tr></table></figure>
+
+<p>backlog 默认只有 1 MB，写入量大或断线时间长时很容易被覆盖，部分同步就会失败。生产上可以按“平均写入速率 × 预计最长断线时间”估算 repl-backlog-size，例如写入 2 MB&#x2F;s、希望容忍 60 秒断线，至少要留 120 MB 以上。这个数字是设计目标，不是固定推荐值。</p>
+<h3 id="异步复制意味着什么"><a href="#异步复制意味着什么" class="headerlink" title="异步复制意味着什么"></a>异步复制意味着什么</h3><p>主节点处理完写命令就返回客户端，并不等待副本确认。副本可能落后几毫秒，也可能落后几分钟；replica-serve-stale-data 默认为 yes，副本在失去主连接后仍会返回旧数据。复制延迟可以用 INFO replication 里的 lag 观察，但 lag 只表示最后一次 ACK 的时间差，不等于某条具体命令的延迟。</p>
+<p>这带来一个必须接受的事实：主节点在故障前最后一段写入，可能还没到副本。Sentinel 切换和 Cluster 晋升都以“把某个副本提升为主”收尾，因此都可能丢掉这段数据。后文会分别讨论如何用 min-replicas-to-write 和 WAIT 缩小窗口，但不会有零损失的银弹。</p>
+<p>复制还支持级联：副本可以再挂副本，用来分担全量同步的压力。代价是链路更长、延迟更大，故障转移时可选的晋升对象也更多，需要靠优先级和偏移量来约束。</p>
+<h2 id="Sentinel：监控、仲裁与故障转移"><a href="#Sentinel：监控、仲裁与故障转移" class="headerlink" title="Sentinel：监控、仲裁与故障转移"></a>Sentinel：监控、仲裁与故障转移</h2><h3 id="它解决什么问题"><a href="#它解决什么问题" class="headerlink" title="它解决什么问题"></a>它解决什么问题</h3><p>Sentinel 是一个独立进程，不存业务数据，只做三件事：持续监控主从节点、在主观认为主节点失联后与其他 Sentinel 交换意见、在达成共识后选出一个副本提升为主，并通知客户端。它不负责分片，所有数据仍在一个主节点上，因此适合“数据量能装进单机、但不能再接受人工切换”的场景。</p>
+<p>一个最小的 Sentinel 配置如下：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># sentinel.conf</span></span><br><span class="line">port 26379</span><br><span class="line">daemonize <span class="built_in">yes</span></span><br><span class="line">protected-mode <span class="built_in">yes</span></span><br><span class="line"><span class="built_in">bind</span> 10.0.0.21</span><br><span class="line">sentinel monitor mymaster 10.0.0.11 6379 2</span><br><span class="line">sentinel down-after-milliseconds mymaster 30000</span><br><span class="line">sentinel failover-timeout mymaster 180000</span><br><span class="line">sentinel parallel-syncs mymaster 1</span><br><span class="line">sentinel auth-pass mymaster S3cretPass</span><br></pre></td></tr></table></figure>
+
+<p><code>sentinel monitor</code> 的最后一个参数是 quorum，表示至少多少个 Sentinel 认为主节点不可达，才把它标记为客观下线。名字 mymaster 是逻辑名，客户端和 Sentinel 之间靠这个名字而不是 IP 通信。</p>
+<h3 id="监控、主观下线与客观下线"><a href="#监控、主观下线与客观下线" class="headerlink" title="监控、主观下线与客观下线"></a>监控、主观下线与客观下线</h3><p>每个 Sentinel 每秒向主节点、副本和其他 Sentinel 发送 PING，每 10 秒发送 INFO，每 2 秒通过 <code>__sentinel__:hello</code> 频道交换对主节点的看法。当某个 Sentinel 在 down-after-milliseconds 内收不到主节点的有效响应，它把主节点标记为主观下线（SDOWN）；这只代表它自己的判断。</p>
+<p>当足够多的 Sentinel（达到 quorum）都报告 SDOWN，主节点被标记为客观下线（ODOWN）。注意 quorum 只用于“确认故障”，不等于“授权切换”。真正发起故障转移的 Sentinel 还必须赢得多数票，也就是获得包括自己在内的多数 Sentinel 支持。3 个 Sentinel 的 quorum 通常设为 2，5 个设为 3；quorum 设得过高会让故障无法被确认，设得过低则容易因单个网络抖动触发切换。</p>
+<h3 id="领导选举与故障转移"><a href="#领导选举与故障转移" class="headerlink" title="领导选举与故障转移"></a>领导选举与故障转移</h3><p>ODOWN 之后，Sentinel 之间要进行一次类似 Raft 的选举。发现故障的 Sentinel 向其他 Sentinel 请求投票，每个 Sentinel 在每个配置纪元（configuration epoch）只能投一票；拿到多数票的 Sentinel 成为 leader，获得执行故障转移的授权。配置纪元是一个单调递增的编号，用来给“哪一版主从拓扑更新”排序，旧主节点带着旧纪元回来时，会被识别为过时配置并降级为副本。</p>
+<p>故障转移的步骤可以概括为：</p>
+<ol>
+<li>在副本中挑选晋升对象：先看 replica-priority，数值越小优先级越高，0 表示永不晋升；优先级相同再看复制偏移量，偏移量大的数据更新；仍相同则比较 runid。</li>
+<li>向选中的副本发送 REPLICAOF NO ONE，让它停止复制并成为主节点。</li>
+<li>向其余副本发送 REPLICAOF 新主节点地址，让它们改挂新主。</li>
+<li>把旧主节点记录为“待降级”，等它恢复后发送 REPLICAOF，让它成为新主的副本。</li>
+<li>通过 +switch-master 事件把新地址广播给订阅的客户端。</li>
+</ol>
+<pre class="mermaid">sequenceDiagram
+    participant S1 as Sentinel A
+    participant S2 as Sentinel B
+    participant S3 as Sentinel C
+    participant M as 旧主节点
+    participant R as 副本
+    S1->>M: PING 超时
+    S1->>S2: 我认为主节点 SDOWN
+    S1->>S3: 请求确认
+    S2-->>S1: 同意，达到 quorum
+    S3-->>S1: 同意，达到 quorum
+    Note over S1,S3: 主节点进入 ODOWN
+    S1->>S2: 请求投票（新纪元）
+    S2-->>S1: 投票
+    S3-->>S1: 投票
+    Note over S1: 获得多数票，成为 leader
+    S1->>R: REPLICAOF NO ONE
+    S1->>R: 记录为新主节点
+    S1->>S2: 广播 +switch-master</pre>
+
+<p>整个过程受 failover-timeout 约束，超时后会重新尝试。parallel-syncs 控制同时有多少个副本去与新主做全量同步，设得太大可能在新主上造成一波 fork 和网络压力。</p>
+<h3 id="客户端如何发现新主"><a href="#客户端如何发现新主" class="headerlink" title="客户端如何发现新主"></a>客户端如何发现新主</h3><p>客户端不应该把主节点 IP 写死。常见做法是连接 Sentinel 集合，启动时用 SENTINEL get-master-addr-by-name mymaster 拿到当前主地址，之后订阅 +switch-master 事件；也可以用客户端库提供的 Sentinel 连接池（例如 Jedis 的 JedisSentinelPool、Lettuce 的 Sentinel 支持），由库负责在切换后重建连接。</p>
+<p>这里有一个容易被忽略的细节：客户端缓存的地址有“保质期”。如果客户端只在启动时查一次，切换后它会一直向旧主写，直到重启或连接报错。稳妥的做法是同时具备事件订阅、连接失败重查和短 TTL 缓存，三者互为兜底。</p>
+<h3 id="部署上的几条硬规矩"><a href="#部署上的几条硬规矩" class="headerlink" title="部署上的几条硬规矩"></a>部署上的几条硬规矩</h3><p>Sentinel 的数量应为奇数且不少于 3 个，否则无法形成稳定的多数；它们应分布在不同的物理机、机架或可用区，避免一次断电全军覆没；不要和 Redis 主节点部署在同一台机器上，否则主节点故障会连带带走仲裁能力；在 Docker 或 NAT 环境中要配置 sentinel announce-ip 和 announce-port，否则 Sentinel 之间会交换容器内地址，导致互相不可达；Sentinel 端口同样要设置 bind、protected-mode 和密码，不能裸露在公网。</p>
+<h3 id="故障场景与防护"><a href="#故障场景与防护" class="headerlink" title="故障场景与防护"></a>故障场景与防护</h3><p>Sentinel 能处理“进程崩溃”这类干净故障，但对网络分区和客户端行为要更小心。</p>
+<h4 id="网络分区与旧主写入"><a href="#网络分区与旧主写入" class="headerlink" title="网络分区与旧主写入"></a>网络分区与旧主写入</h4><p>假设主节点所在机房与 Sentinel 集群之间的网络中断，但主节点与部分客户端仍然连通。Sentinel 侧看到的是主节点失联，达到 quorum 后发起切换，把副本提升为新主；旧主并不知道自己已经被替换，仍然接受客户端写入。等网络恢复，Sentinel 会把旧主降级为副本，旧主上那段未被复制的写入会被清空。这就是 Sentinel 场景下最典型的脑裂风险。</p>
+<p>要彻底消除它，需要分布式共识和 fencing，Redis 的异步复制给不了。工程上能做的是缩小窗口：在主节点上设置 min-replicas-to-write 和 min-replicas-max-lag，让它在“健康副本不足”时拒绝写入。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 至少 1 个副本，且其延迟不超过 10 秒，否则主节点拒绝写</span></span><br><span class="line">redis-cli CONFIG SET min-replicas-to-write 1</span><br><span class="line">redis-cli CONFIG SET min-replicas-max-lag 10</span><br></pre></td></tr></table></figure>
+
+<p>这两个参数不是万能的：副本可能只是网络慢，主节点会因此拒绝写入，可用性下降；参数只在主节点生效，切换后新主也要有同样的配置；它降低的是“旧主继续接受写入”的概率，不是严格保证。是否启用，要在“丢数据”和“短时不可写”之间做业务判断。</p>
+<h4 id="切换抖动与故障转移循环"><a href="#切换抖动与故障转移循环" class="headerlink" title="切换抖动与故障转移循环"></a>切换抖动与故障转移循环</h4><p>网络不稳定时，主节点可能反复在“可达”和“不可达”之间摆动，Sentinel 跟着反复切换。down-after-milliseconds 设得太短会放大这个问题，设得太长又会让真实故障的恢复变慢。failover-timeout 则决定一次失败的切换多久后重试，太小会叠加压力，太大则恢复缓慢。实践上要结合业务能接受的恢复时间设定，并用监控观察 +failover-end、+switch-master 的频率；如果一天内多次切换，应先查网络和主节点负载，而不是继续调小超时。</p>
+<p>replica-priority 也常被用来做人工干预：给性能弱或跨机房的副本设 0，禁止它被提升；给主推副本设较小值，让 Sentinel 优先选它。但优先级只在副本之间比较，不能替代容量规划。</p>
+<h4 id="客户端缓存过期"><a href="#客户端缓存过期" class="headerlink" title="客户端缓存过期"></a>客户端缓存过期</h4><p>切换完成后，最危险的不是新主，而是“还连着旧主”的客户端。旧主被降级后，写入会收到 READONLY 错误，这其实是保护；更隐蔽的是客户端缓存了旧拓扑，持续重试旧地址，形成错误风暴。客户端应当把 READONLY 错误视为“拓扑已变”的信号，立即重新查询 Sentinel，而不是原地重试。对于使用连接池的应用，还要确保池中的旧连接被清理，避免一半请求打到新主、一半打到旧主。</p>
+<h4 id="适用边界"><a href="#适用边界" class="headerlink" title="适用边界"></a>适用边界</h4><p>Sentinel 不解决容量问题。所有写仍然落在一个主节点，内存上限就是单机上限；增加副本只能分担读，且副本默认只读、可能返回旧数据。当数据量或写入量超过单机，继续堆 Sentinel 没有意义，应该考虑 Cluster。</p>
+<h2 id="Redis-Cluster：槽位、重定向与扩缩容"><a href="#Redis-Cluster：槽位、重定向与扩缩容" class="headerlink" title="Redis Cluster：槽位、重定向与扩缩容"></a>Redis Cluster：槽位、重定向与扩缩容</h2><h3 id="16384-个槽与键的路由"><a href="#16384-个槽与键的路由" class="headerlink" title="16384 个槽与键的路由"></a>16384 个槽与键的路由</h3><p>Cluster 把整个键空间切成 16384 个哈希槽，每个主节点负责一部分槽。键属于哪个槽由 CRC16(key) mod 16384 决定，Cluster 只负责把槽分配给节点，不负责记录每个键的位置。这样路由表很小，节点之间交换的是槽位归属，而不是键列表。</p>
+<p>为什么是 16384 而不是 65536？一个常被引用的解释是心跳包要携带槽位位图：16384 个槽对应 2 KB 位图，65536 个槽则是 8 KB，而 Cluster 的设计规模通常在几百到一千个节点，16384 个槽已经够分。这个数字是协议常量，客户端和集群必须一致，不能自行修改。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">redis-cli -c -h 10.0.0.11 -p 6379</span><br><span class="line">127.0.0.1:6379&gt; CLUSTER KEYSLOT user:1000</span><br><span class="line">(<span class="built_in">integer</span>) 1649</span><br><span class="line">127.0.0.1:6379&gt; SET user:1000 alice</span><br><span class="line">-&gt; Redirected to slot [1649] located at 10.0.0.12:6379</span><br><span class="line">OK</span><br></pre></td></tr></table></figure>
+
+<h3 id="MOVED-与-ASK：两种重定向"><a href="#MOVED-与-ASK：两种重定向" class="headerlink" title="MOVED 与 ASK：两种重定向"></a>MOVED 与 ASK：两种重定向</h3><p>当客户端把命令发到不负责该槽的节点，节点不会代为转发，而是返回重定向。<code>MOVED &lt;slot&gt; &lt;ip:port&gt;</code> 表示这个槽永久归目标节点，客户端应更新本地槽位缓存，以后直接发往新地址；<code>ASK &lt;slot&gt; &lt;ip:port&gt;</code> 表示这个槽正在迁移，目标节点只是临时接管这个键，客户端应先发送 ASKING，再发送原命令，但不要更新槽位缓存，因为迁移完成后归属还会变。</p>
+<pre class="mermaid">flowchart TD
+    A[客户端计算 CRC16 key mod 16384] --> B{本地槽位表命中?}
+    B -- 是 --> C[发送到对应节点]
+    B -- 否 --> D[任选节点发送]
+    D --> E{节点负责该槽?}
+    E -- 是 --> F[正常执行]
+    E -- 否，已迁移 --> G[返回 MOVED]
+    E -- 否，迁移中 --> H[返回 ASK]
+    G --> I[更新槽位表并重试]
+    H --> J[发送 ASKING 后重试目标节点]</pre>
+
+<p>MOVED 是稳定的拓扑变更，ASK 是迁移过程中的临时状态。客户端如果对 ASK 也更新缓存，会在迁移未完成时把请求固定到临时节点，随后收到更多重定向；如果对 MOVED 不更新缓存，则会每次多一跳。成熟的集群客户端会区分两者，并设置最大重定向次数，防止异常情况下无限循环。</p>
+<h3 id="集群总线、故障检测与副本晋升"><a href="#集群总线、故障检测与副本晋升" class="headerlink" title="集群总线、故障检测与副本晋升"></a>集群总线、故障检测与副本晋升</h3><p>Cluster 节点之间通过集群总线通信，端口是客户端端口 + 10000（例如 6379 对应 16379）。总线使用二进制协议和 gossip，交换节点状态、槽位归属和故障判断。节点之间定期 PING&#x2F;PONG，超过 cluster-node-timeout 未响应会被标记为 PFAIL；当多数主节点都认为某个主节点 PFAIL，它才被标记为 FAIL，其副本开始竞选。</p>
+<p>副本晋升需要多数主节点投票，且会等待一段与排名相关的延迟，避免多个副本同时竞选。晋升成功后，新主接管原主的槽位，旧主恢复后自动成为副本。cluster-require-full-coverage 默认为 yes，意味着只要有一个槽没有节点负责，整个集群就拒绝服务；把它设为 no 可以让集群在部分槽不可用时继续服务其余槽，但客户端会看到部分键报错。这是一个可用性与完整性的取舍，不能当成“万能开关”。</p>
+<p>手动切换用 CLUSTER FAILOVER，在副本上执行，默认会先与主节点协调、等待复制追上，再完成切换；FORCE 用于主节点不可达时强制切换，TAKEOVER 则完全不协商，只适合极端故障场景。</p>
+<h3 id="扩缩容与槽迁移"><a href="#扩缩容与槽迁移" class="headerlink" title="扩缩容与槽迁移"></a>扩缩容与槽迁移</h3><p>每个节点先在配置中打开 cluster-enabled yes，并设置 cluster-node-timeout，再执行创建命令：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">redis-cli --cluster create \</span><br><span class="line">  10.0.0.11:6379 10.0.0.12:6379 10.0.0.13:6379 \</span><br><span class="line">  10.0.0.14:6379 10.0.0.15:6379 10.0.0.16:6379 \</span><br><span class="line">  --cluster-replicas 1</span><br></pre></td></tr></table></figure>
+
+<p>前三个成为主节点，后三个作为副本分配到这些主节点上，16384 个槽会被平均分配。<code>--cluster-replicas 1</code> 表示每个主节点一个副本；生产上至少这样配置，否则主节点故障后没有晋升对象。</p>
+<p>扩容分两步：先把新节点加入集群（此时它没有槽），再把部分槽迁过去：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 加入一个新主节点</span></span><br><span class="line">redis-cli --cluster add-node 10.0.0.17:6379 10.0.0.11:6379</span><br><span class="line"><span class="comment"># 从已有节点迁移 1000 个槽到新节点</span></span><br><span class="line">redis-cli --cluster reshard 10.0.0.11:6379 \</span><br><span class="line">  --cluster-from &lt;source-node-id&gt; \</span><br><span class="line">  --cluster-to &lt;new-node-id&gt; \</span><br><span class="line">  --cluster-slots 1000 \</span><br><span class="line">  --cluster-yes</span><br></pre></td></tr></table></figure>
+
+<p>reshard 的底层是逐个槽迁移：目标节点把槽设为 IMPORTING，源节点设为 MIGRATING，源节点用 CLUSTER GETKEYSINSLOT 取出该槽的键，对每个键执行 MIGRATE，把键原子地传到目标节点，最后在集群内广播 SETSLOT NODE，完成归属变更。MIGRATE 是同步的，迁移大 key 会阻塞源节点，所以迁移应避开业务高峰，并控制每次迁移的键数量。</p>
+<p>缩容则相反：先把待下线节点上的槽全部迁走，确认 CLUSTER NODES 中它不再负责任何槽，再用 <code>--cluster del-node</code> 移除。直接删节点会留下无主槽，触发 cluster-require-full-coverage 的保护。</p>
+<h3 id="多键操作与-hash-tag"><a href="#多键操作与-hash-tag" class="headerlink" title="多键操作与 hash tag"></a>多键操作与 hash tag</h3><p>Cluster 不支持跨槽的多键命令。MGET、MSET、SUNIONSTORE、事务、Lua 脚本中的键都必须落在同一个槽，否则会报 CROSSSLOT 错误。解决办法是 hash tag：用花括号包住键的一部分，Cluster 只对花括号内的内容做哈希。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 两个键都按 user:1000 计算槽位，因而可以一起操作</span></span><br><span class="line">SET &#123;user:1000&#125;:profile alice</span><br><span class="line">SET &#123;user:1000&#125;:sessions 3</span><br><span class="line">MGET &#123;user:1000&#125;:profile &#123;user:1000&#125;:sessions</span><br></pre></td></tr></table></figure>
+
+<p>花括号只认第一个配对，且不能嵌套；<code>{}</code> 空标签等于没有标签。设计键名时要把“需要原子操作的数据”放进同一个 tag，但不要把过多数据塞进同一个 tag，否则所有压力会集中到一个槽、一个节点，形成热点。</p>
+<p>Lua 脚本同样受槽位约束：脚本里访问的所有键必须同槽，EVAL 的第一个参数是键的数量，客户端库通常要求显式传入键列表。Cluster 也不支持 SELECT 切换数据库，只能使用 0 号库，依赖多库隔离的应用需要改造。</p>
+<h2 id="客户端、代理与一致性边界"><a href="#客户端、代理与一致性边界" class="headerlink" title="客户端、代理与一致性边界"></a>客户端、代理与一致性边界</h2><h3 id="集群感知客户端"><a href="#集群感知客户端" class="headerlink" title="集群感知客户端"></a>集群感知客户端</h3><p>Cluster 客户端通常内置槽位表，并在收到 MOVED 时刷新。Jedis 的 JedisCluster、Lettuce 的 RedisClusterClient、redis-py 的 RedisCluster、go-redis 的 ClusterClient 都属于这一类。选型时要关注四个行为：是否区分 MOVED 与 ASK、最大重定向次数、拓扑刷新策略（定时还是仅在重定向时）、以及失败重试是否只针对幂等命令。</p>
+<p>重试尤其容易出错。GET、SET 这类命令重复执行结果相同，可以安全重试；INCR、LPUSH、SETNX 之类重复执行会改变结果，盲目重试可能多扣一次库存或多发一条消息。正确做法是在业务层引入请求 ID 做去重，或者只对读操作自动重试，写操作交给上层决定。网络超时并不等于命令没有执行，这一点在故障转移期间尤其明显。</p>
+<p>如果业务需要从副本读，Cluster 副本默认不服务读请求，客户端必须先发送 READONLY 才能读，发送 READWRITE 恢复。副本读同样可能读到旧数据，一致性要求高的场景应读主。</p>
+<h3 id="代理方案"><a href="#代理方案" class="headerlink" title="代理方案"></a>代理方案</h3><p>另一条路是在客户端和 Redis 之间放代理，由代理维护路由，客户端像访问单机一样访问代理。Twemproxy、Codis 以及后来的 Envoy Redis 代理都属于这个思路。代理的好处是兼容旧客户端、集中治理、可以在代理层做限流和审计；代价是多一跳网络、代理本身要解决高可用、跨槽操作仍然受限，而且扩容时往往需要迁移数据。</p>
+<p>代理不是高可用的替代品：它解决的是“客户端不会说集群协议”，不解决“主节点挂了怎么办”。实际架构里，代理后面仍然需要 Sentinel 或 Cluster 提供故障转移。</p>
+<h3 id="一致性与持久化边界"><a href="#一致性与持久化边界" class="headerlink" title="一致性与持久化边界"></a>一致性与持久化边界</h3><p>无论 Sentinel 还是 Cluster，故障转移都是“提升一个副本”，而复制是异步的，所以切换点之前未同步的写入会丢。WAIT 可以让客户端等待指定数量的副本确认：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">SET order:1001 paid</span><br><span class="line">WAIT 1 100</span><br><span class="line"><span class="comment"># 返回 1 表示至少 1 个副本在 100 毫秒内确认</span></span><br></pre></td></tr></table></figure>
+
+<p>WAIT 返回的是“确认的副本数”，不是“数据已持久化”。副本确认只说明命令到了副本的内存，不说明它写进了 RDB 或 AOF；如果副本随后也崩溃，仍可能丢。WAIT 还会阻塞当前客户端，超时返回 0 并不代表命令失败。它适合对少量关键写入加一道保险，不适合当成强一致方案。</p>
+<p>持久化的细节（RDB、AOF、混合持久化、fsync 策略）属于另一篇的主题，这里只强调交集：每个节点各自持久化自己的数据，集群不会做跨节点的一致性快照；备份时要分别对每个主节点执行 BGSAVE，并记录当时的槽位分布，否则恢复出来的数据可能对不上。</p>
+<h2 id="运维实践：建集群、升级与容量陷阱"><a href="#运维实践：建集群、升级与容量陷阱" class="headerlink" title="运维实践：建集群、升级与容量陷阱"></a>运维实践：建集群、升级与容量陷阱</h2><p>创建完成后，先用 redis-cli –cluster check 做一次体检，再用 CLUSTER INFO 和 CLUSTER NODES 确认状态：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">redis-cli --cluster check 10.0.0.11:6379</span><br><span class="line">redis-cli -h 10.0.0.11 -p 6379 CLUSTER INFO</span><br><span class="line">redis-cli -h 10.0.0.11 -p 6379 CLUSTER NODES</span><br></pre></td></tr></table></figure>
+
+<p>CLUSTER INFO 里要重点看 cluster_state 是否为 ok、cluster_slots_assigned 是否为 16384、cluster_known_nodes 是否符合预期。CLUSTER NODES 每行是一个节点，字段依次是节点 ID、地址与总线端口、标志位、主节点 ID、最后 ping&#x2F;pong 时间、配置纪元、连接状态和负责的槽位。标志位里出现 fail、<code>fail?</code>、handshake 都要追查；槽位出现 <code>[slot-&gt;-nodeid]</code> 说明正在迁移。</p>
+<p>扩容时先加节点、再迁槽，迁完后用 –cluster rebalance 调整均衡；缩容时先迁走槽、再删节点。每次只动一个节点，动完观察 cluster_state 和客户端错误率，再继续。</p>
+<p>升级的顺序与复制方向相反：先升级副本，再在副本上执行 CLUSTER FAILOVER，把主角色切到已升级的副本，然后升级旧主（此时它是副本）。这样任何时刻至少有一个节点在提供服务，且新版本先以副本身份验证兼容性。Sentinel 架构同理：先升级副本，手动切换主，再升级旧主，最后逐个升级 Sentinel；升级 Sentinel 期间要保持多数派在线，不要一次全部重启。</p>
+<p>备份需要对每个主节点执行 BGSAVE，收集 RDB、redis.conf、ACL 文件和 CLUSTER NODES 输出；使用 AOF 时还要保证各节点文件完整。恢复时先在隔离环境按原槽位分布重建集群，再导入数据，最后用 –cluster check 校验。没有经过恢复演练的备份，等于没有备份。</p>
+<p>容量与常见坑可以列成一张清单：</p>
+<ul>
+<li>槽位不均：扩容后新节点只拿到少量槽，老节点仍承载大部分请求，用 –cluster rebalance 或按权重调整。</li>
+<li>热点 key：槽按 key 哈希，单个热点 key 一定落在单个节点，加节点无效，需要在业务层拆键或加本地缓存。</li>
+<li>大 key：迁移时 MIGRATE 同步执行，大 key 会阻塞源节点；删除大 key 也可能造成延迟尖刺，上线前应抽样排查。</li>
+<li>跨槽事务与 Lua：设计阶段就要把相关键放进同一个 hash tag，事后改造代价很高。</li>
+<li>MOVED 风暴：客户端拓扑陈旧或频繁迁槽时会放大重定向流量，迁移应安排在低峰，客户端要开启拓扑刷新并设置重定向上限。</li>
+<li>脑裂与切换时间：故障检测依赖 cluster-node-timeout 和多数主节点，网络分区时可能出现双主写入；切换时间是设计目标，必须在自己的环境里做故障演练测量，不能照搬别人的秒数。</li>
+</ul>
+<h2 id="选型：Sentinel、Cluster、代理与托管服务"><a href="#选型：Sentinel、Cluster、代理与托管服务" class="headerlink" title="选型：Sentinel、Cluster、代理与托管服务"></a>选型：Sentinel、Cluster、代理与托管服务</h2><p>把几种形态放在一起比较，决策会清楚很多。</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>Sentinel</th>
+<th>Cluster</th>
+<th>代理</th>
+<th>托管服务</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>数据容量</td>
+<td>单机内存</td>
+<td>多主分片</td>
+<td>取决于后端</td>
+<td>取决于套餐</td>
+</tr>
+<tr>
+<td>写扩展</td>
+<td>单主</td>
+<td>多主</td>
+<td>取决于后端</td>
+<td>视产品而定</td>
+</tr>
+<tr>
+<td>故障转移</td>
+<td>自动</td>
+<td>自动</td>
+<td>依赖后端</td>
+<td>平台负责</td>
+</tr>
+<tr>
+<td>多键与事务</td>
+<td>无限制</td>
+<td>必须同槽</td>
+<td>仍受后端限制</td>
+<td>视产品而定</td>
+</tr>
+<tr>
+<td>客户端改造</td>
+<td>小</td>
+<td>需要集群客户端</td>
+<td>小</td>
+<td>小</td>
+</tr>
+<tr>
+<td>运维复杂度</td>
+<td>中</td>
+<td>高</td>
+<td>中高</td>
+<td>低</td>
+</tr>
+<tr>
+<td>适用场景</td>
+<td>中小数据量、多键操作多</td>
+<td>大数据量、要写扩展</td>
+<td>遗留客户端</td>
+<td>小团队、合规允许</td>
+</tr>
+</tbody></table>
+<p>如果数据能放进单机、业务大量使用多键操作和事务，Sentinel 是更简单的选择；它的复杂度主要在仲裁和客户端发现，不涉及槽迁移。如果数据或写入已经超过单机，或者可以接受按 key 设计分片，Cluster 才是答案，但要接受跨槽限制、运维复杂度上升和迁移成本。代理适合“客户端改不动”的过渡期，不应作为长期架构的核心。托管服务把运维转移给平台，代价是成本、可控性和某些命令与配置的限制，选型前要确认网络延迟、备份策略和扩容方式。</p>
+<p>一个常见的误区是“为了高可用上 Cluster”。Cluster 的高可用并不比 Sentinel 更强，它额外提供的是分片；如果容量不是问题，Cluster 只会增加约束。反过来，数据已经超过单机却继续用 Sentinel，也只是把问题推迟到下一次扩容。</p>
+<h2 id="安全加固要点"><a href="#安全加固要点" class="headerlink" title="安全加固要点"></a>安全加固要点</h2><p>Redis 的默认配置面向本机开发，直接暴露在公网是事故的起点。加固按网络、认证、加密、命令四层推进。</p>
+<p>网络层：bind 只监听内网地址，安全组只放行应用网段，protected-mode 保持 yes；Cluster 总线端口（客户端端口 + 10000）和 Sentinel 的 26379 同样不能暴露，更不要把 Redis 绑定到公网负载均衡。</p>
+<p>认证层：requirepass 只是第一步，Redis 6.0 的 ACL 可以按用户授权。先配置 aclfile，再建最小权限账号：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># redis.conf</span></span><br><span class="line">aclfile /etc/redis/users.acl</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 启用用户、设置密码、限制键空间、只授予必要命令</span></span><br><span class="line">ACL SETUSER app on &gt;S3cretPass ~cache:* +get +<span class="built_in">set</span> +del +expire +ttl</span><br><span class="line">ACL SETUSER <span class="built_in">readonly</span> on &gt;AnotherPass ~* +@<span class="built_in">read</span> -@write -@dangerous</span><br><span class="line">ACL SAVE</span><br></pre></td></tr></table></figure>
+
+<p>生产上建议在 aclfile 里关闭 default 用户（user default off），每个应用独立账号，用 +@read、-@write、-@dangerous 收口，再按需放开命令；ACL LOG 查看拒绝记录，ACL WHOAMI 确认身份。键模式是 glob，~* 等于不限制，等于没隔离。</p>
+<p>加密层：Redis 6.0 内置 TLS，可配置 tls-port、tls-cert-file、tls-key-file、tls-ca-cert-file 并关闭明文端口；Cluster 总线可用 tls-cluster 打开加密。Sentinel 的 TLS 配置项更多，启用前要逐项对照文档验证，不要假设开了端口就全链路加密。</p>
+<p>命令层：FLUSHALL、FLUSHDB、KEYS、CONFIG、DEBUG、SHUTDOWN 等命令在生产环境应通过 ACL 或 rename-command 禁用，确需使用时走堡垒机。慢查询、连接数和拒绝命令数要纳入监控，管理端口与业务流量分开。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>单机 Redis 的瓶颈不只是内存，还包括故障恢复、写入扩展与维护窗口。Sentinel 用监控、quorum、领导选举和配置纪元解决自动切换，适合数据能装进单机且多键操作频繁的场景；Cluster 用 16384 个槽、MOVED&#x2F;ASK 重定向和 gossip 总线解决分片与故障转移，代价是跨槽限制和更高的运维复杂度。两者都建立在异步复制之上，故障切换可能丢失最后一段写入，WAIT 与 min-replicas-to-write 只能缩小窗口，不能消除。落地时先判断容量是否需要分片，再选择拓扑；把客户端重试、备份恢复、升级顺序和安全加固一起设计，才算真正的高可用。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://redis.io/topics/replication">Redis replication</a></li>
+<li><a href="https://redis.io/topics/sentinel">Redis Sentinel</a></li>
+<li><a href="https://redis.io/topics/cluster-tutorial">Redis Cluster tutorial</a></li>
+<li><a href="https://redis.io/topics/cluster-spec">Redis Cluster specification</a></li>
+<li><a href="https://redis.io/topics/acl">Redis ACL</a></li>
+<li><a href="https://redis.io/topics/security">Redis security</a></li>
+<li><a href="https://redis.io/topics/encryption">Redis TLS</a></li>
+<li><a href="https://redis.io/commands/wait">WAIT command</a></li>
+<li><a href="https://redis.io/commands/cluster-failover">CLUSTER FAILOVER command</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Redis 集群与哨兵模式</p><p><a href="https://987763485.github.io/2020/07/07/Redis集群与哨兵模式/">https://987763485.github.io/2020/07/07/Redis集群与哨兵模式/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2020-07-07</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/devops/">devops</a><a class="link-muted mr-2" rel="tag" href="/tags/docker/">docker</a><a class="link-muted mr-2" rel="tag" href="/tags/linux/">linux</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2020/07/12/MySQL%E6%89%A7%E8%A1%8C%E8%AE%A1%E5%88%92explain%E5%AE%9E%E6%88%98/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">MySQL 执行计划 explain 实战</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2020/06/30/iptables%E9%98%B2%E7%81%AB%E5%A2%99%E9%85%8D%E7%BD%AE/"><span class="level-item">iptables 防火墙配置</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>设计工程协作流程 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="设计与前端之间最常见的摩擦，不是某人画错或某人写错，而是双方对”同一件东西”的叫法、状态数和验收口径各说各话。本文站在前端工程视角，把设计到实现拆成一条有准入准出条件的流水线：设计令牌层、组件命名与映射契约、评审与走查节点、变更通知纪律，以及能用来自检的度量口径。读完你会得到一套可以直接抄进团队章程的清单与示例。它适合已经做过若干需求、但每次上线都要靠”肉眼比对稿子”来兜底的设计与前端同学。"><meta property="og:type" content="blog"><meta property="og:title" content="设计工程协作流程"><meta property="og:url" content="https://987763485.github.io/2024/02/27/%E8%AE%BE%E8%AE%A1%E5%B7%A5%E7%A8%8B%E5%8D%8F%E4%BD%9C%E6%B5%81%E7%A8%8B/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="设计与前端之间最常见的摩擦，不是某人画错或某人写错，而是双方对”同一件东西”的叫法、状态数和验收口径各说各话。本文站在前端工程视角，把设计到实现拆成一条有准入准出条件的流水线：设计令牌层、组件命名与映射契约、评审与走查节点、变更通知纪律，以及能用来自检的度量口径。读完你会得到一套可以直接抄进团队章程的清单与示例。它适合已经做过若干需求、但每次上线都要靠”肉眼比对稿子”来兜底的设计与前端同学。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2024-02-26T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-19T06:49:04.043Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="web前端"><meta property="article:tag" content="typescript"><meta property="article:tag" content="react"><meta property="article:tag" content="vue"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2024/02/27/%E8%AE%BE%E8%AE%A1%E5%B7%A5%E7%A8%8B%E5%8D%8F%E4%BD%9C%E6%B5%81%E7%A8%8B/"},"headline":"设计工程协作流程","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2024-02-26T16:00:00.000Z","dateModified":"2026-10-19T06:49:04.043Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"设计与前端之间最常见的摩擦，不是某人画错或某人写错，而是双方对”同一件东西”的叫法、状态数和验收口径各说各话。本文站在前端工程视角，把设计到实现拆成一条有准入准出条件的流水线：设计令牌层、组件命名与映射契约、评审与走查节点、变更通知纪律，以及能用来自检的度量口径。读完你会得到一套可以直接抄进团队章程的清单与示例。它适合已经做过若干需求、但每次上线都要靠”肉眼比对稿子”来兜底的设计与前端同学。"}</script><link rel="canonical" href="https://987763485.github.io/2024/02/27/%E8%AE%BE%E8%AE%A1%E5%B7%A5%E7%A8%8B%E5%8D%8F%E4%BD%9C%E6%B5%81%E7%A8%8B/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2024-02-26T16:00:00.000Z" title="2/27/2024, 12:00:00 AM">2024-02-27</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/">前端开发</a></span><span class="level-item">1 小时读完 (大约7660个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">设计工程协作流程</h1><div class="content"><p>设计与前端之间最常见的摩擦，不是某人画错或某人写错，而是双方对”同一件东西”的叫法、状态数和验收口径各说各话。本文站在前端工程视角，把设计到实现拆成一条有准入准出条件的流水线：设计令牌层、组件命名与映射契约、评审与走查节点、变更通知纪律，以及能用来自检的度量口径。读完你会得到一套可以直接抄进团队章程的清单与示例。它适合已经做过若干需求、但每次上线都要靠”肉眼比对稿子”来兜底的设计与前端同学。</p>
+<h2 id="设计为什么会与实现漂移"><a href="#设计为什么会与实现漂移" class="headerlink" title="设计为什么会与实现漂移"></a>设计为什么会与实现漂移</h2><p>先把问题定义清楚。漂移（design drift）指的是设计意图与线上实现之间的差异随时间累积，而不是某一次明显的 bug。它的根子在于交付物与协作方式本身。设计与实现之间漂移的第一个原因是交付物是静态图：一张设计稿呈现的是一种”正确答案的样子”，但界面在真实世界里有一整套状态——加载中、空数据、部分失败、禁用、悬停、焦点、错误提示，静态图默认只画了”有数据且成功”的那一格，剩下的状态靠实现时临场脑补。</p>
+<p>第二个原因是口头约定占主导。”这个间距和那个一样””这个按钮复用了””红色就是危险操作”这类判断散落在聊天窗口和会议口头里，没有落成可读、可检索、可对比的记录。人员一轮换，约定就丢失，实现只能凭感觉重做。</p>
+<p>第三个原因是缺少共同词汇。设计师说”卡片”，前端说的可能是 <code>Panel</code>、<code>Card</code>、<code>Tile</code>、<code>Block</code> 中的某一个；设计师改了一个圆角，前端不知道这个圆角到底属于”某组件私有”还是”全局令牌”，于是要么不敢动、要么动了一大片。</p>
+<p>下面三个具体漂移现象值得对照自查。其一是”同款不同值”：设计稿里有五处主按钮，颜色本应同一个语义令牌，实现时因为复制粘贴出现了 3 种略有差异的十六进制值，肉眼难辨但截图对比能抓出来。其二是”状态漏配”：设计只给了下拉框收起与展开两态，实现上线后才发现选中态、键盘焦点态、禁用态、报错态全靠前端自行发挥，走查时又发现与另一处组件不一致。其三是”令牌孤岛”：前端已经有一套 CSS 变量，设计工具里另有一套色板，两套各改各的，谁都不是事实源，改一次全站配色要人肉对齐两份。</p>
+<p>需要说明的是，本文只谈设计与前端之间的协作流程与契约，不重复 2016 年那篇《Photoshop 切图与标注协作流程》里的切图与标注单点实现，也不展开《Web 组件化设计系统实践》所讲的组件 API、Shadow DOM 与版本发布机制——那些属于工程实现，本篇只在”契约”层面握手。</p>
+<h2 id="协作流程总览"><a href="#协作流程总览" class="headerlink" title="协作流程总览"></a>协作流程总览</h2><p>把设计与前端之间的一次完整交付画成一条流水线，每个节点都带准入（进入这一格之前必须满足什么）与准出（离开这一格必须交出什么）。下面的 <code>flowchart TD</code> 是本文其余小节的路标：需求评审 → 设计探索 → 设计交付 → 实现 → 走查 → 上线 → 复盘。</p>
+<pre class="mermaid">flowchart TD
+    A[需求评审] --> B[设计探索]
+    B --> C[设计交付]
+    C --> D[前端实现]
+    D --> E[设计走查]
+    E --> F[上线]
+    F --> G[复盘]
+    G -.-> A
+    E -.->|缺陷回退| D</pre>
+
+<p>各节点的准入与准出条件如下（数值口径均为团队约定示例，可按团队实际调整）。</p>
+<table>
+<thead>
+<tr>
+<th>节点</th>
+<th>准入条件</th>
+<th>准出产物</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>需求评审</td>
+<td>需求说明、验收目标就绪</td>
+<td>前端五类问题清单已回答</td>
+</tr>
+<tr>
+<td>设计探索</td>
+<td>评审结论、可用令牌已确认</td>
+<td>关键流程状态草稿</td>
+</tr>
+<tr>
+<td>设计交付</td>
+<td>状态齐全、命名对上登记表</td>
+<td>可开发设计稿 + 令牌变更说明</td>
+</tr>
+<tr>
+<td>前端实现</td>
+<td>收到可开发稿、契约无歧义</td>
+<td>组件 Story 与实现自检通过</td>
+</tr>
+<tr>
+<td>设计走查</td>
+<td>实现部署到走查环境</td>
+<td>分级缺陷记录闭合或挂账</td>
+</tr>
+<tr>
+<td>上线</td>
+<td>走查阻断级缺陷清零</td>
+<td>灰度放量、监控看板就绪</td>
+</tr>
+<tr>
+<td>复盘</td>
+<td>上线后一个迭代周期</td>
+<td>度量数据、流程修订项</td>
+</tr>
+</tbody></table>
+<p>这张图里有两条回退线是流程的关键：走查发现阻断级缺陷时回退到实现，而不是”先上线再说”；复盘产出的流程修订项回流到下一次需求评审。一条没有回退线的流程图只是排期表，画不出协作的真实成本。</p>
+<h2 id="设计令牌层：把视觉决策变成可消费的契约"><a href="#设计令牌层：把视觉决策变成可消费的契约" class="headerlink" title="设计令牌层：把视觉决策变成可消费的契约"></a>设计令牌层：把视觉决策变成可消费的契约</h2><p>漂移的很大一部分来自”值”没有归属。设计令牌（design token）就是把颜色、间距、圆角、字号、阴影这些视觉决策，命名成有层级、可被代码消费的数据对象，让设计和前端共享同一份命名后的取值，而不是各自抄十六进制。</p>
+<p>令牌要分语义层级，最常见的是三级。原始层（primitive）是”不带语义的原料”，如 <code>color.blue.500</code>；语义层（semantic）是”带用途的意图”，如 <code>color.action.primary</code> 指向 <code>color.blue.500</code>；组件层（component）是”某组件当前用哪个语义”，如 <code>button.background.default</code> 指向 <code>color.action.primary</code>。前端绝大多数只应消费语义层与组件层，原始层留给设计内部与主题切换。这样改一个主色只动语义层一处映射，全站随令牌更新，而不是全站的蓝都被替换——这正是”令牌孤岛”的解法。</p>
+<p>下面是一份 JSON 令牌示例（<code>tokens.json</code>），结构是”原始层 + 语义层”：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;color&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;primitive&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">      <span class="attr">&quot;blue&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;500&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;value&quot;</span><span class="punctuation">:</span> <span class="string">&quot;#2563eb&quot;</span> <span class="punctuation">&#125;</span> <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;gray&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;100&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;value&quot;</span><span class="punctuation">:</span> <span class="string">&quot;#f3f4f6&quot;</span> <span class="punctuation">&#125;</span><span class="punctuation">,</span> <span class="attr">&quot;900&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;value&quot;</span><span class="punctuation">:</span> <span class="string">&quot;#111827&quot;</span> <span class="punctuation">&#125;</span> <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;red&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;500&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;value&quot;</span><span class="punctuation">:</span> <span class="string">&quot;#dc2626&quot;</span> <span class="punctuation">&#125;</span> <span class="punctuation">&#125;</span></span><br><span class="line">    <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;semantic&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">      <span class="attr">&quot;text&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">        <span class="attr">&quot;primary&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;value&quot;</span><span class="punctuation">:</span> <span class="string">&quot;&#123;color.primitive.gray.900&#125;&quot;</span> <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">        <span class="attr">&quot;inverse&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;value&quot;</span><span class="punctuation">:</span> <span class="string">&quot;&#123;color.primitive.gray.100&#125;&quot;</span> <span class="punctuation">&#125;</span></span><br><span class="line">      <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;action&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">        <span class="attr">&quot;primary&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;value&quot;</span><span class="punctuation">:</span> <span class="string">&quot;&#123;color.primitive.blue.500&#125;&quot;</span> <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">        <span class="attr">&quot;danger&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;value&quot;</span><span class="punctuation">:</span> <span class="string">&quot;&#123;color.primitive.red.500&#125;&quot;</span> <span class="punctuation">&#125;</span></span><br><span class="line">      <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;surface&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">        <span class="attr">&quot;default&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;value&quot;</span><span class="punctuation">:</span> <span class="string">&quot;#ffffff&quot;</span> <span class="punctuation">&#125;</span></span><br><span class="line">      <span class="punctuation">&#125;</span></span><br><span class="line">    <span class="punctuation">&#125;</span></span><br><span class="line">  <span class="punctuation">&#125;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>这类 <code>{a.b.c}</code> 的引用语法是 Style Dictionary 一类令牌构建工具的常见写法，构建时把语义层解析成具体值，再输出成 CSS 变量、SCSS 或 TypeScript 常量。前端消费令牌有两种主流形态：运行时用 CSS 自定义属性（<code>var(--color-action-primary)</code>），构建时用 TypeScript 常量（编译期就能做类型检查）。下面这份类型定义说明前端如何在 TS 里约束”允许消费的令牌名”，让乱写令牌名在编译期就报错。以 TypeScript 5.3 口径的写法：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 只允许消费语义层令牌名，原始层不对外暴露</span></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">type</span> <span class="title class_">SemanticColorToken</span> =</span><br><span class="line">  | <span class="string">&#x27;text.primary&#x27;</span></span><br><span class="line">  | <span class="string">&#x27;text.inverse&#x27;</span></span><br><span class="line">  | <span class="string">&#x27;action.primary&#x27;</span></span><br><span class="line">  | <span class="string">&#x27;action.danger&#x27;</span></span><br><span class="line">  | <span class="string">&#x27;surface.default&#x27;</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 构建产物里的映射：令牌名 -&gt; CSS 变量名</span></span><br><span class="line"><span class="keyword">declare</span> <span class="keyword">const</span> <span class="attr">CSS_VAR</span>: <span class="title class_">Record</span>&lt;<span class="title class_">SemanticColorToken</span>, <span class="built_in">string</span>&gt;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">function</span> <span class="title function_">tokenToVar</span>(<span class="params"><span class="attr">token</span>: <span class="title class_">SemanticColorToken</span></span>): <span class="built_in">string</span> &#123;</span><br><span class="line">  <span class="keyword">return</span> <span class="string">`var(<span class="subst">$&#123;CSS_VAR[token]&#125;</span>)`</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 组件里只能这样取，传错字符串过不了编译</span></span><br><span class="line"><span class="keyword">const</span> bg = <span class="title function_">tokenToVar</span>(<span class="string">&#x27;action.primary&#x27;</span>);</span><br></pre></td></tr></table></figure>
+
+<p>消费约定要写进组件规范：组件的样式只允许引用语义层与组件层令牌，禁止直接写十六进制或原始层令牌。评审设计稿时也据此判断”这个蓝是不是又新造了一个色值”。</p>
+<p>两种消费形态各有取舍，不是非此即彼。运行时 CSS 自定义属性的好处是主题切换、深色模式可以在不重新构建的前提下整站换值，代价是编译期拿不到”令牌名写错了”这类错误。构建时 TypeScript 常量的好处是类型检查能把住关，代价是换肤要重新出包。成熟做法是两者叠加：以令牌 JSON 为源，构建时同时产出 CSS 变量表与类型安全的 TS 映射，组件样式走 CSS 变量、逻辑判断（如”这个令牌是不是语义上的危险色”）走 TS 常量。</p>
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* 构建工具由 tokens.json 生成的 CSS 变量表，组件只引用语义层 */</span></span><br><span class="line"><span class="selector-pseudo">:root</span> &#123;</span><br><span class="line">  <span class="attr">--color-text-primary</span>: <span class="number">#111827</span>;</span><br><span class="line">  <span class="attr">--color-action-primary</span>: <span class="number">#2563eb</span>;</span><br><span class="line">  <span class="attr">--color-action-danger</span>: <span class="number">#dc2626</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="selector-class">.btn--primary</span> &#123;</span><br><span class="line">  <span class="comment">/* 只允许 var(--color-action-*)，出现十六进制即视为违规 */</span></span><br><span class="line">  <span class="attribute">background</span>: <span class="built_in">var</span>(--color-action-primary);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>前端与设计的协作到此落到一个可检查的口径上：任何未被登记表收录的令牌名，都算变更，都走下一节的流程。</p>
+<h2 id="组件命名与映射契约"><a href="#组件命名与映射契约" class="headerlink" title="组件命名与映射契约"></a>组件命名与映射契约</h2><p>令牌管”值”，命名与映射契约管”东西叫什么、状态怎么对应到代码”。这一节只讲协作契约，组件 API 的实现细节留给工程实现篇，本篇不展开。</p>
+<p>契约的核心是一张登记表：设计稿里的组件名与代码里的组件名一一对应，且变体（variant）与状态（state）有明确的落点——变体映射为一个枚举型属性，状态映射为布尔型属性或属性组合。登记表至少包含列：设计组件名、代码组件名、变体枚举、状态清单、对应 Story 链接。下面是一份示例登记表的文字形态：</p>
+<table>
+<thead>
+<tr>
+<th>设计组件名</th>
+<th>代码组件名</th>
+<th>变体 variant</th>
+<th>状态 state</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>主按钮</td>
+<td><code>&lt;Button&gt;</code></td>
+<td><code>primary</code> &#x2F; <code>secondary</code> &#x2F; <code>ghost</code></td>
+<td><code>disabled</code> &#x2F; <code>loading</code></td>
+</tr>
+<tr>
+<td>下拉选择</td>
+<td><code>&lt;Select&gt;</code></td>
+<td><code>default</code> &#x2F; <code>inline</code></td>
+<td><code>error</code> &#x2F; <code>open</code></td>
+</tr>
+<tr>
+<td>信息卡片</td>
+<td><code>&lt;Card&gt;</code></td>
+<td><code>elevated</code> &#x2F; <code>outlined</code></td>
+<td><code>selectable</code> &#x2F; <code>selected</code></td>
+</tr>
+</tbody></table>
+<p>命名纪律有三条。其一，登记表是唯一命名源，设计工具里的组件命名与代码里的导出名必须逐字一致；发现不一致，先改设计稿或先改代码要由最近改动的一方负责。其二，”变体”回答”这是同一种东西的哪一款”，”状态”回答”它此刻处于什么情形”；把”选中”当成变体还是状态要全团队统一，否则会出现同一个组件在不同人手里落点不同。其三，状态里的 <code>disabled</code> 与 <code>loading</code> 是互斥还是可叠加，要在契约里写死，不要留给实现临场决定。</p>
+<p>“这到底是变体还是状态”是登记表里最容易吵架的地方，值得给一条可判定的规则，而不是各凭理解。判据是：如果这个差异由调用方在使用时就固定选定、运行中不会因用户操作而切换，它是变体；如果这个差异由运行时数据或用户交互驱动、同一实例会在不同取值间来回切换，它是状态。据此列一张对照表（示例为团队约定口径）：</p>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>归类</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>按钮是 primary 还是 ghost</td>
+<td>变体</td>
+<td>调用方在写代码时就定死</td>
+</tr>
+<tr>
+<td>输入框是否处于报错</td>
+<td>状态</td>
+<td>校验结果在运行时改变</td>
+</tr>
+<tr>
+<td>卡片是否可选</td>
+<td>变体</td>
+<td>由业务场景决定它可否被选</td>
+</tr>
+<tr>
+<td>卡片当前是否被选中</td>
+<td>状态</td>
+<td>用户点击在运行时切换</td>
+</tr>
+<tr>
+<td>表格是紧凑还是舒适密度</td>
+<td>变体</td>
+<td>全局设置一次选定</td>
+</tr>
+</tbody></table>
+<p>有了这张表，评审时遇到分歧可以照判据归类，不必争”我觉得”。归错类的代价很实际：把一个本应是状态的”选中”实现成变体，就等于逼调用方为同一份数据维护两个组件实例，交互逻辑随之分裂；反过来把变体当状态，会让枚举值膨胀、Story 目录爆炸。</p>
+<p>同一份契约可以有不同框架的实现。下面是 React 18 函数组件与 Vue 3.4 组件对同一按钮契约的两端写法，属性口径一致：</p>
+<figure class="highlight tsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// React 18：variant 为联合类型，state 拆成布尔属性</span></span><br><span class="line"><span class="keyword">type</span> <span class="title class_">ButtonVariant</span> = <span class="string">&#x27;primary&#x27;</span> | <span class="string">&#x27;secondary&#x27;</span> | <span class="string">&#x27;ghost&#x27;</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">interface</span> <span class="title class_">ButtonProps</span> &#123;</span><br><span class="line">  <span class="attr">variant</span>?: <span class="title class_">ButtonVariant</span>;</span><br><span class="line">  <span class="attr">disabled</span>?: <span class="built_in">boolean</span>;</span><br><span class="line">  <span class="attr">loading</span>?: <span class="built_in">boolean</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">function</span> <span class="title function_">Button</span>(<span class="params">&#123;</span></span><br><span class="line"><span class="params">  variant = <span class="string">&#x27;primary&#x27;</span>,</span></span><br><span class="line"><span class="params">  disabled = <span class="literal">false</span>,</span></span><br><span class="line"><span class="params">  loading = <span class="literal">false</span>,</span></span><br><span class="line"><span class="params">&#125;: <span class="title class_">ButtonProps</span></span>) &#123;</span><br><span class="line">  <span class="comment">// 契约要求 disabled 与 loading 互斥：loading 时按禁用渲染</span></span><br><span class="line">  <span class="keyword">const</span> isDisabled = disabled || loading;</span><br><span class="line">  <span class="keyword">return</span> (</span><br><span class="line">    <span class="language-xml"><span class="tag">&lt;<span class="name">button</span></span></span></span><br><span class="line"><span class="tag"><span class="language-xml">      <span class="attr">data-variant</span>=<span class="string">&#123;variant&#125;</span></span></span></span><br><span class="line"><span class="tag"><span class="language-xml">      <span class="attr">data-loading</span>=<span class="string">&#123;loading</span> ? &#x27;<span class="attr">true</span>&#x27; <span class="attr">:</span> &#x27;<span class="attr">false</span>&#x27;&#125;</span></span></span><br><span class="line"><span class="tag"><span class="language-xml">      <span class="attr">disabled</span>=<span class="string">&#123;isDisabled&#125;</span></span></span></span><br><span class="line"><span class="tag"><span class="language-xml">    /&gt;</span></span></span><br><span class="line">  );</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line">&lt;!-- Vue 3.4 组件，同一按钮契约的另一端实现 --&gt;</span><br><span class="line">&lt;script setup lang=&quot;ts&quot;&gt;</span><br><span class="line">type ButtonVariant = &#x27;primary&#x27; | &#x27;secondary&#x27; | &#x27;ghost&#x27;;</span><br><span class="line"></span><br><span class="line">const props = withDefaults(</span><br><span class="line">  defineProps&lt;&#123;</span><br><span class="line">    variant?: ButtonVariant;</span><br><span class="line">    disabled?: boolean;</span><br><span class="line">    loading?: boolean;</span><br><span class="line">  &#125;&gt;(),</span><br><span class="line">  &#123; variant: &#x27;primary&#x27;, disabled: false, loading: false &#125;,</span><br><span class="line">);</span><br><span class="line"></span><br><span class="line">// 同样把 disabled 与 loading 的互斥规则固化在实现里</span><br><span class="line">const isDisabled = computed(</span><br><span class="line">  () =&gt; props.disabled || props.loading,</span><br><span class="line">);</span><br><span class="line">&lt;/script&gt;</span><br><span class="line"></span><br><span class="line">&lt;template&gt;</span><br><span class="line">  &lt;button</span><br><span class="line">    :data-variant=&quot;props.variant&quot;</span><br><span class="line">    :data-loading=&quot;String(props.loading)&quot;</span><br><span class="line">    :disabled=&quot;isDisabled&quot;</span><br><span class="line">  /&gt;</span><br><span class="line">&lt;/template&gt;</span><br></pre></td></tr></table></figure>
+
+<p>两段代码属性口径、互斥规则、<code>data-*</code> 标记完全一致，差别只在框架语法。这正是”契约是同一份、实现可以两端各写”的含义：走查时可以拿同一份状态清单去查 React 页与 Vue 页，而不是各查一套。顺带划一条边界：本节只约定设计与前端的命名契约，跨语言团队的接口契约与提交规范不在本文范围，那是《多语言团队协作规范》要处理的问题。</p>
+<h2 id="评审节点与交付物标准"><a href="#评审节点与交付物标准" class="headerlink" title="评审节点与交付物标准"></a>评审节点与交付物标准</h2><p>流程里最省钱的一步是需求评审，因为此时改动的代价还只是改一张草图。前端在这个阶段的价值不是”听懂需求”，而是把设计稿里没有明说的状态与边界问题提前问出来。下面五类问题是前端在评审阶段必须提出的清单，缺一项就意味着后面某个节点要补。</p>
+<p>第一类是状态数。每一个交互组件都要问全：默认态、悬停态、按下态、焦点态、禁用态、加载中态、错误态、空数据态，一共几种，是否互斥。状态数不问清，实现就会自己发明，走查就会来回返工。</p>
+<p>第二类是边界数据。文案长度极端时（一个超长的按钮标签、一段超长的用户名）组件是截断、换行还是撑破容器？数字为 0、为负、为超大值时怎么显示？列表只有 1 条和铺满 50 条时的滚动行为是否一致？这些不是”实现细节”，而是设计必须在稿子里表态的内容。</p>
+<p>第三类是空、错、加载。这是最常被整块遗漏的一组：数据还没回来时放骨架屏还是 spinner？请求失败时是整页报错还是局部重试？完全无数据时的插画与文案由谁给？设计稿里如果只有”成功”那一态，就等于把三种状态甩给了实现。</p>
+<p>第四类是响应式断点。同一张稿在窄屏、平板、宽屏下布局如何重排，哪些组件在窄屏下折叠、哪些换方向、哪些直接隐藏，断点阈值是否复用全局令牌。断点不是”缩放”，重排规则要逐组件写明。</p>
+<p>第五类是动效与可访问性。过渡时长、缓动曲线、进入与退出是否成对；动效要能响应”减少动态效果”的系统偏好，键盘焦点路径要可视。此处只对动效与可访问性检查点一句带过，可访问性的工程化门禁属于另一篇《前端可访问性工程化》，本文不展开。</p>
+<p>评审之后，进入”设计交付”节点，交付物的验收口径是：什么才算一份”可开发的设计稿”。可开发不等于好看，而是满足下面这份检查清单——逐项打勾，缺项即视为未交付。</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="bullet">-</span> [ ] 组件名能在登记表里找到，且变体/状态命名与登记表一致</span><br><span class="line"><span class="bullet">-</span> [ ] 每个交互组件的全部状态都有稿，不只有成功态</span><br><span class="line"><span class="bullet">-</span> [ ] 空、错误、加载三态均有明确呈现方式</span><br><span class="line"><span class="bullet">-</span> [ ] 边界数据（超长文案、0 与负数、极端列表长度）有处理说明</span><br><span class="line"><span class="bullet">-</span> [ ] 所有颜色/间距/圆角/字号均引用语义令牌，无裸十六进制</span><br><span class="line"><span class="bullet">-</span> [ ] 响应式断点下每个组件的重排规则写明</span><br><span class="line"><span class="bullet">-</span> [ ] 交互转移条件写清（点 A 之后到哪个态、失败回到哪个态）</span><br><span class="line"><span class="bullet">-</span> [ ] 标注可读：尺寸、层级、可读说明能从交付面板直接取</span><br><span class="line"><span class="bullet">-</span> [ ] 动效成对（进入/退出），并说明减少动效时的降级</span><br><span class="line"><span class="bullet">-</span> [ ] 与实现自检 Story 的链接已互相回填</span><br></pre></td></tr></table></figure>
+
+<p>把清单套到一个具体组件上，能看出它如何把”含糊”逼成”明确”。以”筛选区下拉选择”为例，过一遍清单会得到这样一组结论：状态至少有默认、悬停、焦点、展开、选中、禁用、报错七种，不是设计稿里画的两态；选项列表为空时显示”暂无可选项”而非空白，加载中显示占位骨架而非转圈；当搜索关键词超长时输入区省略号截断、下拉面板不换行；窄屏下面板从触发器下方展开改为底部抽屉；选中一项后面板收起、失焦时未选中则恢复默认。这七条里任何一条没在稿子上写明，都会在走查时以”实现自作主张”的形式回来。清单的作用就是让这些决定发生在评审与交付阶段，而不是实现之后。</p>
+<p>其中”交互转移条件”是最容易被忽略的一栏。静态图能画出”展开的下拉框”，却画不出”点击选项后收起并把选中值写回、失焦时取消”这条转移。转移条件要么写进稿子的说明层，要么在评审会上口头确认后补记，否则实现只能猜，走查时又各说各话。</p>
+<h2 id="走查机制与变更纪律"><a href="#走查机制与变更纪律" class="headerlink" title="走查机制与变更纪律"></a>走查机制与变更纪律</h2><p>走查（design QA，设计验收）是实现完成后、上线之前的一次系统比对，它不是”设计师打开页面随便看看”，而是一次有发起人、有环境、有记录、有分级的验收动作。先把机制约定清楚，走查才不会退化成情绪化的挑刺。</p>
+<p>发起人默认是设计侧，但触发条件是”实现已部署到走查环境”，而不是”前端说做完了”。走查环境必须是一个数据可控、能复现空&#x2F;错&#x2F;加载三态的环境——在一个永远返回成功数据的本地热更新服务上走查，等于放弃了对一半状态的验收。走查按登记表逐组件、逐状态核对，核对对象就是上一节那份检查清单里的每一项。</p>
+<p>缺陷要分级，且级别决定修复优先级与是否阻塞上线。下面是一套分级口径（阈值均为团队约定示例）：</p>
+<table>
+<thead>
+<tr>
+<th>级别</th>
+<th>定义</th>
+<th>修复时限示例</th>
+<th>是否阻塞上线</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>阻断</td>
+<td>状态缺失、令牌用错致对比度不达标、核心流程走不通</td>
+<td>上线前必须闭合</td>
+<td>是</td>
+</tr>
+<tr>
+<td>严重</td>
+<td>变体渲染错误、边界数据下布局撑破、转移条件不符</td>
+<td>当前迭代内</td>
+<td>否，但需挂账</td>
+</tr>
+<tr>
+<td>一般</td>
+<td>间距&#x2F;圆角与稿有肉眼可见偏差、文案截断策略不一致</td>
+<td>排入后续待办</td>
+<td>否</td>
+</tr>
+<tr>
+<td>建议</td>
+<td>主观审美偏好、非规范性的微调</td>
+<td>可选</td>
+<td>否</td>
+</tr>
+</tbody></table>
+<p>分级的关键在”是否阻塞”这一列要提前对齐，而不是走查会上临时争。一条可执行的判定规则是：凡是让某个状态无法达成、或让语义令牌被绕过成硬编码的缺陷，一律至少判严重；能一眼看出与稿不一致但不影响功能与可访问性的，判一般。</p>
+<p>一份可复用的走查记录表模板如下，逐条记录、逐条闭环或挂账：</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">| 编号 | 组件/页面 | 状态 | 现象 | 级别 | 期望依据 | 责任人 | 结论 |</span><br><span class="line">|---|---|---|---|---|---|---|---|</span><br><span class="line">| DQ-001 | Button/列表工具栏 | loading | 加载态无禁用光标 | 一般 | 登记表 loading 互斥规则 | 前端 A | 已修 |</span><br><span class="line">| DQ-002 | Select/筛选区 | error | 错误态未用 danger 令牌 | 严重 | 令牌消费约定 | 前端 B | 挂账迭代 5 |</span><br></pre></td></tr></table></figure>
+
+<p>走完走查不等于流程结束，变更纪律是防漂移的另一半。设计令牌的改动必须走和代码一样的评审通道：令牌变更以一次 PR 的形式提交，PR 里说清楚改了哪个语义令牌、影响哪些组件、是否包含破坏性变更。最危险的是”静默改全局”——有人为了某一个页面把 <code>action.primary</code> 的十六进制改了，结果全站主按钮跟着变。避免它的机制有两条：一是原始层与语义层分离，改语义要显式提交并触发受影响 Story 的视觉回归；二是把”谁动了全局令牌”纳入 PR 审查清单，评审者据此重点看。</p>
+<p>破坏性变更要有提前量与迁移提示。当一个语义令牌被拆分或重命名（例如把 <code>action.primary</code> 拆成 <code>action.primary.bg</code> 与 <code>action.primary.text</code>），要给使用方留出一个迭代周期的窗口（提前量为团队约定示例），期间旧名保留并标注废弃、输出告警，PR 描述里附上从旧名到新名的迁移对照，让两端（React 与 Vue）有时间为自己仓库补迁移。这条纪律和跨团队协作里”接口先加后删”的思路一致，但本文只把它用在令牌这一层。</p>
+<h2 id="单一事实源、度量与反模式"><a href="#单一事实源、度量与反模式" class="headerlink" title="单一事实源、度量与反模式"></a>单一事实源、度量与反模式</h2><p>组件文档——通常是 Storybook 7.x 这类工具——在协作里的角色，是把设计稿从”静态图”升级为”可交互验证物”。设计不再只交付一张图，而是和前端约定：每个登记在册的组件，都在文档里有对应每一状态的 Story，设计师的验收可以对着 Story 而不是对着还在开发中的业务页面。这样”状态齐全”这件事就从口头承诺变成了看得见的目录项。</p>
+<p>落地方式是把 Story 当作状态的合同。契约里的每个变体与状态，对应文档里一个可点开的条目；设计走查时逐条点开核对，缺一个 Story 就是缺一个状态。可访问性检查也能挂在这层：焦点态、减少动效降级在 Story 里各给一个条目，验收时一并看。这里只讲协作机制——文档如何承担”设计可交互验证”的角色；组件 API 本身的实现、Shadow DOM 与发布机制仍归工程实现篇，本文不展开。</p>
+<p>把 Story 挂进 CI 还能反过来强化变更纪律：以 Story 目录为基线跑视觉回归，一旦某个全局令牌被误改，受影响组件的 Story 截图会集体偏移，流水线立刻把它拦在合并之前。这正是”静默改全局”最难防、也最值得用自动化去堵的地方——人工走查能抓显眼的偏差，抓不动”三处主按钮蓝值差了 2 个色阶”这种细节，而基线截图可以。于是设计交付、走查、变更三条线在同一份 Story 目录上交汇，单一事实源才名副其实。</p>
+<p>度量不是为了考核人，而是为了让”流程到底哪里在漏”变得可见。下面几个指标的定义与采集口径值得团队约定（所有数值目标都是团队约定示例，不是行业基准，不可横向比较）：</p>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>定义</th>
+<th>采集口径示例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>返工率</td>
+<td>因设计&#x2F;契约歧义导致的返工提交数 ÷ 迭代总提交数</td>
+<td>提交信息打 <code>rework:</code> 前缀，脚本计数</td>
+</tr>
+<tr>
+<td>走查缺陷密度</td>
+<td>一次走查记录的有效缺陷数 ÷ 走查覆盖组件数</td>
+<td>走查记录表逐条落表后统计</td>
+</tr>
+<tr>
+<td>需求变更次数</td>
+<td>进入实现后设计&#x2F;需求回改的次数</td>
+<td>每次回改在工单上留一条变更记录</td>
+</tr>
+<tr>
+<td>静默令牌变更</td>
+<td>未经 PR 评审的全局令牌改动次数</td>
+<td>令牌构建钩子比对来源 PR</td>
+</tr>
+</tbody></table>
+<p>这些指标要盯趋势，不盯个人。用返工率去考核某个前端”是不是手艺差”，只会逼人把问题藏起来——数据一旦变成绩效考核的输入，采集就会失真，度量就失去意义。正确的用法是在复盘会上看”这一迭代走查缺陷密度为什么升高”，把答案指向流程（是不是评审阶段状态数没问全），而不是指向某个人。</p>
+<p>最后是四类反复出现的反模式及其修复，它们和本文前面每一节都对应。</p>
+<p>其一，”设计稿即最终答案”：把一张成功态静态图当成全部真相，实现被迫脑补其余状态。修复是交付前用检查清单把状态、边界、转移条件补齐，静态图降级为”意图示意”。其二，”前端被动接稿”：前端只在收到终稿后才参与，问题积累到走查才暴露。修复是把前端拉进需求评审，用五类问题清单在最早期发言。其三，”令牌与代码两套真相”：设计工具一套色板、代码里另一套变量，谁都不是源。修复是建立三级令牌层，让构建产物成为唯一被消费的一方。其四，”把协作问题当技术问题”：明明是命名没对齐、状态没约定，却归咎于”前端没还原好”或”设计师不懂实现”。修复是用登记表与走查分级把分歧落到可核对的口径上，让讨论针对”哪一格的哪个状态”，而不是针对人。</p>
+<h2 id="阶段、产出与责任"><a href="#阶段、产出与责任" class="headerlink" title="阶段、产出与责任"></a>阶段、产出与责任</h2><p>把整条流水线收束成一张表，方便直接抄进团队章程。阶段对应输入与产出，责任人指”对这一格准出负责的人”，准出条件是离开该阶段的硬门槛。责任人角色名称为示例，按团队实际映射。</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>输入</th>
+<th>产出</th>
+<th>责任人</th>
+<th>准出条件</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>需求评审</td>
+<td>需求说明、验收目标</td>
+<td>五类问题已回答</td>
+<td>前端</td>
+<td>状态&#x2F;边界&#x2F;断点无悬空问题</td>
+</tr>
+<tr>
+<td>设计探索</td>
+<td>评审结论、可用令牌</td>
+<td>关键流程状态草稿</td>
+<td>设计</td>
+<td>覆盖成功&#x2F;空&#x2F;错&#x2F;加载四态</td>
+</tr>
+<tr>
+<td>设计交付</td>
+<td>状态草稿、登记表</td>
+<td>可开发稿 + 令牌变更说明</td>
+<td>设计</td>
+<td>检查清单逐项打勾</td>
+</tr>
+<tr>
+<td>前端实现</td>
+<td>可开发稿、契约</td>
+<td>组件 Story + 自检</td>
+<td>前端</td>
+<td>每状态 Story 可点开</td>
+</tr>
+<tr>
+<td>设计走查</td>
+<td>走查环境实现</td>
+<td>分级缺陷记录</td>
+<td>设计</td>
+<td>阻断级清零、严重级挂账</td>
+</tr>
+<tr>
+<td>上线</td>
+<td>走查通过产物</td>
+<td>灰度放量与看板</td>
+<td>前端</td>
+<td>令牌变更均经 PR</td>
+</tr>
+<tr>
+<td>复盘</td>
+<td>上线后一个迭代</td>
+<td>度量与流程修订项</td>
+<td>全体</td>
+<td>修订项回流评审清单</td>
+</tr>
+</tbody></table>
+<p>这张表的价值在于每一格都能被追问”你准出了吗”。漂移往往不是某格做错了，而是某格根本没有准出条件，于是可以悄悄跳过。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>设计与前端的漂移，本质是”共同词汇”和”验收口径”的缺失，而不是手艺问题。本文给的解法可以归纳为四件事：用三级设计令牌把视觉决策变成有归属、可消费的数据；用组件命名与映射契约让设计叫法和代码叫法一一对应，并把状态固化成同一份两端实现都遵守的规则；用带准入准出的流水线（评审、交付、走查、变更、复盘）替代口头约定；用只盯趋势、不考核个人的度量让流程的漏洞可见。落地时不必一次全上，建议先从”评审五类问题清单”和”交付检查清单”两张表起步，这两张表成本最低、见效最快，也最能暴露真正的问题在哪个环节。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li>React 官方文档（Hooks 与组件）: <a href="https://react.dev/learn">https://react.dev/learn</a></li>
+<li>Vue 3 官方文档（Composition API 与单文件组件）: <a href="https://vuejs.org/guide/introduction.html">https://vuejs.org/guide/introduction.html</a></li>
+<li>TypeScript 手册（类型别名与联合类型）: <a href="https://www.typescriptlang.org/docs/handbook/2/everyday-types.html">https://www.typescriptlang.org/docs/handbook/2/everyday-types.html</a></li>
+<li>Style Dictionary 官方文档（设计令牌构建）: <a href="https://styledictionary.com/">https://styledictionary.com/</a></li>
+<li>Storybook 官方文档（组件驱动开发与 Story）: <a href="https://storybook.js.org/docs">https://storybook.js.org/docs</a></li>
+<li>W3C WCAG 2.2 规范（减少动画相关成功准则）: <a href="https://www.w3.org/TR/WCAG22/">https://www.w3.org/TR/WCAG22/</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>设计工程协作流程</p><p><a href="https://987763485.github.io/2024/02/27/设计工程协作流程/">https://987763485.github.io/2024/02/27/设计工程协作流程/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2024-02-27</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-19</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/web%E5%89%8D%E7%AB%AF/">web前端</a><a class="link-muted mr-2" rel="tag" href="/tags/typescript/">typescript</a><a class="link-muted mr-2" rel="tag" href="/tags/react/">react</a><a class="link-muted mr-2" rel="tag" href="/tags/vue/">vue</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2024/03/05/Dart%E8%AF%AD%E8%A8%80%E6%A0%B8%E5%BF%83%E7%89%B9%E6%80%A7/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Dart 语言核心特性</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2024/02/20/%E6%8A%80%E6%9C%AF%E9%80%89%E5%9E%8B%E6%96%B9%E6%B3%95%E8%AE%BA/"><span class="level-item">技术选型方法论</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

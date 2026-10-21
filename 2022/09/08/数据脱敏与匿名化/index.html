@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>数据脱敏与匿名化 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="开发同学为了复现一个线上问题，把生产库整个导出到测试环境，姓名、手机号、身份证号一应俱全。这个场景并不罕见，却同时踩中了《个人信息保护法》与《数据安全法》最在意的几条红线。本文要回答的正是这一类问题：脱敏、匿名化、假名化、令牌化到底差在哪里，静态脱敏与动态脱敏各自解决什么问题，常见的掩码、洗牌、日期偏移、格式保留加密与哈希加盐该怎么选，以及为什么“把姓名列删掉”不等于匿名。本文面向需要落地数据安全"><meta property="og:type" content="blog"><meta property="og:title" content="数据脱敏与匿名化"><meta property="og:url" content="https://987763485.github.io/2022/09/08/%E6%95%B0%E6%8D%AE%E8%84%B1%E6%95%8F%E4%B8%8E%E5%8C%BF%E5%90%8D%E5%8C%96/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="开发同学为了复现一个线上问题，把生产库整个导出到测试环境，姓名、手机号、身份证号一应俱全。这个场景并不罕见，却同时踩中了《个人信息保护法》与《数据安全法》最在意的几条红线。本文要回答的正是这一类问题：脱敏、匿名化、假名化、令牌化到底差在哪里，静态脱敏与动态脱敏各自解决什么问题，常见的掩码、洗牌、日期偏移、格式保留加密与哈希加盐该怎么选，以及为什么“把姓名列删掉”不等于匿名。本文面向需要落地数据安全"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2022-09-08T15:15:23.000Z"><meta property="article:modified_time" content="2026-10-18T16:52:11.240Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="网络安全"><meta property="article:tag" content="等级保护"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2022/09/08/%E6%95%B0%E6%8D%AE%E8%84%B1%E6%95%8F%E4%B8%8E%E5%8C%BF%E5%90%8D%E5%8C%96/"},"headline":"数据脱敏与匿名化","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2022-09-08T15:15:23.000Z","dateModified":"2026-10-18T16:52:11.240Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"开发同学为了复现一个线上问题，把生产库整个导出到测试环境，姓名、手机号、身份证号一应俱全。这个场景并不罕见，却同时踩中了《个人信息保护法》与《数据安全法》最在意的几条红线。本文要回答的正是这一类问题：脱敏、匿名化、假名化、令牌化到底差在哪里，静态脱敏与动态脱敏各自解决什么问题，常见的掩码、洗牌、日期偏移、格式保留加密与哈希加盐该怎么选，以及为什么“把姓名列删掉”不等于匿名。本文面向需要落地数据安全"}</script><link rel="canonical" href="https://987763485.github.io/2022/09/08/%E6%95%B0%E6%8D%AE%E8%84%B1%E6%95%8F%E4%B8%8E%E5%8C%BF%E5%90%8D%E5%8C%96/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-09-08T15:15:23.000Z" title="9/8/2022, 11:15:23 PM">2022-09-08</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a></span><span class="level-item">1 小时读完 (大约7666个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">数据脱敏与匿名化</h1><div class="content"><p>开发同学为了复现一个线上问题，把生产库整个导出到测试环境，姓名、手机号、身份证号一应俱全。这个场景并不罕见，却同时踩中了《个人信息保护法》与《数据安全法》最在意的几条红线。本文要回答的正是这一类问题：脱敏、匿名化、假名化、令牌化到底差在哪里，静态脱敏与动态脱敏各自解决什么问题，常见的掩码、洗牌、日期偏移、格式保留加密与哈希加盐该怎么选，以及为什么“把姓名列删掉”不等于匿名。本文面向需要落地数据安全治理的后端工程师、DBA 与合规同学，读完应当能为一张业务表写出可执行、可审计、可验证的脱敏方案。</p>
+<h2 id="四个概念：脱敏、匿名化、假名化与令牌化"><a href="#四个概念：脱敏、匿名化、假名化与令牌化" class="headerlink" title="四个概念：脱敏、匿名化、假名化与令牌化"></a>四个概念：脱敏、匿名化、假名化与令牌化</h2><p>先把术语摆正。这四个词常被混用，但法律含义与技术属性差别很大，混用会导致方案设计与合规判断同时出错。</p>
+<p><strong>脱敏（masking）</strong> 是一个工程统称，指按既定规则对敏感字段做变形，使其在特定场景下不再暴露原始值。它是一个动作，不承诺结果强度：把手机号中间四位换成星号是脱敏，把整列替换成随机数也是脱敏。它回答“怎么改”，不回答“改完还安全吗”。</p>
+<p><strong>匿名化（anonymization）</strong> 是一个结果状态：数据无法通过任何合理手段再关联到特定个人，且过程不可逆。“合理手段”意味着匿名性总是相对于攻击者的能力而言；“不可逆”意味着原始值不能再被恢复。k-匿名、l-多样性、差分隐私，本质上都在定义“什么叫无法识别”。</p>
+<p><strong>假名化（pseudonymization）</strong> 是用一个假名替换直接标识符，同时保留一张映射表，必要时可以还原。比如把用户 ID 换成 <code>U_8f3a91</code>，映射关系放在独立的密钥库里。假名化后的数据仍然属于个人信息，因为只要映射表在，个人仍然可被间接识别。这一点在监管口径上很重要：假名化不构成匿名化，处理者仍要承担个人信息处理者的义务。</p>
+<p><strong>令牌化（tokenization）</strong> 是假名化的工程化形态，通常用于支付卡号一类格式固定的高敏数据。系统把卡号换成令牌，映射保存在隔离的令牌库（token vault）中，业务系统只接触令牌。令牌不含原始信息，只能查表还原。它与加密的区别在于：加密是数学变换，密钥泄露即全量泄露；令牌化是查表，攻击者拿到令牌但拿不到令牌库，就无从还原。</p>
+<table>
+<thead>
+<tr>
+<th>概念</th>
+<th>处理对象</th>
+<th>是否可逆</th>
+<th>处理后是否仍属个人信息</th>
+<th>典型场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>脱敏</td>
+<td>字段值</td>
+<td>视方法而定</td>
+<td>通常是</td>
+<td>测试数据、展示层遮蔽</td>
+</tr>
+<tr>
+<td>匿名化</td>
+<td>整个数据集</td>
+<td>不可逆</td>
+<td>否（达到匿名标准时）</td>
+<td>数据发布、统计开放</td>
+</tr>
+<tr>
+<td>假名化</td>
+<td>直接标识符</td>
+<td>可逆（有映射表）</td>
+<td>是</td>
+<td>跨系统关联、用户分析</td>
+</tr>
+<tr>
+<td>令牌化</td>
+<td>卡号等高敏值</td>
+<td>查表可逆</td>
+<td>是</td>
+<td>支付、风控</td>
+</tr>
+</tbody></table>
+<p>这张表最值得记住的是第三列与第四列的组合关系：可逆性决定了合规属性。只要映射表存在，数据在法律上仍然是个人信息，在技术上仍然可被还原，两者都不满足匿名的要求。</p>
+<p>另一个维度是<strong>处理粒度</strong>：脱敏作用于字段，匿名化作用于记录乃至整个数据集，假名化作用于标识符，令牌化作用于单个高敏值。用字段级手段应对数据集级威胁，是实践中最常见的错配。</p>
+<h3 id="直接标识符与准标识符"><a href="#直接标识符与准标识符" class="headerlink" title="直接标识符与准标识符"></a>直接标识符与准标识符</h3><p>理解这四个概念之后，还需要引入一组更基础的概念：直接标识符（direct identifier）与准标识符（quasi-identifier）。</p>
+<p>直接标识符是能单独锁定个人的字段，姓名、身份证号、护照号、手机号、银行卡号、生物特征模板都属于此类。准标识符是单独看不具备唯一性、但组合起来可能锁定个人的字段，性别、年龄、邮编、职业、就诊科室、入职日期都是典型例子。美国计算机科学家 Sweeney 在 1997 年的一项研究中指出，美国约 87% 的人口可以被“邮编 + 性别 + 出生日期”这三项的组合唯一识别，这个结论后来被反复引用，成为 k-匿名研究的起点。</p>
+<p>这也是为什么“删掉姓名”远远不够：准标识符的组合仍能拼出另一把钥匙，而且更难被纳入审查范围。</p>
+<h3 id="可逆性的判据"><a href="#可逆性的判据" class="headerlink" title="可逆性的判据"></a>可逆性的判据</h3><p>判断一种手段属于哪一档，可以问三个问题：原始值是否还在系统里？是否存在能还原的密钥或映射表？还原需要多大的计算代价？</p>
+<p>哈希在直觉上不可逆，但这依赖输入空间的大小。手机号只有十一位，去掉号段前缀后枚举空间有限，攻击者用彩虹表在几小时内就能反查大半。所以裸哈希不构成匿名化，加盐哈希也只是弱假名化，HMAC 在密钥保管得当的前提下才接近不可逆。FPE 则明确可逆，它的价值在于保持格式以便下游无需改造，而不是让数据不可还原；把它当作匿名化手段来宣传，是厂商材料里常见的过度表述。</p>
+<h2 id="静态脱敏与动态脱敏"><a href="#静态脱敏与动态脱敏" class="headerlink" title="静态脱敏与动态脱敏"></a>静态脱敏与动态脱敏</h2><p>按发生时机划分，脱敏有两条主线。静态脱敏在数据离开生产环境之前完成，结果落到另一份存储里，典型场景是生产数据下传测试环境、对外提供数据集。动态脱敏不改变存储中的原始数据，在查询返回结果的那一刻按访问者身份决定是否遮蔽，典型场景是客服后台、运维查询、数据分析平台。</p>
+<p>两者不是替代关系。静态脱敏防的是“数据副本失控”，动态脱敏防的是“有权限的人看到了不该看的字段”。成熟的组织通常两者都要：生产库保持原样并对访问做动态控制，测试库用静态脱敏后的副本。</p>
+<pre class="mermaid">flowchart TD
+    A[生产库原始数据] --> B{使用场景}
+    B -->|下传到测试环境| C[静态脱敏作业]
+    B -->|业务实时查询| D[动态脱敏网关]
+    C --> E[脱敏副本 落库或导出]
+    C --> F[脱敏日志与校验报告]
+    D --> G[按角色返回遮蔽结果]
+    D --> H[访问审计流水]
+    E --> I[测试与开发使用]
+    G --> J[客服 运维 分析师]</pre>
+
+<p>静态脱敏的关键约束是“一次处理、长期使用”。规则必须在下发之前定好，副本一旦流出就很难收回。工程上要注意：副本存放位置与生产隔离，访问副本同样要审批；作业要留版本号，否则半年后没人说得清测试库是用哪版规则生成的；副本要有有效期，避免“临时导一份”变成永久资产。</p>
+<p>动态脱敏的关键约束是不能影响语义与性能。它通常以数据库代理、视图或应用层拦截器实现。代理方案对应用透明，但引入额外跳数与单点；视图方案简单，却难以表达“同一张表对不同角色返回不同列”的复杂策略；应用层方案最灵活，但要求所有访问都走统一持久层，一旦有人直连数据库就形同虚设。</p>
+<h3 id="开发与测试环境的数据复制风险"><a href="#开发与测试环境的数据复制风险" class="headerlink" title="开发与测试环境的数据复制风险"></a>开发与测试环境的数据复制风险</h3><p>“把生产库导一份到测试环境”是数据泄露事件里最高频的起因之一。它的危险性在于三个因素叠加：副本脱离了原有的访问控制、往往被放在安全基线更低的机器上、还会被开发人员下载到本地。</p>
+<p>一个典型的失守路径是这样的：运维为了排查慢查询，用 <code>mysqldump</code> 导出全库，文件放在测试机的 <code>/tmp</code> 目录；测试机开了弱口令的 SSH，几周后被撞库。整个链条里没有任何一个环节看起来“特别严重”，但结果与直接拖库无异。</p>
+<p>对应的治理手段并不复杂，难在执行：禁止生产数据以明文形式进入非生产环境；确有需要时走统一的脱敏下发流程，由平台生成副本而不是由个人导出；对副本打水印或植入少量标记记录，外泄后可以定位来源；测试环境的数据库连接做网络隔离。本文建议把“是否允许明文生产数据出生产域”作为一项单独的审批项，而不是夹在普通的权限申请里。</p>
+<p>还有一个容易漏掉的角落：备份与日志。数据库备份、慢查询日志、错误日志里的 SQL 参数、链路追踪的属性，都可能携带原始敏感值。很多团队对主库做了脱敏，却把带完整参数的慢日志长期留在共享存储上，梳理数据流时要一并纳入。</p>
+<h2 id="常用技术：从掩码到格式保留加密"><a href="#常用技术：从掩码到格式保留加密" class="headerlink" title="常用技术：从掩码到格式保留加密"></a>常用技术：从掩码到格式保留加密</h2><p>具体手段可以按变形强度与可逆性排成一条谱系，下面逐类说明适用场景与坑。</p>
+<h3 id="掩码与替换"><a href="#掩码与替换" class="headerlink" title="掩码与替换"></a>掩码与替换</h3><p>掩码是最轻的一档，保留部分字符、遮蔽其余部分。手机号保留前三后四、身份证保留前六后四、银行卡保留后四位，都是行业惯例。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">mask_phone</span>(<span class="params">phone: <span class="built_in">str</span></span>) -&gt; <span class="built_in">str</span>:</span><br><span class="line">    <span class="string">&quot;&quot;&quot;保留前三后四位，中间用星号遮蔽；长度异常时整串遮蔽&quot;&quot;&quot;</span></span><br><span class="line">    <span class="keyword">if</span> <span class="built_in">len</span>(phone) != <span class="number">11</span>:</span><br><span class="line">        <span class="keyword">return</span> <span class="string">&quot;*&quot;</span> * <span class="built_in">len</span>(phone)</span><br><span class="line">    <span class="keyword">return</span> phone[:<span class="number">3</span>] + <span class="string">&quot;****&quot;</span> + phone[-<span class="number">4</span>:]</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">mask_id_card</span>(<span class="params">id_card: <span class="built_in">str</span></span>) -&gt; <span class="built_in">str</span>:</span><br><span class="line">    <span class="string">&quot;&quot;&quot;身份证保留前六后四，遮蔽出生日期段&quot;&quot;&quot;</span></span><br><span class="line">    <span class="keyword">if</span> <span class="built_in">len</span>(id_card) <span class="keyword">not</span> <span class="keyword">in</span> (<span class="number">15</span>, <span class="number">18</span>):</span><br><span class="line">        <span class="keyword">return</span> <span class="string">&quot;*&quot;</span> * <span class="built_in">len</span>(id_card)</span><br><span class="line">    <span class="keyword">return</span> id_card[:<span class="number">6</span>] + <span class="string">&quot;*&quot;</span> * (<span class="built_in">len</span>(id_card) - <span class="number">10</span>) + id_card[-<span class="number">4</span>:]</span><br></pre></td></tr></table></figure>
+
+<p>掩码的优点是直观、可读、几乎零成本，缺点是安全性有限。手机号保留前三后四，剩下的四位只对应一万种组合，配合号段信息几乎可以枚举；身份证保留前六后四，被遮蔽的恰恰是出生日期，而它是准标识符里威力最大的一项。所以掩码适合展示层，不能作为对外发布数据的唯一手段。</p>
+<p>替换（substitution）是用一个语义合理的假值顶替原值，比如把真实姓名换成同性别、同年龄段的名字库抽样，把地址换成同城市的随机地址。它的好处是保持了数据“看起来像真的”这一属性，测试用例不会因为字段全变成星号而失效。实现上要注意假值不能与真实值碰撞，地址替换要保持行政区划层级完整。</p>
+<h3 id="洗牌、日期偏移与泛化"><a href="#洗牌、日期偏移与泛化" class="headerlink" title="洗牌、日期偏移与泛化"></a>洗牌、日期偏移与泛化</h3><p>洗牌（shuffling）在同一列内部打乱顺序，保持值的分布不变但破坏行与值的对应关系。它适合统计分析，不适合需要行内一致性的场景。实施时要按同一粒度分组洗牌，比如按城市分组打乱邮编，否则会出现“北京用户配上海邮编”这种一眼假的数据。</p>
+<p>日期偏移（date shifting）给每个主体一个固定的随机偏移量，所有相关日期加上同一个偏移。这样既保持了时间间隔（住院三天仍然是三天），又不会暴露真实日期。偏移量必须按主体固定，按行随机会破坏时间序列的先后关系；它本身也要妥善保存，因为可逆。</p>
+<p>泛化（generalization）把精确值替换为区间或上位概念：年龄 34 岁变成“30-39”，邮编 100081 变成“1000**”，职业“心内科主治医师”变成“医疗从业者”。泛化是 k-匿名的基础操作，代价是信息损失，粒度太粗则数据失去分析价值，太细则起不到保护作用。</p>
+<h3 id="格式保留加密"><a href="#格式保留加密" class="headerlink" title="格式保留加密"></a>格式保留加密</h3><p>格式保留加密（Format-Preserving Encryption，FPE）在加密之后仍然保持原有的字符集与长度，比如把 16 位数字卡号加密成另一个 16 位数字串。这样下游系统不需要修改字段长度、校验规则与索引结构。</p>
+<p>NIST 在 SP 800-38G 中标准化了 FF1 与 FF3 两种模式，2019 年的修订版又对 FF3 的参数做了限制。工程上要注意三点：第一，它是可逆的，密钥就是一切，必须放在 KMS 或 HSM 中，不能出现在代码与配置里；第二，它不提供完整性保护，密文被篡改后仍能解密出“合法格式”的垃圾值，需要额外加 MAC；第三，它解决的是格式兼容，不是不可识别，不要拿它当匿名化方案对外宣传。</p>
+<h3 id="哈希与加盐"><a href="#哈希与加盐" class="headerlink" title="哈希与加盐"></a>哈希与加盐</h3><p>哈希适合做“关联而不暴露”的场景：同一个手机号在同一盐值下结果相同，业务方可以用哈希值做去重与用户画像关联，却拿不到手机号本身。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> hashlib</span><br><span class="line"><span class="keyword">import</span> hmac</span><br><span class="line"><span class="keyword">import</span> secrets</span><br><span class="line"></span><br><span class="line"><span class="comment"># 盐值必须全局唯一且妥善保管，不能硬编码在代码里</span></span><br><span class="line">SALT = secrets.token_bytes(<span class="number">32</span>)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">hash_phone</span>(<span class="params">phone: <span class="built_in">str</span></span>) -&gt; <span class="built_in">str</span>:</span><br><span class="line">    <span class="string">&quot;&quot;&quot;加盐哈希：同一手机号结果稳定，可用于关联与去重&quot;&quot;&quot;</span></span><br><span class="line">    <span class="keyword">return</span> hashlib.sha256(SALT + phone.encode(<span class="string">&quot;utf-8&quot;</span>)).hexdigest()</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">hmac_phone</span>(<span class="params">phone: <span class="built_in">str</span>, key: <span class="built_in">bytes</span></span>) -&gt; <span class="built_in">str</span>:</span><br><span class="line">    <span class="string">&quot;&quot;&quot;密钥化哈希：攻击者没有密钥就无法离线枚举&quot;&quot;&quot;</span></span><br><span class="line">    <span class="keyword">return</span> hmac.new(key, phone.encode(<span class="string">&quot;utf-8&quot;</span>), hashlib.sha256).hexdigest()</span><br></pre></td></tr></table></figure>
+
+<p>普通加盐哈希的问题是盐值一旦泄露，攻击者可以对有限空间的手机号做离线枚举。HMAC 把盐换成密钥，安全性依赖密钥保管，更适合需要长期稳定的场景。还要注意哈希的副作用：一旦业务需要“按手机号前缀搜索”，哈希值就无能为力，这时要么保留一个受控的明文索引，要么改用 FPE。</p>
+<h3 id="技术选型对照"><a href="#技术选型对照" class="headerlink" title="技术选型对照"></a>技术选型对照</h3><table>
+<thead>
+<tr>
+<th>手段</th>
+<th>可逆性</th>
+<th>保持格式</th>
+<th>保持分布</th>
+<th>主要用途</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>掩码</td>
+<td>不可逆</td>
+<td>部分</td>
+<td>否</td>
+<td>展示层、日志</td>
+</tr>
+<tr>
+<td>替换</td>
+<td>不可逆</td>
+<td>是</td>
+<td>近似</td>
+<td>测试数据构造</td>
+</tr>
+<tr>
+<td>洗牌</td>
+<td>不可逆</td>
+<td>是</td>
+<td>是</td>
+<td>统计分析</td>
+</tr>
+<tr>
+<td>日期偏移</td>
+<td>可逆</td>
+<td>是</td>
+<td>是</td>
+<td>时序数据</td>
+</tr>
+<tr>
+<td>泛化</td>
+<td>不可逆</td>
+<td>否</td>
+<td>否</td>
+<td>数据发布</td>
+</tr>
+<tr>
+<td>FPE</td>
+<td>可逆</td>
+<td>是</td>
+<td>否</td>
+<td>需要回查的业务</td>
+</tr>
+<tr>
+<td>加盐哈希</td>
+<td>不可逆</td>
+<td>否</td>
+<td>否</td>
+<td>关联、去重</td>
+</tr>
+</tbody></table>
+<h2 id="重识别风险：删掉姓名并不等于匿名"><a href="#重识别风险：删掉姓名并不等于匿名" class="headerlink" title="重识别风险：删掉姓名并不等于匿名"></a>重识别风险：删掉姓名并不等于匿名</h2><p>数据发布方最常见的错觉是：只要把姓名、身份证号、手机号这三列删掉，剩下的数据就“不涉及个人信息”了。这个判断在技术上几乎总是错的。</p>
+<p>重识别（re-identification）指攻击者借助外部信息，把匿名数据集中的某条记录重新对应到具体个人。它依赖的不是某个单独字段，而是准标识符的组合。前面“邮编 + 性别 + 出生日期”识别 87% 人口的结论，说明三个粗糙字段就足以定位绝大多数人。</p>
+<h3 id="三类典型攻击"><a href="#三类典型攻击" class="headerlink" title="三类典型攻击"></a>三类典型攻击</h3><p><strong>准标识符组合</strong>是最基础的一类。攻击者不需要任何秘密信息，只要数据集保留足够多的准标识符，逐列组合就能缩小候选集，直到唯一。选民登记表、病历、员工花名册都具备这种结构。</p>
+<p><strong>稀有值</strong>是组合攻击的加速器。某个岗位全公司只有一个人，某种罕见病在某个城市只有两例，某个邮编段只对应一个新交付的小区，这些取值本身就是准唯一标识。只盯着字段名而忽略取值分布，稀有值会直接击穿所有泛化努力。</p>
+<p><strong>连接攻击</strong>是最致命的一类。攻击者手上有两份数据：一份是脱敏后的数据集，一份是公开或可获取的数据集（比如企业公示信息、社交资料、快递面单）。两份数据各自都不含完整标识，但通过共有的准标识符做连接，就能把匿名记录“接”到真实身份上。Netflix 在 2006 年公开的推荐数据集，随后被研究者结合 IMDb 评分记录重识别，就是连接攻击的经典教材。</p>
+<pre class="mermaid">flowchart LR
+    A[脱敏数据集 邮编 性别 年龄] --> C[按准标识符连接]
+    B[公开数据集 姓名 邮编 性别 年龄] --> C
+    C --> D[重识别后的个人记录]</pre>
+
+<h3 id="为什么删掉姓名没有用"><a href="#为什么删掉姓名没有用" class="headerlink" title="为什么删掉姓名没有用"></a>为什么删掉姓名没有用</h3><p>删掉姓名之所以没用，是因为身份信息藏在剩余字段里。即使准标识符全部泛化，行为序列与消费分布仍可能构成统计指纹。因此判断一份数据是否真正匿名，不能看它删了哪些列，而要看在给定攻击者能力假设下，任意一条记录的可区分度有多高。这正是 k-匿名、l-多样性、差分隐私存在的意义：把“匿名”从形容词变成可度量的指标。</p>
+<h2 id="k-匿名与-l-多样性：思想与局限"><a href="#k-匿名与-l-多样性：思想与局限" class="headerlink" title="k-匿名与 l-多样性：思想与局限"></a>k-匿名与 l-多样性：思想与局限</h2><p>k-匿名（k-anonymity）的思路非常朴素：对数据做泛化与抑制，使任意一条记录在准标识符上至少还有 k-1 条记录与它完全相同。这样攻击者最多把目标定位到一个规模为 k 的等价类里。</p>
+<p>实现上有两种基本操作。泛化是把取值变粗，比如把年龄 34 改成 30-39，把邮编 100081 改成 1000**；抑制是直接删除或置空，比如把稀有的职业值统一改成“其他”。两种操作都会损失信息，k 越大损失越大，通常从 k&#x3D;3 或 k&#x3D;5 起步。</p>
+<p>k-匿名有两个著名的局限。第一个是<strong>同质攻击</strong>：假设一个等价类里的 k 条记录在敏感属性上完全相同，比如这 5 个人都患同一种疾病，攻击者虽然不知道目标是哪一个，却已经知道了目标的疾病。k-匿名只约束准标识符，不约束敏感属性。</p>
+<p>第二个是<strong>背景知识攻击</strong>。攻击者可能事先知道“目标住在某小区且是女性”，这等价于给数据集加了一个额外过滤条件，等价类的实际规模可能远小于 k。</p>
+<p>l-多样性（l-diversity）针对第一个局限提出：要求每个等价类在敏感属性上至少有 l 个“充分不同”的取值。最简单的定义是不同值个数不少于 l，更严格的定义会考虑取值分布的熵。它缓解了同质攻击，但当敏感值分布极度偏斜时，熵指标可能达标而推断风险仍然很高；对背景知识攻击也依然无能为力。</p>
+<p>这一系列模型后来还有 t-接近（t-closeness）等改进。模型越精细，约束越强，可用性下降也越明显。本文的建议是：不要把模型当作合规通关的证明，而应把它当作评估工具。小规模、对外发布的数据集可以先做等价类检查；大规模行为数据的 k-匿名代价往往高到不可接受，应当转向差分隐私一类的方案。</p>
+<h2 id="差分隐私：噪声的直觉"><a href="#差分隐私：噪声的直觉" class="headerlink" title="差分隐私：噪声的直觉"></a>差分隐私：噪声的直觉</h2><p>差分隐私（differential privacy）换了一个思路：不再试图删掉标识信息，而是承认精确的统计结果也可能泄露个体，于是给结果加噪声，让攻击者无法判断某个人是否在集合里。</p>
+<p>它的核心承诺可以这样理解：对只差一条记录的相邻数据集，算法输出的分布几乎相同。也就是说，某个人的记录加进去或拿出来，查询结果的差异被噪声淹没，攻击者反推“这个人是否在数据里”的成功率被限制在一个很小的范围内。这个范围由参数 ε 控制，ε 越小噪声越大，隐私越强，可用性越差。</p>
+<p>噪声不是随便加的。加多少取决于查询的敏感度，即一条记录的变化最多能让结果变动多少：计数查询的敏感度是 1，求和查询取决于单条记录的最大取值。拉普拉斯机制是最常用的一种，按敏感度与 ε 的比值确定噪声尺度。本文不展开公式，只需记住一个工程结论：<strong>差分隐私保护的是查询结果，不是数据本身</strong>。同一份数据可以支撑多次查询，但每次查询都会消耗隐私预算，预算耗尽后要么停止服务，要么接受更强的噪声。</p>
+<p>这也解释了它的适用边界：差分隐私适合发布统计量、训练模型、做群体分析，不适合逐条明细查询。实现上要注意组合定理，多个查询的隐私消耗会累加，给每个查询分配固定 ε，累计起来可能远超预期。工业界的落地案例集中在“只发布聚合结果”的场景，比如浏览器收集使用统计、人口普查机构发布统计表。</p>
+<h2 id="工程落地：从字段清单到审计闭环"><a href="#工程落地：从字段清单到审计闭环" class="headerlink" title="工程落地：从字段清单到审计闭环"></a>工程落地：从字段清单到审计闭环</h2><p>技术手段选好之后，决定成败的是工程流程。本文建议按五步走。</p>
+<p><strong>第一步，字段分级。</strong> 把每张表的每个字段标注敏感级别，至少区分公开、内部、敏感、高敏四档，并标注它属于直接标识符还是准标识符。产出应当是可机读的字段清单，而非散落在文档里的表格，分级标准要与组织已有的分类分级制度对齐。</p>
+<p><strong>第二步，策略配置。</strong> 把“字段 + 场景 + 角色 → 处理方法”固化成配置，而不是写死在代码里。配置至少要包含：适用字段、脱敏算法及其参数、生效环境、豁免名单、审批单号。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 以 PostgreSQL 14 为例：用视图实现按角色的动态脱敏</span></span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">VIEW</span> v_customer_masked <span class="keyword">AS</span></span><br><span class="line"><span class="keyword">SELECT</span></span><br><span class="line">    id,</span><br><span class="line">    <span class="keyword">CASE</span> <span class="keyword">WHEN</span> <span class="built_in">current_user</span> <span class="keyword">IN</span> (<span class="string">&#x27;analyst&#x27;</span>) <span class="keyword">THEN</span> <span class="string">&#x27;***&#x27;</span> <span class="keyword">ELSE</span> name <span class="keyword">END</span> <span class="keyword">AS</span> name,</span><br><span class="line">    <span class="keyword">CASE</span> <span class="keyword">WHEN</span> <span class="built_in">current_user</span> <span class="keyword">IN</span> (<span class="string">&#x27;analyst&#x27;</span>)</span><br><span class="line">         <span class="keyword">THEN</span> <span class="keyword">left</span>(phone, <span class="number">3</span>) <span class="operator">||</span> <span class="string">&#x27;****&#x27;</span> <span class="operator">||</span> <span class="keyword">right</span>(phone, <span class="number">4</span>)</span><br><span class="line">         <span class="keyword">ELSE</span> phone <span class="keyword">END</span> <span class="keyword">AS</span> phone,</span><br><span class="line">    city,</span><br><span class="line">    created_at</span><br><span class="line"><span class="keyword">FROM</span> customer;</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 只授予视图权限，收回基表权限</span></span><br><span class="line"><span class="keyword">REVOKE</span> <span class="keyword">ALL</span> <span class="keyword">ON</span> customer <span class="keyword">FROM</span> analyst;</span><br><span class="line"><span class="keyword">GRANT</span> <span class="keyword">SELECT</span> <span class="keyword">ON</span> v_customer_masked <span class="keyword">TO</span> analyst;</span><br></pre></td></tr></table></figure>
+
+<p>视图方案简单，但要注意两点：查询计划可能因为 <code>CASE</code> 表达式而无法下推，大表上会有性能损失；视图的权限模型依赖数据库角色，跨库、跨引擎的场景需要代理层补齐。</p>
+<p><strong>第三步，审批与审计。</strong> 任何“查看明文”的请求都应走独立审批，记录里写明用途、范围、时限。审计日志要能回答谁、在什么时间、通过哪个接口、查询了哪些字段、返回了多少行。重点不是有没有日志，而是能不能在事后回答某个人看过哪些敏感数据。</p>
+<p><strong>第四步，可用性验证。</strong> 脱敏后的数据必须仍能支撑业务：字段长度与格式是否满足下游校验；关联键是否仍可连接；统计分布是否漂移过大；典型查询是否能跑通。建议对每批数据抽检一定比例记录，人工确认“看起来合理、用起来能跑”。</p>
+<p><strong>第五步，性能与成本。</strong> 动态脱敏的开销主要来自代理跳转、表达式计算与结果集重写，通常在高并发下才显现；静态脱敏的开销集中在全量扫描与写回，适合放在低峰期。上线前要用真实数据量压测，不要用几千行样本推断千万行表的表现。</p>
+<h2 id="合规视角：原则对应与边界"><a href="#合规视角：原则对应与边界" class="headerlink" title="合规视角：原则对应与边界"></a>合规视角：原则对应与边界</h2><p>《个人信息保护法》与《数据安全法》都已施行，它们对脱敏的要求是原则性的。本文只做原则层面的对应，不解读条文，也不构成法律意见。</p>
+<p>从原则上看，脱敏主要对应三件事。其一是<strong>最小必要</strong>：处理个人信息应当限于实现目的的最小范围，脱敏让非必要字段不进入使用环节。其二是<strong>安全保障</strong>：处理者应当采取加密、去标识化等安全技术措施；去标识化被明确列为可采取的措施，但不等于匿名化，处理者仍需承担相应义务。其三是<strong>告知与同意</strong>：脱敏不能替代告知同意，数据用于新目的时仍要重新审视合法性基础。</p>
+<p>在等保与合规咨询的语境里，有两个容易混淆的对象。<strong>等保 2.0 的分类分级</strong>关注信息系统与数据的等级划分，回答“这套系统该按几级保护、要落实哪些控制项”；<strong>个人信息合规</strong>关注处理活动是否满足合法性、正当性、必要性，回答“这次处理有没有依据”。做方案时不要用一份脱敏报告同时应付两边，两者的证据链并不相同。</p>
+<p>还要提醒一个误区：把匿名化当作免责通道。《个人信息保护法》对匿名化后的信息留出了空间，但前提是“无法识别特定自然人且不能复原”。实践中绝大多数所谓的匿名化只做到了假名化或去标识化，一旦被重识别，处理者仍要按个人信息承担责任。因此对外表述要保守，把“去标识化”与“匿名化”分开写；技术评估要严格，用重识别测试验证，而不是用字段清单自证。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>脱敏是动作，匿名化是结果，假名化与令牌化是可逆的中间态；判断一种手段属于哪一档，看原始值是否还在、有没有映射或密钥、还原代价有多大。静态脱敏防副本失控，动态脱敏防越权查看，两者要配合使用，而“生产库导一份到测试环境”始终是最需要堵住的口子。技术选型上，掩码适合展示，替换与洗牌适合造测试数据，FPE 解决格式兼容，加盐哈希与 HMAC 解决关联去重。更重要的是：删掉姓名不等于匿名，准标识符组合、稀有值与连接攻击会让“匿名”数据重新指向个人，k-匿名与差分隐私只是评估框架，不是通关证书。把字段分级、策略配置、审批审计、可用性验证与性能压测串成闭环，方案才站得住。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://csrc.nist.gov/publications/detail/sp/800-188/draft">NIST SP 800-188, De-Identifying Government Datasets</a></li>
+<li><a href="https://csrc.nist.gov/publications/detail/sp/800-122/final">NIST SP 800-122, Guide to Protecting the Confidentiality of Personally Identifiable Information</a></li>
+<li><a href="https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-38G.pdf">NIST SP 800-38G, Recommendation for Block Cipher Modes of Operation: Methods for Format-Preserving Encryption</a></li>
+<li><a href="https://www.cis.upenn.edu/~aaroth/Papers/privacybook.pdf">Dwork, Roth: The Algorithmic Foundations of Differential Privacy</a></li>
+<li><a href="https://flk.npc.gov.cn/">国家法律法规数据库</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>数据脱敏与匿名化</p><p><a href="https://987763485.github.io/2022/09/08/数据脱敏与匿名化/">https://987763485.github.io/2022/09/08/数据脱敏与匿名化/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2022-09-08</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-19</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a><a class="link-muted mr-2" rel="tag" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/">等级保护</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2022/09/10/%E9%95%BF%E4%BB%BB%E5%8A%A1%E6%8B%86%E5%88%86%E4%B8%8E%E6%96%AD%E7%82%B9%E7%BB%AD%E8%B7%91/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">长任务拆分与断点续跑</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2022/09/01/RAG%E6%A3%80%E7%B4%A2%E5%A2%9E%E5%BC%BA%E7%94%9F%E6%88%90%E5%AE%9E%E6%88%98/"><span class="level-item">RAG 检索增强生成实战</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

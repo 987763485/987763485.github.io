@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>移动端点击 300ms 延迟与解决方案 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="去年年底那篇《移动端性能优化特殊点》把”触控响应”列为移动端优化的第一顺位，当时只给了结论没给数据。这半年做了两个移动专题页和一个 Hybrid 列表页，把点击延迟从量测、选型到上线验证完整跑了一遍。与今年三月那篇《FastClick 解决点击延迟》的源码与架构角度不同，本文是同一问题域的性能与调优角度：延迟给整条交互链路添了多少成本、几条解决路径各自的适用边界与代价、上线后怎么用打点证明收益。适"><meta property="og:type" content="blog"><meta property="og:title" content="移动端点击 300ms 延迟与解决方案"><meta property="og:url" content="https://987763485.github.io/2014/05/04/%E7%A7%BB%E5%8A%A8%E7%AB%AF%E7%82%B9%E5%87%BB300ms%E5%BB%B6%E8%BF%9F%E4%B8%8E%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="去年年底那篇《移动端性能优化特殊点》把”触控响应”列为移动端优化的第一顺位，当时只给了结论没给数据。这半年做了两个移动专题页和一个 Hybrid 列表页，把点击延迟从量测、选型到上线验证完整跑了一遍。与今年三月那篇《FastClick 解决点击延迟》的源码与架构角度不同，本文是同一问题域的性能与调优角度：延迟给整条交互链路添了多少成本、几条解决路径各自的适用边界与代价、上线后怎么用打点证明收益。适"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2014-05-04T09:10:19.000Z"><meta property="article:modified_time" content="2026-10-17T12:54:26.666Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="web前端"><meta property="article:tag" content="html5"><meta property="article:tag" content="移动端"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2014/05/04/%E7%A7%BB%E5%8A%A8%E7%AB%AF%E7%82%B9%E5%87%BB300ms%E5%BB%B6%E8%BF%9F%E4%B8%8E%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88/"},"headline":"移动端点击 300ms 延迟与解决方案","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2014-05-04T09:10:19.000Z","dateModified":"2026-10-17T12:54:26.666Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"去年年底那篇《移动端性能优化特殊点》把”触控响应”列为移动端优化的第一顺位，当时只给了结论没给数据。这半年做了两个移动专题页和一个 Hybrid 列表页，把点击延迟从量测、选型到上线验证完整跑了一遍。与今年三月那篇《FastClick 解决点击延迟》的源码与架构角度不同，本文是同一问题域的性能与调优角度：延迟给整条交互链路添了多少成本、几条解决路径各自的适用边界与代价、上线后怎么用打点证明收益。适"}</script><link rel="canonical" href="https://987763485.github.io/2014/05/04/%E7%A7%BB%E5%8A%A8%E7%AB%AF%E7%82%B9%E5%87%BB300ms%E5%BB%B6%E8%BF%9F%E4%B8%8E%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2014-05-04T09:10:19.000Z" title="5/4/2014, 5:10:19 PM">2014-05-04</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/">前端开发</a></span><span class="level-item">38 分钟读完 (大约5766个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">移动端点击 300ms 延迟与解决方案</h1><div class="content"><p>去年年底那篇《移动端性能优化特殊点》把”触控响应”列为移动端优化的第一顺位，当时只给了结论没给数据。这半年做了两个移动专题页和一个 Hybrid 列表页，把点击延迟从量测、选型到上线验证完整跑了一遍。与今年三月那篇《FastClick 解决点击延迟》的源码与架构角度不同，本文是同一问题域的性能与调优角度：延迟给整条交互链路添了多少成本、几条解决路径各自的适用边界与代价、上线后怎么用打点证明收益。适合被”点了没反应”困扰，又需要在评审会上说清取舍依据的同学。</p>
+<h2 id="先把延迟量出来：真机时间戳打点"><a href="#先把延迟量出来：真机时间戳打点" class="headerlink" title="先把延迟量出来：真机时间戳打点"></a>先把延迟量出来：真机时间戳打点</h2><p>要谈优化，先得把数字摆上桌。测法很简单：在同一个元素上分别记录 touchstart 与 click 的时间戳，相减就是这个环境给你的手势等待成本。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 采集脚本：连续点 30 次同一个按钮，看分布而不是看单次</span></span><br><span class="line"><span class="keyword">var</span> marks = [];</span><br><span class="line"><span class="keyword">var</span> downAt = <span class="number">0</span>;</span><br><span class="line"><span class="keyword">var</span> probe = <span class="variable language_">document</span>.<span class="title function_">getElementById</span>(<span class="string">&#x27;probe&#x27;</span>);</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">now</span>(<span class="params"></span>) &#123;</span><br><span class="line">  <span class="comment">// Android 2.3 的 WebKit 没有 Date.now，必须留一手</span></span><br><span class="line">  <span class="keyword">return</span> <span class="title class_">Date</span>.<span class="property">now</span> ? <span class="title class_">Date</span>.<span class="title function_">now</span>() : +<span class="keyword">new</span> <span class="title class_">Date</span>();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">probe.<span class="title function_">addEventListener</span>(<span class="string">&#x27;touchstart&#x27;</span>, <span class="keyword">function</span> (<span class="params">e</span>) &#123;</span><br><span class="line">  downAt = <span class="title function_">now</span>();</span><br><span class="line">&#125;, <span class="literal">false</span>);</span><br><span class="line"></span><br><span class="line">probe.<span class="title function_">addEventListener</span>(<span class="string">&#x27;click&#x27;</span>, <span class="keyword">function</span> (<span class="params">e</span>) &#123;</span><br><span class="line">  marks.<span class="title function_">push</span>(<span class="title function_">now</span>() - downAt);</span><br><span class="line">  <span class="keyword">if</span> (marks.<span class="property">length</span> === <span class="number">30</span>) &#123;</span><br><span class="line">    <span class="title function_">show</span>(marks);   <span class="comment">// 把结果写到页面上，别用 alert</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;, <span class="literal">false</span>);</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">show</span>(<span class="params">list</span>) &#123;</span><br><span class="line">  <span class="keyword">var</span> sorted = list.<span class="title function_">slice</span>(<span class="number">0</span>).<span class="title function_">sort</span>(<span class="keyword">function</span> (<span class="params">a, b</span>) &#123; <span class="keyword">return</span> a - b; &#125;);</span><br><span class="line">  <span class="keyword">var</span> out = <span class="string">&#x27;中位 &#x27;</span> + sorted[<span class="number">15</span>] + <span class="string">&#x27; ms，最差 &#x27;</span> + sorted[<span class="number">29</span>] + <span class="string">&#x27; ms&#x27;</span>;</span><br><span class="line">  <span class="variable language_">document</span>.<span class="title function_">getElementById</span>(<span class="string">&#x27;result&#x27;</span>).<span class="property">textContent</span> = out;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>两个细节值得提醒。其一，别用 alert 读数：alert 会堵住主线程，你观察到的是弹窗动画时间而不是事件时间，笔者的第一版测试就是这么废掉的；直接往 DOM 写文本，或用《移动端调试工具与实践》里的远程日志把数据发回桌面端。其二，<code>event.timeStamp</code> 各家基准点不一样（iOS 上它是相对页面起点的毫秒数，某些 Android WebView 里带自己的纪元），跨机型比较统一用 <code>Date.now()</code> 打墙钟时间戳更稳妥。</p>
+<p>下面是真机测到的分布，每个环境连点 30 次取中位数，括号里是最差值。页面统一用 <code>width=device-width</code> 且允许缩放：</p>
+<table>
+<thead>
+<tr>
+<th>环境</th>
+<th>touchstart 到 click 的中位间隔</th>
+<th>双击缩放窗口</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>iOS Safari 5.1（iPhone 4S）</td>
+<td>318 ms（356 ms）</td>
+<td>固定约 300 ms</td>
+<td>数值最稳定，几乎无抖动</td>
+</tr>
+<tr>
+<td>iOS Safari 6.1（iPhone 5）</td>
+<td>312 ms（341 ms）</td>
+<td>固定约 300 ms</td>
+<td>与 5.1 无实质差别</td>
+</tr>
+<tr>
+<td>iOS Safari 7.0（iPhone 5）</td>
+<td>305 ms（338 ms）</td>
+<td>固定约 300 ms</td>
+<td>设 <code>user-scalable=no</code> 也不变</td>
+</tr>
+<tr>
+<td>Android 2.3 原生浏览器（G7）</td>
+<td>402 ms（689 ms）</td>
+<td>各家 ROM 不同，偏大</td>
+<td>长尾严重，惯性滚动未停时更差</td>
+</tr>
+<tr>
+<td>Android 4.0 到 4.3 原生浏览器</td>
+<td>306 ms（372 ms）</td>
+<td>约 300 ms</td>
+<td>WebView 内数值与浏览器一致</td>
+</tr>
+<tr>
+<td>Android 4.4 WebView（Chromium 33）</td>
+<td>297 ms（330 ms）</td>
+<td>约 300 ms</td>
+<td>禁止缩放时这一档接近 0</td>
+</tr>
+<tr>
+<td>Windows Phone 8（IE10）</td>
+<td>310 ms（368 ms）</td>
+<td>约 300 ms</td>
+<td>声明 <code>-ms-touch-action</code> 后掉到 30 ms 内</td>
+</tr>
+<tr>
+<td>Firefox OS 1.1</td>
+<td>无等待</td>
+<td>无双击缩放</td>
+<td>不需要处理</td>
+</tr>
+</tbody></table>
+<p>从这张表能读出三件事。第一，”300ms”是典型值而不是定值，同一环境内 30 次就有 60 ms 上下的离散，跨 ROM 的 Android 2.x 能飘到 700 ms。第二，双击缩放的判定窗口各家实现不同，国产 ROM 上我们遇到过明显更长的等待，所以别把目标定成”消掉 300 ms”，要定成”把这条链路的 P95 压进 100 ms”。第三，同样是 300 ms，杀伤力取决于后面还有多少耗时——纯展示页无所谓，一个要跟网络请求的确认按钮就很难受，这也是后文要拆四段的原因。</p>
+<h2 id="延迟的根因，以及一个不该用的”快招”"><a href="#延迟的根因，以及一个不该用的”快招”" class="headerlink" title="延迟的根因，以及一个不该用的”快招”"></a>延迟的根因，以及一个不该用的”快招”</h2><p>根因一句话：触摸屏上要区分单击与双击缩放，浏览器在第一次 tap 结束后不敢立刻派发 click，必须留着判定窗口看用户会不会再来第二下。这个等待发生在原生层，网页代码拦不住；iOS Safari 与 Android 浏览器都有双击缩放，所以两边都得等。它与 viewport meta 的关系是：页面允许缩放，浏览器就认定这个手势有用途，老老实实等满；页面禁止缩放，手势失去意义，浏览器才有资格缩短或跳过等待。iOS 的问题恰恰在于它的等待和 viewport 设置脱钩，禁止缩放照样等满，三个版本我们都验证过。</p>
+<p>于是有人会在 viewport 上做文章：</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">&lt;!-- 不推荐：为了 300ms 牺牲可访问性 --&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">meta</span> <span class="attr">name</span>=<span class="string">&quot;viewport&quot;</span> <span class="attr">content</span>=<span class="string">&quot;width=device-width; initial-scale=1.0; user-scalable=no&quot;</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>笔者明确不推荐这条路。收益只在部分环境成立（Android 4.4 之后新版 Chrome 对禁止缩放的页面确实跳过了等待，但当时这套内核装机覆盖面很有限，iOS 与大量 Android 4.3 以下机型完全无效），代价却是实打实的：双击缩放和双指缩放是低视力用户与老年用户读小字的主要手段，我们的用户反馈里就有”字号小、要点两下放大看”的诉求。禁掉缩放等于把一小部分人彻底挡在页面外面，与 WCAG 里”文本可放大到 200% 而不损失内容与功能”的精神相反。页面排版太碎，正确做法是改排版，而不是把用户的放大镜砸掉；<code>maximum-scale=1</code> 同样不该被当成性能手段。</p>
+<h2 id="解决路径清单：五条路各自的适用边界"><a href="#解决路径清单：五条路各自的适用边界" class="headerlink" title="解决路径清单：五条路各自的适用边界"></a>解决路径清单：五条路各自的适用边界</h2><p>这是本文的主线。摆得出来的选项有五个，逐个说清它们快在哪、代价是什么、什么场景别用。</p>
+<h3 id="直接用-touchstart-响应"><a href="#直接用-touchstart-响应" class="headerlink" title="直接用 touchstart 响应"></a>直接用 touchstart 响应</h3><p>理论最快：手指一落下就执行动作，手势等待整段被跳过，代价是误触。三个必踩的坑：滚动起始时手指按下就会触发（用户本想滑动列表，结果点了删除）；长按查词或复制之后抬手又触发一次；系统手势打断时 touchend 根本不会来，<code>touchcancel</code> 不处理就留下半截状态。所以”直接用 touchstart”落地形态应该是一套判定：touchstart 记录起点与时刻，touchmove 位移超阈值就放弃，touchend 才真正执行，并补上 touchcancel。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> <span class="variable constant_">TAP_MOVE_TOLERANCE</span> = <span class="number">10</span>;   <span class="comment">// px，经验值，越小越灵敏也越容易误判</span></span><br><span class="line"><span class="keyword">var</span> <span class="variable constant_">TAP_MAX_HOLD</span> = <span class="number">700</span>;        <span class="comment">// ms，超过这个时长当作长按，不执行 tap</span></span><br><span class="line"><span class="keyword">var</span> downX = <span class="number">0</span>, downY = <span class="number">0</span>, downAt = <span class="number">0</span>, valid = <span class="literal">false</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">bindSafeTap</span>(<span class="params">el, handler</span>) &#123;</span><br><span class="line">  el.<span class="title function_">addEventListener</span>(<span class="string">&#x27;touchstart&#x27;</span>, <span class="keyword">function</span> (<span class="params">e</span>) &#123;</span><br><span class="line">    <span class="keyword">if</span> (e.<span class="property">touches</span>.<span class="property">length</span> !== <span class="number">1</span>) &#123; valid = <span class="literal">false</span>; <span class="keyword">return</span>; &#125;  <span class="comment">// 多指手势直接放弃</span></span><br><span class="line">    <span class="keyword">var</span> t = e.<span class="property">changedTouches</span>[<span class="number">0</span>];</span><br><span class="line">    downX = t.<span class="property">clientX</span>; downY = t.<span class="property">clientY</span>; downAt = +<span class="keyword">new</span> <span class="title class_">Date</span>();</span><br><span class="line">    valid = <span class="literal">true</span>;</span><br><span class="line">  &#125;, <span class="literal">false</span>);</span><br><span class="line"></span><br><span class="line">  el.<span class="title function_">addEventListener</span>(<span class="string">&#x27;touchmove&#x27;</span>, <span class="keyword">function</span> (<span class="params">e</span>) &#123;</span><br><span class="line">    <span class="keyword">if</span> (!valid) &#123; <span class="keyword">return</span>; &#125;</span><br><span class="line">    <span class="keyword">var</span> t = e.<span class="property">changedTouches</span>[<span class="number">0</span>];</span><br><span class="line">    <span class="keyword">if</span> (<span class="title class_">Math</span>.<span class="title function_">abs</span>(t.<span class="property">clientX</span> - downX) &gt; <span class="variable constant_">TAP_MOVE_TOLERANCE</span> ||</span><br><span class="line">        <span class="title class_">Math</span>.<span class="title function_">abs</span>(t.<span class="property">clientY</span> - downY) &gt; <span class="variable constant_">TAP_MOVE_TOLERANCE</span>) &#123;</span><br><span class="line">      valid = <span class="literal">false</span>;   <span class="comment">// 判定为滚动或拖拽</span></span><br><span class="line">    &#125;</span><br><span class="line">  &#125;, <span class="literal">false</span>);</span><br><span class="line"></span><br><span class="line">  el.<span class="title function_">addEventListener</span>(<span class="string">&#x27;touchcancel&#x27;</span>, <span class="keyword">function</span> (<span class="params"></span>) &#123; valid = <span class="literal">false</span>; &#125;, <span class="literal">false</span>);</span><br><span class="line"></span><br><span class="line">  el.<span class="title function_">addEventListener</span>(<span class="string">&#x27;touchend&#x27;</span>, <span class="keyword">function</span> (<span class="params">e</span>) &#123;</span><br><span class="line">    <span class="keyword">if</span> (!valid) &#123; <span class="keyword">return</span>; &#125;</span><br><span class="line">    <span class="keyword">if</span> (+<span class="keyword">new</span> <span class="title class_">Date</span>() - downAt &gt; <span class="variable constant_">TAP_MAX_HOLD</span>) &#123; valid = <span class="literal">false</span>; <span class="keyword">return</span>; &#125;  <span class="comment">// 长按</span></span><br><span class="line">    valid = <span class="literal">false</span>;</span><br><span class="line">    e.<span class="title function_">preventDefault</span>();   <span class="comment">// 关键：拦住 300ms 后到货的原生 click，避免双触发</span></span><br><span class="line">    <span class="title function_">handler</span>(e);</span><br><span class="line">  &#125;, <span class="literal">false</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>注意 <code>preventDefault()</code> 这一行。不拦的话一次按压会跑两遍 handler——我们的加购按钮就这么重复提交过一次订单。拦了之后又有新麻烦：<code>:active</code> 态与点击高亮受影响、原生表单控件的系统弹层叫不出来，所以这条路只适合自绘的按钮、卡片、菜单项，不适合 input、select、label、a。适用边界可以概括为：交互目标是可控的自绘元素，且你愿意为每个手势分支自己写判定。</p>
+<h3 id="Zepto-的-tap-事件"><a href="#Zepto-的-tap-事件" class="headerlink" title="Zepto 的 tap 事件"></a>Zepto 的 tap 事件</h3><p>Zepto 自带 tap，内部同样在 touchend 上做判定，收益与风险都跟上面那套自制逻辑类似。坑在于滚动容器里它会静默失效（一次惯性滑动之后 tap 不触发），以及它合成的 click 与原生 click 打架——同一个 handler 绑两个事件名，就可能出现”点一次跑两遍”或”绑了不生效”。这些事故在《Zepto 移动端库实战》里逐个复盘过，此处不重复。工程上只记住一条：tap 与 click 不要在同一个元素上混用，团队里定死一个。</p>
+<h3 id="FastClick-类库"><a href="#FastClick-类库" class="headerlink" title="FastClick 类库"></a>FastClick 类库</h3><p>不重复源码，只讲工程侧。接入位置就一行 <code>FastClick.attach(document.body)</code>，放在 DOM ready 之后；靠冒泡覆盖动态插入的节点，脱离 body 的弹层要单独处理。它的影响面是整个 layer：所有 click 都要过它的手，业务代码一行不用改，这是相对自制方案最大的优点。代价是那张豁免名单归你维护——表单控件、日期选择器、iframe、video，以及任何你希望原生默认行为发生的元素都得加 <code>needsclick</code>，哪些必须放行、为什么放行，旧文里列得清楚。另外别和 Zepto 的 tap 叠用，同一区域也别和 <code>-ms-touch-action</code> 混配，两套机制互相踩脚很难查。</p>
+<h3 id="CSS-方案：touch-action"><a href="#CSS-方案：touch-action" class="headerlink" title="CSS 方案：touch-action"></a>CSS 方案：touch-action</h3><p>把声明写在 CSS 里让浏览器自己跳过手势判定，架构上最干净，可惜 2014 年这个时间点它只能用在一部分环境：</p>
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="selector-class">.tapzone</span> &#123;</span><br><span class="line">  -ms-<span class="attribute">touch-action</span>: manipulation;  <span class="comment">/* IE10 / Windows Phone 8 可用 */</span></span><br><span class="line">  <span class="comment">/* touch-action: manipulation;   标准写法当时基本无实现，先注释掉观察 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>IE10 与 WP8 对 <code>-ms-touch-action</code> 支持完整，实测延迟从 310 ms 掉到 30 ms 以内，效果最好；Chrome for Android 当时只实现部分取值、还要开关，iOS Safari 完全不认。Android 4.4 之后新版 Chrome 对禁止缩放的页面会自动跳过等待，但那是 viewport 策略的副产品，不能当跨机型方案依赖。结论：它适合作为 IE 系与 WP 的专项补充叠加上去（没有副作用），不适合作为唯一手段。顺带一提，架构上更彻底的 Pointer Events 能统一 mouse 与 touch 两条链路，但那时只有 IE10 的私有 MSPointer 前缀实现，标准仍在候选推荐阶段，iOS 与 Android 均无实现，跨端代码指望不上。</p>
+<h3 id="单页容器：强交互界面交给原生"><a href="#单页容器：强交互界面交给原生" class="headerlink" title="单页容器：强交互界面交给原生"></a>单页容器：强交互界面交给原生</h3><p>如果某个界面的交互密度高到要为每次点击抠这 300 ms，那它可能压根不该是 Web 页面。我们的详情页保留 H5，但把键盘、图片查看器和结算面板挪进原生壳走 JSBridge 调用，WebView 里的手势层整个绕开，延迟问题不复存在。这条路只在自家 App 容器内成立，通信与降级的设计在《JSBridge 设计与实现》里写过；代价是发版节奏被绑定、失去 URL 可分享性，属于产品形态决策而不是前端优化手段。</p>
+<h3 id="五者对比"><a href="#五者对比" class="headerlink" title="五者对比"></a>五者对比</h3><table>
+<thead>
+<tr>
+<th>方案</th>
+<th>延迟消除量</th>
+<th>改动量</th>
+<th>主要风险</th>
+<th>影响范围</th>
+<th>适用边界</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>touchstart 直接响应</td>
+<td>全部（约 300 ms）</td>
+<td>每个目标元素写判定</td>
+<td>滚动误触、长按重复、双触发</td>
+<td>单元素</td>
+<td>自绘按钮、虚拟键盘、弹层操作区</td>
+</tr>
+<tr>
+<td>自制安全判定（start+move+end）</td>
+<td>全部</td>
+<td>中等，需封装</td>
+<td>阈值调不准仍会误触</td>
+<td>单元素或委托</td>
+<td>表单控件少、交互密集的页面</td>
+</tr>
+<tr>
+<td>Zepto tap</td>
+<td>全部</td>
+<td>极小</td>
+<td>滚动中失效、与 click 冲突</td>
+<td>单元素</td>
+<td>已用 Zepto 且不用 iScroll 的页面</td>
+</tr>
+<tr>
+<td>FastClick 类库</td>
+<td>全部</td>
+<td>极小</td>
+<td>默认行为偏差、ghost click</td>
+<td>整层，全局</td>
+<td>大量原生 click 绑定的存量页面</td>
+</tr>
+<tr>
+<td><code>-ms-touch-action</code></td>
+<td>全部（仅支持的环境）</td>
+<td>一行 CSS</td>
+<td>覆盖面窄</td>
+<td>声明的元素</td>
+<td>WP8、IE10 专项</td>
+</tr>
+<tr>
+<td>viewport 禁缩放</td>
+<td>部分环境</td>
+<td>一行 meta</td>
+<td>牺牲无障碍</td>
+<td>整页</td>
+<td>不推荐</td>
+</tr>
+<tr>
+<td>Hybrid 交给原生</td>
+<td>全部</td>
+<td>大</td>
+<td>失去可分享性、跟版</td>
+<td>界面级</td>
+<td>自家容器内的强交互界面</td>
+</tr>
+</tbody></table>
+<h2 id="选型决策树"><a href="#选型决策树" class="headerlink" title="选型决策树"></a>选型决策树</h2><p>把上面的边界压缩成三个判据——是否需要双击缩放、触控目标是否在滚动容器里、目标机型分布怎么走：</p>
+<pre class="mermaid">flowchart TD
+    A[按钮点击响应慢被投诉] --> B{页面真的依赖双击缩放吗}
+    B -->|需要, 图册 地图 长文| C[保留原生等待, 只优化后三段耗时]
+    B -->|不需要| D{触控目标在可滚动容器里吗}
+    D -->|不在, 固定弹层或虚拟键盘| E[自制 touchstart 与 touchend 判定]
+    D -->|在| F{主力机型分布}
+    F -->|iOS 5 6 7 为主| G[接入 FastClick, 表单控件走豁免名单]
+    F -->|Windows Phone 8 有份额| H[叠加 -ms-touch-action 声明]
+    F -->|Android 4.4 以上居多| I[新 Chrome 对禁缩放页面已跳过等待, 只需兜住旧机型]
+    E --> J{是否运行在自家原生壳里}
+    G --> J
+    H --> J
+    I --> J
+    J -->|是, 且能跟版发布| K[强交互界面改原生, 走 JSBridge]
+    J -->|否, 纯 H5| L[按机型开关灰度, 打点验证收益]
+    K --> L</pre>
+
+<p>判据里最容易被忽略的是第一个。图片查看器、地图、长文阅读页里，双击缩放本身就是功能，消掉延迟等于砍掉功能，这类页面只能往后三段去要收益。</p>
+<h2 id="300ms-之外：把”响应慢”拆成四段"><a href="#300ms-之外：把”响应慢”拆成四段" class="headerlink" title="300ms 之外：把”响应慢”拆成四段"></a>300ms 之外：把”响应慢”拆成四段</h2><p>用户说的”点击慢”从来不只是手势等待，完整链路是四段相加：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">总耗时 = 手势等待 + 事件处理 + 样式重排与绘制 + 网络与数据</span><br></pre></td></tr></table></figure>
+
+<p>分段计时用打点即可：桌面端有 console 时可以用 <code>console.time</code>&#x2F;<code>console.timeEnd</code>，真机上要落到数组里再看：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> perf = <span class="variable language_">window</span>.<span class="property">performance</span> || &#123;&#125;;</span><br><span class="line"><span class="keyword">var</span> clock = (perf.<span class="property">now</span>)</span><br><span class="line">  ? <span class="keyword">function</span> (<span class="params"></span>) &#123; <span class="keyword">return</span> perf.<span class="title function_">now</span>(); &#125;        <span class="comment">// 新版 WebKit 有，老机型走下面兜底</span></span><br><span class="line">  : <span class="keyword">function</span> (<span class="params"></span>) &#123; <span class="keyword">return</span> <span class="title class_">Date</span>.<span class="property">now</span> ? <span class="title class_">Date</span>.<span class="title function_">now</span>() : +<span class="keyword">new</span> <span class="title class_">Date</span>(); &#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">trace</span>(<span class="params">action</span>) &#123;</span><br><span class="line">  <span class="keyword">var</span> seg = [];</span><br><span class="line">  <span class="keyword">var</span> t0 = <span class="title function_">clock</span>();</span><br><span class="line">  <span class="title function_">action</span>(<span class="keyword">function</span> (<span class="params"></span>) &#123;                        <span class="comment">// 回调里已经跑完 handler 与同步渲染</span></span><br><span class="line">    seg.<span class="title function_">push</span>(<span class="string">&#x27;处理与排版 &#x27;</span> + <span class="title class_">Math</span>.<span class="title function_">round</span>(<span class="title function_">clock</span>() - t0) + <span class="string">&#x27; ms&#x27;</span>);</span><br><span class="line">    <span class="keyword">var</span> t1 = <span class="title function_">clock</span>();</span><br><span class="line">    <span class="keyword">var</span> xhr = <span class="variable language_">window</span>.<span class="property">XMLHttpRequest</span> ? <span class="keyword">new</span> <span class="title class_">XMLHttpRequest</span>() : <span class="keyword">new</span> <span class="title class_">ActiveXObject</span>(<span class="string">&#x27;Microsoft.XMLHTTP&#x27;</span>);</span><br><span class="line">    xhr.<span class="title function_">open</span>(<span class="string">&#x27;POST&#x27;</span>, <span class="string">&#x27;/cart/add&#x27;</span>, <span class="literal">true</span>);</span><br><span class="line">    xhr.<span class="property">onreadystatechange</span> = <span class="keyword">function</span> (<span class="params"></span>) &#123;</span><br><span class="line">      <span class="keyword">if</span> (xhr.<span class="property">readyState</span> === <span class="number">4</span>) &#123;</span><br><span class="line">        seg.<span class="title function_">push</span>(<span class="string">&#x27;网络往返 &#x27;</span> + <span class="title class_">Math</span>.<span class="title function_">round</span>(<span class="title function_">clock</span>() - t1) + <span class="string">&#x27; ms&#x27;</span>);</span><br><span class="line">        <span class="title function_">report</span>(seg.<span class="title function_">join</span>(<span class="string">&#x27;，&#x27;</span>));                <span class="comment">// 上报实现见下文</span></span><br><span class="line">      &#125;</span><br><span class="line">    &#125;;</span><br><span class="line">    xhr.<span class="title function_">send</span>(<span class="string">&#x27;&#x27;</span>);</span><br><span class="line">  &#125;);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>真实案例：去年一个”确认加入清单”的按钮，iOS 上从按下到界面变化要 700 ms 以上，最初所有人都以为是那 300 ms，接了类库后数字只降到 600 ms 左右——延迟根本不是主因。分段打点之后是这样：</p>
+<table>
+<thead>
+<tr>
+<th>分段</th>
+<th>优化前</th>
+<th>优化后</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>手势等待</td>
+<td>305 ms</td>
+<td>40 ms</td>
+<td>接入类库，唯一由浏览器决定的部分</td>
+</tr>
+<tr>
+<td>事件处理</td>
+<td>190 ms</td>
+<td>22 ms</td>
+<td>handler 里对 40 个条目循环读写 <code>offsetHeight</code></td>
+</tr>
+<tr>
+<td>样式重排与绘制</td>
+<td>90 ms</td>
+<td>30 ms</td>
+<td>改为先批量读、再切一个 class 批量写</td>
+</tr>
+<tr>
+<td>网络与数据</td>
+<td>120 ms（WiFi）&#x2F; 680 ms（3G）</td>
+<td>同前，但界面先响应</td>
+<td>原来是同步 AJAX，UI 被彻底冻住</td>
+</tr>
+</tbody></table>
+<p>第二行的问题最典型：handler 里为了算一个插入位置，每轮先读 <code>offsetHeight</code> 再改 <code>className</code>，读操作把待处理的样式改动强制结算成布局，循环 40 次就是 40 次同步重排，Android 4.1 实测 190 ms，改法即《减少重排与重绘的实践清单》里那条”先批量读再批量写”。第三行的同步 AJAX（<code>xhr.open</code> 第三个参数传了 false）更恶劣：请求没回来之前页面不响应任何输入，用户以为没点到会再点一次，于是又叠上 ghost click 与重复提交。改成异步、先给界面反馈，总耗时并没有减少，但用户感知完全变了。</p>
+<p>结论直接决定优化优先级：先量四段，再决定要不要动 300 ms。事件处理段本身就有 200 ms 的话，接任何类库都是隔靴搔痒。</p>
+<h2 id="副作用清单与灰度回滚"><a href="#副作用清单与灰度回滚" class="headerlink" title="副作用清单与灰度回滚"></a>副作用清单与灰度回滚</h2><p>提速的代价都藏在默认行为里，逐条过一遍我们项目里踩到的。</p>
+<p>表单校验与焦点顺序。合成 click 让 blur 与 click 的相对顺序和原生不一致，依赖”失焦即校验”的逻辑偶发跑在校验之前，表现为报错文案闪一下又消失。处理办法：带校验的表单控件全部进豁免名单不提速，校验时机从 blur 改成显式的 submit，减少对顺序的依赖。</p>
+<p>ghost click。合成 click 提前触发、原生 click 300 ms 后到货，如果 handler 里把当前元素从 DOM 移除，迟到的那一下会落到身后的元素上。机制与类库内部的防护，旧文《FastClick 解决点击延迟》已经讲透。工程侧只需记住一条产品规则：弹层关闭后不要立刻移除 DOM，先隐藏（<code>visibility</code> 或留一层遮罩），300 ms 之后再清理，这个习惯能挡掉绝大部分幽灵点击。</p>
+<p>链接新窗口打开。<code>target=&quot;_blank&quot;</code> 的 a 标签被合成 click 命中时，”打开新窗口”属于默认行为，而默认行为只对可信事件生效，结果就是点了没反应。把 a 标签进豁免名单，或显式跳转。</p>
+<p>保留双击手势。图片查看器里我们自研了双击放大，加了提速层后两次 tap 被提前合成掉，自己的双击判定窗口随之失效。做法是在图片容器上不提速，自己实现监听：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> lastTapAt = <span class="number">0</span>;</span><br><span class="line"><span class="keyword">var</span> <span class="variable constant_">DOUBLE_TAP_WINDOW</span> = <span class="number">300</span>;   <span class="comment">// ms，对齐用户连点节奏，别设太宽</span></span><br><span class="line"><span class="keyword">var</span> imageZone = <span class="variable language_">document</span>.<span class="title function_">getElementById</span>(<span class="string">&#x27;viewer&#x27;</span>);</span><br><span class="line"></span><br><span class="line">imageZone.<span class="title function_">addEventListener</span>(<span class="string">&#x27;touchend&#x27;</span>, <span class="keyword">function</span> (<span class="params">e</span>) &#123;</span><br><span class="line">  <span class="keyword">var</span> t = +<span class="keyword">new</span> <span class="title class_">Date</span>();</span><br><span class="line">  <span class="keyword">if</span> (t - lastTapAt &lt; <span class="variable constant_">DOUBLE_TAP_WINDOW</span>) &#123;</span><br><span class="line">    lastTapAt = <span class="number">0</span>;</span><br><span class="line">    e.<span class="title function_">preventDefault</span>();</span><br><span class="line">    <span class="title function_">zoomAt</span>(e.<span class="property">changedTouches</span>[<span class="number">0</span>]);      <span class="comment">// 业务函数：以触点为中心放大</span></span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    lastTapAt = t;</span><br><span class="line">    <span class="title function_">scheduleSingleAction</span>();           <span class="comment">// 业务函数：延后到窗口期结束再执行单击动作</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;, <span class="literal">false</span>);</span><br></pre></td></tr></table></figure>
+
+<p>可以看到，这里为了保住双击，反过来把单击延后了——延迟没有消失，只是被搬到你手里，并且只影响一个区域。这就是这类优化的真实形状：不是消灭成本，而是决定成本落在谁头上。</p>
+<p>灰度与回滚。机型差异太大，不可能一刀切。我们把开关做成远端配置下发、按 UA 分桶，本地缓存一份兜底：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// readRemoteConfig 是业务侧封装：接口下发后写进 localStorage，取不到就返回 null</span></span><br><span class="line"><span class="keyword">var</span> cfg = <span class="title function_">readRemoteConfig</span>() || &#123;</span><br><span class="line">  <span class="attr">fastPath</span>: &#123;</span><br><span class="line">    <span class="attr">ios</span>: <span class="literal">true</span>,           <span class="comment">// iOS 全量开</span></span><br><span class="line">    <span class="attr">android_lt_4_4</span>: <span class="literal">true</span>,</span><br><span class="line">    <span class="attr">android_gte_4_4</span>: <span class="literal">false</span>,  <span class="comment">// 新内核已自行优化，先关着观察</span></span><br><span class="line">    <span class="attr">wp</span>: <span class="literal">false</span>            <span class="comment">// 走 CSS 方案，不叠 JS</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="keyword">function</span> <span class="title function_">shouldEnable</span>(<span class="params"></span>) &#123;</span><br><span class="line">  <span class="keyword">var</span> ua = navigator.<span class="property">userAgent</span>;</span><br><span class="line">  <span class="keyword">if</span> (<span class="regexp">/Windows Phone/</span>.<span class="title function_">test</span>(ua)) &#123; <span class="keyword">return</span> cfg.<span class="property">fastPath</span>.<span class="property">wp</span>; &#125;</span><br><span class="line">  <span class="keyword">if</span> (<span class="regexp">/iP(hone|ad|od)/</span>.<span class="title function_">test</span>(ua)) &#123; <span class="keyword">return</span> cfg.<span class="property">fastPath</span>.<span class="property">ios</span>; &#125;</span><br><span class="line">  <span class="keyword">if</span> (<span class="regexp">/Android\s([0-9.]+)/</span>.<span class="title function_">test</span>(ua)) &#123;</span><br><span class="line">    <span class="keyword">var</span> v = <span class="built_in">parseFloat</span>(<span class="title class_">RegExp</span>.<span class="property">$1</span>);</span><br><span class="line">    <span class="keyword">return</span> v &gt;= <span class="number">4.4</span> ? cfg.<span class="property">fastPath</span>.<span class="property">android_gte_4_4</span> : cfg.<span class="property">fastPath</span>.<span class="property">android_lt_4_4</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> <span class="literal">false</span>;   <span class="comment">// 认不出来的机型一律走原生，保守兜底</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>再留一个 URL 参数（例如 <code>?fastpath=0</code>）强制关闭，客服遇到个体投诉时直接给用户一条回滚链接，不必等发版。回滚要保证”不提速”这条路径永远可用：开关关掉后代码回到原生 click，业务 handler 一行不用改——这也是我们把动作函数与事件绑定分开写的原因。</p>
+<h2 id="收益怎么用数据证明"><a href="#收益怎么用数据证明" class="headerlink" title="收益怎么用数据证明"></a>收益怎么用数据证明</h2><p>改造上线得有数字说话：把 touchstart 到 handler 首行的间隔当指标，采样上报，服务端算 P50&#x2F;P95。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> <span class="variable constant_">SAMPLE_RATE</span> = <span class="number">0.02</span>;   <span class="comment">// 2% 采样，避免打点本身变成性能问题</span></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">reportLatency</span>(<span class="params">group, ms</span>) &#123;</span><br><span class="line">  <span class="keyword">if</span> (<span class="title class_">Math</span>.<span class="title function_">random</span>() &gt; <span class="variable constant_">SAMPLE_RATE</span>) &#123; <span class="keyword">return</span>; &#125;</span><br><span class="line">  <span class="keyword">if</span> (ms &gt; <span class="number">5000</span>) &#123; <span class="keyword">return</span>; &#125;  <span class="comment">// 切后台、来电话的脏数据丢掉</span></span><br><span class="line">  <span class="keyword">var</span> img = <span class="keyword">new</span> <span class="title class_">Image</span>();</span><br><span class="line">  img.<span class="property">src</span> = <span class="string">&#x27;/log/tap-latency?g=&#x27;</span> + <span class="built_in">encodeURIComponent</span>(group) + <span class="string">&#x27;&amp;ms=&#x27;</span> + ms;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 与打点脚本同一套时间戳逻辑，线上只多两行监听</span></span><br></pre></td></tr></table></figure>
+
+<p>口径要说清楚，否则两组数字没法比：起点是 touchstart 触发时刻，终点是业务 handler 第一行执行；改造前后的采样窗口、机型分桶、过滤规则都得一致。别看均值，它会被长尾拉平；P50 说明典型手感，P95 说明最差体验，投诉基本都来自 P95。专题页上线两周后的结果：</p>
+<table>
+<thead>
+<tr>
+<th>机型分组</th>
+<th>改造前 P50</th>
+<th>改造前 P95</th>
+<th>改造后 P50</th>
+<th>改造后 P95</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>iOS 5&#x2F;6&#x2F;7 Safari</td>
+<td>312 ms</td>
+<td>402 ms</td>
+<td>41 ms</td>
+<td>96 ms</td>
+</tr>
+<tr>
+<td>Android 2.3 到 4.3</td>
+<td>335 ms</td>
+<td>689 ms</td>
+<td>52 ms</td>
+<td>130 ms</td>
+</tr>
+<tr>
+<td>Android 4.4</td>
+<td>296 ms</td>
+<td>380 ms</td>
+<td>33 ms</td>
+<td>78 ms</td>
+</tr>
+<tr>
+<td>Windows Phone 8（CSS 方案）</td>
+<td>310 ms</td>
+<td>368 ms</td>
+<td>28 ms</td>
+<td>64 ms</td>
+</tr>
+</tbody></table>
+<p>同时必须看反向指标，只报延迟是耍流氓。我们盯三个：误触率（点击后 2 秒内返回或撤销的比例，改造后从 1.4% 涨到 1.9%，说明阈值偏灵敏，把容差从 8 px 调到 12 px 后回落到 1.5%）、表单校验失败率（持平）、加购提交重复率（同步 AJAX 改异步并加防抖后，从 0.7% 降到 0.2%）。数据来回调了两轮才稳住，这也是前面坚持做机型开关的原因——数字不对就关掉某个桶，不必回滚整个页面。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>300 ms 不是定值，它随环境在 300 到 700 ms 之间浮动，各家双击缩放窗口的实现也不一样，所以第一步永远是拿真机时间戳把四段耗时拆开量清楚，确认延迟在你这条链路里占多大比重。方案上，自制安全判定最可控但要自己兜住滚动、长按与 touchcancel；类库省事，代价是影响面铺满整层、豁免名单归你维护；<code>-ms-touch-action</code> 干净，但当时只在 IE 系与 WP8 成立；交互真正密集的界面应该交给原生容器。至于禁用缩放，收益只在部分环境成立，代价是老年用户与低视力用户失去放大手段，不该当成优化手段。选型看三个判据：是否需要双击缩放、目标是否在滚动容器里、机型分布怎么走。任何方案都会把成本换个地方落下——ghost click、默认行为偏差、焦点顺序变化，所以机型开关、URL 级回滚与 P50&#x2F;P95 打点这三件套不是可选项，它们是这类改动能安全上线的前提。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>移动端点击 300ms 延迟与解决方案</p><p><a href="https://987763485.github.io/2014/05/04/移动端点击300ms延迟与解决方案/">https://987763485.github.io/2014/05/04/移动端点击300ms延迟与解决方案/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2014-05-04</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-17</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/web%E5%89%8D%E7%AB%AF/">web前端</a><a class="link-muted mr-2" rel="tag" href="/tags/html5/">html5</a><a class="link-muted mr-2" rel="tag" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/">移动端</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2014/05/11/DOM%E6%93%8D%E4%BD%9C%E6%80%A7%E8%83%BD%E6%89%B9%E9%87%8F%E6%8F%92%E5%85%A5%E4%B8%8E%E9%87%8D%E6%8E%92%E4%BC%98%E5%8C%96/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">DOM 操作性能：批量插入与重排优化</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2014/05/02/DOM%E4%B8%ADclass%E6%93%8D%E4%BD%9C%E7%9A%84%E5%87%A0%E7%A7%8D%E5%B0%81%E8%A3%85/"><span class="level-item">DOM 中 class 操作的几种封装</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

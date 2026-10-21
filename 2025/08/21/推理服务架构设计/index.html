@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>推理服务架构设计 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="为什么需要分层"><meta property="og:type" content="blog"><meta property="og:title" content="推理服务架构设计"><meta property="og:url" content="https://987763485.github.io/2025/08/21/%E6%8E%A8%E7%90%86%E6%9C%8D%E5%8A%A1%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="为什么需要分层"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2025-08-20T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-20T13:44:33.458Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="大模型"><meta property="article:tag" content="python"><meta property="article:tag" content="typescript"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2025/08/21/%E6%8E%A8%E7%90%86%E6%9C%8D%E5%8A%A1%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"},"headline":"推理服务架构设计","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2025-08-20T16:00:00.000Z","dateModified":"2026-10-20T13:44:33.458Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"为什么需要分层"}</script><link rel="canonical" href="https://987763485.github.io/2025/08/21/%E6%8E%A8%E7%90%86%E6%9C%8D%E5%8A%A1%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2025-08-20T16:00:00.000Z" title="8/21/2025, 12:00:00 AM">2025-08-21</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></span><span class="level-item">30 分钟读完 (大约4531个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">推理服务架构设计</h1><div class="content"><h2 id="为什么需要分层"><a href="#为什么需要分层" class="headerlink" title="为什么需要分层"></a>为什么需要分层</h2><p>大模型推理服务的特殊现实是内部引擎变化极快。引擎实现、模型版本、并行策略几乎每季度都在换，而调用方——业务前端、智能体（Agent）编排器、批处理作业——发出的请求形态却应当多年保持稳定。分层的意义就是把”对外契约稳定”与”对内快速变化”拆开，把变化关在靠下的层里：一层换实现时，上层仍遵守同一份契约。不分层，一次引擎升级会拖着请求参数、错误语义、流式格式全链条改，最后没人敢升级。</p>
+<p>本文讨论的五层结构如下：接入与网关管对外契约；调度与路由回答”这次请求交给谁”；引擎实例负责算出 token；模型与权重存储把正确的权重送到正确的实例上；观测与计量横跨各层，把内部状态翻译成可核对的信号。</p>
+<pre class="mermaid">flowchart TD
+    A[调用方] --> B[接入与网关层]
+    B --> C[调度与路由层]
+    C --> D[引擎实例层]
+    D --> E[模型与权重存储层]
+    F[观测与计量] -.采集.-> B
+    F -.采集.-> C
+    F -.采集.-> D
+    F -.采集.-> E</pre>
+
+<p>层与层之间靠契约说话：请求模式、错误语义、取消传播、流式帧格式、就绪状态。边界画错的代价是具体的——把路由决策塞进引擎，它就成了谁都不敢动的黑盒；把计费逻辑散在两层，对账永远对不平。兼容层差异、断连处置、计费对账等落地细节归《大模型推理服务化实践》，本文只画层与契约。</p>
+<h2 id="网关层：只做可预期的控制"><a href="#网关层：只做可预期的控制" class="headerlink" title="网关层：只做可预期的控制"></a>网关层：只做可预期的控制</h2><p>网关（Gateway）是对外契约的唯一持有者，职责清单应当克制：鉴权与租户识别，把令牌换算成内部身份与租户标识；协议归一（Protocol Normalization），把各家引擎 API 在参数命名、流式帧、错误码上的差异收敛到一套内部契约；限流与配额，按租户与接口控制进入系统的请求量；请求改写，做长度截断与结构化输出（Structured Output）的参数映射；以及把调用方的取消信号正确下传，而不是等引擎算完了才发现没人要结果。</p>
+<p>网关有一条必须钉死的红线：不做推理决策。选哪个实例、排队还是拒绝、是否切换备用模型，都属于调度的领域；网关只做可预期的控制——给定同样的输入，必然得到同样的放行或拒绝结果。一旦网关开始”看情况转发”，排查问题就要跨越两层假设，定位成本成倍增加。其内部如何设计归《模型服务网关设计》，本文只确定它在分层中的位置：契约的守门人，而不是大脑。</p>
+<h2 id="调度与路由层：这次交给谁"><a href="#调度与路由层：这次交给谁" class="headerlink" title="调度与路由层：这次交给谁"></a>调度与路由层：这次交给谁</h2><p>调度与路由（Router &#x2F; Scheduler）回答：这个请求现在给哪个实例。职责有四组。其一，按模型与版本选择实例池——同一套服务常同时存在多个模型与版本，池子要先选对。其二，按请求特征分桶：输入长度、是否带工具调用（Tool Call）、能否命中缓存、在线还是离线，混在一起会互相拖累。其三，排队与优先级，明确谁是交互式请求、谁可以让路。其四，抢占与重试的边界：什么情况下允许腾出低优先级请求、重试由谁发起，这些决策必须发生在这一层并被记录。</p>
+<p>路由必须知道实例当前能不能接，这就是就绪四态：进程存活、模型已加载、预热完成、可接流量。只检查”进程活着”的健康检查是事故源头——刚加载完权重、第一批请求还在触发内核编译与缓存初始化的实例，看着健康，实际第一波全慢；预热完成应作为健康检查里的显式状态。伸缩信号与排水归《推理服务的弹性伸缩》，本文只衔接一句：就绪四态同时是伸缩决策的输入。</p>
+<h2 id="引擎层的边界"><a href="#引擎层的边界" class="headerlink" title="引擎层的边界"></a>引擎层的边界</h2><p>引擎（Inference Engine）管的是单实例内部的事：连续批处理（Continuous Batching）如何组织、显存如何分配、采样如何执行。它不该管的两件事同样明确：租户与计费。引擎看到的应当是”一批已分给它的请求”，这批请求来自哪个租户、值多少钱是上层的事；让引擎认识租户，等于把商业策略编译进一个每季度更换的实现里。</p>
+<p>跨层最容易画错的两条边界都在这里。其一，把排队策略放进引擎：引擎内部悄悄维护私有等待队列，上层以为请求已在处理，实际排在引擎里——这段等待不可观测，超时归因全部失真，策略藏在没人负责的地方；排队应当显式留在调度层，引擎只接收准入后的请求。其二，把 KV 相关参数散落在网关配置里：网关的作者不懂参数语义，引擎的作者改不动它们，最后无人负责。机制的公式与原理本文不重讲，以《大模型推理优化：KV Cache 与 PagedAttention》为准。</p>
+<h2 id="存储与模型分发层"><a href="#存储与模型分发层" class="headerlink" title="存储与模型分发层"></a>存储与模型分发层</h2><p>存储层回答两个问题：权重从哪里来、怎么到达实例。来源应当是单一可审计的仓库，分发要么由实例按需拉取，要么在启动前预热同步。最难设计的是扩容瞬间：上百个实例同时拉取同一份权重时，源站被雪崩式请求打垮，扩容反而比故障更慢。常见做法有两种：镜像化，把权重烘进容器镜像或只读缓存层，随镜像分发天然分摊；共享缓存，在节点层建权重缓存，把同一节点的百次拉取收敛为一次。关键是让”重复拉取”收敛为”一次拉取”。</p>
+<p>版本与校验不能省：每份权重记录按内容计算的哈希摘要（Digest）与来源，由实例加载前核对，数值由流水线生成，绝不能手抄进文档。权重属于敏感资产：不进日志、不进外部缓存、临时副本用完即清理。配置文件与密钥要分域：配置域放泄漏了尚可公开的项，密钥域放泄漏了必须立即轮换的项，混放是密钥进日志的最常见原因。</p>
+<h2 id="流式协议的选择"><a href="#流式协议的选择" class="headerlink" title="流式协议的选择"></a>流式协议的选择</h2><p>推理服务要持续吐 token，常见的四种承载各有所适。SSE（Server-Sent Events，服务器发送事件）基于 HTTP 单向推送，贴合服务端连续产出，穿透大多数代理，是稳妥默认。WebSocket 双向，适合持续回传工具结果或中间状态的场景，但带来一套连接管理义务。分块 HTTP（Transfer-Encoding: chunked）最简单，却没有事件帧边界，客户端解析容易出错。RPC 流（例如 gRPC streaming）适合内部服务间的层间调用，跨浏览器生态时要费劲。</p>
+<p>流式让两件事变难。一是幂等：流已被对端消费一部分，不能简单重放整个响应；断连之后”重试”与”续传”是两种语义，契约必须写明支持哪一种。二是背压（Backpressure）：客户端不收时，服务端要不要继续生成？生成就是计算成本，生产没人接收的流就是白付成本，契约应写明”持续不收则停止生成并释放资源”。中间代理是现实约束：负载均衡、API 网关、企业代理都可能因空闲超时切断长连接，表现为”流戛然而止且没有报错”，这是常见事故源，心跳与空闲超时的逐层配置是架构层义务；断连后的具体处置是运维议题，本文只登记为契约项。</p>
+<h2 id="幂等、超时与预算的分层"><a href="#幂等、超时与预算的分层" class="headerlink" title="幂等、超时与预算的分层"></a>幂等、超时与预算的分层</h2><p>请求级幂等（Idempotency）键用来判断”这是不是同一个请求的重试”。设计有一条红线：键里不能含用户敏感原文。标识一旦由原文派生，日志、缓存、监控都会顺着键把它扩散出去，脱敏永远追不上复制；应使用内容摘要值，或调用方独立发放、本身不携带语义的标识。</p>
+<p>超时要作为预算逐层下发，而不是各层各自拍一个数字。粗粒度关系是：总预算 &#x3D; 排队 + 首 token + 生成 + 重试余量。若每层只有固定超时，一定会出现网关已断开、引擎还在为无人接收的连接继续生成。下面的分配数值为团队约定示例，不是行业标准：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">budget:</span></span><br><span class="line">  <span class="attr">total_ms:</span> <span class="number">120000</span>        <span class="comment"># 全链路总预算</span></span><br><span class="line">  <span class="attr">queue_ms:</span> <span class="number">15000</span>         <span class="comment"># 调度层排队预算</span></span><br><span class="line">  <span class="attr">first_token_ms:</span> <span class="number">8000</span>    <span class="comment"># 首 token 时间预算</span></span><br><span class="line">  <span class="attr">generate_ms:</span> <span class="number">90000</span>      <span class="comment"># 生成预算</span></span><br><span class="line">  <span class="attr">retry_reserve_ms:</span> <span class="number">7000</span>  <span class="comment"># 预留一次重试的余量</span></span><br></pre></td></tr></table></figure>
+
+<p>重试放大是架构问题而不是客户端问题：网关、路由、客户端各自重试两次，一次上游故障就在引擎里变成八倍执行。契约必须写明哪一层拥有重试权，其余层只向上暴露失败。</p>
+<h2 id="多模型与灰度"><a href="#多模型与灰度" class="headerlink" title="多模型与灰度"></a>多模型与灰度</h2><p>一套服务承载多模型与版本有三种形态。按请求指定：调用方显式传模型名，灵活，但把版本选择的知识压给业务方。按租户绑定：路由表决定哪个租户用哪个模型，集中，但租户迁移要走变更流程。按策略路由：按流量比例、请求特征或成本约束在候选模型间选择，最强也最容易失控——无论哪种，规则都必须存放在可集中审计的地方。</p>
+<p>灰度（Canary Release）按两种单位切：按租户，试点范围清晰、反馈容易归因；按流量分桶，用一致性哈希让同一会话稳定落在同一版本。灰度开关唯一的硬性要求是能一键回退：切换必须是集中路由规则的一次修改，而不是”手工慢慢降量”。AB 的观测口径必须与离线评测一致，否则灰度结论无法使用。模型退役最易漏掉的是衍生资产一致性：嵌入（Embedding）与索引不与模型同步换代，就会出现旧索引配新模型的错配。</p>
+<h2 id="可观测点清单"><a href="#可观测点清单" class="headerlink" title="可观测点清单"></a>可观测点清单</h2><p>可观测性（Observability）是把每层的内部状态翻译成可核对的信号，三条原则先于任何工具选型。命名统一：同一概念在每层用同一字段名，别一层叫 queue 另一层叫 pending。trace 贯穿：链路标识（Trace ID）由网关生成并必须传到引擎，任取一个请求都能看到排队、首 token、生成的完整时间线。指标低基数（Cardinality）：不要把模型的完整输入输出当标签，长度分桶或哈希分桶已经够用。以下清单可直接抄，字段名为约定示例：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">gateway:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">request_total&#123;tenant,</span> <span class="string">endpoint,</span> <span class="string">model_alias&#125;</span>   <span class="comment"># 请求量与拒绝原因</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">rate_limited_total&#123;tenant&#125;</span>                     <span class="comment"># 限流与配额命中</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">cancel_propagated_total</span>                        <span class="comment"># 取消信号下传</span></span><br><span class="line"><span class="attr">router:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">queue_depth&#123;pool,</span> <span class="string">priority&#125;</span>                    <span class="comment"># 各池排队深度</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">admission_latency_bucket</span>                       <span class="comment"># 准入延迟分布</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">ready_state&#123;pool&#125;</span>                              <span class="comment"># 就绪四态当前值</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">retry_total&#123;layer,</span> <span class="string">reason&#125;</span>                     <span class="comment"># 重试按发起层归类</span></span><br><span class="line"><span class="attr">engine:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">running_requests</span>                               <span class="comment"># 正在生成的请求数</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">ttft_bucket</span>                                    <span class="comment"># 首 token 时间分布</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">preemption_total</span>                               <span class="comment"># 抢占次数</span></span><br><span class="line"><span class="attr">storage:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">weight_fetch_duration_bucket</span>                   <span class="comment"># 权重拉取耗时</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">checksum_mismatch_total</span>                        <span class="comment"># 校验失败次数</span></span><br></pre></td></tr></table></figure>
+
+<p>脱敏（Redaction）与最小必要同样是架构义务：用户提问原文与输出不进日志、不进缓存键、不进指标标签；留存期与访问权限写进配置。批处理调度算法本身归《大模型批处理与调度》，本文只规定离线队列至少暴露深度与等待时长。</p>
+<h2 id="失败模式与降级路径"><a href="#失败模式与降级路径" class="headerlink" title="失败模式与降级路径"></a>失败模式与降级路径</h2><p>每类故障都该有写进契约的默认行为，而不是靠值班同学临场判断。引擎全忙：交互式请求在预算内排队并暴露深度，超预算快速失败，离线流量走独立的池。目标模型不可用：降级顺序是同池换版本、备用模型、纯检索式回答或致歉，换模型是调度层的决策。上游取消：立即停止生成并释放。缓存不可用：必须有穿透保护。下表按场景、现象、期望、禁忌整理：</p>
+<table>
+<thead>
+<tr>
+<th>故障场景</th>
+<th>现象</th>
+<th>期望行为</th>
+<th>绝对不要</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>引擎全忙</td>
+<td>排队变长、首 token 变慢</td>
+<td>预算内排队并暴露深度，超预算快速失败</td>
+<td>静默无限排队</td>
+</tr>
+<tr>
+<td>模型不可用</td>
+<td>指定模型名持续报错</td>
+<td>路由层降级到备用版本或模型</td>
+<td>让网关临场猜模型</td>
+</tr>
+<tr>
+<td>上游取消</td>
+<td>流中断或连接关闭</td>
+<td>立即停止生成并释放资源</td>
+<td>继续为无人接收的流消耗算力</td>
+</tr>
+<tr>
+<td>缓存不可用</td>
+<td>命中率骤降</td>
+<td>穿透保护、限流放行</td>
+<td>全量直通打穿引擎</td>
+</tr>
+<tr>
+<td>权重拉取雪崩</td>
+<td>扩容反而变慢</td>
+<td>共享缓存或镜像分发摊开拉取</td>
+<td>让百实例齐打源站</td>
+</tr>
+</tbody></table>
+<h2 id="安全与合规边界"><a href="#安全与合规边界" class="headerlink" title="安全与合规边界"></a>安全与合规边界</h2><p>以下每层一句，展开各归其文。网关层：请求携带的外部内容——网页抓取、工具返回、上下文引用——一律按不可信输入（Untrusted Input）对待，边界划定与注入防护机制详见注入防护专文。检索与调度链路：越权召回的防线必须设在检索阶段，无权限的内容根本不能进入提示词，靠生成层”别说出来”不算边界。存储层：权重与密钥分域、审计可查。观测层：脱敏、留存期与访问控制前置设计。合规时间线上：EU AI Act 对通用人工智能（General-Purpose AI）的义务自 2025 年 8 月已经适用；国内《人工智能生成合成内容标识办法》已公布、即将施行，生成内容加标识的义务即将到来，架构上先预留元数据字段是稳妥做法，条款解读不在本文范围。</p>
+<h2 id="分层对照表"><a href="#分层对照表" class="headerlink" title="分层对照表"></a>分层对照表</h2><p>最后一张总表，把各层的职责与禁忌钉在一起：</p>
+<table>
+<thead>
+<tr>
+<th>层</th>
+<th>职责</th>
+<th>绝不负责</th>
+<th>对外契约</th>
+<th>常见越界</th>
+<th>坏了的症状</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>网关</td>
+<td>鉴权、协议归一、限流、取消下传</td>
+<td>推理决策、实例选择</td>
+<td>内部请求模式与错误语义</td>
+<td>开始”看情况转发”</td>
+<td>故障定位跨层猜假设</td>
+</tr>
+<tr>
+<td>调度路由</td>
+<td>选池、分桶、排队、重试权</td>
+<td>租户计费、引擎内核</td>
+<td>就绪四态与准入结果</td>
+<td>把排队藏进引擎</td>
+<td>超时归因失真</td>
+</tr>
+<tr>
+<td>引擎</td>
+<td>批处理、显存组织、采样</td>
+<td>租户、计费、排队策略</td>
+<td>准入后请求的执行结果</td>
+<td>KV 参数散落在网关配置</td>
+<td>参数无人负责</td>
+</tr>
+<tr>
+<td>权重存储</td>
+<td>分发、校验、清理</td>
+<td>业务路由决策</td>
+<td>版本加摘要的可加载制品</td>
+<td>权重进日志与外部缓存</td>
+<td>资产泄漏</td>
+</tr>
+<tr>
+<td>观测计量</td>
+<td>每层信号、trace、脱敏</td>
+<td>高基数原文采集</td>
+<td>统一命名的事件与指标</td>
+<td>输入输出当标签</td>
+<td>存储爆炸与合规风险</td>
+</tr>
+</tbody></table>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>本文的立场可以压缩成三句话。第一，分层不是为了优雅，而是为了把”引擎每季度都在变”与”调用方多年不该变”解耦，契约是变化的缓冲区。第二，每层的价值大半体现在它拒绝做什么：网关不做推理决策，引擎不认识租户，排队不许藏进私有队列，KV 参数不许散落在网关配置。第三，就绪四态、预算下发、取消传播、脱敏与最小必要，都是写进契约的架构义务，而不是运维阶段再补的经验。把层画清、把边界守住，之后换成什么引擎、什么模型，服务都还是同一个服务。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>推理服务架构设计</p><p><a href="https://987763485.github.io/2025/08/21/推理服务架构设计/">https://987763485.github.io/2025/08/21/推理服务架构设计/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2025-08-21</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-20</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="link-muted mr-2" rel="tag" href="/tags/python/">python</a><a class="link-muted mr-2" rel="tag" href="/tags/typescript/">typescript</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2025/08/28/Rust%E9%A1%B9%E7%9B%AECI%E4%B8%8E%E5%8F%91%E5%B8%83/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Rust 项目 CI 与发布</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2025/08/19/%E6%8F%90%E7%A4%BA%E8%AF%8D%E5%B7%A5%E7%A8%8B%E8%BF%9B%E9%98%B6%E6%8A%80%E5%B7%A7/"><span class="level-item">提示词工程进阶技巧</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

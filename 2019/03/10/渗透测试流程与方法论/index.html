@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>渗透测试流程与方法论 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="不少团队第一次做渗透测试，是从一份漏洞扫描报告开始的：几十页高危、中危列表，没人说得清哪些真的能被利用，也没人安排复测。本文从项目管理和防御视角出发，梳理一次授权渗透测试的完整流程：怎么划定边界、每个阶段交付什么、如何控制测试本身的风险、报告怎么写才有用。工具操作与具体漏洞原理不在本篇展开。"><meta property="og:type" content="blog"><meta property="og:title" content="渗透测试流程与方法论"><meta property="og:url" content="https://987763485.github.io/2019/03/10/%E6%B8%97%E9%80%8F%E6%B5%8B%E8%AF%95%E6%B5%81%E7%A8%8B%E4%B8%8E%E6%96%B9%E6%B3%95%E8%AE%BA/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="不少团队第一次做渗透测试，是从一份漏洞扫描报告开始的：几十页高危、中危列表，没人说得清哪些真的能被利用，也没人安排复测。本文从项目管理和防御视角出发，梳理一次授权渗透测试的完整流程：怎么划定边界、每个阶段交付什么、如何控制测试本身的风险、报告怎么写才有用。工具操作与具体漏洞原理不在本篇展开。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2019-03-10T09:33:53.000Z"><meta property="article:modified_time" content="2026-10-18T12:53:47.409Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="网络安全"><meta property="article:tag" content="等级保护"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2019/03/10/%E6%B8%97%E9%80%8F%E6%B5%8B%E8%AF%95%E6%B5%81%E7%A8%8B%E4%B8%8E%E6%96%B9%E6%B3%95%E8%AE%BA/"},"headline":"渗透测试流程与方法论","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2019-03-10T09:33:53.000Z","dateModified":"2026-10-18T12:53:47.409Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"不少团队第一次做渗透测试，是从一份漏洞扫描报告开始的：几十页高危、中危列表，没人说得清哪些真的能被利用，也没人安排复测。本文从项目管理和防御视角出发，梳理一次授权渗透测试的完整流程：怎么划定边界、每个阶段交付什么、如何控制测试本身的风险、报告怎么写才有用。工具操作与具体漏洞原理不在本篇展开。"}</script><link rel="canonical" href="https://987763485.github.io/2019/03/10/%E6%B8%97%E9%80%8F%E6%B5%8B%E8%AF%95%E6%B5%81%E7%A8%8B%E4%B8%8E%E6%96%B9%E6%B3%95%E8%AE%BA/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2019-03-10T09:33:53.000Z" title="3/10/2019, 5:33:53 PM">2019-03-10</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a></span><span class="level-item">27 分钟读完 (大约4010个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">渗透测试流程与方法论</h1><div class="content"><p>不少团队第一次做渗透测试，是从一份漏洞扫描报告开始的：几十页高危、中危列表，没人说得清哪些真的能被利用，也没人安排复测。本文从项目管理和防御视角出发，梳理一次授权渗透测试的完整流程：怎么划定边界、每个阶段交付什么、如何控制测试本身的风险、报告怎么写才有用。工具操作与具体漏洞原理不在本篇展开。</p>
+<h2 id="一、边界先行：只讨论获得书面授权的测试"><a href="#一、边界先行：只讨论获得书面授权的测试" class="headerlink" title="一、边界先行：只讨论获得书面授权的测试"></a>一、边界先行：只讨论获得书面授权的测试</h2><p>渗透测试在技术动作上与入侵没有本质区别，区别只在授权。测试人员拿着客户给的域名、账号和时间窗口去尝试突破，这份授权既是工作依据，也是事后说明“我在做什么”的唯一凭证。没有书面授权，哪怕只是对自家子域做一次目录扫描，也可能触碰法律红线；有了授权，也要逐条确认它覆盖了即将动手的每一个目标。</p>
+<p>一份可用的授权书至少要写清六件事：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">1. 目标范围：域名、IP 段、端口、API、移动端包名、可用测试账号</span><br><span class="line">2. 时间窗口：起止时间（含时区）、可测试时段与禁测时段</span><br><span class="line">3. 测试类型：黑盒/灰盒/白盒、是否含社会工程、是否含拒绝服务验证</span><br><span class="line">4. 禁止项：不落地后门、不下载真实数据、不修改配置、不删除日志</span><br><span class="line">5. 数据处理：证据加密存放、脱敏规则、留存期限与销毁方式</span><br><span class="line">6. 紧急联系人：双方各一名，电话可达，约定升级顺序与中止暗号</span><br></pre></td></tr></table></figure>
+
+<p>范围要写到可执行的粒度。“测试公司官网”这样的描述没有意义，需要列出具体域名、对应 IP、是否包含 CDN 回源地址、是否包含下属单位的系统。第三方托管的云服务、支付渠道、办公网通常不在授权内，测试时看到也要绕开。</p>
+<p>禁止项要具体到动作：不植入后门、不下载业务数据、不修改配置、不清除日志、不对生产库执行写操作，这些条款能挡住大部分测试事故。数据处理常被忽略：测试中拿到的身份证号、手机号、订单信息属于个人信息，截图要打码，证据加密存放，结束后按约定期限销毁。</p>
+<p>最后是沟通机制：双方各指定一名联系人，测试期间电话可达，并约定中止暗号，业务方发现异常时说出暗号即可停止测试。</p>
+<h2 id="二、渗透测试与漏洞扫描、红队、风险评估的区别"><a href="#二、渗透测试与漏洞扫描、红队、风险评估的区别" class="headerlink" title="二、渗透测试与漏洞扫描、红队、风险评估的区别"></a>二、渗透测试与漏洞扫描、红队、风险评估的区别</h2><p>这四个词经常被混用，目标、方法和产出差别很大：</p>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>主要目标</th>
+<th>方法</th>
+<th>典型产出</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>漏洞扫描</td>
+<td>发现已知弱点</td>
+<td>工具批量探测、规则匹配</td>
+<td>漏洞列表与修复建议</td>
+<td>资产盘点、日常巡检</td>
+</tr>
+<tr>
+<td>渗透测试</td>
+<td>验证可利用性与影响</td>
+<td>人工分析、组合利用</td>
+<td>带证据的风险报告</td>
+<td>上线前、年度评估、测评前</td>
+</tr>
+<tr>
+<td>红队演练</td>
+<td>检验检测与响应能力</td>
+<td>隐蔽渗透、社会工程、长期驻留</td>
+<td>攻防复盘与改进项</td>
+<td>检验防守方与流程</td>
+</tr>
+<tr>
+<td>风险评估</td>
+<td>识别并量化风险</td>
+<td>资产、威胁、脆弱性分析</td>
+<td>风险清单与处置计划</td>
+<td>立项、预算、体系建设</td>
+</tr>
+</tbody></table>
+<p>扫描器回答“这个资产上有没有已知问题”。它快、覆盖面广，适合定期跑，但误报多，也判断不了两个中危组合起来能不能打穿。渗透测试回答“能不能进来、进来能拿走什么”，靠人工把零散信息串成路径，因此慢、贵、覆盖面窄，一份报告通常只覆盖几十个关键点。两者不能互相替代。</p>
+<p>红队演练的目标不是找漏洞，而是检验防守方能否发现和处置，允许使用社会工程、钓鱼等手段，周期以周或月计，产出是攻防复盘而非修复清单。把红队报告直接丢给开发修，效果往往很差，因为其中很多“问题”是流程和监控的缺失。</p>
+<p>风险评估是管理视角：资产值多少、面临什么威胁、现有控制能否挡住、还剩多少残余风险。它不一定要动手测试，访谈与配置核查也能支撑结论，渗透测试的发现可以作为输入，但不能替代它。</p>
+<p>选择哪一种，取决于要回答什么问题：关心已知漏洞做扫描，关心系统能否扛住攻击做渗透，关心防守方能否发现入侵做红队，关心预算投向做风险评估。预算有限时，常见组合是季度扫描加年度渗透。</p>
+<h2 id="三、标准流程：八个阶段，一条闭环"><a href="#三、标准流程：八个阶段，一条闭环" class="headerlink" title="三、标准流程：八个阶段，一条闭环"></a>三、标准流程：八个阶段，一条闭环</h2><p>PTES 把渗透测试拆成前期交互、情报收集、威胁建模、漏洞分析、渗透攻击、后渗透、报告几个阶段，OWASP Testing Guide 更侧重 Web 侧的测试项组织，但骨架一致：先谈清边界，再收集信息、验证利用、评估影响，最后清理现场并写成报告。项目可按规模裁剪，比如把威胁建模并入信息收集，但范围界定、证据留存、清理、复测不能省。</p>
+<pre class="mermaid">flowchart TD
+    A[范围界定与授权] --> B[信息收集]
+    B --> C[威胁建模]
+    C --> D[漏洞发现与验证]
+    D --> E[利用与影响评估]
+    E --> F[横向移动与权限提升]
+    F --> G[清理与复测]
+    G --> H[报告与复测闭环]</pre>
+
+<p>图中的箭头是单向的，实际执行经常回退：验证时发现新资产，要回到信息收集补全清单；利用时发现影响超出预期，要停下来重新评估。流程的价值不在按顺序走完，而在于每一步都有明确的输入、输出和停止条件。</p>
+<h2 id="四、每个阶段交付什么"><a href="#四、每个阶段交付什么" class="headerlink" title="四、每个阶段交付什么"></a>四、每个阶段交付什么</h2><p>项目管理最容易失控的地方，是“做到哪算完”没有共识。给每个阶段定义交付物，既能让客户知道钱花在哪，也能让测试人员在切换阶段时自检。</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>输入</th>
+<th>输出</th>
+<th>交付物</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>范围界定</td>
+<td>业务清单、授权书</td>
+<td>确认的范围与计划</td>
+<td>范围清单、测试计划</td>
+</tr>
+<tr>
+<td>信息收集</td>
+<td>范围清单</td>
+<td>资产与入口清单</td>
+<td>资产清单、拓扑草图</td>
+</tr>
+<tr>
+<td>威胁建模</td>
+<td>资产清单、业务流程</td>
+<td>优先攻击路径</td>
+<td>威胁列表、测试用例</td>
+</tr>
+<tr>
+<td>漏洞验证</td>
+<td>测试用例</td>
+<td>可复现的漏洞</td>
+<td>测试记录、证据包</td>
+</tr>
+<tr>
+<td>利用评估</td>
+<td>已验证漏洞</td>
+<td>影响结论</td>
+<td>影响说明、风险初判</td>
+</tr>
+<tr>
+<td>横向提权</td>
+<td>已控节点</td>
+<td>可达范围</td>
+<td>路径图、影响范围</td>
+</tr>
+<tr>
+<td>清理复测</td>
+<td>变更记录</td>
+<td>恢复确认</td>
+<td>清理记录、复测结论</td>
+</tr>
+<tr>
+<td>报告</td>
+<td>全部证据</td>
+<td>整改建议</td>
+<td>正式报告、汇报材料</td>
+</tr>
+</tbody></table>
+<h3 id="4-1-准备：范围清单、资产清单、测试计划"><a href="#4-1-准备：范围清单、资产清单、测试计划" class="headerlink" title="4.1 准备：范围清单、资产清单、测试计划"></a>4.1 准备：范围清单、资产清单、测试计划</h3><p>范围清单来自授权书，但要落到可执行的粒度：域名解析到哪些 IP、是否有 CDN、API 网关后面挂了几个服务、移动端是否要测。资产清单由客户提供一版，测试人员再用公开信息补充一版，对不上的地方就是需要确认的盲区。测试计划写明人员分工、时间安排、测试类型、工具清单、风险控制措施和沟通方式，要让运维、开发和业务负责人都看过，尤其是窗口期和禁止项。</p>
+<p>威胁建模常被跳过，却决定后面把时间花在哪：按暴露程度、数据敏感度、业务重要性给资产排序，再设想攻击者会从哪条路径进来，就能得到优先测试清单，避免把时间耗在登录框和搜索框上。</p>
+<h3 id="4-2-执行：测试记录与证据"><a href="#4-2-执行：测试记录与证据" class="headerlink" title="4.2 执行：测试记录与证据"></a>4.2 执行：测试记录与证据</h3><p>执行阶段的核心产物不是漏洞数量，而是可复核的记录：时间、目标、请求与响应摘要、账号、结果判断。截图带系统时间，命令输出保留原始文本，证据按“日期-目标-序号”命名，存放在加密目录。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">mkdir</span> -p evidence/20190310-api</span><br><span class="line"><span class="built_in">date</span> -u +<span class="string">&quot;%Y-%m-%dT%H:%M:%SZ&quot;</span> | <span class="built_in">tee</span> evidence/20190310-api/timeline.txt</span><br><span class="line"><span class="built_in">sha256sum</span> evidence/20190310-api/*.txt &gt;&gt; evidence/20190310-api/checksum.txt</span><br></pre></td></tr></table></figure>
+
+<p>记录的价值在复测和争议处理时体现：开发说“这个洞修了”，拿出当时的请求和响应即可核对；客户质疑是否碰了不该碰的数据，时间线和校验值能说明范围。</p>
+<p>利用与影响评估要克制：验证到能读到一条测试账号的数据就够了，不必扩大战果；横向移动只在授权范围内进行，每跳一次记录时间和路径。目的是证明风险存在，不是把系统打穿。</p>
+<h3 id="4-3-收尾：清理、报告、复测"><a href="#4-3-收尾：清理、报告、复测" class="headerlink" title="4.3 收尾：清理、报告、复测"></a>4.3 收尾：清理、报告、复测</h3><p>清理包括删除上传的测试文件、撤销新建账号、还原配置、关闭测试隧道和代理，每项都要记录并由客户侧确认。很多事故不是发生在测试中，而是测试结束后遗留的账号或文件被人利用。</p>
+<p>报告在收尾阶段产出，复测在客户修复后进行：逐项验证修复是否有效、是否引入新问题，给出“已修复、部分修复、未修复、接受风险”四类结论。</p>
+<h2 id="五、测试类型与视角的选择"><a href="#五、测试类型与视角的选择" class="headerlink" title="五、测试类型与视角的选择"></a>五、测试类型与视角的选择</h2><p>黑盒只给目标地址，模拟外部攻击者，能反映真实暴露面，但效率低，容易耗在登录页和前端逻辑上。白盒提供源码、配置和账号，覆盖深、误报少，适合上线前检查，代价是需要开发配合。灰盒给测试账号和部分架构信息，是多数项目的默认选择：既保留攻击者视角，又不在信息收集上烧掉一半预算。</p>
+<p>内部视角从办公网或服务器网段发起，重点看横向移动、弱口令和过度授权；外部视角从互联网发起，重点看暴露的服务、VPN 和对外 API。两者发现的问题往往不同，预算允许时都做。</p>
+<p>生产环境最真实，但风险最高；测试环境安全，却常与生产配置不一致，测出的问题可能是环境差异造成的。破坏性验证、权限提升、横向移动应放在预生产或灰度环境，生产上只做只读、低频验证并全程盯守；若只有生产可用，必须配合下一节的控制措施。</p>
+<h2 id="六、风险控制：把影响关进笼子"><a href="#六、风险控制：把影响关进笼子" class="headerlink" title="六、风险控制：把影响关进笼子"></a>六、风险控制：把影响关进笼子</h2><p>测试窗口对照运维日历确定，避开业务高峰、结算、备份和发布窗口。速率限制要落到参数上：扫描器降并发，对登录、下单、支付、短信接口设更低阈值，避免账号锁定或短信轰炸。</p>
+<p>可能影响业务的测试必须单列成清单，逐条评估并请业务方签字确认，例如口令爆破、大文件上传、并发竞争、拒绝服务验证、数据库写操作。清单之外的动作默认按只读处理。看到真实个人信息应立即停止截图，改用测试账号复现，报告证据统一打码。</p>
+<p>回滚与熔断也要提前约定：每项变更都有还原步骤，错误率、响应时间、5xx 比例超过阈值即暂停，由联系人确认后再决定。停止条件写进计划：触达核心数据、业务异常、发现越界目标、联系人失联，任一条成立即停。</p>
+<h2 id="七、报告是产品，不是工具输出"><a href="#七、报告是产品，不是工具输出" class="headerlink" title="七、报告是产品，不是工具输出"></a>七、报告是产品，不是工具输出</h2><p>执行摘要控制在一页：测了什么、何时测的、总体风险如何、最该先做的三件事。管理层只看这一页，不要出现工具名和晦涩术语。风险分级要统一口径，结合 CVSS 与业务影响给出高中低，写明定级依据；同类问题合并，列出受影响资产。</p>
+<p>每个问题包含标题、位置、复现步骤、影响、证据、修复建议和复测结果。复现步骤要让开发在测试环境独立重现，证据用请求响应摘要和打码截图，修复建议区分临时缓解与根治方案，并标注责任人和时限。</p>
+<p>工具输出只是原料，把扫描器结果原样贴进报告，等于把整理工作推给读者。报告要回答三个问题：最危险的是什么、为什么危险、下一步做什么。</p>
+<h2 id="八、常见问题"><a href="#八、常见问题" class="headerlink" title="八、常见问题"></a>八、常见问题</h2><p>范围蔓延最普遍：测试中发现新子域、新接口就顺手测了，正确做法是回到授权流程补签，否则就是越界。更危险的是未授权测试，对子公司、云上资产、第三方接口想当然地认为“都是一家的”，法律风险最高。</p>
+<p>只测 Web 也是通病：门户测得很细，开源组件、第三方接口这些供应链环节，以及运维通道和移动端都没人管，攻击者偏偏从这些地方进来。报告没有优先级同样常见，五十条中危平铺，开发不知道先修哪个；修复不复测，三个月后问题还在。</p>
+<p>还有一种是当合规打卡：为测评凑一份报告，测完不整改，风险只是换了个地方存放。测试报告应进入缺陷管理流程，有责任人、有期限、有复测结论，否则再专业的测试也只是一次昂贵的演练。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>渗透测试的价值不在“攻破”，而在用可控的方式证明风险、推动修复。把授权写细、交付物定清、有风险的测试单列、复测做成闭环，一次测试才算完整。报告里的每条问题都应落到具体的责任人和时间点，测试结论才有意义。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>渗透测试流程与方法论</p><p><a href="https://987763485.github.io/2019/03/10/渗透测试流程与方法论/">https://987763485.github.io/2019/03/10/渗透测试流程与方法论/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2019-03-10</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a><a class="link-muted mr-2" rel="tag" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/">等级保护</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2019/03/12/%E5%AE%89%E5%85%A8%E4%BA%8B%E4%BB%B6%E5%BA%94%E6%80%A5%E5%93%8D%E5%BA%94%E6%B5%81%E7%A8%8B/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">安全事件应急响应流程</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2019/03/03/NestJS%E5%BE%AE%E6%9C%8D%E5%8A%A1%E5%AE%9E%E8%B7%B5/"><span class="level-item">NestJS 微服务实践</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

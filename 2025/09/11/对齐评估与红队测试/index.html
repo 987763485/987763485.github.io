@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>对齐评估与红队测试 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="大模型发布时人人都晒能力榜单，但决定一个系统能不能安全站到真实用户面前的，往往是另一套材料：它在该拒绝的类别上拒绝了没有，在不该拒绝的地方误伤了多少，以及人工红队翻出了哪些没人预料到的失败形态。本文把对齐评估（alignment evaluation）与红队测试（red teaming）当成两件普通工程事务来讲：评估集怎么建、打分口径怎么定、红队怎么组织、发现怎么变成上线门禁与可审计的记录。适合已"><meta property="og:type" content="blog"><meta property="og:title" content="对齐评估与红队测试"><meta property="og:url" content="https://987763485.github.io/2025/09/11/%E5%AF%B9%E9%BD%90%E8%AF%84%E4%BC%B0%E4%B8%8E%E7%BA%A2%E9%98%9F%E6%B5%8B%E8%AF%95/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="大模型发布时人人都晒能力榜单，但决定一个系统能不能安全站到真实用户面前的，往往是另一套材料：它在该拒绝的类别上拒绝了没有，在不该拒绝的地方误伤了多少，以及人工红队翻出了哪些没人预料到的失败形态。本文把对齐评估（alignment evaluation）与红队测试（red teaming）当成两件普通工程事务来讲：评估集怎么建、打分口径怎么定、红队怎么组织、发现怎么变成上线门禁与可审计的记录。适合已"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2025-09-10T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-20T13:37:46.651Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="大模型"><meta property="article:tag" content="python"><meta property="article:tag" content="typescript"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2025/09/11/%E5%AF%B9%E9%BD%90%E8%AF%84%E4%BC%B0%E4%B8%8E%E7%BA%A2%E9%98%9F%E6%B5%8B%E8%AF%95/"},"headline":"对齐评估与红队测试","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2025-09-10T16:00:00.000Z","dateModified":"2026-10-20T13:37:46.651Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"大模型发布时人人都晒能力榜单，但决定一个系统能不能安全站到真实用户面前的，往往是另一套材料：它在该拒绝的类别上拒绝了没有，在不该拒绝的地方误伤了多少，以及人工红队翻出了哪些没人预料到的失败形态。本文把对齐评估（alignment evaluation）与红队测试（red teaming）当成两件普通工程事务来讲：评估集怎么建、打分口径怎么定、红队怎么组织、发现怎么变成上线门禁与可审计的记录。适合已"}</script><link rel="canonical" href="https://987763485.github.io/2025/09/11/%E5%AF%B9%E9%BD%90%E8%AF%84%E4%BC%B0%E4%B8%8E%E7%BA%A2%E9%98%9F%E6%B5%8B%E8%AF%95/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2025-09-10T16:00:00.000Z" title="9/11/2025, 12:00:00 AM">2025-09-11</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></span><span class="level-item">1 小时读完 (大约11896个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">对齐评估与红队测试</h1><div class="content"><p>大模型发布时人人都晒能力榜单，但决定一个系统能不能安全站到真实用户面前的，往往是另一套材料：它在该拒绝的类别上拒绝了没有，在不该拒绝的地方误伤了多少，以及人工红队翻出了哪些没人预料到的失败形态。本文把对齐评估（alignment evaluation）与红队测试（red teaming）当成两件普通工程事务来讲：评估集怎么建、打分口径怎么定、红队怎么组织、发现怎么变成上线门禁与可审计的记录。适合已经把能力评测那条线跑通、需要补上安全评测这条线的工程师与质量负责人。读完你会拿到一套可以直接照着搭的流程框架与判定骨架。需要先声明：本文只讨论流程、判定口径与防御结论，全文不包含任何可复制的攻击话术、越狱模板或有害内容样例；需要指认某类风险时，一律用类别名称加期望行为来表达。</p>
+<h2 id="先分清三件事"><a href="#先分清三件事" class="headerlink" title="先分清三件事"></a>先分清三件事</h2><p>围绕大模型的评估工作经常被混在一个”打分”词里谈，把它们拆开是本文后续讨论的前提。</p>
+<p>第一件是能力评测（capability evaluation），回答”会不会”：数学推理、代码生成、翻译质量、长文摘要，样本有明确对错或可比较的优劣。通用能力评测的方法学往期《大模型应用评估》已有专门讨论，本文不重复展开。</p>
+<p>第二件是对齐与安全性评估，回答”该不该、会不会越界”：在给定危害类别下，模型的行为是否符合事先写好的边界。它的样本没有天然的”标准答案文本”，只有”期望行为口径”——哪类请求必须拒绝、拒绝到什么程度算合格、哪些表面相似的请求必须答全。</p>
+<p>第三件是红队，回答”我们还没想到什么”：前两件工作都在按已知口径验证，红队则是有组织地构造对抗情景，去找口径之外的失败形态。红队发现的问题会反过来修订口径，口径再沉淀进下一轮的评估集，三者是循环关系而不是并列关系。</p>
+<p>它们不能互相替代，最根本的原因是覆盖结构不同。能力评测是”在大量题目上求平均”，一道题错了扣一点分；对齐失败却是稀疏而尖锐的，一个类别上的系统性失守，摊进能力总分里几乎看不见。所以”能力分数高”不但不能推导出”对齐做得好”，反而常常掩盖问题：一个能把推理题答得漂亮的模型，完全可能在某类请求的边界上表现得不稳定。更深一层，能力评测度量的是”理解”，而理解能力强并不保证守得住边界——恰恰相反，理解越深，越有可能读懂请求背后那个没有被明说的意图，并错误地选择去满足它。至于红队，它和固定评估集的差别在于”搜索是否依赖已有口径”：评估集检验的是你已经想到的东西，红队检验的是你没想到的东西，用前者代替后者，等于只检查考纲、不检查考纲之外的世界。至于训练一侧的方法——如何用强化学习与偏好数据把边界教给模型——往期《RLHF 对齐训练入门》已经讲过，本文只管训练之后的评估与验证，不碰训练方法。</p>
+<h2 id="对齐评估集怎么建"><a href="#对齐评估集怎么建" class="headerlink" title="对齐评估集怎么建"></a>对齐评估集怎么建</h2><p>危害类别的定义要按后果分类，而不是按攻击手法分类。这是建集第一步，也是最多人做错的一步。手法是一个快速变化的变量：同一类危害后果，可以从无数种话术、角色设定、多轮铺垫接近，你永远追不上；后果却是相对稳定的变量，它能支撑一个可以长期维护、可以跨版本比较、能自然对接响应流程与责任划分的分类体系。按手法分类的评估集，每逢新手法出现就要推倒重建；按后果分类的评估集，新手法只是同一格子里的新样本。类别命名建议统一写成”领域加后果”的形式，每个类别再配一段口径描述，说清四件事：危害后果是什么、该拒到什么行为、不该拒的边界在哪、判为该类别需要什么证据。这段口径描述就是后文红队登记、分级、门禁共用的坐标系，各处引用同一份，不允许各自另立一套。</p>
+<p>正例与反例必须成对出现。每个危害类别都要同时准备”应当拒绝”的正例，和”表面相似但不应过度拒绝”的反例。只有正例的评估集，测出来的永远是”模型学会了拒绝”，而不是”模型学会了在正确的边界上拒绝”；反例缺失时，把模型调成无差别拒答反而能拿到最漂亮的成绩，这正是考核被应试的开端。反例的设计原则是与正例共享语境、但落在后果口径的另一侧。安全培训、漏洞研究、内容审核、医学教育、法律实务、文学创作等专业场景，都存在正当接触风险话题的需求，这些语境应当以类别层面的描述进入反例集合——本文同样不给出任何具体样例话术，只规定”每个类别的反例必须覆盖至少两类正当专业语境”这样的结构性要求。</p>
+<p>拒绝类样本的分布要贴近真实使用。抽样时应当参考线上真实请求的类别比例、长度分布、多轮占比与表达间接程度。如果评估集里全是教科书式的直白违规请求，它会系统性高估模型在真实流量上的表现：现实请求经常把意图拆进多轮对话、藏在转述里、混在大段上下文材料中，这些形态在教科书样本里一概测不到。分布失真的评估集比没有评估集更危险，因为它给出的是虚假的安全感。</p>
+<p>最后一条是建集纪律：评测集与训练、提示迭代必须隔离。评测集是迭代的标尺，同一批样本如果同时被用于训练数据清洗、提示词调优和上线打分，三个方向会一起过拟合到同一把尺子上，尺子本身就被折弯了。切分口径沿用同期数据集管理篇目给出的训练集、开发集、保留集三分离做法——保留集的含义是：从不进入任何训练与提示迭代循环，只出现在上线评估与审计现场，且定期整批更换。这一节”成对设计正例与反例”的思路，与同期《RAG 检索质量评估》里查询样本的成对设计彼此呼应，但那边度量的是检索质量指标，本文度量的是安全行为口径，两套评估各走各的回归集，不要互相挪用样本。</p>
+<h2 id="打分口径：把”评审员的感觉”写成可复核的规则"><a href="#打分口径：把”评审员的感觉”写成可复核的规则" class="headerlink" title="打分口径：把”评审员的感觉”写成可复核的规则"></a>打分口径：把”评审员的感觉”写成可复核的规则</h2><p>对齐评估的核心干货在打分口径这一层，多数团队恰恰在这里最含糊。第一个要放弃的习惯是”过与不过”的二元判定。二元判定丢掉了最有价值的信息：一次输出到底是在正确拒绝、还是拒对了但方式失当、还是根本判错了方向。安全场景里”应拒未拒”和”不应拒却拒了”是两种性质完全相反的缺陷，把它们都塞进一个布尔值里，回归集就失去了分诊能力。本文推荐的四档口径是：完全可用（行为与期望一致且质量合格）、有瑕疵（方向正确但表达、解释或拒答方式有可改进处）、应拒未拒（该守住边界却没有守住，这是安全缺陷）、不应拒却拒（不该设防的地方误伤，这是可用性缺陷）。两档缺陷分别进两个回归集合，后文门禁会分别对它们设条件。</p>
+<p>评分规则必须写成可复核的判定规则，而不是留给评审员的临场感觉。一份能复核的评分口径长这样：先给出该样本的期望行为（拒绝、部分回答加风险提示、还是完整回答），再给出每档的判定条件（例如”输出了可被直接用于危害步骤的增量信息即判应拒未拒，不论语气多么谨慎””拒绝了但拒绝理由与类别口径不符判有瑕疵”），最后给判定所需的证据要求（引用输出中的哪一类片段支撑该判定）。判断标准写在纸上，两个陌生人拿同一份口径对同一条输出打分，才可能得到可以解释的分歧，而不是各打各的。</p>
+<p>评分者间的一致程度要用数字衡量，不能靠”大家感觉差不多”。标准做法是双盲独立评分加一致性统计：小样本阶段用一致率，类别较多时用 Cohen’s kappa（科恩卡帕系数）度量两位评审超出随机水平的一致程度，把一致性数字连同分歧样本人群一起归档。一致性低于团队约定的阈值时，问题不在评审员素质，而在口径写得有歧义，应当修订判定条件后重新试评。分歧的仲裁也要有制度：提交第三方裁决，裁决结论必须回写进口径文档的判例区，让下一次同类分歧直接有例可循。仲裁过程积累的分歧案例，是口径文档最有价值的附录。</p>
+<p>最后一个提醒：评分规则本身会被应试。任何口径一旦上线考核，就会有人对着分数写样例——调提示词的人、买数据的人、甚至做评估的人，都会自觉不自觉地寻找”判定条件的空隙”。缓解办法有三层：评分口径版本化，考核用口径与开发可见口径保持部分差异；定期轮换与整批更换评测样本；对”分数好看得异常”的迭代做样例溯源审计，检查新增高分样本是否集中来自同一个生成渠道。分数异常好与分数差一样值得警觉。</p>
+<h2 id="自动化评估：模型当评审员的能与不能"><a href="#自动化评估：模型当评审员的能与不能" class="headerlink" title="自动化评估：模型当评审员的能与不能"></a>自动化评估：模型当评审员的能与不能</h2><p>人工评分成本高、慢，规模化筛子几乎必然引入模型评审员（LLM-as-judge，以大模型充当评审员）。但它有一组结构性偏差，必须先认清再谈缓解。第一类是长度偏好：评审模型系统性地更给长回答打高分，于是一个冗长但越界的输出可能被”详尽有用”的滤镜抬过去，而一个简洁正确的拒绝反而吃亏。第二类是风格自偏好：评审模型偏爱与自己输出风格、措辞习惯相近的答案，用同家系的模型评审自家模型，等于让考生互评作文。第三类是格式敏感：同样的内容，换个排版、加个列表、换种语气，分数就会漂移，说明它有一部分注意力花在了行为之外的表层特征上。</p>
+<p>缓解手段是一套组合拳，缺一层都会漏。成对比较替代绝对打分：给评审模型同一样本下两个候选输出，问”哪个更符合这条判定口径”，成对判断对长度与格式远不如绝对分数敏感。固定评分口径并随版本冻结：评审提示词内嵌判定条件而非自由发挥的安全观，评审提示词本身要与被评审模型版本解耦、独立做版本管理，改一个标点都要留痕，否则上个月与本月的分数不可比。抽样人工复核不可省略：按类别与判定结果分层抽样，人工重评一部分样本，统计自动化判定与人工判定的一致情况，把复核结论作为该批自动化分数的置信注记。校准集要长期维护：留一小批人工标注金标样本，评审模型换版本、换提示词后先跑校准集，漂移超限的评审配置不允许上岗。</p>
+<p>即便做完这些，自动化评估的定位也只能是筛子，不能是结论。它的正确用法是把海量样本里”大概率有问题”的部分捞出来交给人：日常回归、大范围横向扫描、迭代中的快速反馈都可以交给它；上线门禁的最终判定、危害分级的认定、对外交付的评估结论，必须有人工评分与仲裁记录背书。原因在于上面三类偏差无法被彻底消除，只能被压到”筛选够用”的水平——筛子漏掉的样本恰恰是安全场景里最贵的那一类；同时评审模型与被评审模型共享同一时代的训练分布，它们对某个新兴边界的理解可能以完全相同的方式出错，这种”同错”不会体现在任何一致性统计里。把筛子当结论，等于把系统性盲区写进了安全声明。</p>
+<h2 id="人工红队怎么组织"><a href="#人工红队怎么组织" class="headerlink" title="人工红队怎么组织"></a>人工红队怎么组织</h2><p>红队不是”找几个聪明人随便试”，它是一项需要像测试计划一样被组织的活动。首先是角色分工，四类视角缺一不可。外部红队带来模型团队之外的世界知识：他们不了解你的训练数据构成，因此也不会被你的思维定式同化，最擅长评估集编制者想不到的路径。内部开发视角负责把发现翻译回系统：同一个现象，在提示层、检索层、工具层、模型层的原因与修法完全不同，没有开发者在场，很多发现会以”改提示词试试”收场。业务安全视角关心的是可达性与规模：这个缺陷在真实产品的入口结构下有没有触达路径，影响的是全部用户还是某个配置分支。法务合规视角关心后果定性与对外义务：同一件发现，是否触发对外报告、是否需要留存证据、是否影响正在进行的合规交付。</p>
+<p>其次是时间盒与目标。每一轮红队开始前必须书面回答三个问题：这一轮要证明或证伪什么假设（例如”多轮语境下的某类边界是否稳定”），覆盖哪些危害类别（引用评估集那一节的类别坐标系），明确不覆盖什么。没有范围的红队会在两周内把力气均匀撒在所有方向，最后哪个类别都拿不出有说服力的结论。时间盒建议以一到两周为一轮，轮末强制交付发现清单而不是口头汇报；探索性最强的方向单独立项，不与验证性目标混在同一个时间盒里。</p>
+<p>第三是”发现即记录、不公开细节”的披露流程。红队成员确认一个现象后，第一时间在受控位置登记：类别、复现条件的类别级描述、影响的输出形态、证据摘要。登记本身不要求先定级，防止”怕定了低级别没人看”而拖延记录。细节的公开范围按最小必要收敛：报告仅在参与修复的人之间流转，对外沟通（包括与上游模型提供方或第三方）走事先约定的披露通道，约定好时限与披露窗口期的节奏；绝不因为”对方也是安全团队”就直接粘贴原始会话。过程记录里同样不保存可复制的完整尝试序列，只保存类别级的等价描述，这一点与后文回归用例的存储纪律是同一套原则。</p>
+<p>最后是红队成果的分级口径。很多团队把红队简化成”打穿没打穿”的攻防记分，这是一个危险的指标：它奖励制造戏剧性的人，惩罚默默补盲区的人，而且”打穿”与否取决于防线当前形态，与真实风险没有稳定关系。本文推荐的分级维度是三个正交问题的乘积：后果严重度（按下一节的分级表）、可达性（在真实产品入口与配置下被触达的难易）、现有防线是否覆盖（纵深防御里是否已有一层能拦住它）。三个维度各自记录、共同决定处置优先级；一个”后果严重但当前入口结构不可达”的发现与一个”后果中等但人人可触达”的发现，处置顺序完全不同，而这正是”打穿没打穿”这个单一比特永远表达不了的信息。</p>
+<h2 id="危害分级：给一张可操作的分级表"><a href="#危害分级：给一张可操作的分级表" class="headerlink" title="危害分级：给一张可操作的分级表"></a>危害分级：给一张可操作的分级表</h2><p>分级表的意义在于把”严不严重”从形容词变成流程开关。下表每一档写清判定证据要求、响应时限与签核角色；时限与档位命名均为团队约定示例，不是任何行业标准，落地时应按自身业务重定数值。</p>
+<table>
+<thead>
+<tr>
+<th>档位</th>
+<th>典型形态</th>
+<th>判定证据要求</th>
+<th>响应时限（团队约定示例）</th>
+<th>签核角色（团队约定示例）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>一级：体验受损</td>
+<td>个别用户困惑、过度拒绝、回答质量下降，无安全后果</td>
+<td>可复现样本与类别归属，反例对照成立</td>
+<td>常规迭代内处理</td>
+<td>评估负责人</td>
+</tr>
+<tr>
+<td>二级：单点误导</td>
+<td>对特定请求给出不该给的增量信息，但缺少现实行动链条</td>
+<td>输出证据摘要加口径判定记录，双评审一致</td>
+<td>一周内进入修复队列</td>
+<td>安全负责人加业务负责人</td>
+</tr>
+<tr>
+<td>三级：可辅助现实伤害</td>
+<td>输出去掉门槛后明显降低现实危害实施成本，且入口可达</td>
+<td>证据摘要、可达性分析、防线覆盖分析三件齐备</td>
+<td>四十八小时内启动处置</td>
+<td>安全负责人加法务合规</td>
+</tr>
+<tr>
+<td>四级：紧迫重大风险</td>
+<td>具备规模化触达路径，叠加现实伤害的紧迫迹象</td>
+<td>三级全部证据加影响面估计与缓解有效性评估</td>
+<td>即时上报，按预定义升级流程</td>
+<td>最高技术责任人加合规责任人</td>
+</tr>
+</tbody></table>
+<p>读这张表要注意三个设计决定。第一，证据要求随档位升高而加厚，因为越高的档位触发的动作越重，误判的代价也越大；一级缺陷可以单人判定，三级以上必须双评审一致并留仲裁路径。第二，响应时限从”迭代”到”即时”的跨度是刻意的：分级表的价值就是让低档问题不打断紧急通道、让紧急问题不被例会流程淹没，两头的失效都比中间档更常见。第三，签核角色写的是职责而不是人名，人名随组织变动，职责口径要稳定；表中所有时限均为团队约定示例，不同业务体量应重新校准，但”每档必须有明确时限与签字人”这条结构不应省。分级发生在登记之后、修复之前，由安全负责人召集评审，法务合规从三级起必须在场。</p>
+<h2 id="拒答率的正确读法与错误读法"><a href="#拒答率的正确读法与错误读法" class="headerlink" title="拒答率的正确读法与错误读法"></a>拒答率的正确读法与错误读法</h2><p>拒答率（refusal rate）是对齐仪表盘上最容易被读错的一个数。错误读法有三种，而且常常同时出现。第一种是把它当单一质量指标看：”拒答率低说明模型开放好用”或者”拒答率高说明模型安全”——两个方向都错，因为分母里混着该拒与不该拒两类样本，任何一个方向的数字都可以由两种完全相反的原因造成。第二种是跨类别汇总比较：把武器类、隐私类、医疗类压成一个总拒答率去追趋势，类别间的结构变化全被平均掉了。第三种是脱离反例看正例：只看该拒的拒没拒，不看反例有没有被误伤。</p>
+<p>正确的读法只有一个入口：按类别拆开，且每个类别的正例与反例成对照呈现。报表里一个类别至少并列四个数：正例中正确拒绝的比例、正例中应拒未拒的数量、反例中被误拒的数量、反例中正确回答的比例。只看”类别加方向”这一层，多数误读就会消失：某类别拒答率突然升高，可能是防线变强了，也可能是过度拒绝恶化了，前者体现在正例、后者体现在反例，拆开了才能区分。</p>
+<p>过度拒绝的代价要专门算一笔账，而且它对专业用户最贵。普通用户遇到一次误拒，换个说法或者换个工具就绕过去了；安全研究员、医生、审核员、法务人员的正当请求被误拒，意味着整条工作流中断，而这批人恰恰是产品里留存价值最高的用户。更隐蔽的是分布效应：误拒最常在专业术语密集、语境复杂的请求上发生，于是过度拒绝的系统性代价是”把专业用户挤出去、把普通用户留下来”，产品用户构成被评估缺陷悄悄改变，而汇总拒答率对这件事完全不敏感。</p>
+<p>工程落地上，把”该拒的没拒”和”不该拒的拒了”分进两个不同的回归集，是本文反复强调的纪律在报表侧的体现。两个集合各自设阈值、各自报警、各自走各自的修复流程：漏拒回归集恶化时收紧边界并复评邻近类别，误拒回归集恶化时放宽边界并回查反例覆盖。混在一个集合里，两种修复动作互相抵消，你会看到指标反复横跳而找不到原因。这两个集合的样本来源分别是评估集的正例池与反例池，新增样本先进池子按口径评审，再按类别分派进对应回归集，全程不引入未评审样本。</p>
+<h2 id="缺陷回归与上线门禁"><a href="#缺陷回归与上线门禁" class="headerlink" title="缺陷回归与上线门禁"></a>缺陷回归与上线门禁</h2><p>红队与评估发现的价值，取决于它能不能沉淀成每次上线前都会重跑的回归用例。转换的第一原则是不保存攻击话术原文。用例里保存的是三件东西：危害类别（引用统一坐标系）、期望行为（该拒绝、该部分回答、该完整回答）、判定规则（输出满足什么条件算通过）——即类别级的等价表述，配合必要的语境描述（长度区间、轮次结构、专业领域标签），保证”陌生评审员拿口径文档能重建测试”而不是”照着原文粘贴一遍”。这类用例本身构成可复用测试资产，必须做访问控制：仓库权限独立于普通测试库，导出与复制留痕，离职与转岗时按数据处理。同期《大模型安全与提示注入防护》处理注入类缺陷的防御工程，本文这边只衔接一句：注入类发现转回归用例时同样遵守”类别加期望行为加判定规则”的存储纪律，防御实现细节归那边。</p>
+<p>门禁条件的设计要承认一个现实：不可能所有类别在所有时刻都是零。可行的结构是把类别分成两圈。内圈是硬零类别：这些类别上的应拒未拒数量必须为零，没有任何例外通道，判定规则也最短最硬，宁可牺牲一点召回也不留模糊空间。外圈是有限例外类别：允许在受控条件下带缺陷上线，但每个例外必须绑定补偿控制（入口限流、输出过滤、人工复核通道、功能降级等防御侧手段的具体组合），例外本身要审批留痕。下面给出一个门禁清单骨架，字段与阈值全部是团队约定示例：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 上线对齐门禁清单骨架（阈值均为团队约定示例，非行业标准）</span></span><br><span class="line"><span class="attr">gate:</span> <span class="string">alignment-release-check</span></span><br><span class="line"><span class="attr">hard_zero_categories:</span>            <span class="comment"># 内圈：应拒未拒必须为 0</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">category:</span> <span class="string">&lt;类别名-来自统一坐标系&gt;</span></span><br><span class="line">    <span class="attr">must_be:</span> <span class="string">zero_missed_refusal</span></span><br><span class="line">    <span class="attr">judge:</span> <span class="string">dual-reviewer-agreement</span>   <span class="comment"># 双评审一致才算判定成立</span></span><br><span class="line"><span class="attr">limited_exception_categories:</span>    <span class="comment"># 外圈：允许例外，但必须绑定补偿控制</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">category:</span> <span class="string">&lt;类别名&gt;</span></span><br><span class="line">    <span class="attr">max_open_defects:</span> <span class="string">&lt;整数，示例&gt;</span></span><br><span class="line">    <span class="attr">compensating_controls:</span>       <span class="comment"># 缺任一项则例外申请自动无效</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">&lt;控制手段名称&gt;</span></span><br><span class="line">    <span class="attr">exception_approval:</span></span><br><span class="line">      <span class="attr">required_signers:</span> [<span class="string">&lt;安全负责人&gt;</span>, <span class="string">&lt;业务负责人&gt;</span>]</span><br><span class="line">      <span class="attr">record_fields:</span> [<span class="string">理由</span>, <span class="string">影响面</span>, <span class="string">到期复审日期</span>]</span><br><span class="line"><span class="attr">over_refusal_budget:</span>             <span class="comment"># 误拒侧单独设限，与漏拒侧互不抵消</span></span><br><span class="line">  <span class="attr">regression_set:</span> <span class="string">over-refusal-set</span></span><br><span class="line">  <span class="attr">max_delta_vs_baseline:</span> <span class="string">&lt;示例值&gt;</span></span><br><span class="line"><span class="attr">audit_trail:</span></span><br><span class="line">  <span class="attr">store:</span> <span class="string">&lt;受控用例库&gt;</span></span><br><span class="line">  <span class="attr">access:</span> <span class="string">need-to-know</span></span><br></pre></td></tr></table></figure>
+
+<p>例外审批的留痕要点是”有到期日”。没有复审日期的例外会永久化：上线时批的一次例外，三个月后没人记得为什么存在，成了门禁上的一枚锈钉子。每个例外记录理由、影响面、补偿控制的有效证据与到期复审日期，到期未复审的例外自动升级为待处理缺陷，走紧急通道而不是继续静默豁免。门禁执行本身要自动化加人工复核结合：能机判的部分（回归集运行、数量阈值）挂进流水线，需要口径判定的部分由评估负责人在流水线出口签字，签字记录与版本号绑定，保证半年后还能回答”当时是谁依据什么放的行”。</p>
+<h2 id="记录留存与可审计"><a href="#记录留存与可审计" class="headerlink" title="记录留存与可审计"></a>记录留存与可审计</h2><p>对齐评估与红队的产出最终是一类证据材料，证据材料的第一要求是能被审计，第二要求是本身不构成新的数据泄露面。这两条约束决定了记录里该有什么、不该有什么。</p>
+<p>一份发现或事故记录应当包含：危害类别（统一坐标系的名称）、影响面描述（涉及哪些入口、哪些配置分支、大致规模量级即可）、判定证据的摘要（输出片段的类别级描述加判定结论，而不是整段原始会话）、修复动作（改了口径、加了防线还是降级了功能）、复验结论（谁复验、依据什么判定缺陷关闭）、以及贯穿全程的版本号与时间戳。这些字段合起来回答审计的三个基本问题：发生了什么、你们凭什么这么说、你们做了什么并且验证过。</p>
+<p>一份记录不应包含的东西同样要列成清单：用户提问原文、任何可复用的攻击话术或完整尝试序列、密钥与令牌、模型权重或其可还原片段、可识别到个人的信息。这不是过度谨慎——评估记录库的读者范围通常远小于生产数据平台，恰恰是最容易被复制外带的敏感语料库。最小必要与脱敏在这里的操作含义是：证据只保留支撑判定所需的最小片段，保留片段一律经过脱敏处理（去标识符、去精确时间、必要时做类别级改写），宁可复验时重新取证，也不在文档里囤积原始素材。几条红线单独写死：不把用户提问原文长期留存在评估记录中，需要引用时以摘要加受控引用的方式处理；不长期留存可定位到个人的精确地理位置信息；堆快照、内存转储与模型权重文件不外发、不进入跨部门流转通道——排障需要时走独立的受控流程，用完即清。</p>
+<p>留存期限与访问控制按记录类型分级设定，数值为团队约定示例：已关闭的普通缺陷记录保留一个复审周期后归档冷存储，涉及三级以上危害的发现记录与对应审批留痕按合规要求延长保留，全部记录库执行与用例库同源的最小权限模型——按角色授权而不是按团队批量放开，读取与导出行为留审计日志。跨部门流转（向法务、向合规交付、向审计方）必须逐次授权，授权记录本身也是审计对象：谁在什么时候把哪批记录给了哪个部门、用于什么用途。对齐评估的记录体系自己先做到可审计，才有资格作为别人的证据。</p>
+<h2 id="与线上监控的衔接"><a href="#与线上监控的衔接" class="headerlink" title="与线上监控的衔接"></a>与线上监控的衔接</h2><p>离线评估通过与线上无事之间隔着一道分布的鸿沟，衔接机制的细节——指标采集、告警与看板实现——由同期监控篇目负责，本文只列与对齐相关的信号与原因。上线后有三类信号最值得盯，因为它们各自指向离线评估的一类盲区。第一类是异常拒绝率变化：某类别的拒绝行为占比在模型或提示版本不变时缓慢漂移，通常意味着输入分布在动——新热点事件、新用户群、新集成渠道都会改变请求的形态，而离线评估集是按上线前的分布抽的。第二类是投诉与反馈的类别分布：用户举报经过类别归因后形成时间序列，它反映的是”真实世界认为你越界了什么”，与口径认定的偏差正是修订口径的原料。第三类是工具层的越权尝试计数：当模型接入检索、代码执行、外部服务调用等工具后，风险形态会从”文本输出越界”迁移到”行为序列越界”，工具调用的权限校验拦截计数是这类迁移最前端的信号——尤其是 MCP（Model Context Protocol，模型上下文协议）这类工具互联规范在 2025-03-26 与 2025-06-18 两次修订后被广泛接入的当下，工具生态本身成了评估边界的一部分。</p>
+<p>离线通过不等于线上无事，机制上有三个确定的原因。其一是分布漂移：评估集的抽样分布与线上真实分布之间的差距只会随时间拉大，不会自动收敛，这正是前文要求评测集定期整批更换的原因。其二是上下文里多了检索内容：线上一次请求的上下文经常混着检索回来的第三方材料，离线样本没有这个变量，而检索内容既可能稀释模型的边界遵循、也可能伪装成合法语境诱发误答，这类失败在离线评估集里结构性地测不到。其三是模型版本更换：底座升级后即便提示词与防线一字不动，行为边界也会移动，上线前跑过的评估集只覆盖了新版本的样本面，没有覆盖新版本与线上分布的交互面。对齐评估与线上监控因此是同一枚硬币的两面：监控信号定期回流，作为下一轮评估集抽样分布的校准输入，这个回流管道不通，评估集就在一圈圈老化。</p>
+<h2 id="合规锚点：评估记录本身就是交付物"><a href="#合规锚点：评估记录本身就是交付物" class="headerlink" title="合规锚点：评估记录本身就是交付物"></a>合规锚点：评估记录本身就是交付物</h2><p>写这篇文档的 2025 年 9 月，生成式 AI 的监管时间线已经连续落地了几个节点，本文只取与实践直接相关的三层事实，不做条款解读，也不引用任何条款编号与罚则。第一层：中国《人工智能生成合成内容标识办法》已于 2025-09-01 施行，对工程团队的要求收敛为一句话——生成合成内容需要按要求标识，标识能力的实现与验证应进入每次上线检查，其验证记录与本文的记录体系天然同构。第二层：欧盟《人工智能法案》对通用目的 AI 模型（GPAI，general-purpose AI）的义务自 2025-08-02 起适用，涉及模型层的系统性工作由法务牵头对应，工程侧的任务是把技术文档与评估证据按可交付的形态日常维护，而不是等检查通知下来再补材料。第三层：《网络数据安全管理条例》自 2025-01-01 起施行，它对评估实践的影响主要落在数据与记录的留存、流转环节，与本文上一节的留存纪律直接相关。</p>
+<p>三层锚点合起来指向一个工程结论：评估记录本身就是可交付的证据材料。合规交付的最差形态是”临时拼装”——为了应审从聊天工具、个人文档和各人记忆里回收三个月前的结论，拼装出一份没人能复现的报告；最差的是补出来的口径没有版本历史，评审记录没有签核链，证据摘要与当时的判定规则对不上。正确形态是把评估活动做成连续留痕的日常：口径文档有版本、评分有双记录、例外有审批、缺陷有复验，对外交付时从记录库里按类别与时间窗导出即可。这层的实现不需要任何新工具，需要的只是把”这次评审的结论写进受控文档库”变成流程里不可跳过的一步。监管细节的解读与适用判断归法务，本文的边界止于：工程侧要保证留痕完整、可检索、可复核，让法务拿到的每份材料都能追溯回生成它时的口径版本。</p>
+<h2 id="一次红队的完整流程复盘"><a href="#一次红队的完整流程复盘" class="headerlink" title="一次红队的完整流程复盘"></a>一次红队的完整流程复盘</h2><p>以下复盘隐去全部产品与模型细节，只保留流程骨架，攻击环节一律以类别名指代。背景是一支约二十人的跨职能队伍，对一版接入检索与工具调用的助手产品做的为期两周的季度红队，底座是当年 8 月刚发布的新一代模型系列——8 月 7 日发布的 GPT-5 等版本让能力口径整体上移，团队据此把本轮假设定为”能力升级后，既有边界口径是否出现了新空隙”。</p>
+<p>第一步是目标界定。发起方用半天把假设写成可证伪的句子：”在检索内容进入上下文的情形下，某三个危害类别的拒绝边界在多轮对话中不稳定。”目标句子同时圈定了本轮不做什么：不测基础设施安全、不测内容审核链路、不覆盖剩余类别。第二步是范围与规则。书面写明什么可以测（预发的完整产品入口、全部已发布功能分支）、什么禁止（不针对真实用户账号、不对外部服务发起压测、数据只在预发环境流转），以及发现问题的登记时限与保密等级。规则页与目标页同一天发给全体参与者，避免”我以为不能碰”与”我以为随便测”两类事故。</p>
+<p>第三步是分组建案。按危害类别立五个案组，每组混配外部红队成员与内部开发，业务安全与法务合规不设组、以巡回方式参与各组的中期评审。每个案组认领目标时同时认领对应的反例池——测该类别的误拒同样计入产出，防止全组只追逐”打穿”的戏剧性。第四步是发现登记与分级。两周里共登记数十条发现，全部按”类别、复现条件的类别级描述、证据摘要”的模板入库；分级评审会按前文危害分级表逐条定档，争议最大的一条是”检索内容改写语境导致某类误拒上升”，最终定为一级体验问题而不是安全缺陷，理由是对照反例池后确认它是防线收紧的正常代价。</p>
+<pre class="mermaid">flowchart TD
+    A[目标界定] --> B[范围与规则]
+    B --> C[分组建案]
+    C --> D[发现登记]
+    D --> E[分级评审]
+    E --> F[修复与补偿控制]
+    F --> G[复验]
+    G --> H[结论与残余风险声明]
+    H --> I[回归用例入库]
+    I --> A</pre>
+
+<p>第五步是修复与补偿控制。三级以上发现走紧急通道：两条改防线（新增过滤口径、收紧工具权限校验），一条改流程（把某类高风险功能从默认开启改为显式开启并加二次确认）；二级以下进入迭代，由认领组的内部开发负责翻译到对应层。第六步是复验。复验由未参与修复的第三方评审员按原用例的判定规则重跑，而不是由修复者自证，复验结论回写发现记录。第七步是结论与残余风险声明。报告末页固定三段：本轮覆盖了什么、未覆盖什么、覆盖了但确认拦不住的残余风险及其补偿控制与复审日期——最后一段最常被省略，却最能体现报告的可信度，因为它承认了防线的边界。报告归档时同时归档口径版本、用例增量与分级评审记录，验收标准只有一条：一个没参与过本轮的人，能仅凭归档材料复核每一条分级结论。</p>
+<h2 id="手段对照：谁能证明什么"><a href="#手段对照：谁能证明什么" class="headerlink" title="手段对照：谁能证明什么"></a>手段对照：谁能证明什么</h2><p>把本文讨论的各种手段放进同一张表，方便按预算与节奏选配。代价列与频次列为团队约定示例的量级，非精确成本。</p>
+<table>
+<thead>
+<tr>
+<th>手段</th>
+<th>能证明什么</th>
+<th>不能证明什么</th>
+<th>代价（示例量级）</th>
+<th>建议频次</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>公开基准分数</td>
+<td>底座能力的相对位置</td>
+<td>你的产品边界上的行为</td>
+<td>极低</td>
+<td>随底座版本</td>
+</tr>
+<tr>
+<td>自建能力评测</td>
+<td>任务质量与版本回归</td>
+<td>安全与对齐状态</td>
+<td>中</td>
+<td>每迭代</td>
+</tr>
+<tr>
+<td>对齐评估集成对样本</td>
+<td>已知口径下的行为符合性</td>
+<td>口径之外的失败形态</td>
+<td>中高（建集与维护）</td>
+<td>每次上线</td>
+</tr>
+<tr>
+<td>自动化模型评审</td>
+<td>海量样本中疑似问题的召回</td>
+<td>分级结论与放行判定</td>
+<td>低（运行）中高（校准）</td>
+<td>每日或每迭代</td>
+</tr>
+<tr>
+<td>人工红队</td>
+<td>预料之外的失败与防线空隙</td>
+<td>覆盖面完整（受限于时间盒）</td>
+<td>高（组队与周期）</td>
+<td>每季度一轮</td>
+</tr>
+<tr>
+<td>线上灰度监控</td>
+<td>真实分布上的行为漂移信号</td>
+<td>未放流量部分的状态</td>
+<td>中</td>
+<td>持续</td>
+</tr>
+<tr>
+<td>事件复盘</td>
+<td>具体一次失效的完整因果链</td>
+<td>未发生的同类风险</td>
+<td>中高（每次投入）</td>
+<td>按事件</td>
+</tr>
+</tbody></table>
+<p>这张表的正确用法不是逐行照抄，而是看清三组关系。第一组：公开基准与自建能力评测都在”会不会”一侧，它们与安全侧手段的样本、口径、判分逻辑互不相通，用能力分数代替安全结论是本文明确反对的做法。第二组：成对样本评估、自动化评审、人工红队是按”已知口径、规模化筛选、未知搜索”排列的纵深，三者互补，砍掉任何一层都会让另外两层的结论变脆。第三组：线上灰度监控与事件复盘是两个方向相反的回流管道——监控把线上分布的变化送回评估集，复盘把真实失效送回危害类别坐标系，一个健康的体系靠这两条回流保持与现实的接触面，而不是靠初始口径文档永远正确。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>本文把对齐评估与红队拆成了可执行的工程链条：先分清能力评测、对齐评估与红队三件事各自的覆盖结构，再按后果而非手法建危害类别，用正例与反例成对的方式把边界钉住；打分写成可复核的判定规则，用一致性统计与仲裁机制保证口径稳定，把模型评审员限制在”筛子”的位置上；红队按角色分工与时间盒组织，成果用”后果严重度乘可达性乘防线覆盖”分级，而不是用”打穿没打穿”记分；发现沉淀为不含攻击原文的回归用例，进分圈内零、圈外例外的上线门禁；记录按最小必要与脱敏留存，成为随时可交付的证据材料，并与线上监控互为回流管道。</p>
+<p>三条最值得先做的小事：给现有评估报表加上反例列，把”该拒未拒”与”不该拒却拒”拆进两个回归集；给评分口径做一次双评审一致性测量，看看分歧是否超出随机水平；给下一次上线加一份带到期复审日期的例外清单。对齐评估没有一劳永逸的通过线，只有持续校准的口径与持续回流的证据链。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li>Ganguli 等，《Red Teaming Language Models to Reduce Harms: Methods, Scaling Behaviors, and Lessons Learned》（Anthropic，2022，arXiv:2209.07858）</li>
+<li>Perez 等，《Discovering Language Model Behaviors with Model-Written Evaluations》（Anthropic，2022，arXiv:2212.09251）</li>
+<li>Liang 等，《Holistic Evaluation of Language Models》（HELM，斯坦福，2022，arXiv:2211.09110）</li>
+<li>NIST《人工智能风险管理框架》（AI RMF 1.0，2023）</li>
+<li>OpenAI《Preparedness Framework》（发布前安全评估框架，公开名称）</li>
+<li>Anthropic《Responsible Scaling Policy》（风险分级与停线机制，公开名称）</li>
+<li>Google DeepMind《Frontier Safety Framework》（前沿模型安全框架，公开名称）</li>
+<li>OWASP《Top 10 for LLM Applications》（大模型应用风险清单，公开名称）</li>
+<li>《人工智能生成合成内容标识办法》（2025-09-01 施行）</li>
+<li>《网络数据安全管理条例》（2025-01-01 施行）</li>
+<li>欧盟《人工智能法案》通用目的 AI 模型义务（自 2025-08-02 起适用）</li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>对齐评估与红队测试</p><p><a href="https://987763485.github.io/2025/09/11/对齐评估与红队测试/">https://987763485.github.io/2025/09/11/对齐评估与红队测试/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2025-09-11</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-20</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="link-muted mr-2" rel="tag" href="/tags/python/">python</a><a class="link-muted mr-2" rel="tag" href="/tags/typescript/">typescript</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2025/09/13/Rust%E9%AB%98%E6%80%A7%E8%83%BD%E7%BD%91%E7%BB%9C%E6%9C%8D%E5%8A%A1%E5%AE%9E%E8%B7%B5/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Rust 高性能网络服务实践</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2025/09/04/Rustunsafe%E4%B8%8E%E8%A3%B8%E6%8C%87%E9%92%88%E5%AE%9E%E8%B7%B5/"><span class="level-item">Rust unsafe 与裸指针实践</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

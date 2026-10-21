@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>敏捷开发实践中的站会与迭代 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="我们前端小组 2013 年被拉进公司敏捷改造，到写这篇的 2015 年末正好两三年。这期间 Scrum 的仪式我们基本照搬过一遍，又拆掉一半换成半看板的样子，踩的坑大多不是”书上不是这么写的”，而是”这套动作和我们的活儿对不上”。本文不解释名词，只记站会和迭代在我们这儿真实走形的过程，顺带交代 Scrum、看板、混合三种节奏各适合什么样的团队。"><meta property="og:type" content="blog"><meta property="og:title" content="敏捷开发实践中的站会与迭代"><meta property="og:url" content="https://987763485.github.io/2015/11/22/%E6%95%8F%E6%8D%B7%E5%BC%80%E5%8F%91%E5%AE%9E%E8%B7%B5%E4%B8%AD%E7%9A%84%E7%AB%99%E4%BC%9A%E4%B8%8E%E8%BF%AD%E4%BB%A3/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="我们前端小组 2013 年被拉进公司敏捷改造，到写这篇的 2015 年末正好两三年。这期间 Scrum 的仪式我们基本照搬过一遍，又拆掉一半换成半看板的样子，踩的坑大多不是”书上不是这么写的”，而是”这套动作和我们的活儿对不上”。本文不解释名词，只记站会和迭代在我们这儿真实走形的过程，顺带交代 Scrum、看板、混合三种节奏各适合什么样的团队。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2015-11-22T15:35:40.000Z"><meta property="article:modified_time" content="2026-10-18T02:21:24.839Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="web前端"><meta property="article:tag" content="前端工程化"><meta property="article:tag" content="nodejs"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2015/11/22/%E6%95%8F%E6%8D%B7%E5%BC%80%E5%8F%91%E5%AE%9E%E8%B7%B5%E4%B8%AD%E7%9A%84%E7%AB%99%E4%BC%9A%E4%B8%8E%E8%BF%AD%E4%BB%A3/"},"headline":"敏捷开发实践中的站会与迭代","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2015-11-22T15:35:40.000Z","dateModified":"2026-10-18T02:21:24.839Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"我们前端小组 2013 年被拉进公司敏捷改造，到写这篇的 2015 年末正好两三年。这期间 Scrum 的仪式我们基本照搬过一遍，又拆掉一半换成半看板的样子，踩的坑大多不是”书上不是这么写的”，而是”这套动作和我们的活儿对不上”。本文不解释名词，只记站会和迭代在我们这儿真实走形的过程，顺带交代 Scrum、看板、混合三种节奏各适合什么样的团队。"}</script><link rel="canonical" href="https://987763485.github.io/2015/11/22/%E6%95%8F%E6%8D%B7%E5%BC%80%E5%8F%91%E5%AE%9E%E8%B7%B5%E4%B8%AD%E7%9A%84%E7%AB%99%E4%BC%9A%E4%B8%8E%E8%BF%AD%E4%BB%A3/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2015-11-22T15:35:40.000Z" title="11/22/2015, 11:35:40 PM">2015-11-22</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/">研发管理</a></span><span class="level-item">26 分钟读完 (大约3974个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">敏捷开发实践中的站会与迭代</h1><div class="content"><p>我们前端小组 2013 年被拉进公司敏捷改造，到写这篇的 2015 年末正好两三年。这期间 Scrum 的仪式我们基本照搬过一遍，又拆掉一半换成半看板的样子，踩的坑大多不是”书上不是这么写的”，而是”这套动作和我们的活儿对不上”。本文不解释名词，只记站会和迭代在我们这儿真实走形的过程，顺带交代 Scrum、看板、混合三种节奏各适合什么样的团队。</p>
+<h2 id="先说清楚我们在折腾什么"><a href="#先说清楚我们在折腾什么" class="headerlink" title="先说清楚我们在折腾什么"></a>先说清楚我们在折腾什么</h2><p>改造刚开始时组里流行一句话：”上了敏捷，需求就快了。”两年下来我的结论相反：敏捷不让需求变快，它只是把慢的原因暴露出来，让你没法再糊弄自己。</p>
+<p>站会解决的是信息同步。谁在做什么、卡在哪、今天能给什么，以前靠”路过问一句”传播，问不到的人就重复劳动或者干等。十五分钟过一遍，收益是当天不用再在群里刷屏催进度。</p>
+<p>迭代解决的则是变更的定价。以前排期是”这个月做完这三个大需求”，做到第二十天产品来加需求，我只能说”那要下个月”，谁也不服谁。有了迭代，加需求不再是情绪化的争吵，而是”下一轮再说”或者”从待办里挪一个等量的出去”，这才是我们和上游关系变好的真正原因。</p>
+<p>这两件事分量不同，也就不必捆在一起推行：站会可以先上，迭代晚点上。</p>
+<h2 id="三种节奏摆开比较"><a href="#三种节奏摆开比较" class="headerlink" title="三种节奏摆开比较"></a>三种节奏摆开比较</h2><p>三种做法我们前后都试过：Scrum 是全照搬那一版，看板是维护线那一版，混合是最后稳定下来两年多的那一版。差异列在一起会直观很多。</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>Scrum</th>
+<th>看板</th>
+<th>混合（我们的做法）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>迭代节奏</td>
+<td>固定两周或三周一轮，起止日不可变</td>
+<td>无固定迭代，任务流完就走</td>
+<td>迭代定计划，执行按看板流动</td>
+</tr>
+<tr>
+<td>任务粒度</td>
+<td>拆到一两天能完成的故事与子任务</td>
+<td>不限粒度，靠限流控制堆积</td>
+<td>故事按迭代切，任务按当天切</td>
+</tr>
+<tr>
+<td>变更容忍</td>
+<td>迭代内原则上不接新需求</td>
+<td>随时插入，只要优先级够高</td>
+<td>迭代内留口子，维护类随时进</td>
+</tr>
+<tr>
+<td>度量方式</td>
+<td>每轮速度、故事点消耗曲线</td>
+<td>前置时间、阻塞时长、各列在制品数</td>
+<td>计划命中率加各列停留时间</td>
+</tr>
+<tr>
+<td>适合团队</td>
+<td>需求能打包、变更能压住的功能小组</td>
+<td>线上运维、支持类、需求极碎的小组</td>
+<td>既做版本又接线上问题的复合小组</td>
+</tr>
+</tbody></table>
+<h3 id="我们是怎么选的"><a href="#我们是怎么选的" class="headerlink" title="我们是怎么选的"></a>我们是怎么选的</h3><p>第一轮全组上 Scrum，两周一起。问题在前端这边特别明显：既要做版本功能，又要接运营临时改文案、改活动页、修线上样式这些活儿，它们没有一个能撑到”下一轮再排”，页面白屏三分钟是当天就要处理的事。于是每轮刚开始计划就被打断七八次，到后来没人认真估点了，反正估了也会变。</p>
+<p>第二次调整，我们把线上维护那一块单独拆出来挂看板，不设迭代，只设两条规矩：同时在做的活儿不超过人数的两倍，插单必须显式挤掉一件正在做的事。效果立竿见影，碎需求不再是敌人，因为它天然有一列接住。</p>
+<p>但纯看板放在版本需求上不行。我们的版本要和后端一起发车，没有共同起止日，就没有”这一版到底交付什么”这句话，前端做完了后端还没联调完，谁也不知道要等到哪天。所以最后落到混合：迭代用来定计划、锁定本轮目标，执行按看板流动，站会看的是列而不是任务清单。</p>
+<p>选型的依据其实就一条，我后来推荐给别的组也反复用：看你们被打断的频率。一轮计划中途插单超过三四次，Scrum 的仪式感会反噬你，先把这部分挂看板；如果活儿能攒、外部压力主要来自发版日而不是运维，那就老老实实定迭代。</p>
+<h2 id="站会是怎么变形的"><a href="#站会是怎么变形的" class="headerlink" title="站会是怎么变形的"></a>站会是怎么变形的</h2><p>站会这个会本身很简单，简单到容易被做坏。下面每条都是我们自己或邻组发生过的场景。</p>
+<p>第一种变形，讲成给项目经理汇报。第一轮站会由项目经理主持，她习惯按人点名，每人讲完她追问细节、当场改优先级。三次之后大家学会了两件事：只讲她爱听的、把风险藏起来。后来改成开发自己主持，项目经理旁听，只在”谁需要我协调什么”那一步发言，那堵墙才拆掉。</p>
+<p>第二种变形，变成技术讨论会，拖到一个钟头。有次A说”这个组件的动画我想换个思路”，六个人围过来讨论实现，会散了讨论还没完。之后定了两个动作：站会只允许说”卡在哪儿”和”今天交什么”，凡是要画图、要两个人以上争论的话题，当场记下人和题、会后单独约十五分钟；再把站会挪到有白板的过道，站着讲，物理上不让讨论展开。</p>
+<p>第三种变形，是”还在做”。这三个字信息量是零，讲完大家各自散。我们改成两句填空：昨天有没有产出能给别人看的东西，今天打算交出什么。答不上”今天交什么”，就说明这件事卡住了，卡在哪必须当场说。</p>
+<p>第四种变形，有人请假导致任务黑洞。前端人手紧，一个人请假，他的活儿在待办列上静静躺着没人认领，到迭代结束才发现。后来要求站会开场先过一遍”今天谁不在”，不在的人的任务当场由在场者认领或退回待办池，宁可让那一列空出来，也不留一个假装的进行中。</p>
+<p>第五种变形，站会时间定得太早。我们一度定在九点半，正好卡在最没用的时候：联调多在下午才发生，前一天晚上后端改的接口谁也不知道，头一天”还在做”，第二天还是”还在做”。调到上午十一点后，当天的接口变更和部署结果能先进入视野，站会才有内容可讲；维护多的那一队干脆定在下午两点半。</p>
+<p>第六种变形最容易忽略：物理白板和线上看板双轨。工位旁贴便利贴的白板，项目跟踪用线上系统，两边各自更新，两周后同一张任务在白板是”待测试”、线上是”进行中”，站会讲的和统计报表对不上，回顾会上吵的全是”到底谁的数据是真的”。办法是把线上看板当唯一事实源，站会投屏看它；工位白板降级成当日草稿，只写人名和一句话。</p>
+<h2 id="迭代本身的坑"><a href="#迭代本身的坑" class="headerlink" title="迭代本身的坑"></a>迭代本身的坑</h2><h3 id="故事点被当成工时承诺"><a href="#故事点被当成工时承诺" class="headerlink" title="故事点被当成工时承诺"></a>故事点被当成工时承诺</h3><p>改造第二年，故事点就被拿去当承诺用了。管理层看到”这轮消化了四十个点”，下一轮直接要四十个点的活儿，还把点和人天画等号。这是最伤敏捷的做法：点的意义在相对比较，它不是时间单位，也不该跨人换算。纠偏是讲清两件事——换算系数由团队自己维持、不对外承诺，对外只谈范围与时间的取舍。</p>
+<h3 id="估算的两条路"><a href="#估算的两条路" class="headerlink" title="估算的两条路"></a>估算的两条路</h3><p>规划扑克我们试过，好处是把分歧亮出来——一人估三、一人估八，那五点的差就是必须讨论的信息。坏处是慢，一张卡争论五分钟，一场计划会做四小时。后来粗估换成 T 恤尺码，只有 XS 到 XL 五档，用在待办排序和”要不要拆”的判断上；只有进迭代的那批活儿才回去掰点数。排序不需要精确，精确只在承诺范围内才有价值。</p>
+<h3 id="插单与缓冲"><a href="#插单与缓冲" class="headerlink" title="插单与缓冲"></a>插单与缓冲</h3><p>插单这件事最后是靠预留解决的，而不是靠意志力。做法很朴素：每轮迭代把容量留出一成到两成给线上问题和临时改动，不留满。起初有人反对，说那是浪费产能；两三轮后发现，不留 buffer 的那几轮计划命中率惨不忍睹，像每天加班赶工却什么都没交付。留出来的部分不是浪费，是给不确定性交的税。</p>
+<h3 id="前后端依赖导致前端空转"><a href="#前后端依赖导致前端空转" class="headerlink" title="前后端依赖导致前端空转"></a>前后端依赖导致前端空转</h3><p>前端这一轮要做的页面，接口后端下一轮才给，整个团队盯着一个空 URL 干等，这是改造前期最浪费的一段。我们的处理是先约定：接口文档在计划会上就要有雏形，字段名、类型、空值行为、错误码四项必须写死，写不死就说明需求本身还没想清楚。约定一定下，前端就用自己的假数据先把页面跑起来，联调只剩验证。假数据怎么写、怎么切换成真实接口，是另篇要展开的事。要强调的是顺序：约定在前，联调在后。</p>
+<h3 id="完成定义里少了两件事"><a href="#完成定义里少了两件事" class="headerlink" title="完成定义里少了两件事"></a>完成定义里少了两件事</h3><p>我们的 DoD 一开始只有”代码合并、自测通过”，结果每轮大量任务标了完成，上线时才发现没联调、没在测试环境跑过、没给产品看过。做完了却上不了线，最容易让人对项目失去信任。后来加进四条：测试环境跑过、联调过、产品验收过、日志和埋点能看。完成定义写得越虚，迭代结束那天越难看。</p>
+<h2 id="需求在看板上怎么走完"><a href="#需求在看板上怎么走完" class="headerlink" title="需求在看板上怎么走完"></a>需求在看板上怎么走完</h2><p>混合模式跑起来之后，任务的生命周期就是看板上那几列。图里最重要的不是列名，而是”阻塞”这一列必须存在，且有人在站会点名看它。</p>
+<pre class="mermaid">flowchart TD
+    A[需求进入产品待办列表] --> B{是否排进本轮迭代}
+    B -->|是| C[拆任务放入待办列]
+    B -->|否| D[留在池子里继续排优先级]
+    C --> E[进行中]
+    E --> F{是否被卡住}
+    F -->|是| G[阻塞列 站会点名处理]
+    G --> E
+    F -->|否| H[待自测]
+    H --> I[联调中]
+    I --> J[待验收]
+    J --> K[已完成]
+    K --> L[回顾会统计停留时长]</pre>
+
+<p>工具这块没折腾太多。缺陷与任务的主数据在 Jira 6.x，需求文档和迭代目标写在 Confluence，两边靠链接串起来；运营那条线用 Teambition 和 Trello 提需求，禅道也有一支在用，跨部门催进度用 Tower，最早那批需求台账还在 Excel 里。工具对成败的影响远没有列定义大，同一个 Jira 能让团队跑得顺也能跑得累，差别在于你们有没有规定”进行中不超过几件”。便利贴加白板这个最原始的组合我们一直留着，断网的会议室里它比任何系统可靠。</p>
+<h2 id="四种会议的分工"><a href="#四种会议的分工" class="headerlink" title="四种会议的分工"></a>四种会议的分工</h2><p>到第二年我们稳定下来的会就这四个，目的、时长、参与人和产出都定死，避免一个会吸收另外三个的职责。</p>
+<table>
+<thead>
+<tr>
+<th>会议</th>
+<th>目的</th>
+<th>时长</th>
+<th>参与者</th>
+<th>产出</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>站会</td>
+<td>同步进度与阻塞，不解决问题</td>
+<td>十五分钟，站着</td>
+<td>全体开发，旁听不发言</td>
+<td>更新后的看板、会后讨论名单</td>
+</tr>
+<tr>
+<td>计划会</td>
+<td>定本轮目标与范围、估算</td>
+<td>两到三小时</td>
+<td>产品、开发、测试</td>
+<td>迭代目标与进迭代的任务清单</td>
+</tr>
+<tr>
+<td>评审会</td>
+<td>给需求方看能跑的东西</td>
+<td>一小时</td>
+<td>产品、开发、相关方</td>
+<td>验收结论，新需求进待办</td>
+</tr>
+<tr>
+<td>回顾会</td>
+<td>找流程里的坑，挑一个改</td>
+<td>一小时</td>
+<td>只有团队内部</td>
+<td>一到两条下轮可执行动作</td>
+</tr>
+</tbody></table>
+<p>评审会和回顾会最容易犯的错是合并成一个，同一个小时里既演示又吵架，两头都没做好。分开后评审只谈东西对不对，回顾只谈配合顺不顺，各自才收敛。</p>
+<h2 id="用一个脚本看一眼自己的节奏"><a href="#用一个脚本看一眼自己的节奏" class="headerlink" title="用一个脚本看一眼自己的节奏"></a>用一个脚本看一眼自己的节奏</h2><p>看板列的停留时长是最诚实的指标，比点数好用。Jira 6.x 导出 CSV，里面有创建时间、更新时间、当前状态，写个小脚本聚合一下就够用。下面是第一版，跑在 Node 上，ES5 写法。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// node board-stats.js jira-export.csv</span></span><br><span class="line"><span class="keyword">var</span> fs = <span class="built_in">require</span>(<span class="string">&#x27;fs&#x27;</span>);</span><br><span class="line"><span class="keyword">var</span> csv = fs.<span class="title function_">readFileSync</span>(process.<span class="property">argv</span>[<span class="number">2</span>], <span class="string">&#x27;utf8&#x27;</span>).<span class="title function_">trim</span>().<span class="title function_">split</span>(<span class="string">&#x27;\n&#x27;</span>);</span><br><span class="line"><span class="keyword">var</span> head = csv.<span class="title function_">shift</span>().<span class="title function_">split</span>(<span class="string">&#x27;,&#x27;</span>);</span><br><span class="line"><span class="keyword">var</span> iStatus = head.<span class="title function_">indexOf</span>(<span class="string">&#x27;状态&#x27;</span>);</span><br><span class="line"><span class="keyword">var</span> iUpdated = head.<span class="title function_">indexOf</span>(<span class="string">&#x27;更新时间&#x27;</span>);</span><br><span class="line"><span class="keyword">var</span> buckets = &#123;&#125;;</span><br><span class="line">csv.<span class="title function_">forEach</span>(<span class="keyword">function</span> (<span class="params">line</span>) &#123;</span><br><span class="line">  <span class="keyword">var</span> cols = line.<span class="title function_">split</span>(<span class="string">&#x27;,&#x27;</span>);</span><br><span class="line">  <span class="keyword">var</span> st = cols[iStatus];</span><br><span class="line">  <span class="keyword">if</span> (!st) &#123; <span class="keyword">return</span>; &#125;</span><br><span class="line">  <span class="keyword">if</span> (!buckets[st]) &#123; buckets[st] = &#123; <span class="attr">count</span>: <span class="number">0</span>, <span class="attr">hours</span>: <span class="number">0</span> &#125;; &#125;</span><br><span class="line">  buckets[st].<span class="property">count</span> += <span class="number">1</span>;</span><br><span class="line">  <span class="comment">// 从更新时间倒推在当前列待了多久，粗估够用</span></span><br><span class="line">  <span class="keyword">var</span> spent = (<span class="title class_">Date</span>.<span class="title function_">now</span>() - <span class="keyword">new</span> <span class="title class_">Date</span>(cols[iUpdated]).<span class="title function_">getTime</span>()) / <span class="number">3600000</span>;</span><br><span class="line">  buckets[st].<span class="property">hours</span> += spent;</span><br><span class="line">&#125;);</span><br><span class="line"><span class="title class_">Object</span>.<span class="title function_">keys</span>(buckets).<span class="title function_">forEach</span>(<span class="keyword">function</span> (<span class="params">k</span>) &#123;</span><br><span class="line">  <span class="variable language_">console</span>.<span class="title function_">log</span>(k, buckets[k].<span class="property">count</span>, (buckets[k].<span class="property">hours</span> / buckets[k].<span class="property">count</span>).<span class="title function_">toFixed</span>(<span class="number">1</span>) + <span class="string">&#x27;h&#x27;</span>);</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>第一版跑出来，”待验收”平均停留两天多，往前追才发现是测试环境排队、产品没时间看。数字本身不神奇，神奇的是它把讨论从”我感觉很慢”变成”卡在哪一步”。脚本很糙，字段对不上就会算错，够用就行。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>两三年下来最大的体会是：站会和迭代是两个独立的东西，别当成一套仪式一起搬进来，也别一起丢掉。站会值不值得开，看它有没有回答”今天交什么、卡在哪儿”；迭代值不值得定，看它有没有给变更一个可谈的价格。Scrum 给纪律，看板给现实感，混合是我们这种既要发版又要救火的小组唯一能长跑的形态。坑几乎都不是概念错而是场景错——把功能团队的节奏套到维护团队身上，把讨论用的会开成汇报用的会。工具换什么都不解决这个问题，只有把列定义、完成定义、插单规则写下来并守上两轮，节奏才会长在自己身上。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>敏捷开发实践中的站会与迭代</p><p><a href="https://987763485.github.io/2015/11/22/敏捷开发实践中的站会与迭代/">https://987763485.github.io/2015/11/22/敏捷开发实践中的站会与迭代/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2015-11-22</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/web%E5%89%8D%E7%AB%AF/">web前端</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/">前端工程化</a><a class="link-muted mr-2" rel="tag" href="/tags/nodejs/">nodejs</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2015/11/27/Sass%E5%B7%A5%E7%A8%8B%E5%8C%96%E9%85%8D%E7%BD%AE%E4%B8%8E%E7%9B%AE%E5%BD%95%E7%BB%93%E6%9E%84/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Sass 工程化配置与目录结构</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2015/11/15/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91%E8%A7%84%E8%8C%83%E8%90%BD%E5%9C%B0%E5%AE%9E%E8%B7%B5/"><span class="level-item">前端开发规范落地实践</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

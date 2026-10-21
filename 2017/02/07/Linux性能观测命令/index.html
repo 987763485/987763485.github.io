@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Linux 性能观测命令 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="线上接口突然变慢，登录机器一看 CPU 不高、内存也够，于是把怀疑投向代码，改了两版却没好转。这类”资源看起来很闲、用户就是很慢”的故障，多半藏在磁盘 I&amp;#x2F;O、连接队列或者某一次阻塞调用里。本文按”先全局后局部”的顺序，把 CentOS 7（内核 3.10）与 Ubuntu 16.04（内核 4.4）上随手可用的观测命令串成一条排查路径：先判断是哪类资源出了问题，再定位到进程，最后落到系"><meta property="og:type" content="blog"><meta property="og:title" content="Linux 性能观测命令"><meta property="og:url" content="https://987763485.github.io/2017/02/07/Linux%E6%80%A7%E8%83%BD%E8%A7%82%E6%B5%8B%E5%91%BD%E4%BB%A4/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="线上接口突然变慢，登录机器一看 CPU 不高、内存也够，于是把怀疑投向代码，改了两版却没好转。这类”资源看起来很闲、用户就是很慢”的故障，多半藏在磁盘 I&amp;#x2F;O、连接队列或者某一次阻塞调用里。本文按”先全局后局部”的顺序，把 CentOS 7（内核 3.10）与 Ubuntu 16.04（内核 4.4）上随手可用的观测命令串成一条排查路径：先判断是哪类资源出了问题，再定位到进程，最后落到系"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2017-02-07T02:55:21.000Z"><meta property="article:modified_time" content="2026-10-18T10:42:22.715Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="linux"><meta property="article:tag" content="容器技术"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2017/02/07/Linux%E6%80%A7%E8%83%BD%E8%A7%82%E6%B5%8B%E5%91%BD%E4%BB%A4/"},"headline":"Linux 性能观测命令","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2017-02-07T02:55:21.000Z","dateModified":"2026-10-18T10:42:22.715Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"线上接口突然变慢，登录机器一看 CPU 不高、内存也够，于是把怀疑投向代码，改了两版却没好转。这类”资源看起来很闲、用户就是很慢”的故障，多半藏在磁盘 I&#x2F;O、连接队列或者某一次阻塞调用里。本文按”先全局后局部”的顺序，把 CentOS 7（内核 3.10）与 Ubuntu 16.04（内核 4.4）上随手可用的观测命令串成一条排查路径：先判断是哪类资源出了问题，再定位到进程，最后落到系"}</script><link rel="canonical" href="https://987763485.github.io/2017/02/07/Linux%E6%80%A7%E8%83%BD%E8%A7%82%E6%B5%8B%E5%91%BD%E4%BB%A4/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2017-02-07T02:55:21.000Z" title="2/7/2017, 10:55:21 AM">2017-02-07</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/">容器与运维</a></span><span class="level-item">1 小时读完 (大约8378个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Linux 性能观测命令</h1><div class="content"><p>线上接口突然变慢，登录机器一看 CPU 不高、内存也够，于是把怀疑投向代码，改了两版却没好转。这类”资源看起来很闲、用户就是很慢”的故障，多半藏在磁盘 I&#x2F;O、连接队列或者某一次阻塞调用里。本文按”先全局后局部”的顺序，把 CentOS 7（内核 3.10）与 Ubuntu 16.04（内核 4.4）上随手可用的观测命令串成一条排查路径：先判断是哪类资源出了问题，再定位到进程，最后落到系统调用与热点函数。读完之后，你应该能在几分钟内判断一台机器”慢在哪”，并且知道哪些数字不能照字面相信。</p>
+<h2 id="一次”CPU-不高、内存也够”的故障"><a href="#一次”CPU-不高、内存也够”的故障" class="headerlink" title="一次”CPU 不高、内存也够”的故障"></a>一次”CPU 不高、内存也够”的故障</h2><p>事情发生在一个订单查询接口上：P99 从 80ms 涨到 1.2s，错误率没动，请求还在成功返回，只是变慢。我们先查应用日志，没有异常堆栈；再看连接池，活跃连接数正常；重启一台实例，好了十分钟又慢回去。就这样折腾了将近两个小时。</p>
+<p>原因是在一条随手敲的命令里露出来的：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">top -b -n 1 | <span class="built_in">head</span> -n 5</span><br></pre></td></tr></table></figure>
+
+<p>输出大概是这样的：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">top - 22:14:03 up 41 days,  3:12,  2 users,  load average: 9.02, 8.77, 8.31</span><br><span class="line">Tasks: 214 total,   3 running, 211 sleeping,   0 stopped,   0 zombie</span><br><span class="line">%Cpu(s): 18.3 us,  4.1 sy,  0.0 ni, 61.2 id, 15.8 wa,  0.0 hi,  0.6 si</span><br><span class="line">KiB Mem :  8169004 total,   612340 free,  3012456 used,  4544208 buff/cache</span><br><span class="line">KiB Swap:  2097148 total,        0 free,  2097148 used,  6001180 avail Mem</span><br></pre></td></tr></table></figure>
+
+<p>CPU 空闲 61%，负载却接近 9，这两个数字放在一起就已经矛盾了。空闲高说明 CPU 没被算满，负载高说明有大量任务在排队。再看 <code>wa</code> 那一列：15.8%，接近六分之一的 CPU 时间在等 I&#x2F;O。这一列平时最容易被忽略，因为它不产生”忙”的观感，只产生”慢”的观感。</p>
+<p>顺着这条线继续查：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">iostat -x 1 3</span><br></pre></td></tr></table></figure>
+
+<p><code>%util</code> 常年在 95% 以上，<code>await</code> 从正常的 2ms 涨到 120ms，<code>w/s</code> 并不高但单次写入极慢。也就是说磁盘并没有被大量小请求打满，而是每次写入都要等很久，典型的”设备已经饱和，但吞吐并不高”。再用 <code>iotop -oPa</code> 看具体进程，发现两个东西在抢盘：一个是凌晨没跑完、拖到白天的备份任务，另一个是应用自己把访问日志按请求同步刷盘。</p>
+<p>请求线程在写日志时被阻塞，处理能力下降，新连接进不来，于是又叠加了第二个问题。<code>ss -s</code> 显示 <code>TIME_WAIT</code> 有两万多个，<code>ss -lnt</code> 里 8080 端口的 <code>Recv-Q</code> 持续非零，说明排队已经发生在内核的 accept 队列里，而不是应用内部。</p>
+<p>最后把备份任务挪到凌晨并限速，日志改成异步落盘，调大 backlog，重启。三个动作里只有第一个是根因，后两个是缓解。这个案例值得记住的地方不在于结论，而在于<strong>三个最常看的数字全都正常</strong>：CPU 不高、内存 available 还有 6GB、磁盘空间也够。如果观测只停留在”CPU 和内存”，这类问题永远找不到。</p>
+<h2 id="观测方法论：USE-与先全局后局部"><a href="#观测方法论：USE-与先全局后局部" class="headerlink" title="观测方法论：USE 与先全局后局部"></a>观测方法论：USE 与先全局后局部</h2><p>排查性能问题最容易犯的错，是打开 <code>top</code> 盯着第一行看，看到一个不高的数字就换一台机器。有效的做法是先有框架，再选命令。</p>
+<h3 id="USE：对每类资源问三个问题"><a href="#USE：对每类资源问三个问题" class="headerlink" title="USE：对每类资源问三个问题"></a>USE：对每类资源问三个问题</h3><p>USE 方法把系统拆成若干资源：CPU、内存、磁盘、网络接口、以及更下层的控制器与总线。对每一类资源，依次问三个问题：</p>
+<ul>
+<li><strong>利用率</strong>：这段时间里资源有多忙？CPU 的 <code>us + sy</code>、磁盘的 <code>%util</code>、网络的带宽占用。</li>
+<li><strong>饱和度</strong>：有多少工作在排队等它？CPU 的 runqueue 长度与 load、磁盘的 <code>aqu-sz</code> 与 <code>await</code>、内存的 swap 换入换出。</li>
+<li><strong>错误</strong>：有没有出错？网卡的 <code>errors</code>&#x2F;<code>dropped</code>、磁盘的 <code>dmesg</code> 报错与 <code>smartctl</code>、内存的机器检查异常。</li>
+</ul>
+<p>这三个问题里，<strong>饱和度最容易被漏掉，也最能解释”资源不忙但很慢”</strong>。开头那个案例，磁盘利用率 98% 是”忙”，<code>await</code> 120ms 是”排队”，两者一起才构成完整的判断。只看利用率，会得出”磁盘很忙，加块盘”；加上饱和度，才知道”单次 I&#x2F;O 太慢，先查是谁在同步写”。</p>
+<p>把这张表在心里过一遍，排查时就不会东一榔头西一棒子：</p>
+<table>
+<thead>
+<tr>
+<th>资源</th>
+<th>利用率</th>
+<th>饱和度</th>
+<th>错误</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CPU</td>
+<td><code>us</code>、<code>sy</code>、<code>mpstat</code> 单核</td>
+<td>load、<code>vmstat</code> 的 <code>r</code></td>
+<td><code>dmesg</code>、<code>mcelog</code></td>
+</tr>
+<tr>
+<td>内存</td>
+<td><code>free</code> 的 used、<code>available</code></td>
+<td><code>si</code>&#x2F;<code>so</code>、OOM 日志</td>
+<td><code>dmesg</code>、<code>edac-util</code></td>
+</tr>
+<tr>
+<td>磁盘</td>
+<td><code>iostat -x</code> 的 <code>%util</code></td>
+<td><code>await</code>、<code>aqu-sz</code></td>
+<td><code>dmesg</code>、<code>smartctl -a</code></td>
+</tr>
+<tr>
+<td>网络</td>
+<td><code>sar -n DEV</code> 的 <code>txkB/s</code></td>
+<td><code>netstat -s</code> 重传、<code>ss -s</code></td>
+<td><code>ip -s link</code> 的 errors</td>
+</tr>
+</tbody></table>
+<h3 id="先全局，后局部"><a href="#先全局，后局部" class="headerlink" title="先全局，后局部"></a>先全局，后局部</h3><p>观测的顺序应当是从粗到细，每一步都用上一步的结论缩小范围：</p>
+<ol>
+<li><strong>全局</strong>：<code>uptime</code>、<code>vmstat 1</code>、<code>top</code> 看三十秒，判断是 CPU、内存、I&#x2F;O 还是网络。</li>
+<li><strong>子系统</strong>：<code>mpstat -P ALL</code>、<code>iostat -x</code>、<code>sar -n DEV</code>、<code>ss -s</code>，定位到哪一类资源、哪个设备、哪个核。</li>
+<li><strong>进程</strong>：<code>pidstat</code>、<code>iotop</code>、<code>top -H</code>，定位到哪个进程、哪个线程。</li>
+<li><strong>代码</strong>：<code>strace -c</code>、<code>perf top</code>、<code>/proc/&lt;pid&gt;/stack</code>，定位到系统调用与热点函数。</li>
+</ol>
+<p>反过来，一上来就 <code>strace</code> 某个进程，范围太窄：可能盯错了进程，也可能盯错了资源。越往下层的工具开销越大，先做便宜的观测是有实际意义的。</p>
+<h3 id="一次只改一个变量"><a href="#一次只改一个变量" class="headerlink" title="一次只改一个变量"></a>一次只改一个变量</h3><p>这条纪律比任何命令都重要。见过太多次”重启 + 调大连接池 + 加一台机器”三件事一起做，然后问题消失了，谁也不知道是哪个起了作用，下次复发时又要从头猜。</p>
+<p>正确的做法是：记录时间点，记下改动前的基线数字（load、<code>await</code>、P99），只改一项，等一个完整的观测周期（至少几分钟，覆盖一次流量波动），再对比同一组数字。如果无效，改回去，再试下一项。观测数据要和变更记录对齐，否则事后无法复盘。</p>
+<p>还有一点：<strong>观测本身有成本</strong>。<code>strace -c</code> 能让被跟踪的进程慢几倍，<code>perf record</code> 在高频采样下也会吃掉可观 CPU，<code>iostat</code> 的每次采样都要读内核计数器。生产环境上，先看 <code>/proc</code> 里的现成计数，再考虑启用采样工具；必须用的时候，限定时间（比如 <code>timeout 30</code>）并挑一台不影响主流程的实例。</p>
+<h2 id="负载：三个数字和它们骗人的地方"><a href="#负载：三个数字和它们骗人的地方" class="headerlink" title="负载：三个数字和它们骗人的地方"></a>负载：三个数字和它们骗人的地方</h2><p><code>uptime</code> 输出末尾那三个数，是 1 分钟、5 分钟、15 分钟的平均负载。它们不是三次独立采样，而是内核每 5 秒读一次当前值，再用指数衰减平滑出来的：1 分钟那一项对瞬时变化最敏感，15 分钟那一项最迟钝。所以<strong>看趋势比看绝对值有用</strong>：三个数递增说明负载在爬升，递减说明在恢复；1 分钟跳高而 15 分钟还低，多半是一次备份或日志轮转。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">uptime</span></span><br><span class="line"><span class="comment"># 22:14:03 up 41 days, load average: 9.02, 8.77, 8.31</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="负载和核数的关系"><a href="#负载和核数的关系" class="headerlink" title="负载和核数的关系"></a>负载和核数的关系</h3><p>Linux 的 load average 统计的是”正在运行 + 等待运行”的 task 数量，粗略地说就是排队长度。它和 CPU 核数直接相关：4 核机器上 load 4 意味着每个核都恰好有一个任务，属于刚好饱和；load 8 意味着平均每个任务要等一轮才能被调度。</p>
+<p>经验上的分档是：<code>load / 核数</code> 小于 0.7 算舒适，0.7 到 1.0 属于接近饱和，长期大于 1.0 就该看看是谁在排队，大于 2.0 基本可以认定有问题。但这只是起点，不是判决书——因为负载里还混进了另一类任务。</p>
+<h3 id="不可中断睡眠也会推高负载"><a href="#不可中断睡眠也会推高负载" class="headerlink" title="不可中断睡眠也会推高负载"></a>不可中断睡眠也会推高负载</h3><p>Linux 的 load average 与其他 Unix 有一个重要差别：它把 <code>TASK_UNINTERRUPTIBLE</code>（也就是 <code>ps</code> 里的 <code>D</code> 状态）的 task 也算进去了。这类 task 不占 CPU，它在等 I&#x2F;O 完成、等锁、等 NFS 响应，处于”叫不醒”的状态。</p>
+<p>于是就会出现开头那种矛盾：CPU 空闲 60%，load 却是 9。这 9 里面可能有一大半是卡在磁盘上的进程。判断方法很直接：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">ps -eo state,pid,ppid,wchan:24,<span class="built_in">comm</span> | awk <span class="string">&#x27;$1 ~ /^D/&#x27;</span></span><br><span class="line"><span class="built_in">cat</span> /proc/12345/stack        <span class="comment"># 需要 root，看内核栈卡在哪</span></span><br></pre></td></tr></table></figure>
+
+<p>如果 <code>D</code> 状态进程很多，且 <code>wchan</code> 指向文件系统或块设备相关函数，那负载的根子在 I&#x2F;O，不在 CPU。此时去加 CPU 或者调大线程池都没有意义，只会让更多线程一起卡在同一个设备上。反过来，如果 <code>D</code> 状态很少而 <code>r</code>（running）很多，那才是真的算力不够。</p>
+<p>另外，load 不区分任务权重，死循环线程和只跑几毫秒的定时任务都算 1，所以它只适合判断排队长度，不负责回答”谁在浪费 CPU”——后者要靠 <code>pidstat</code>。</p>
+<h2 id="CPU：先把”忙”拆开"><a href="#CPU：先把”忙”拆开" class="headerlink" title="CPU：先把”忙”拆开"></a>CPU：先把”忙”拆开</h2><p><code>top</code> 顶部那一行 <code>%Cpu(s)</code>，把 CPU 时间分成了若干份。多数人只看 <code>id</code>（空闲），实际上其余几列才是线索：</p>
+<ul>
+<li><code>us</code>：用户态时间。高，说明应用在算，可能是热点函数、也可能是死循环。</li>
+<li><code>sy</code>：内核态时间。高，说明系统调用频繁、锁竞争激烈，或者在做大量内存分配与网络收发。</li>
+<li><code>wa</code>：等待 I&#x2F;O 完成的时间。注意它是”CPU 空闲但因为有未完成的 I&#x2F;O 而没有被调度去做别的事”的记账，高 <code>wa</code> 通常意味着磁盘或网络存储慢。</li>
+<li><code>hi</code> &#x2F; <code>si</code>：硬中断与软中断。网卡流量大时 <code>si</code> 会明显升高。</li>
+<li><code>st</code>：被 hypervisor 偷走的时间。云主机上 <code>st</code> 高，说明宿主机上的邻居在抢 CPU，你自己的机器上找不到原因。</li>
+</ul>
+<h3 id="单核不均：mpstat-P-ALL"><a href="#单核不均：mpstat-P-ALL" class="headerlink" title="单核不均：mpstat -P ALL"></a>单核不均：mpstat -P ALL</h3><p><code>top</code> 默认显示的是所有核的平均值，平均值会掩盖单核打满。一个典型的 8 核机器，一个线程跑满一个核，总体 <code>us</code> 只有 12.5%，看起来非常闲，但那个线程所在的请求就是慢。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mpstat -P ALL 1 3</span><br></pre></td></tr></table></figure>
+
+<p>输出按核列出 <code>%usr</code>、<code>%sys</code>、<code>%iowait</code>、<code>%soft</code>、<code>%idle</code>。如果只有一个核 <code>%usr</code> 接近 100，其余都闲，那问题就是单线程热点，方向是查这个线程在算什么，而不是加机器。<code>%soft</code> 集中在某一个核，通常是网卡中断都落到了 CPU0，可以考虑 <code>irqbalance</code> 或调整 <code>/proc/irq/*/smp_affinity</code>。</p>
+<h3 id="按进程与线程归因"><a href="#按进程与线程归因" class="headerlink" title="按进程与线程归因"></a>按进程与线程归因</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">pidstat -u 1 5           <span class="comment"># 每秒钟列出各进程的 %usr %system %CPU</span></span><br><span class="line">pidstat -t -p 12345 1    <span class="comment"># 指定进程，按线程展开</span></span><br></pre></td></tr></table></figure>
+
+<p><code>pidstat</code> 给的是区间增量，而不是 <code>top</code> 那种开机以来的累计值，更适合回答”过去 5 秒谁在吃 CPU”。加 <code>-t</code> 展开到线程，再配合 <code>top -H -p &lt;pid&gt;</code> 拿线程 ID 对照栈，是定位单线程热点的常规路径。</p>
+<h3 id="vmstat：一屏看全系统"><a href="#vmstat：一屏看全系统" class="headerlink" title="vmstat：一屏看全系统"></a>vmstat：一屏看全系统</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">vmstat 1</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----</span><br><span class="line"> r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st</span><br><span class="line"> 3  4      0 612340  92104 4452104    0    0   412  1830 2210 18432 18  4 61 16  0</span><br></pre></td></tr></table></figure>
+
+<p>第一行是开机以来的平均值，从第二行起才是区间值，这一点后面还会说。这里关心的是 <code>r</code>、<code>b</code>、<code>in</code>、<code>cs</code>：<code>r</code> 是等待运行的进程数，等价于瞬时排队长度；<code>b</code> 是处于不可中断睡眠的进程数；<code>in</code> 是每秒中断次数；<code>cs</code> 是每秒上下文切换次数。</p>
+<p><code>cs</code> 的绝对值没有统一标准，几万很常见。要看的是它和 <code>sy</code> 的关系：<code>cs</code> 高、<code>sy</code> 也高，通常是锁竞争或者大量短系统调用；<code>cs</code> 高而 <code>sy</code> 不高，可能是线程数过多导致的调度抖动。用 <code>pidstat -w 1</code> 可以看每个进程的自愿切换（<code>cswch/s</code>，等 I&#x2F;O 或锁）和非自愿切换（<code>nvcswch/s</code>，时间片用完被抢占）。非自愿切换高，说明可运行线程多于核数，减少线程数往往比加 CPU 更有效。</p>
+<p><code>in</code> 高的时候，先看 <code>/proc/interrupts</code> 里是哪一类中断在涨。网卡中断随流量涨是正常的；如果是某个设备的中断数异常增长，可能是硬件或驱动问题。软中断（<code>si</code>）高而流量并不大时，要怀疑是不是有小包攻击或者连接数异常。</p>
+<p>把上面几列组合起来，可以得到一个粗略的判据：<code>us</code> 高查代码，<code>sy</code> 高查系统调用与锁，<code>wa</code> 高查磁盘，<code>si</code> 高查网络与中断，<code>st</code> 高就找云厂商。这五条不能覆盖所有情况，但能在大方向上少走弯路。</p>
+<h2 id="内存：别看-free，看-available"><a href="#内存：别看-free，看-available" class="headerlink" title="内存：别看 free，看 available"></a>内存：别看 free，看 available</h2><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">free -m</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">              total        used        free      shared  buff/cache   available</span><br><span class="line">Mem:           7977        2941         598         212        4437        4396</span><br><span class="line">Swap:          2047           0        2047</span><br></pre></td></tr></table></figure>
+
+<p>很多人看到 <code>free</code> 只剩 598MB 就开始紧张，这是最常见的误读之一。Linux 会把空闲内存尽量拿去做 page cache，缓存文件内容；这部分内存随时可以被回收给应用使用。所以判断”还有多少内存可用”，要看 <code>available</code> 这一列。</p>
+<p><code>available</code> 是内核给出的估算值：在不引起 swap 的前提下，还能分配多少内存给新进程。它大致等于 <code>free</code> 加上大部分可回收的 <code>buff/cache</code>，再减去一些不可回收的缓存与预留。</p>
+<p><code>buff/cache</code> 里其实混了两类东西：<code>buff</code> 是块设备的元数据缓存，通常很小；<code>cache</code> 是 page cache、tmpfs 与共享内存。读多的机器 cache 大是健康表现，说明热数据在内存里；真正要担心的是 <code>available</code> 持续走低且 swap 开始活动。</p>
+<h3 id="swap-与-OOM"><a href="#swap-与-OOM" class="headerlink" title="swap 与 OOM"></a>swap 与 OOM</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">vmstat 1 5</span><br></pre></td></tr></table></figure>
+
+<p>看 <code>si</code> 与 <code>so</code>：前者是每秒从 swap 换入的页数，后者是换出。两者长期为 0，说明内存压力不大；持续为非零，说明系统已经在用磁盘当内存，此时任何应用的延迟都会抖，因为一次缺页就可能要读盘。偶发的个位数不必惊慌，内核的 <code>kswapd</code> 会做一些预防性回收。</p>
+<p>swap 用满不等于立刻 OOM。OOM 触发条件是内核在直接回收之后仍然分配不到内存，此时 <code>oom-killer</code> 会按 <code>oom_score</code> 挑一个进程杀掉，通常挑占用 RSS 最大的。事后确认要看：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">dmesg | grep -i -E <span class="string">&quot;out of memory|oom-killer&quot;</span></span><br><span class="line">grep -i <span class="string">&quot;killed process&quot;</span> /var/log/messages</span><br></pre></td></tr></table></figure>
+
+<p>在 CentOS 7 上，<code>/var/log/messages</code> 由 rsyslog 写入，日志里会带上被杀进程的 RSS 与 <code>oom_score_adj</code>。被杀的是自己的服务时，先确认是流量增长、缓存无上限，还是真有泄漏，不要只想着加内存。</p>
+<p>判断泄漏要看趋势而不是瞬时值：<code>/proc/&lt;pid&gt;/status</code> 里的 <code>VmRSS</code> 连续几小时单调上涨，基本可以确认；要看具体是哪段映射在涨，读 <code>/proc/&lt;pid&gt;/smaps</code> 按区间汇总 <code>Rss</code>。<code>drop_caches</code> 只在排查缓存影响时用一次，不要写成定时任务，清完之后系统要重新预热，短时间会更慢。</p>
+<h2 id="磁盘：-util-只是入场券"><a href="#磁盘：-util-只是入场券" class="headerlink" title="磁盘：%util 只是入场券"></a>磁盘：%util 只是入场券</h2><p>磁盘是”资源不忙但很慢”最常见的发源地，因为它的延迟单位是毫秒，而 CPU 是纳秒。<code>iostat</code> 属于 sysstat 包，CentOS 7 与 Ubuntu 16.04 都预装或一条命令可装。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">iostat -x 1 3</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Device:  r/s     w/s     rkB/s   wkB/s  await  aqu-sz  %util</span><br><span class="line">sda      12.4    86.2    620.1   4210.5  118.7   9.83   98.6</span><br></pre></td></tr></table></figure>
+
+<p>几个字段的含义需要说清楚：</p>
+<ul>
+<li><code>r/s</code>、<code>w/s</code>：每秒的读、写请求数，也就是 IOPS。</li>
+<li><code>await</code>：每个请求的平均耗时，单位毫秒，<strong>包含排队时间</strong>。</li>
+<li><code>aqu-sz</code>：平均队列长度，队列越长说明排队越严重。</li>
+<li><code>%util</code>：设备处于忙碌状态的时间比例。</li>
+</ul>
+<p>关键在于把 <code>await</code> 和 <code>r/s</code>、<code>w/s</code> 一起看。<code>w/s</code> 不高但 <code>await</code> 很高，说明每次写入本身很慢，可能是机械盘寻道、RAID 卡电池失效导致写缓存被关闭、或者底层存储限速。<code>w/s</code> 很高且 <code>await</code> 也高，说明队列堆积，属于吞吐打满。这两种情况的处理方式完全不同：前者要查设备与链路，后者要考虑拆分流或换介质。</p>
+<p><code>%util</code> 要谨慎对待。对单块机械盘，接近 100% 基本等于饱和；但对 SSD、RAID 阵列、SAN 卷，设备可以并行处理多个请求，<code>%util</code> 到 100% 并不代表没有余量。这时候 <code>await</code> 与 <code>aqu-sz</code> 比 <code>%util</code> 更可信。反过来，某些虚拟化环境下 <code>%util</code> 的计算方式并不可靠，只能当参考。</p>
+<h3 id="找到写盘的进程"><a href="#找到写盘的进程" class="headerlink" title="找到写盘的进程"></a>找到写盘的进程</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">iotop -oPa</span><br></pre></td></tr></table></figure>
+
+<p><code>-o</code> 只显示有实际 I&#x2F;O 的进程，<code>-P</code> 按进程聚合（默认按线程），<code>-a</code> 显示累计而非瞬时速率。<code>iotop</code> 需要 root，且在 3.10 内核上依赖内核的 task I&#x2F;O 统计，能用但自身有一定开销，不要长期挂着。</p>
+<p>如果 <code>iotop</code> 不可用，<code>pidstat -d 1</code> 也能给出每个进程的 <code>kB_rd/s</code> 与 <code>kB_wr/s</code>，更轻量。再往下，<code>/proc/&lt;pid&gt;/io</code> 里的 <code>read_bytes</code> 与 <code>write_bytes</code> 是累计值，两次采样相减就是区间内的真实磁盘 I&#x2F;O，比 <code>rchar</code>、<code>wchar</code>（包含缓存命中）更准确。</p>
+<p>空间层面，<code>df -h</code> 看容量，<code>df -i</code> 看 inode 使用率。inode 耗尽的原理与处理另有专文讨论，这里只需要记住：<strong>磁盘还有空间但写不进去，先看 <code>df -i</code></strong>，报错通常是 “No space left on device”，但 <code>df -h</code> 显示还有很多空余。</p>
+<p>最后是”到底哪个文件在写”。<code>lsof -p &lt;pid&gt;</code> 能列出进程打开的文件，按 <code>REG</code> 过滤即可；<code>lsof +D</code> 在大目录上非常慢，不适合生产，先用 <code>iotop</code> 定位进程更实际。</p>
+<h2 id="网络：连接状态比带宽更常出问题"><a href="#网络：连接状态比带宽更常出问题" class="headerlink" title="网络：连接状态比带宽更常出问题"></a>网络：连接状态比带宽更常出问题</h2><p>多数”接口慢”的网络问题并不在带宽，而在连接数、队列和重传。<code>ss</code> 来自 iproute2，CentOS 7 与 Ubuntu 16.04 默认安装，比 <code>netstat</code> 快得多，因为后者要遍历 <code>/proc/net/tcp</code> 的全部内容。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ss -s</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Total: 412</span><br><span class="line">TCP:   3184 (estab 412, closed 2610, orphaned 3, timewait 2408)</span><br></pre></td></tr></table></figure>
+
+<p>这行汇总已经能说明很多问题。<code>estab</code> 是当前建立的连接，<code>timewait</code> 是处于 <code>TIME_WAIT</code> 的连接数。<code>TIME_WAIT</code> 由主动关闭的一方产生，持续 2 倍 MSL（Linux 上约 60 秒），用来保证最后一个 ACK 能重传、并让旧连接的延迟报文消散。它是正常状态，不是泄漏。但数量长期维持在几万，会占满本地端口，客户端尤其容易撞上”Cannot assign requested address”。</p>
+<p>处理方式要分角色：如果是客户端（比如反向代理连后端），<code>net.ipv4.tcp_tw_reuse=1</code> 可以让新连接复用处于 <code>TIME_WAIT</code> 的端口，这是有效的；服务端被动关闭时，<code>TIME_WAIT</code> 堆在服务端并不影响新连接，不必处理。<code>tcp_max_tw_buckets</code> 限制总数只是掩盖问题。至于 <code>tcp_tw_recycle</code>，它在 NAT 环境下会误丢连接，<strong>不要在 2017 年的生产环境里打开它</strong>，后来的内核版本已经把它移除了。</p>
+<p>比 <code>TIME_WAIT</code> 更值得警惕的是 <code>CLOSE_WAIT</code>。它表示对方已经关闭、本端还没调用 <code>close()</code>，数量持续增长基本等于应用有连接泄漏：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ss -tan state close-wait | <span class="built_in">wc</span> -l</span><br></pre></td></tr></table></figure>
+
+<h3 id="监听队列与-backlog"><a href="#监听队列与-backlog" class="headerlink" title="监听队列与 backlog"></a>监听队列与 backlog</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ss -lntp</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">State   Recv-Q  Send-Q  Local Address:Port  Process</span><br><span class="line">LISTEN  129     128     0.0.0.0:8080        users:((&quot;java&quot;,pid=2311,fd=98))</span><br></pre></td></tr></table></figure>
+
+<p>在 <code>LISTEN</code> 状态下，<code>Recv-Q</code> 是当前已经完成三次握手、等待应用 <code>accept()</code> 的连接数，<code>Send-Q</code> 是 backlog 上限。<code>Recv-Q</code> 持续接近 <code>Send-Q</code>，说明应用接受连接的速度跟不上，新连接会在内核里排队甚至被丢弃；此时 <code>netstat -s</code> 里的 “listen queue of a socket overflowed” 会增加。调大 <code>somaxconn</code> 与应用的 backlog 只能缓解，根子还是应用处理不过来。</p>
+<p>非 <code>LISTEN</code> 状态下，<code>Recv-Q</code> 表示已收到但应用还没读走的字节数，这个值长期很大，说明读得慢。</p>
+<h3 id="带宽、丢包与重传"><a href="#带宽、丢包与重传" class="headerlink" title="带宽、丢包与重传"></a>带宽、丢包与重传</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sar -n DEV 1 5</span><br></pre></td></tr></table></figure>
+
+<p><code>rxkB/s</code>、<code>txkB/s</code> 与网卡标称带宽对比，能判断是否打满。千兆网卡实测跑到 110MB&#x2F;s 左右就到顶了。但更多时候带宽只用了三成，延迟却很高，这时要看重传：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">netstat -s | grep -E <span class="string">&quot;retrans|overflow|prune|drop&quot;</span></span><br><span class="line">ss -tin</span><br></pre></td></tr></table></figure>
+
+<p><code>netstat -s</code> 里的 <code>segments retransmitted</code> 与总数相除就是重传率，超过 1% 就值得查链路。<code>ss -tin</code> 可以看单条连接的 <code>rtt</code>、<code>cwnd</code>、<code>retrans</code>，适合确认”是不是某几条连接在拖后腿”。物理层丢包用 <code>ip -s link</code> 看 <code>errors</code> 与 <code>dropped</code>，网卡队列丢包用 <code>ethtool -S eth0</code> 看 <code>discard</code> 计数。</p>
+<h2 id="进程与文件：从系统落到具体对象"><a href="#进程与文件：从系统落到具体对象" class="headerlink" title="进程与文件：从系统落到具体对象"></a>进程与文件：从系统落到具体对象</h2><p>定位到某个进程之后，还需要回答三个问题：它打开了什么、它在等什么、它把时间花在哪些系统调用上。</p>
+<h3 id="端口与文件句柄"><a href="#端口与文件句柄" class="headerlink" title="端口与文件句柄"></a>端口与文件句柄</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">ss -lntp | grep 8080          <span class="comment"># 谁占了端口</span></span><br><span class="line">lsof -p 2311 | <span class="built_in">wc</span> -l          <span class="comment"># 这个进程开了多少 fd</span></span><br><span class="line">lsof -p 2311 | grep -c REG    <span class="comment"># 其中普通文件有多少</span></span><br></pre></td></tr></table></figure>
+
+<p><code>lsof</code> 输出很长，按类型过滤更有用：<code>REG</code> 是普通文件，<code>IPv4</code>&#x2F;<code>IPv6</code> 是套接字，<code>DIR</code> 是目录。当应用报 “Too many open files” 时，先确认是句柄泄漏还是上限太小：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cat</span> /proc/2311/limits | grep <span class="string">&quot;open files&quot;</span></span><br><span class="line"><span class="built_in">ls</span> /proc/2311/fd | <span class="built_in">wc</span> -l</span><br></pre></td></tr></table></figure>
+
+<p>前者看 <code>Max open files</code> 的软硬限制，后者看实际用量。数量接近上限且持续增长，是泄漏；没接近上限却报错，可能是 <code>fs.file-max</code> 或者 systemd 单元里的 <code>LimitNOFILE</code> 没生效——CentOS 7 用 systemd 管理服务，<code>/etc/security/limits.conf</code> 对这类进程不一定生效，这一点常被忽略。</p>
+<h3 id="proc-里的现成信息"><a href="#proc-里的现成信息" class="headerlink" title="&#x2F;proc 里的现成信息"></a>&#x2F;proc 里的现成信息</h3><p><code>/proc/&lt;pid&gt;/status</code> 是最便宜的信息源，不需要任何额外工具：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">grep -E <span class="string">&quot;State|VmRSS|VmSwap|Threads|voluntary&quot;</span> /proc/2311/status</span><br></pre></td></tr></table></figure>
+
+<p><code>State</code> 是进程状态，<code>VmRSS</code> 是实际占用的物理内存，<code>VmSwap</code> 是被换出的部分，<code>Threads</code> 是线程数，两个 <code>ctxt_switches</code> 是自愿与非自愿上下文切换的累计值。两次读取相减，就能算出这个进程的切换频率。<code>Threads</code> 异常增长往往意味着线程池没有上限，或者每次请求都新建线程。</p>
+<h3 id="strace-的适用边界"><a href="#strace-的适用边界" class="headerlink" title="strace 的适用边界"></a>strace 的适用边界</h3><p><code>strace -c</code> 按系统调用聚合次数与耗时，是回答”它在等什么”的快捷方式：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">timeout</span> 10 strace -c -f -p 2311</span><br></pre></td></tr></table></figure>
+
+<p><code>-c</code> 输出统计表，<code>-f</code> 跟随所有线程，<code>-p</code> 附加到已有进程。典型的读法：<code>futex</code> 占比高说明锁竞争；大量 <code>read</code> 每次只读几百字节说明有小 I&#x2F;O；<code>epoll_wait</code> 占比高而 CPU 不忙，说明在等事件，瓶颈在别处。</p>
+<p>但它有明确的边界。<code>strace</code> 基于 <code>ptrace</code>，每次系统调用都要停下来通知跟踪进程，等于加了两趟上下文切换。在高并发服务上，附加 <code>strace</code> 可能让延迟翻几倍，甚至把服务拖垮。所以只在低流量实例或短时间窗口内使用，必须带 <code>timeout</code>，不要拿它做长期监控，也不要同时对多个进程 <code>strace</code>。需要长期、低开销的观测时，应该换 <code>perf</code> 或者应用自身的埋点。</p>
+<h2 id="追踪：perf-与火焰图"><a href="#追踪：perf-与火焰图" class="headerlink" title="追踪：perf 与火焰图"></a>追踪：perf 与火焰图</h2><p><code>strace</code> 只能看到系统调用的边界，看不到用户态内部在算什么。要回答”CPU 到底花在哪个函数上”，需要采样型 profiler。2017 年初在 Linux 上的标准答案是 <code>perf</code>，它利用内核的 <code>perf_events</code> 子系统，按固定频率采样调用栈，开销远低于 <code>ptrace</code>。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">perf top -g</span><br><span class="line">perf record -F 99 -g -p 2311 -- <span class="built_in">sleep</span> 30</span><br><span class="line">perf report</span><br></pre></td></tr></table></figure>
+
+<p><code>perf top</code> 是实时视图，适合快速看一眼；<code>perf record</code> 把样本写进 <code>perf.data</code>，再用 <code>perf report</code> 交互式浏览。<code>-F 99</code> 表示每秒采样 99 次，取 99 而不是 100 是为了避开定时器与采样频率共振导致的偏差；<code>-g</code> 记录调用栈。</p>
+<p>火焰图是把 <code>perf report</code> 的文本变成一张更容易读的图。当年的工具链是 Brendan Gregg 的 FlameGraph 脚本：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">perf record -F 99 -g -p 2311 -- <span class="built_in">sleep</span> 30</span><br><span class="line">perf script &gt; out.perf</span><br><span class="line">./stackcollapse-perf.pl out.perf &gt; out.folded</span><br><span class="line">./flamegraph.pl out.folded &gt; out.svg</span><br></pre></td></tr></table></figure>
+
+<p>读法有三条：<strong>横轴是采样占比，不是时间顺序</strong>，条越宽表示该函数占用的 CPU 越多；<strong>纵轴是调用栈深度</strong>，下面是调用者，上面是被调用者；<strong>找自己代码里最宽的条</strong>，而不是最顶上的条。最顶上往往是 <code>libc</code> 的 <code>memcpy</code> 或者内核的 <code>schedule</code>，真正有意义的是它的父节点——是你的哪段代码调用了它。如果一条宽条下面挂着 <code>syscall</code>，说明时间花在内核；如果挂在 <code>futex</code>，说明在等锁。</p>
+<p><code>perf</code> 在生产上最常见的障碍是权限与符号。<code>/proc/sys/kernel/perf_event_paranoid</code> 默认是 2，普通用户只能观测自己的进程，且看不到内核态样本；要分析内核热点需要 root 或把它调到 0 以下。看内核符号还需要装 <code>kernel-debuginfo</code>（CentOS）或 <code>linux-image-*-dbgsym</code>（Ubuntu），否则一堆 <code>[unknown]</code>。Java 这类 JIT 语言还要额外生成符号映射，否则栈里只有地址。</p>
+<p>需要说明的是，这些年在内核追踪上出现了新工具，但 2017 年初还未进入发行版，属于后来才有的方向；当下把 <code>perf</code> 用熟已经足够覆盖绝大多数 CPU 热点问题。</p>
+<h2 id="组合套路：三条常用路径"><a href="#组合套路：三条常用路径" class="headerlink" title="组合套路：三条常用路径"></a>组合套路：三条常用路径</h2><p>单个命令只能回答一个问题，真正省时间的是把命令按固定顺序串起来。下面三条路径覆盖了日常大部分场景。</p>
+<h3 id="一分钟快速体检"><a href="#一分钟快速体检" class="headerlink" title="一分钟快速体检"></a>一分钟快速体检</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">uptime</span></span><br><span class="line">dmesg | <span class="built_in">tail</span> -n 20</span><br><span class="line">vmstat 1 5</span><br><span class="line">mpstat -P ALL 1 5</span><br><span class="line">pidstat -u 1 5</span><br><span class="line">iostat -xz 1 5</span><br><span class="line">free -m</span><br><span class="line">sar -n DEV 1 5</span><br><span class="line">ss -s</span><br></pre></td></tr></table></figure>
+
+<p>这套顺序的逻辑是：先看负载趋势与内核有没有报错，再用 <code>vmstat</code> 判断大类，然后分别用 <code>mpstat</code>、<code>pidstat</code>、<code>iostat</code>、<code>sar</code> 确认 CPU、进程、磁盘、网络，最后用 <code>ss -s</code> 看连接总量。全部跑完不超过一分钟，每条都只看区间值。它不能替代深入分析，但能第一时间排除大部分方向。</p>
+<h3 id="数据库慢查询时的观测顺序"><a href="#数据库慢查询时的观测顺序" class="headerlink" title="数据库慢查询时的观测顺序"></a>数据库慢查询时的观测顺序</h3><p>遇到”数据库慢”，不要第一反应就去翻慢查询日志。正确的顺序是自下而上：先用 <code>iostat -x</code> 确认数据盘是否饱和、<code>await</code> 是否升高；用 <code>vmstat</code> 确认有没有 swap 活动；用 <code>top</code> 看 <code>mysqld</code> 的 <code>us</code> 与 <code>sy</code> 比例；用 <code>ss -s</code> 看连接数是否暴涨。主机层没问题，再进实例层看 <code>SHOW PROCESSLIST</code> 与慢查询日志，最后才是单条 SQL 的执行计划。</p>
+<p>这个顺序能避免一类常见误判：SQL 本身没变慢，是磁盘被备份任务拖慢了，此时优化 SQL 毫无意义。反过来，如果主机层一切正常而 <code>mysqld</code> 的 <code>us</code> 很高、慢查询里出现了新的全表扫描，那才是 SQL 的问题。</p>
+<h3 id="容器宿主机上的观测差异"><a href="#容器宿主机上的观测差异" class="headerlink" title="容器宿主机上的观测差异"></a>容器宿主机上的观测差异</h3><p>容器内跑 <code>free</code>、<code>top</code>、<code>iostat</code>，读到的往往是宿主机的数据：<code>/proc/meminfo</code>、<code>/proc/stat</code>、<code>/proc/loadavg</code> 都没有做命名空间隔离。于是容器里 <code>free</code> 显示整机 64GB 内存，<code>nproc</code> 显示宿主机的 32 核，但进程实际只能用 cgroup 限额里的那部分。看到”内存很充裕”却频繁 OOM，或者”CPU 很闲”却延迟很高，多半就是被限额卡住了。</p>
+<p>此时要去看 cgroup 自己的计数器：CPU 被限流看 <code>cpu.stat</code> 里的 <code>nr_throttled</code> 与 <code>throttled_time</code>，内存看 <code>memory.stat</code> 与 <code>memory.failcnt</code>。具体的 cgroup 参数与 Docker 资源限制配置另有专文，这里只强调一点：<strong>在容器里做性能观测，先确认你看到的是谁的数</strong>。宿主机上的 <code>iostat</code> 也是同理，它看到的是整块盘，不区分是哪个容器写的。</p>
+<h2 id="采样与记录：别只看当下"><a href="#采样与记录：别只看当下" class="headerlink" title="采样与记录：别只看当下"></a>采样与记录：别只看当下</h2><p>前面所有命令都有一个共同缺陷：它们只描述”你盯着屏幕的这一分钟”。故障往往在你登录之前就发生过，或者在你离开之后才复发。</p>
+<p><code>sysstat</code> 包默认带一个 cron 任务，每 10 分钟把所有指标写进 <code>/var/log/sa/saDD</code>，保留一周左右：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">sar -f /var/log/sa/sa07 -s 20:00:00 -e 21:00:00</span><br><span class="line">sar -f /var/log/sa/sa07 -n DEV</span><br></pre></td></tr></table></figure>
+
+<p>事后回看某个时间段的 CPU、内存、磁盘、网络，比现场猜可靠得多；需要更细粒度就调 <code>/etc/cron.d/sysstat</code>。<code>nmon</code> 适合交互式看，也能按秒记录成文件再用 <code>nmon -f</code> 的分析脚本出图。再往上，就把 <code>load</code>、<code>await</code>、<code>si/so</code>、<code>TIME_WAIT</code> 数这些关键指标定期送进监控系统（当年常见的是 Zabbix 或 StatsD 加 Graphite），让趋势和告警替你值守。</p>
+<h2 id="常见误读"><a href="#常见误读" class="headerlink" title="常见误读"></a>常见误读</h2><ul>
+<li><strong><code>top</code> 的 <code>%CPU</code> 可以超过 100</strong>。它是按单核计的，一个四线程进程跑满四个核会显示 400%，不代表异常。</li>
+<li><strong><code>free</code> 里的 <code>buff/cache</code> 不是被吃掉的内存</strong>，它可回收，判断依据是 <code>available</code>。</li>
+<li><strong><code>iostat</code> 第一次报告不可信</strong>，那是开机以来的平均值；加 <code>-y</code> 跳过，或从第二行开始读。</li>
+<li><strong><code>vmstat</code> 第一行同样是平均值</strong>，区间值从第二行起。</li>
+</ul>
+<h2 id="排查表"><a href="#排查表" class="headerlink" title="排查表"></a>排查表</h2><table>
+<thead>
+<tr>
+<th>症状</th>
+<th>先看什么</th>
+<th>再看什么</th>
+<th>常见原因</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>整体卡、CPU 闲</td>
+<td><code>uptime</code> 的 load、<code>vmstat</code> 的 <code>b</code></td>
+<td><code>ps</code> 的 D 状态、<code>/proc/&lt;pid&gt;/stack</code></td>
+<td>磁盘慢、NFS 挂起、同步写日志</td>
+</tr>
+<tr>
+<td>单请求慢、吞吐正常</td>
+<td><code>mpstat -P ALL</code></td>
+<td><code>pidstat -t</code>、<code>perf top</code></td>
+<td>单线程热点、大锁、GC</td>
+</tr>
+<tr>
+<td>周期性抖动</td>
+<td><code>sar</code> 历史数据</td>
+<td><code>crontab</code>、备份任务时间</td>
+<td>定时任务与业务争抢</td>
+</tr>
+<tr>
+<td>写入报错但磁盘有空间</td>
+<td><code>df -i</code></td>
+<td><code>lsof -p</code> 的 REG 文件</td>
+<td>inode 耗尽、句柄泄漏</td>
+</tr>
+<tr>
+<td>连接超时</td>
+<td><code>ss -s</code>、<code>ss -lnt</code> 的 Recv-Q</td>
+<td><code>netstat -s</code> 的 overflow</td>
+<td>backlog 太小、accept 太慢</td>
+</tr>
+<tr>
+<td>云主机上莫名变慢</td>
+<td><code>top</code> 的 <code>st</code></td>
+<td>宿主机监控、同宿邻居</td>
+<td>CPU 被超卖、steal 高</td>
+</tr>
+<tr>
+<td>容器内 OOM 但内存充足</td>
+<td>cgroup 的 <code>memory.failcnt</code></td>
+<td><code>memory.stat</code></td>
+<td>被 limit 卡住，看到的是宿主机的数</td>
+</tr>
+</tbody></table>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>性能观测的难点不在命令，而在顺序与判断。先用 USE 把资源分成利用率、饱和度、错误三个维度，按”全局—子系统—进程—代码”逐层缩小范围，并且一次只改一个变量。看到 CPU 不高、内存也够却很慢时，优先怀疑 <code>wa</code>、<code>await</code>、<code>D</code> 状态与连接队列。所有命令的数字都有口径，<code>%CPU</code>、<code>buff/cache</code>、<code>iostat</code> 与 <code>vmstat</code> 的首行都需要换算或跳过。最后，把这些指标持续记录下来，故障结束后还能回看，才算真正把观测做完整。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="http://www.brendangregg.com/linuxperf.html">Linux Performance</a></li>
+<li><a href="http://techblog.netflix.com/2015/11/linux-performance-analysis-in-60s.html">Linux Performance Analysis in 60,000 Milliseconds</a></li>
+<li><a href="http://www.teamquest.com/import/pdfs/whitepaper/ldavg1.pdf">UNIX Load Average Part 1: How It Works</a></li>
+<li><a href="http://www.brendangregg.com/perf.html">perf Examples</a></li>
+<li><a href="http://www.brendangregg.com/flamegraphs.html">Flame Graphs</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Linux 性能观测命令</p><p><a href="https://987763485.github.io/2017/02/07/Linux性能观测命令/">https://987763485.github.io/2017/02/07/Linux性能观测命令/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2017-02-07</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/linux/">linux</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/">容器技术</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2017/02/09/Docker%E6%98%AF%E4%BB%80%E4%B9%88%E4%B8%8E%E6%A0%B8%E5%BF%83%E6%A6%82%E5%BF%B5/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Docker 是什么与核心概念</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2017/01/31/Docker%E8%B5%84%E6%BA%90%E9%99%90%E5%88%B6%E4%B8%8E%E7%9B%91%E6%8E%A7/"><span class="level-item">Docker 资源限制与监控</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

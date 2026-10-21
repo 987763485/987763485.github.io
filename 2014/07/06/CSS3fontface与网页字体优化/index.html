@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>CSS3 @font-face 与网页字体优化 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="上一篇写字体加载，把 FOIT、FOUT 和就绪检测讲完了，留下问得最多的一句话是：这个字体文件本身还能不能再小一点。本文只谈文件，不谈加载时机——描述符与 local() 的边界、同一份字体五种格式的体积差、中文怎么靠子集化从 MB 级打到 KB 级、多字重要不要下真文件、回退字体的度量怎么配、体积预算怎么钉进构建。至于下载窗口期浏览器怎么渲染、宽度轮询检测怎么写、CDN 上的跨域与 MIME"><meta property="og:type" content="blog"><meta property="og:title" content="CSS3 @font-face 与网页字体优化"><meta property="og:url" content="https://987763485.github.io/2014/07/06/CSS3fontface%E4%B8%8E%E7%BD%91%E9%A1%B5%E5%AD%97%E4%BD%93%E4%BC%98%E5%8C%96/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="上一篇写字体加载，把 FOIT、FOUT 和就绪检测讲完了，留下问得最多的一句话是：这个字体文件本身还能不能再小一点。本文只谈文件，不谈加载时机——描述符与 local() 的边界、同一份字体五种格式的体积差、中文怎么靠子集化从 MB 级打到 KB 级、多字重要不要下真文件、回退字体的度量怎么配、体积预算怎么钉进构建。至于下载窗口期浏览器怎么渲染、宽度轮询检测怎么写、CDN 上的跨域与 MIME"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2014-07-06T09:34:19.000Z"><meta property="article:modified_time" content="2026-10-17T13:41:27.961Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="web前端"><meta property="article:tag" content="css3"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2014/07/06/CSS3fontface%E4%B8%8E%E7%BD%91%E9%A1%B5%E5%AD%97%E4%BD%93%E4%BC%98%E5%8C%96/"},"headline":"CSS3 @font-face 与网页字体优化","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2014-07-06T09:34:19.000Z","dateModified":"2026-10-17T13:41:27.961Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"上一篇写字体加载，把 FOIT、FOUT 和就绪检测讲完了，留下问得最多的一句话是：这个字体文件本身还能不能再小一点。本文只谈文件，不谈加载时机——描述符与 local() 的边界、同一份字体五种格式的体积差、中文怎么靠子集化从 MB 级打到 KB 级、多字重要不要下真文件、回退字体的度量怎么配、体积预算怎么钉进构建。至于下载窗口期浏览器怎么渲染、宽度轮询检测怎么写、CDN 上的跨域与 MIME"}</script><link rel="canonical" href="https://987763485.github.io/2014/07/06/CSS3fontface%E4%B8%8E%E7%BD%91%E9%A1%B5%E5%AD%97%E4%BD%93%E4%BC%98%E5%8C%96/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2014-07-06T09:34:19.000Z" title="7/6/2014, 5:34:19 PM">2014-07-06</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/">前端开发</a></span><span class="level-item">38 分钟读完 (大约5754个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">CSS3 @font-face 与网页字体优化</h1><nav class="series-nav" aria-label="系列文章导航"><div class="series-nav-meta"><i class="fas fa-book-open" aria-hidden="true"></i><span>本文属于《<a class="series-nav-title" href="/series/html-css/">HTML 与 CSS</a>》第 41/62 篇</span></div><div class="series-nav-links"><a class="series-nav-link series-nav-prev" href="/2013/12/19/CSS%E7%B2%BE%E7%81%B5%E5%9B%BE%E4%B8%8E%E5%9B%BE%E6%96%87%E6%B7%B7%E6%8E%92%E6%8E%92%E7%89%88%E6%8A%80%E5%B7%A7/"><i class="fas fa-chevron-left" aria-hidden="true"></i><span>上一篇</span></a><a class="series-nav-link series-nav-index" href="/series/html-css/">系列目录</a><a class="series-nav-link series-nav-next" href="/2014/06/03/CSS3%E6%BB%A4%E9%95%9Cfilter%E4%B8%8E%E6%B7%B7%E5%90%88%E6%A8%A1%E5%BC%8Fblend-mode/"><span>下一篇</span><i class="fas fa-chevron-right" aria-hidden="true"></i></a></div></nav><div class="content"><p>上一篇写字体加载，把 FOIT、FOUT 和就绪检测讲完了，留下问得最多的一句话是：这个字体文件本身还能不能再小一点。本文只谈文件，不谈加载时机——描述符与 <code>local()</code> 的边界、同一份字体五种格式的体积差、中文怎么靠子集化从 MB 级打到 KB 级、多字重要不要下真文件、回退字体的度量怎么配、体积预算怎么钉进构建。至于下载窗口期浏览器怎么渲染、宽度轮询检测怎么写、CDN 上的跨域与 MIME 怎么配，旧文《字体加载与 FOIT、FOUT 问题》已经说过，这里不重复。</p>
+<h2 id="描述符的边界，以及-local-埋过的坑"><a href="#描述符的边界，以及-local-埋过的坑" class="headerlink" title="描述符的边界，以及 local() 埋过的坑"></a>描述符的边界，以及 local() 埋过的坑</h2><p><code>@font-face</code> 的描述符就那么几个，2014 年真正把语义落实的只有一半：</p>
+<table>
+<thead>
+<tr>
+<th>描述符</th>
+<th>作用</th>
+<th>今年的实际状况</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>font-family</td>
+<td>给这个文件起一个族名</td>
+<td>必须与 CSS 里引用的名字逐字符一致，含空格要加引号</td>
+</tr>
+<tr>
+<td>src</td>
+<td>候选来源列表，<code>local()</code> 与 <code>url()</code> 混写</td>
+<td>浏览器按顺序挑第一个能用的，<code>local()</code> 排前面会短路后面所有 <code>url()</code></td>
+</tr>
+<tr>
+<td>format()</td>
+<td>声明后面那个 URL 的容器类型</td>
+<td><code>embedded-opentype</code> &#x2F; <code>woff</code> &#x2F; <code>truetype</code> &#x2F; <code>opentype</code> &#x2F; <code>svg</code>，认不出的跳过</td>
+</tr>
+<tr>
+<td>unicode-range</td>
+<td>声明这个文件负责哪些码位</td>
+<td>只有 Chrome 和 IE 的部分版本实现，Firefox、Safari 直接忽略，指望不上</td>
+</tr>
+<tr>
+<td>font-style</td>
+<td>这个文件是正体还是斜体</td>
+<td>正常可用</td>
+</tr>
+<tr>
+<td>font-weight</td>
+<td>这个文件的真实字重</td>
+<td>正常可用，且必须和文件内 OS&#x2F;2 表的 usWeightClass 对上</td>
+</tr>
+<tr>
+<td>font-stretch</td>
+<td>字面宽度（condensed &#x2F; expanded）</td>
+<td>除 IE 个别版本外基本无人实现，写了也白写</td>
+</tr>
+<tr>
+<td>font-variant</td>
+<td>normal &#x2F; small-caps</td>
+<td>只有 Chrome、Opera 会拿它做族内选择，别当特性用</td>
+</tr>
+</tbody></table>
+<p>坑在 <code>local()</code>。它的语义是”先看用户机器上有没有这个字体，有就直接用，不发请求”，听起来省，实际是调试黑洞。上半年的品牌页就吃过一次：标题字体是买了 web 授权的方正兰亭黑，<code>src</code> 第一行写了 <code>local(&#39;方正兰亭黑_GBK&#39;)</code>，设计同学的开发机装过全套字库，页面一路正常，视觉走查也过了。子集化流程五月初上线，构建产物 296 KB，日志里那条字体 URL 的请求数连续两周是零——内网机器全部命中 <code>local()</code>，子集压根没被下载过，等于白做。问题是在外部用户反馈里暴露的：标题的”™”和后台动态注入的活动名变成了豆腐块。因为开发机上那份完整版覆盖两万余码位，我们的 296 KB 子集只有 940 余个。</p>
+<p>三条经验：</p>
+<ol>
+<li>品牌字体、子集字体一律不要写 <code>local()</code>：用户机器上那个同名家族是什么版本、什么字重你控制不了，命中与否会让线上表现和开发机完全不同。</li>
+<li><code>local()</code> 只用来复用系统自带字体（<code>local(&#39;Microsoft YaHei&#39;)</code>、<code>local(&#39;SimHei&#39;)</code> 之类），而且要想清楚中文 Windows 上很多字体注册名是本地化的，名字对不上就是白写一行。</li>
+<li>排查”我这好使、他那不好使”时，先把 <code>local()</code> 注释掉再比一次；确认可用性看 Network 面板的字体类型过滤。至于怎么判断字体真的换上了，旧文里有轮询检测的实现；最近 Bryan Jackson 放了个叫 FontFaceObserver 的新库，思路一样、做得更轻，作者还在完善，本项目暂时自研。</li>
+</ol>
+<h2 id="格式选型：同一份字体的五种容器"><a href="#格式选型：同一份字体的五种容器" class="headerlink" title="格式选型：同一份字体的五种容器"></a>格式选型：同一份字体的五种容器</h2><p>先给口径。WOFF 不是什么新字形格式，它就是一个带压缩的 sfnt 容器：把 TTF&#x2F;OTF 内部的每张表单独做 zlib deflate，加一小段头部和校验，字形数据完全不变。所以同一份字体，WOFF 相对 TTF 的压缩率稳定落在 25%—40%，具体跟内容相关，汉字表（glyf）压得狠、cmap 基本压不动。EOT 是微软自己的压缩 sfnt，只 Windows&#x2F;IE 认。SVG 字体是把轮廓写成路径文本，无压缩，体积最大。</p>
+<p>下面是笔者手上两份字体 2014 年 6 月的实测（原始字节，未计服务端压缩）：</p>
+<table>
+<thead>
+<tr>
+<th>格式</th>
+<th>容器本质</th>
+<th>压缩</th>
+<th>Open Sans Regular</th>
+<th>方正兰亭黑 GBK（全量）</th>
+<th>谁需要它</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>eot</td>
+<td>微软压缩 sfnt</td>
+<td>有，私有算法</td>
+<td>68.9 KB</td>
+<td>7.21 MB</td>
+<td>IE6—8 必须，IE9 也认</td>
+</tr>
+<tr>
+<td>otf</td>
+<td>sfnt + CFF 轮廓</td>
+<td>无</td>
+<td>118.4 KB</td>
+<td>12.86 MB</td>
+<td>老 Safari、桌面软件更常见</td>
+</tr>
+<tr>
+<td>ttf</td>
+<td>sfnt + TrueType 轮廓</td>
+<td>无</td>
+<td>96.4 KB</td>
+<td>10.42 MB</td>
+<td>老 Android 2.x&#x2F;4.3 以下只认它</td>
+</tr>
+<tr>
+<td>woff</td>
+<td>压缩 sfnt</td>
+<td>逐表 zlib</td>
+<td>61.2 KB</td>
+<td>6.98 MB</td>
+<td>主力：IE9+、Chrome 6+、FF 3.6+、Safari 5.1+、Android 4.4+</td>
+</tr>
+<tr>
+<td>svg</td>
+<td>路径文本</td>
+<td>无</td>
+<td>121.7 KB</td>
+<td>16.30 MB</td>
+<td>只给 iOS 5 以下兜底，新 iOS 已停止支持</td>
+</tr>
+</tbody></table>
+<p>三点结论。第一，西文那份 WOFF 相对 TTF 省 36.5%，正落在 25%—40% 这个正常区间；中文那份 otf 到 woff 省 46%，汉字轮廓重复度高、deflate 收益格外好，别拿西文的经验去猜中文。这就是”WOFF 当主力”的全部理由。第二，EOT 绕不开：IE6—8 只吃这一种，而浏览器不会帮你导出，必须在构建里挂一次转换。微软放过 <code>ttf2eot</code> 这类命令行工具，Font Squirrel 的网页生成器也内置了，我们用的是前者。注意 <code>ttf2eot</code> 不吃 CFF 轮廓，OTF 直接转要么失败要么丢字形，得先用 FontForge 把曲线从 cubic 转成 quadratic（导出 TTF 时自动做这一步），再转 EOT。第三，WOFF 2.0 从 2013 年 8 月起仍是 W3C 工作草案，号称同字形下再省三成，但目前只有 Chromium 内核的实验性构建支持，覆盖率可以忽略不计，项目里不能依赖，也别为它预留管线。</p>
+<h2 id="子集化才是中文优化的主战场"><a href="#子集化才是中文优化的主战场" class="headerlink" title="子集化才是中文优化的主战场"></a>子集化才是中文优化的主战场</h2><p>上面那张表里中文那列，压成 WOFF 也还有 6.98 MB，按 2014 年国内 3G 有效下行 1.5—2 Mbps 算，光下载就要 28—37 秒。整包中文字体做 webfont 是死路，只能裁剪：留多少码位，就花多少体积。兰亭黑这份裁剪后摊下来每个汉字约 250—350 字节（WOFF 压缩后，共享表另计），所以”下多少字”几乎是”下多少 KB”的线性关系，可控性极强。</p>
+<p>裁剪的前提是知道页面用了哪些字。文案散在 HTML 和 CSS 里，人工数不可能，我们把它做成构建的一个环节。下面这段是抽字符的脚本，Node 0.10 直接跑，不依赖第三方包：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// extract-chars.js —— 扫描构建产物，收集页面真正用到的码位</span></span><br><span class="line"><span class="comment">// 用法：node extract-chars.js dist  产出 used-chars.txt 与 used-unicode.txt</span></span><br><span class="line"><span class="keyword">var</span> fs = <span class="built_in">require</span>(<span class="string">&#x27;fs&#x27;</span>);</span><br><span class="line"><span class="keyword">var</span> path = <span class="built_in">require</span>(<span class="string">&#x27;path&#x27;</span>);</span><br><span class="line"></span><br><span class="line"><span class="keyword">var</span> codes = &#123;&#125;;                                  <span class="comment">// &#123;码位: true&#125;</span></span><br><span class="line"><span class="keyword">var</span> <span class="variable constant_">BASE</span> = <span class="title function_">range</span>(<span class="number">0x20</span>, <span class="number">0x7e</span>);                     <span class="comment">// 西文可见字符全留，含空格</span></span><br><span class="line"><span class="variable constant_">BASE</span> = <span class="variable constant_">BASE</span>.<span class="title function_">concat</span>(<span class="title function_">range</span>(<span class="number">0x3000</span>, <span class="number">0x303f</span>));        <span class="comment">// 中日韩标点：、。《》「」</span></span><br><span class="line"><span class="variable constant_">BASE</span> = <span class="variable constant_">BASE</span>.<span class="title function_">concat</span>([<span class="number">0x2014</span>, <span class="number">0x2018</span>, <span class="number">0x2019</span>, <span class="number">0x201c</span>, <span class="number">0x201d</span>, <span class="number">0x2026</span>, <span class="number">0xff01</span>,</span><br><span class="line">                    <span class="number">0xff08</span>, <span class="number">0xff09</span>, <span class="number">0xff0c</span>, <span class="number">0xff1a</span>, <span class="number">0xff1b</span>, <span class="number">0xff1f</span>, <span class="number">0xff5e</span>]);</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">range</span>(<span class="params"><span class="keyword">from</span>, to</span>) &#123;</span><br><span class="line">  <span class="keyword">var</span> out = [];</span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">var</span> i = <span class="keyword">from</span>; i &lt;= to; i++) &#123; out.<span class="title function_">push</span>(i); &#125;</span><br><span class="line">  <span class="keyword">return</span> out;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">add</span>(<span class="params">text</span>) &#123;</span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">var</span> i = <span class="number">0</span>; i &lt; text.<span class="property">length</span>; i++) &#123;</span><br><span class="line">    <span class="keyword">var</span> hi = text.<span class="title function_">charCodeAt</span>(i);</span><br><span class="line">    <span class="keyword">if</span> (hi &gt;= <span class="number">0xd800</span> &amp;&amp; hi &lt;= <span class="number">0xdbff</span>) &#123;           <span class="comment">// 代理对：扩展 B 区生僻字要合并</span></span><br><span class="line">      <span class="keyword">var</span> lo = text.<span class="title function_">charCodeAt</span>(i + <span class="number">1</span>);</span><br><span class="line">      <span class="keyword">if</span> (lo &gt;= <span class="number">0xdc00</span> &amp;&amp; lo &lt;= <span class="number">0xdfff</span>) &#123;</span><br><span class="line">        codes[<span class="number">0x10000</span> + ((hi - <span class="number">0xd800</span>) &lt;&lt; <span class="number">10</span>) + (lo - <span class="number">0xdc00</span>)] = <span class="literal">true</span>;</span><br><span class="line">        i++;</span><br><span class="line">        <span class="keyword">continue</span>;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> (hi &gt;= <span class="number">0x21</span>) &#123; codes[hi] = <span class="literal">true</span>; &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">walk</span>(<span class="params">dir</span>) &#123;</span><br><span class="line">  fs.<span class="title function_">readdirSync</span>(dir).<span class="title function_">forEach</span>(<span class="keyword">function</span> (<span class="params">name</span>) &#123;</span><br><span class="line">    <span class="keyword">var</span> full = path.<span class="title function_">join</span>(dir, name);</span><br><span class="line">    <span class="keyword">if</span> (fs.<span class="title function_">statSync</span>(full).<span class="title function_">isDirectory</span>()) &#123; <span class="keyword">return</span> <span class="title function_">walk</span>(full); &#125;</span><br><span class="line">    <span class="keyword">var</span> text = fs.<span class="title function_">readFileSync</span>(full, <span class="string">&#x27;utf8&#x27;</span>);</span><br><span class="line">    <span class="keyword">if</span> (<span class="regexp">/\.html$/</span>.<span class="title function_">test</span>(name)) &#123;</span><br><span class="line">      <span class="title function_">add</span>(text.<span class="title function_">replace</span>(<span class="regexp">/&lt;!--[\s\S]*?--&gt;/g</span>, <span class="string">&#x27;&#x27;</span>)     <span class="comment">// 注释不是文案</span></span><br><span class="line">               .<span class="title function_">replace</span>(<span class="regexp">/&lt;script[\s\S]*?&lt;\/script&gt;/gi</span>, <span class="string">&#x27;&#x27;</span>)</span><br><span class="line">               .<span class="title function_">replace</span>(<span class="regexp">/&lt;style[\s\S]*?&lt;\/style&gt;/gi</span>, <span class="string">&#x27;&#x27;</span>)</span><br><span class="line">               .<span class="title function_">replace</span>(<span class="regexp">/&lt;[^&gt;]+&gt;/g</span>, <span class="string">&#x27;&#x27;</span>));           <span class="comment">// 标签连着属性一起干掉</span></span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (<span class="regexp">/\.css$/</span>.<span class="title function_">test</span>(name)) &#123;</span><br><span class="line">      <span class="keyword">var</span> m, re = <span class="regexp">/content\s*:\s*([&quot;&#x27;])([^&quot;&#x27;]+)\1/g</span>; <span class="comment">// CSS 生成的文案也要捞回来</span></span><br><span class="line">      <span class="keyword">while</span> ((m = re.<span class="title function_">exec</span>(text)) !== <span class="literal">null</span>) &#123; <span class="title function_">add</span>(m[<span class="number">2</span>]); &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">var</span> list = <span class="variable constant_">BASE</span>.<span class="title function_">slice</span>();</span><br><span class="line"><span class="keyword">for</span> (<span class="keyword">var</span> c <span class="keyword">in</span> codes) &#123; <span class="keyword">if</span> (codes.<span class="title function_">hasOwnProperty</span>(c)) &#123; list.<span class="title function_">push</span>(+c); &#125; &#125;</span><br><span class="line">list = list.<span class="title function_">filter</span>(<span class="keyword">function</span> (<span class="params">v, i, a</span>) &#123; <span class="keyword">return</span> a.<span class="title function_">indexOf</span>(v) === i; &#125;);</span><br><span class="line">list.<span class="title function_">sort</span>(<span class="keyword">function</span> (<span class="params">a, b</span>) &#123; <span class="keyword">return</span> a - b; &#125;);</span><br><span class="line"></span><br><span class="line"><span class="comment">// pyftsubset 既能吃 --text-file 也能吃 --unicodes，两份都吐出来</span></span><br><span class="line"><span class="keyword">var</span> bmp = list.<span class="title function_">filter</span>(<span class="keyword">function</span> (<span class="params">v</span>) &#123; <span class="keyword">return</span> v &lt;= <span class="number">0xffff</span>; &#125;);</span><br><span class="line">fs.<span class="title function_">writeFileSync</span>(<span class="string">&#x27;used-chars.txt&#x27;</span>, bmp.<span class="title function_">map</span>(<span class="keyword">function</span> (<span class="params">v</span>) &#123;</span><br><span class="line">  <span class="keyword">return</span> <span class="title class_">String</span>.<span class="title function_">fromCharCode</span>(v);</span><br><span class="line">&#125;).<span class="title function_">join</span>(<span class="string">&#x27;&#x27;</span>), <span class="string">&#x27;utf8&#x27;</span>);</span><br><span class="line">fs.<span class="title function_">writeFileSync</span>(<span class="string">&#x27;used-unicode.txt&#x27;</span>, <span class="title function_">toRanges</span>(list), <span class="string">&#x27;utf8&#x27;</span>);</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">hex</span>(<span class="params">n</span>) &#123; <span class="keyword">return</span> n.<span class="title function_">toString</span>(<span class="number">16</span>).<span class="title function_">toUpperCase</span>(); &#125;</span><br><span class="line"><span class="keyword">function</span> <span class="title function_">toRanges</span>(<span class="params">sorted</span>) &#123;                       <span class="comment">// 连续码位合并成 U+XXXX-U+YYYY</span></span><br><span class="line">  <span class="keyword">var</span> out = [], start = sorted[<span class="number">0</span>], prev = sorted[<span class="number">0</span>];</span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">var</span> i = <span class="number">1</span>; i &lt;= sorted.<span class="property">length</span>; i++) &#123;</span><br><span class="line">    <span class="keyword">var</span> cur = sorted[i];</span><br><span class="line">    <span class="keyword">if</span> (cur === prev + <span class="number">1</span>) &#123; prev = cur; <span class="keyword">continue</span>; &#125;</span><br><span class="line">    out.<span class="title function_">push</span>(start === prev ? <span class="string">&#x27;U+&#x27;</span> + <span class="title function_">hex</span>(start) : <span class="string">&#x27;U+&#x27;</span> + <span class="title function_">hex</span>(start) + <span class="string">&#x27;-&#x27;</span> + <span class="title function_">hex</span>(prev));</span><br><span class="line">    start = cur; prev = cur;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> out.<span class="title function_">join</span>(<span class="string">&#x27;,&#x27;</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>上面那份 <code>--text-file</code> 输出刻意只取 BMP：<code>String.fromCodePoint</code> 是 ES6 的东西，Node 0.10 里没有，所以扩展 B 区的生僻字必须走 <code>--unicodes</code>，这个分支记得单独测。跑完首页得到 1379 个码位（汉字 1284、西文数字标点 95）。</p>
+<p>裁剪用 fonttools 的 <code>pyftsubset</code>（我们钉的是 2.3，2012 年 8 月那一版，<code>--flavor=woff</code> 已经能用），参数跑通一次之后就进构建脚本常年不动了：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 1. 从 CFF 轮廓的 OTF 里裁出页面用到的码位</span></span><br><span class="line">pyftsubset LanTingHei-GBK.otf \</span><br><span class="line">  --unicodes=<span class="string">&quot;<span class="subst">$(cat used-unicode.txt)</span>&quot;</span> \</span><br><span class="line">  --output-file=build/brand-regular.otf \</span><br><span class="line">  --layout-features=<span class="string">&#x27;kern,tnum,locl&#x27;</span> \</span><br><span class="line">  --no-hinting \</span><br><span class="line">  --drop-tables=DSIG,BLOCK,EBDT,EBLC,EBIS \</span><br><span class="line">  --desubroutinize</span><br><span class="line"></span><br><span class="line"><span class="comment"># 2. sfnt 打包成 WOFF，字形一个不动，只是逐表 zlib（第 1 步加 --flavor=woff 也能一步出）</span></span><br><span class="line">sfnt2woff build/brand-regular.otf build/brand-regular.woff</span><br><span class="line"></span><br><span class="line"><span class="comment"># 3. 老 IE 那一份还得单独转，pyftsubset 不产 EOT，而且 ttf2eot 不吃 CFF</span></span><br><span class="line">fontforge -lang=ff -c <span class="string">&#x27;Open($1); Export($2, &quot;TrueType&quot;)&#x27;</span> build/brand-regular.otf build/brand-regular.ttf</span><br><span class="line">ttf2eot build/brand-regular.ttf build/brand-regular.eot</span><br></pre></td></tr></table></figure>
+
+<p><code>--no-hinting</code> 和 <code>--drop-tables</code> 是中文专属的红利：不少国产字体里挂着 EBDT&#x2F;EBLC&#x2F;EBIS 这套点阵位图（为了小字号在老 Windows 上清晰），裁剪时不丢的话能占产物三分之一以上，而 web 上根本用不到；<code>BLOCK</code> 是某些中文字体自带的另一份位图。DSIG 签名必丢。<code>--desubroutinize</code> 只在源是 CFF 轮廓时需要，因为子集化会把子程序引用打断。<code>--layout-features</code> 一定要显式列，<code>kern</code> 被裁掉之后中英混排的字距会散，报表里数字列要对齐还得靠 <code>tnum</code>。没装 Python 环境的同事会用 Font Squirrel 生成器网页版，勾 Expert 模式下的自定义子集，但要记得它默认会重写族名、有时还改度量，产物拿回来得比对一遍。</p>
+<p>实测数据如下，3G 那一列按 RTT 250 ms、有效下行 2 Mbps 估（传输耗时 &#x3D; 体积&#x2F;带宽 + 一个 RTT，新建 CDN 域再加两个 RTT）：</p>
+<table>
+<thead>
+<tr>
+<th>裁剪方案</th>
+<th>覆盖码位</th>
+<th>产物格式</th>
+<th>体积</th>
+<th>3G 估算</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>不裁剪，整包</td>
+<td>2.1 万余</td>
+<td>otf</td>
+<td>12.86 MB</td>
+<td>53 s</td>
+</tr>
+<tr>
+<td>GB2312 一级常用字</td>
+<td>3,755</td>
+<td>woff</td>
+<td>1.96 MB</td>
+<td>8.3 s</td>
+</tr>
+<tr>
+<td>同上，去 hinting 与位图表</td>
+<td>3,755</td>
+<td>woff</td>
+<td>1.07 MB</td>
+<td>4.6 s</td>
+</tr>
+<tr>
+<td>首页实测用字</td>
+<td>1,379</td>
+<td>woff</td>
+<td>428 KB</td>
+<td>2.0 s</td>
+</tr>
+<tr>
+<td>首页实测用字</td>
+<td>1,379</td>
+<td>eot</td>
+<td>476 KB</td>
+<td>2.2 s</td>
+</tr>
+<tr>
+<td>只有大标题 62 字</td>
+<td>62</td>
+<td>woff</td>
+<td>27 KB</td>
+<td>0.4 s</td>
+</tr>
+</tbody></table>
+<p>从 12.86 MB 到 27 KB，四百多倍，这就是中文 webfont 唯一可行的优化。</p>
+<p>代价也必须写在脸上，别只吹收益：</p>
+<ul>
+<li>动态文案缺字。后台可配的运营标题、用户昵称、商品名，只要冒出一个不在子集里的字，前台就是豆腐块或者悄悄掉回退字体，走查看不出、线上炸得莫名其妙。兜底办法是把可能变的那部分（价格、倒计时、活动名）改成服务端出图或走系统字体栈，webfont 只覆盖设计稿里确定的静态文案；ASCII 与中日韩标点整段留作基线，别抠这几字节。</li>
+<li>多一条发布链路。文案一改就得重跑抽字符、重新裁剪、换指纹、刷 CDN，任何一环漏掉就是”新 HTML 配旧字体”的缺字。这条得进 Grunt 的 build 任务，产物跟 HTML 同一次发布，禁止手工替换字体文件。</li>
+<li>许可问题。中文商用字体的 web 嵌入授权多数按域名加 PV 计费，”能不能裁剪、能不能衍生再分发”要逐条看协议，有些明确禁止改动轮廓，兰亭黑这份我们单独签过 web 授权才敢进构建。文泉驿、Droid Sans Fallback 这类带字体例外许可的才能随便折腾；冬青黑体虽然常见，苹果授权并不覆盖 web 嵌入。法务红线往往比技术红线更早踩到。</li>
+</ul>
+<h2 id="多字重与多样式：一笔一笔算体积"><a href="#多字重与多样式：一笔一笔算体积" class="headerlink" title="多字重与多样式：一笔一笔算体积"></a>多字重与多样式：一笔一笔算体积</h2><p>每个字重都是一份独立文件、一次独立下载，体积账要按总和算，不按单个算。西文一个家族三档 WOFF 大约 61 + 62 + 64 &#x3D; 187 KB；中文按上面那张表，三档页面级子集就是 3 × 428 &#x3D; 1.28 MB，三档 GB2312 级子集是 3 × 1.07 &#x3D; 3.2 MB——一个数字就能否掉这个设计。</p>
+<p>那 bold 该不该下真字体？先看合成加粗：CSS 要 700 而族里只有 400 的文件时，浏览器可能把轮廓外扩（伪 bold），西文勉强能忍，中文 16 px 以下笔画直接糊成一团，32 px 的标题明显发肿。更麻烦的是各家支持并不一致：Chrome 与 Firefox 新版会对下载的 webfont 做合成，Safari 对伪斜的支持早于伪粗，老 IE 干脆不做合成，结果是不加粗——同一份 CSS 在三台机器上给出三种形态。别拿”浏览器会替我加粗”当方案，要拿它当风险。</p>
+<p>我们的取舍表：</p>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>做法</th>
+<th>增量体积</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>正文只用一档</td>
+<td>只声明 font-weight:400 的页面级子集</td>
+<td>428 KB</td>
+<td>已经超预算，结论是正文干脆不上 webfont</td>
+</tr>
+<tr>
+<td>首页大标题要 Bold，字号 28 px 以上、只用 62 字</td>
+<td>单独做 62 字的 Bold 子集</td>
+<td>+27 KB</td>
+<td>字少时真字体便宜得发指</td>
+</tr>
+<tr>
+<td>全站 Light &#x2F; Regular &#x2F; Bold 三档正文</td>
+<td>三份 3,755 字子集</td>
+<td>+2.1 MB</td>
+<td>直接否掉，Light 那种细体改用图片</td>
+</tr>
+<tr>
+<td>只有两三个按钮文字要粗</td>
+<td>只下 Regular，接受合成或系统字体加粗</td>
+<td>0</td>
+<td>小字号合成还能看，测过才算</td>
+</tr>
+</tbody></table>
+<p>声明上有两个纪律。同一个家族的不同字重必须用同一个 <code>font-family</code> 名，靠 <code>font-weight</code> 描述符区分，写成两个族名会导致 CSS 无法做字重匹配；每个 <code>@font-face</code> 声明的字重要和文件里 OS&#x2F;2.usWeightClass 一致，声明成 400 的文件实际是 500，浏览器会认为”还需要加权”而再做一次合成，得到双重加粗的糊字。</p>
+<p><code>font-style: italic</code> 同理，但中文不需要真斜体——汉字斜切之后不可读，我们的做法是子集里只保留正体，<code>&lt;em&gt;</code> 在中文语境改用颜色或下划线，西文引文若只有一两处，直接让它用系统字体的斜体，不为一个斜体付 60 KB。</p>
+<h2 id="度量匹配：性能之外的观感性能"><a href="#度量匹配：性能之外的观感性能" class="headerlink" title="度量匹配：性能之外的观感性能"></a>度量匹配：性能之外的观感性能</h2><p>先说一个反直觉的好消息：中文在这件事上天生占便宜。汉字的 advance width 几乎都严格等于 1 em，替换的瞬间 10 个汉字永远是 10 em 宽，换行位置一个字都不会变。抖动怎么减轻旧文讲过（写死 px 行高那一套），这里不重复，只补度量选型——中文真正会跳的是纵向行盒与视觉字面：</p>
+<table>
+<thead>
+<tr>
+<th>字体</th>
+<th>16 px 时的默认行盒（Chrome&#x2F;Win7 实测）</th>
+<th>汉字字面占 em</th>
+<th>观感</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>宋体 SimSun</td>
+<td>约 18 px</td>
+<td>0.83</td>
+<td>字小、重心低、笔画细</td>
+</tr>
+<tr>
+<td>微软雅黑</td>
+<td>约 21 px</td>
+<td>0.94</td>
+<td>字撑满格、重心高</td>
+</tr>
+<tr>
+<td>方正兰亭黑</td>
+<td>约 22 px</td>
+<td>0.93</td>
+<td>与雅黑接近，但行盒再高一截</td>
+</tr>
+<tr>
+<td>Helvetica Neue</td>
+<td>约 18 px</td>
+<td>—</td>
+<td>拉丁文参考基准</td>
+</tr>
+<tr>
+<td>Arial</td>
+<td>约 18 px</td>
+<td>—</td>
+<td>与 Helvetica 几乎同度量</td>
+</tr>
+<tr>
+<td>Verdana</td>
+<td>约 21 px</td>
+<td>—</td>
+<td>x-height 与字宽都明显偏大</td>
+</tr>
+</tbody></table>
+<p>结论：中文标题的子集字体（黑体系，兰亭黑、雅黑一路都算）用微软雅黑兜回退是最稳的一对，宋体回退会让字瞬间”缩一圈”；西文则选 Arial 而不是 Verdana 或 Tahoma，因为 Arial 与 Helvetica 的 x-height（约 0.519 em）和 cap height（约 0.717 em）几乎相同，替换时行宽变化最小。西文才是度量匹配的主战场，量化标准是：回退字体与目标字体的 x-height 差不超过 0.03 em、小写平均字宽（OS&#x2F;2 的 xAvgCharWidth）差不超过 3%，超过这个阈值，一段三行的正文就可能从三行变四行。</p>
+<p>工具上，<code>ttx -t OS/2 -t hhea 文件.woff</code> 就能导出 sxHeight、sCapHeight、xAvgCharWidth、ascender&#x2F;descender，FontForge 的 Font Info 里同一份数据更直观。度量对不上还能主动改：反正子集是我们自己裁的，把行盒对齐回退字体合法且有效，脚本十行就够——</p>
+<figure class="highlight py"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># fix-metrics.py —— 把子集字体的行盒调成与微软雅黑一致（fonttools 2.3）</span></span><br><span class="line"><span class="keyword">from</span> fontTools.ttLib <span class="keyword">import</span> TTFont</span><br><span class="line"></span><br><span class="line">f = TTFont(<span class="string">&#x27;build/brand-regular.otf&#x27;</span>)</span><br><span class="line">upm = f[<span class="string">&#x27;head&#x27;</span>].unitsPerEm                  <span class="comment"># 常见 1000 或 2048</span></span><br><span class="line">hhea, os2 = f[<span class="string">&#x27;hhea&#x27;</span>], f[<span class="string">&#x27;OS/2&#x27;</span>]</span><br><span class="line"></span><br><span class="line">hhea.ascender  = <span class="built_in">int</span>(<span class="number">0.88</span> * upm)            <span class="comment"># 行盒上伸</span></span><br><span class="line">hhea.descender = <span class="built_in">int</span>(-<span class="number">0.12</span> * upm)           <span class="comment"># 行盒下延</span></span><br><span class="line">hhea.lineGap   = <span class="number">0</span></span><br><span class="line">os2.sTypoAscender, os2.sTypoDescender = hhea.ascender, hhea.descender</span><br><span class="line">os2.sTypoLineGap = <span class="number">0</span></span><br><span class="line">os2.usWinAscent, os2.usWinDescent = <span class="built_in">int</span>(<span class="number">0.88</span> * upm), <span class="built_in">int</span>(<span class="number">0.12</span> * upm)</span><br><span class="line">                                          <span class="comment"># Windows 下浏览器优先读 usWin*，漏改等于白改</span></span><br><span class="line">f.save(<span class="string">&#x27;build/brand-regular-fix.otf&#x27;</span>)</span><br></pre></td></tr></table></figure>
+
+<p><code>sxHeight</code> 之类也能改，但那是拿度量去骗浏览器的基线判定，改完必须重新目测，非必要不碰。</p>
+<h2 id="体积预算与监控"><a href="#体积预算与监控" class="headerlink" title="体积预算与监控"></a>体积预算与监控</h2><p>优化没有预算就是玄学。我们给项目定的红线是：首屏一次加载的全部 webfont 之和不超过 100 KB，单个中文子集不超过 40 KB，单个西文 WOFF 不超过 65 KB，移动端弱网默认不注入字体。按 3G RTT 250 ms、有效下行 2 Mbps 估，100 KB 是 0.4 s 传输加一次 RTT，约 0.66 s，用户不会觉得页面坏了；400 KB 就是 1.9 s，标题那段空白期会直接反映到跳出率上。拿这把尺子回去量子集化那节的数据就清楚了：62 字的标题子集 27 KB，达标；1,379 码位的首页全量文案 428 KB，超线四倍——中文子集化省到最后，能负担的只有标题和品牌字，这是预算替我们做的决定。</p>
+<p>红线要能被机器执行才有意义。下面这个脚本挂在 Grunt 的 build 之后，超预算返回非零，CI 直接卡住发布：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// check-font-budget.js —— 扫描 CSS 里的 @font-face，统计字体文件体积</span></span><br><span class="line"><span class="comment">// 用法：node check-font-budget.js dist  Node 0.10</span></span><br><span class="line"><span class="keyword">var</span> fs = <span class="built_in">require</span>(<span class="string">&#x27;fs&#x27;</span>), path = <span class="built_in">require</span>(<span class="string">&#x27;path&#x27;</span>);</span><br><span class="line"><span class="keyword">var</span> <span class="variable constant_">ROOT</span> = process.<span class="property">argv</span>[<span class="number">2</span>] || <span class="string">&#x27;dist&#x27;</span>;</span><br><span class="line"><span class="keyword">var</span> <span class="variable constant_">BUDGET</span> = <span class="number">100</span> * <span class="number">1024</span>;                       <span class="comment">// 首屏字体总量上限</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">cssFiles</span>(<span class="params">dir</span>) &#123;</span><br><span class="line">  <span class="keyword">var</span> out = [];</span><br><span class="line">  fs.<span class="title function_">readdirSync</span>(dir).<span class="title function_">forEach</span>(<span class="keyword">function</span> (<span class="params">name</span>) &#123;</span><br><span class="line">    <span class="keyword">var</span> full = path.<span class="title function_">join</span>(dir, name);</span><br><span class="line">    <span class="keyword">if</span> (fs.<span class="title function_">statSync</span>(full).<span class="title function_">isDirectory</span>()) &#123; out = out.<span class="title function_">concat</span>(<span class="title function_">cssFiles</span>(full)); &#125;</span><br><span class="line">    <span class="keyword">else</span> <span class="keyword">if</span> (<span class="regexp">/\.css$/</span>.<span class="title function_">test</span>(name)) &#123; out.<span class="title function_">push</span>(full); &#125;</span><br><span class="line">  &#125;);</span><br><span class="line">  <span class="keyword">return</span> out;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">var</span> seen = &#123;&#125;, total = <span class="number">0</span>;</span><br><span class="line"><span class="title function_">cssFiles</span>(<span class="variable constant_">ROOT</span>).<span class="title function_">forEach</span>(<span class="keyword">function</span> (<span class="params">file</span>) &#123;</span><br><span class="line">  <span class="keyword">var</span> css = fs.<span class="title function_">readFileSync</span>(file, <span class="string">&#x27;utf8&#x27;</span>);</span><br><span class="line">  <span class="keyword">var</span> blocks = css.<span class="title function_">match</span>(<span class="regexp">/@font-face\s*\&#123;[^&#125;]*\&#125;/g</span>) || [];</span><br><span class="line">  blocks.<span class="title function_">forEach</span>(<span class="keyword">function</span> (<span class="params">block</span>) &#123;</span><br><span class="line">    <span class="keyword">var</span> m, re = <span class="regexp">/url\(\s*[&#x27;&quot;]?([^&#x27;&quot;)?#]+)[&#x27;&quot;]?\s*\)/g</span>;</span><br><span class="line">    <span class="keyword">while</span> ((m = re.<span class="title function_">exec</span>(block)) !== <span class="literal">null</span>) &#123;</span><br><span class="line">      <span class="keyword">var</span> url = m[<span class="number">1</span>];</span><br><span class="line">      <span class="keyword">if</span> (<span class="regexp">/^(https?:)?\/\//</span>.<span class="title function_">test</span>(url) || url.<span class="title function_">indexOf</span>(<span class="string">&#x27;data:&#x27;</span>) === <span class="number">0</span>) &#123; <span class="keyword">return</span>; &#125;</span><br><span class="line">      <span class="keyword">var</span> abs = path.<span class="title function_">resolve</span>(path.<span class="title function_">dirname</span>(file), url);</span><br><span class="line">      <span class="keyword">if</span> (!fs.<span class="title function_">existsSync</span>(abs)) &#123;</span><br><span class="line">        <span class="variable language_">console</span>.<span class="title function_">error</span>(<span class="string">&#x27;MISSING  &#x27;</span> + abs);      <span class="comment">// 路径写错或没被拷进产物，比超预算更常见</span></span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="keyword">if</span> (seen[abs]) &#123; <span class="keyword">return</span>; &#125;               <span class="comment">// 同一文件被多处引用只计一次</span></span><br><span class="line">      seen[abs] = <span class="literal">true</span>;</span><br><span class="line">      <span class="keyword">var</span> size = fs.<span class="title function_">statSync</span>(abs).<span class="property">size</span>;</span><br><span class="line">      total += size;</span><br><span class="line">      <span class="variable language_">console</span>.<span class="title function_">log</span>((size / <span class="number">1024</span>).<span class="title function_">toFixed</span>(<span class="number">1</span>) + <span class="string">&#x27; KB  &#x27;</span> + abs);</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;);</span><br><span class="line">&#125;);</span><br><span class="line"></span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&#x27;----  首屏字体总量 &#x27;</span> + (total / <span class="number">1024</span>).<span class="title function_">toFixed</span>(<span class="number">1</span>) + <span class="string">&#x27; KB / 预算 &#x27;</span> +</span><br><span class="line">            (<span class="variable constant_">BUDGET</span> / <span class="number">1024</span>) + <span class="string">&#x27; KB&#x27;</span>);</span><br><span class="line">process.<span class="title function_">exit</span>(total &gt; <span class="variable constant_">BUDGET</span> ? <span class="number">1</span> : <span class="number">0</span>);</span><br></pre></td></tr></table></figure>
+
+<p>线上侧靠日志。字体缺字、路径写错、CDN 没刷干净，日志里的异常分布总比用户投诉先到：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># nginx 访问日志里统计字体请求，看命中率与状态码分布</span></span><br><span class="line">awk <span class="string">&#x27;$7 ~ /\.(woff|eot|ttf)$/ &#123;print $7, $9&#125;&#x27;</span> access.log | <span class="built_in">sort</span> | <span class="built_in">uniq</span> -c | <span class="built_in">sort</span> -rn | <span class="built_in">head</span></span><br></pre></td></tr></table></figure>
+
+<p>顺带两条配置纪律：还在发 TTF 或 SVG 字体的，服务端压缩别漏；字体文件名要随内容变并挂长缓存，做法与旧文《静态资源版本号与缓存更新》完全一致，本文不再展开。</p>
+<h2 id="与切图、iconfont-的取舍"><a href="#与切图、iconfont-的取舍" class="headerlink" title="与切图、iconfont 的取舍"></a>与切图、iconfont 的取舍</h2><p>图标不在本文范围：iconfont 只解决图标，制作链路旧文《CSS 图标字体 iconfont 的使用与制作》已经写完，不重复。真正要每次权衡的是小标题、艺术字这类装饰性文字——切图还是 webfont。</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>切图（PNG，含 @2x）</th>
+<th>子集 webfont</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>体积</td>
+<td>一个中文艺术字标题 34—60 KB，且每处都要</td>
+<td>62 字子集 27 KB，全站同一份可复用</td>
+</tr>
+<tr>
+<td>清晰度</td>
+<td>Retina 要出两倍图，放大即糊</td>
+<td>矢量，任何倍率与字号都锐利</td>
+</tr>
+<tr>
+<td>维护</td>
+<td>改一个字要找设计重出图、重新切</td>
+<td>只要新字在子集里，改 HTML 即可</td>
+</tr>
+<tr>
+<td>SEO &#x2F; 可访问性</td>
+<td>文字变成图片，要靠 alt，不可选中</td>
+<td>真文本，可搜索、可翻译、可选中</td>
+</tr>
+<tr>
+<td>多语言</td>
+<td>N 套图</td>
+<td>每种语言重新裁一份子集，成本线性</td>
+</tr>
+<tr>
+<td>动态文案</td>
+<td>服务端出图可覆盖任意字</td>
+<td>缺字即豆腐块，是硬伤</td>
+</tr>
+<tr>
+<td>授权成本</td>
+<td>一次买断或自制</td>
+<td>商用中文字体按域名&#x2F;PV 计费，可能很贵</td>
+</tr>
+</tbody></table>
+<p>判断标准很粗：同一款装饰字体全站不超过三处、文案铁定不变，切图省事；超过三处或文案每季度要改，做一份 62 字以内的子集更划算；带数字与用户输入的内容，两者都别当正文用。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>字体优化的杠杆全在文件本身：WOFF 当主力能省三到五成，EOT 是给老 IE 的固定税负，SVG 只留一条兜底，剩下的体积全靠子集化换出来——12.86 MB 的整包能裁成 27 KB，代价是缺字风险、一条发布链路和一份许可协议。字重要按总和算账，中文多一档 Light 就是几百 KB 起跳，能靠合成将就的只有小字号西文。度量上中文比西文幸运（汉字等宽，换行不动），要对齐的是行盒与视觉字面，实在对不上就用 fonttools 改度量。最后把 100 KB 的红线写成脚本卡进 CI，把字体 URL 的命中率打进日志，这套优化才不是一次性手艺。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>CSS3 @font-face 与网页字体优化</p><p><a href="https://987763485.github.io/2014/07/06/CSS3fontface与网页字体优化/">https://987763485.github.io/2014/07/06/CSS3fontface与网页字体优化/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2014-07-06</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-17</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/web%E5%89%8D%E7%AB%AF/">web前端</a><a class="link-muted mr-2" rel="tag" href="/tags/css3/">css3</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2014/07/13/HTML5contenteditable%E5%AF%8C%E6%96%87%E6%9C%AC%E7%BC%96%E8%BE%91%E5%85%A5%E9%97%A8/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">HTML5 contenteditable 富文本编辑入门</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2014/06/29/JavaScript%E6%9F%AF%E9%87%8C%E5%8C%96%E4%B8%8E%E5%81%8F%E5%87%BD%E6%95%B0%E5%BA%94%E7%94%A8/"><span class="level-item">JavaScript 柯里化与偏函数应用</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

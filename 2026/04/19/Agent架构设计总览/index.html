@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Agent 架构设计总览 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="本文把 Agent 系统拆成可以命名的层次，给出每层的一句话职责、三个关键设计选择，以及该层与相邻层之间的边界。它不深入任何单层的实现细节：遇到细节，本文只写一句划界，然后把读者指向对应的主题。目标只有一个——读完之后，你碰到一个新问题应该能回答”这属于哪一层、这层的默认方案是什么、什么信号说明该换”。"><meta property="og:type" content="blog"><meta property="og:title" content="Agent 架构设计总览"><meta property="og:url" content="https://987763485.github.io/2026/04/19/Agent%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1%E6%80%BB%E8%A7%88/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="本文把 Agent 系统拆成可以命名的层次，给出每层的一句话职责、三个关键设计选择，以及该层与相邻层之间的边界。它不深入任何单层的实现细节：遇到细节，本文只写一句划界，然后把读者指向对应的主题。目标只有一个——读完之后，你碰到一个新问题应该能回答”这属于哪一层、这层的默认方案是什么、什么信号说明该换”。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2026-04-18T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-20T16:35:07.544Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="大模型"><meta property="article:tag" content="python"><meta property="article:tag" content="agent"><meta property="article:tag" content="typescript"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2026/04/19/Agent%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1%E6%80%BB%E8%A7%88/"},"headline":"Agent 架构设计总览","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2026-04-18T16:00:00.000Z","dateModified":"2026-10-20T16:35:07.544Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"本文把 Agent 系统拆成可以命名的层次，给出每层的一句话职责、三个关键设计选择，以及该层与相邻层之间的边界。它不深入任何单层的实现细节：遇到细节，本文只写一句划界，然后把读者指向对应的主题。目标只有一个——读完之后，你碰到一个新问题应该能回答”这属于哪一层、这层的默认方案是什么、什么信号说明该换”。"}</script><link rel="canonical" href="https://987763485.github.io/2026/04/19/Agent%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1%E6%80%BB%E8%A7%88/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2026-04-18T16:00:00.000Z" title="4/19/2026, 12:00:00 AM">2026-04-19</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></span><span class="level-item">1 小时读完 (大约9187个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Agent 架构设计总览</h1><nav class="series-nav" aria-label="系列文章导航"><div class="series-nav-meta"><i class="fas fa-book-open" aria-hidden="true"></i><span>本文属于《<a class="series-nav-title" href="/series/agent/">Agent 智能体开发</a>》第 30/55 篇</span></div><div class="series-nav-links"><a class="series-nav-link series-nav-prev" href="/2026/03/06/Agent%E8%A7%84%E5%88%92%E8%83%BD%E5%8A%9B%E6%8F%90%E5%8D%87%E5%AE%9E%E8%B7%B5/"><i class="fas fa-chevron-left" aria-hidden="true"></i><span>上一篇</span></a><a class="series-nav-link series-nav-index" href="/series/agent/">系列目录</a><a class="series-nav-link series-nav-next" href="/2026/02/25/Agent%E4%BB%A3%E7%A0%81%E6%89%A7%E8%A1%8C%E6%B2%99%E7%AE%B1%E8%AE%BE%E8%AE%A1/"><span>下一篇</span><i class="fas fa-chevron-right" aria-hidden="true"></i></a></div></nav><div class="content"><p>本文把 Agent 系统拆成可以命名的层次，给出每层的一句话职责、三个关键设计选择，以及该层与相邻层之间的边界。它不深入任何单层的实现细节：遇到细节，本文只写一句划界，然后把读者指向对应的主题。目标只有一个——读完之后，你碰到一个新问题应该能回答”这属于哪一层、这层的默认方案是什么、什么信号说明该换”。</p>
+<h2 id="从最小回路讲起"><a href="#从最小回路讲起" class="headerlink" title="从最小回路讲起"></a>从最小回路讲起</h2><p>所有 Agent 都从同一个回路长出来：一个模型、一个循环、一组工具。三件东西各自补上纯语言模型缺的一块能力。模型负责在给定的上下文里做出下一步判断，这是”决策”。循环把一次性的问答变成可迭代的过程，让上一轮的结果成为下一轮的输入，这是”时间”。工具让模型的输出落到模型之外的世界——读文件、查数据库、发工单——再把世界的回答原路带回上下文，这是”作用力”。缺任何一件，系统就退化成别的东西：没有循环是单次调用，没有工具是聊天机器人，没有模型则只剩一串写死的脚本。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">run</span>(<span class="params">goal: <span class="built_in">str</span>, tools: <span class="built_in">dict</span>, max_steps: <span class="built_in">int</span> = <span class="number">8</span></span>) -&gt; <span class="built_in">str</span>:</span><br><span class="line">    msgs = [&#123;<span class="string">&quot;role&quot;</span>: <span class="string">&quot;user&quot;</span>, <span class="string">&quot;content&quot;</span>: goal&#125;]</span><br><span class="line">    <span class="keyword">for</span> _ <span class="keyword">in</span> <span class="built_in">range</span>(max_steps):                        <span class="comment"># 循环：把单次决策变成序列</span></span><br><span class="line">        resp = model.chat(msgs, tools=<span class="built_in">list</span>(tools.values()))</span><br><span class="line">        <span class="keyword">if</span> <span class="keyword">not</span> resp.tool_calls:</span><br><span class="line">            <span class="keyword">return</span> resp.text                          <span class="comment"># 不再要工具，视为收敛</span></span><br><span class="line">        <span class="keyword">for</span> call <span class="keyword">in</span> resp.tool_calls:</span><br><span class="line">            out = tools[call.name].invoke(**call.args)  <span class="comment"># 工具：向外产生副作用</span></span><br><span class="line">            msgs.append(&#123;<span class="string">&quot;role&quot;</span>: <span class="string">&quot;tool&quot;</span>, <span class="string">&quot;call_id&quot;</span>: call.<span class="built_in">id</span>, <span class="string">&quot;content&quot;</span>: out&#125;)</span><br><span class="line">    <span class="keyword">raise</span> RuntimeError(<span class="string">&quot;step budget exhausted&quot;</span>)       <span class="comment"># 预算触顶也要有交代</span></span><br></pre></td></tr></table></figure>
+
+<p>这个不到三十行的回路，是本文后面全部内容共同参照的基准形状：每一层都是它的某一部分被拉伸、被复制，或者被外部要求之后长出来的。要记住的是回路里没有”框架”这个词——框架只是后来给这些部位起的名字。</p>
+<pre class="mermaid">flowchart TD
+    A["目标进入"] --> B["组装上下文"]
+    B --> C["模型决策"]
+    C -->|"需要调用工具"| D["执行工具"]
+    D --> E["结果回填上下文"]
+    E --> C
+    C -->|"可以回答"| F["返回用户"]
+    C -->|"步数或成本触顶"| G["停止并交代状态"]
+    G --> F</pre>
+
+<p>两条划界提前说清：模型本身怎么部署、怎么扛并发与延迟，属于推理服务那一侧，见《大模型推理服务架构》；回路里”怎么把大目标拆成小步、步与步怎么排”属于规划那一侧，见《Agent 任务规划与分解》，本文后面也不再碰这两块。</p>
+<h2 id="六层框架"><a href="#六层框架" class="headerlink" title="六层框架"></a>六层框架</h2><p>最小回路能跑，但生产系统围着它会长出六种彼此独立的关注点。本文用六层给它们编号：接入、编排、执行、记忆、评测、治理。编号的全部价值在于——任何讨论都得先说清在哪一层，跨层的抱怨才有资格被称为问题，而不是口味之争。</p>
+<p><strong>接入层</strong>。职责：把外部请求变成一次可追踪的运行，并把运行过程中的状态变化送回外部。三个关键设计选择：协议形态（REST、SSE、WebSocket 各承担什么）；会话与租户标识怎么生成、怎么一路透传；流式与取消的边界划在哪。</p>
+<p><strong>编排层</strong>。职责：决定下一步跑什么、由谁来跑、失败往哪走。三个关键设计选择：编排范式（代码式链、声明式图 &#x2F; DAG、状态机 + 事件）；运行状态放在哪一层手里；单智能体还是多智能体分工。</p>
+<p><strong>执行层</strong>。职责：安全地产生副作用，并把世界的回答整理成结构化结果。三个关键设计选择：工具粒度做多粗；权限与确认门槛设在哪里；沙箱与网络出口怎么收。</p>
+<p><strong>记忆层</strong>。职责：决定什么留在上下文里、什么写出去、什么时候忘掉。三个关键设计选择：上下文窗口 &#x2F; 会话记忆 &#x2F; 长期记忆三层怎么划界；写入策略（谁能写、写什么、要不要人签字）；检索与淘汰用什么口径。</p>
+<p><strong>评测层</strong>。职责：让”这次改动变好了”成为可复核的命题，并把复核结论接回架构决策。三个关键设计选择：黄金集怎么建、怎么维持不过期；离线门禁挂在流水线的哪一步；线上真实交互怎么回灌成用例。</p>
+<p><strong>治理层</strong>。职责：让运行可归责、可追责、成本可控、义务可满足。三个关键设计选择：身份与凭据模型（人、服务账号、智能体代理身份三者怎么区分）；审计留痕记到哪一层保真度；成本预算护栏与合规义务怎么落到同一个链路上。</p>
+<pre class="mermaid">flowchart TD
+    L1["接入层：请求进入，过程可见"] --> L2["编排层：决定下一步跑什么"]
+    L2 --> L3["执行层：产生副作用并结构化回收"]
+    L3 --> L2
+    L2 <--> L4["记忆层：什么留下、什么写出、什么忘掉"]
+    L4 --> L2
+    L5["评测层：改动是否更好"] -.-> L1
+    L5 -.-> L2
+    L5 -.-> L3
+    L5 -.-> L4
+    L6["治理层：可归责、可追责、可控成本"] -.-> L1
+    L6 -.-> L3
+    L6 -.-> L4</pre>
+
+<p>六层的顺序有讲究：接入在最外，因为它最先接触不可信输入；治理在最上，因为它对所有层都可能行使否决权；评测与治理是仅有的两个横向层，它们不产生业务步骤，只约束别的层怎么产生步骤。后面每层各给一次地图，不给路。</p>
+<h2 id="接入层"><a href="#接入层" class="headerlink" title="接入层"></a>接入层</h2><p>接入层解决的问题是：外面的人怎么把一个意图交进来，以及交进来之后他怎么知道自己没有被遗忘在某个队列里。形态上通常是三种协议搭配使用，而不是三选一。REST 承担提交任务、查询历史、拉取工件这些”一问一答”的动作，好处是能复用现成的网关、限流与鉴权设施，任何语言的客户端都写得出来。SSE 承担过程可见性，把生成中的文本增量、工具调用开始与结束、阶段变更按序推给调用方；它单向、走普通 HTTP、容易被中间设备透传，代价是断线重连必须自己补齐语义。WebSocket 留给真正双向的场景：用户在运行中途补充信息、多路复用若干条运行、需要低延迟取消指令。判断标准很朴素——只推不需要收，就别升级到 WebSocket。</p>
+<p>会话标识是接入层第二件事，也是最容易被拖到最后才补的一件事。一个可用的最小集合是四个标识：租户标识、会话标识、运行标识、步骤标识。租户标识决定配额、数据边界和审计归属，必须来自鉴权结果而不是请求体；会话标识把多轮对话与同一批记忆绑在一起；运行标识对应一次回路执行，是所有日志与追踪的根；步骤标识把运行内部的每次模型调用与工具调用排出来。四个标识一路透传，评测层与治理层才有可能把数据接回来——这也是本文反复强调”先分层、后细节”的原因：这四个字段是跨层的接口，不是接入层的私事。关于 Agent 应用怎么把这套接口做成产品形态，属于《Agent 原生应用架构》的范围，本文不展开。</p>
+<p>流式与取消的边界要说清楚，否则后面所有的”卡住”都会被归咎于模型。流式的边界在于：可以流的是文本增量与阶段事件，不可以流的是尚未确定的副作用承诺。工具结果在确定之前不能当成最终回答推给用户，否则取消时无法解释”你说了一半又说不算”。取消的边界在于：接入层只负责把取消意图变成一个带运行标识的信号，真正决定”现在能不能停”的是编排层和执行层。已经发出但尚未提交的外部写操作，必须靠幂等键与补偿动作收尾；沙箱里正在跑的进程可以强杀，外部世界的 API 不能强杀。因此一个诚实的取消语义至少有三种结果——已停止、已提交无法撤回、正在收尾——把取消实现成布尔值是最常见的架构错误。</p>
+<h2 id="编排层"><a href="#编排层" class="headerlink" title="编排层"></a>编排层</h2><p>编排层是六层里唯一”每层都可能变成它”的一层，所以最需要划界。它只做三件事：决定下一步、把状态推进、失败时选择去哪。范式有三种。</p>
+<p>代码式链：编排逻辑就是宿主语言的函数组合，控制流写在 if 和 for 里。它的长处是迭代快、调试直接，模型输出的中间形态不必先映射成数据结构。代价是运行状态散落在调用栈和闭包里，进程一死就没了，恢复要靠外部补齐；同时”这段链跑到哪儿了”对上层不可见。LangChain 1.x 主线与 OpenAI Agents SDK（仍是 0.x）这类以代码为中心的取向，基本落在这个范式里。</p>
+<p>声明式图 &#x2F; DAG：把步骤与边写成一张可序列化的图，运行时按拓扑推进，节点状态可持久化、可重放、可从中间节点恢复。长处是可视化、可在图层面做并发与重试策略，天然适配”流程固定、内容由模型填充”的业务；代价是灵活性被图的结构约束住，模型在运行时想加一步就得走动态子图这类补丁。LangGraph 1.1 的取向属于这一范式。</p>
+<p>状态机 + 事件：状态显式建模，转移由事件触发，编排器只做匹配与派发，副作用留在事件处理器里。长处是与消息中间件、工作流引擎、审计系统最合拍，分布式部署与故障恢复是它的主场；代价是事件风暴，以及”看起来什么都能接”导致意图散落在几十个处理器里，很难回答”这个流程整体在干什么”。</p>
+<p>CrewAI、AutoGen、Eino 在本文只按定位提及：前两者偏多智能体协作的角色编排，Eino 偏 Go 生态的组件化编排，三者各自覆盖前述一到两种范式。三种范式在同一个真实系统里怎么选、怎么混用、怎么比价，是编排对比主题的范畴，本文只承认”必须有名字”这一件事。同样，多个智能体之间怎么分工、怎么通信、怎么收敛，属于《多智能体协作模式设计》，本文只把它记为编排层的一个设计选择。一句必须写下来的提醒：不要因为一张图能画得漂亮，就把所有决策都塞进图里；图的价值在可恢复，不在表达力。</p>
+<h2 id="执行层"><a href="#执行层" class="headerlink" title="执行层"></a>执行层</h2><p>执行层是系统里唯一真正改变世界的地方，因此它的架构问题全都是安全问题，只是表现成接口问题。第一个选择是工具粒度。粗粒度工具（”部署这一版”）让模型少做决定、少犯错，但一次调用背后是十几个不可见步骤，失败时无法定位、权限上无法分级；细粒度工具（”读这个文件””执行这条命令”）可组合、可审计，代价是模型要在长序列里保持一致意图，上下文负担和步数预算都涨上去。实践里有个朴素判据：一个工具应当在权限边界处切断，而不是在功能边界处切断——两件事需要不同的授权，就应该是两个工具。工具接口本身怎么跨进程、跨语言暴露，属于协议层，本文只承认 MCP（2025-11-25 修订版）已经把工具与资源的声明形态标准化、其 Registry 仍在预览这一事实。</p>
+<p>第二个选择是权限与确认门槛，它是执行层与治理层唯一的交接面。要回答的三个问题是：智能体以谁的身份行动；哪些动作可以自动做、哪些必须人签字；签字发生在执行前还是可以在执行后补救。门槛通常按”可逆性 × 影响半径”两个轴摆放，最激进的组合是不可逆且影响半径大（对外付款、删库、发生产变更），这类动作的正确架构不是”提示模型谨慎”，而是在工具实现里强制两段式：先申请、拿到带运行标识的一次性凭据，再执行。具体阈值由团队约定，示例值是”影响半径大于 100 个对象或不可逆即需人签字”（示意值）。至于沙箱怎么隔离、网络出口怎么收敛、越权与提示注入在执行层怎么拦截，属于沙箱与权限主题，本文一句带过；但要提醒一句：沙箱是执行层的架构属性，不是可插拔的安全附件，等工具集稳定后再补沙箱，几乎必然要重写工具签名。</p>
+<p>第三个选择是出口。所有对外调用收敛到统一网关，才能同时满足审计留痕、成本控制与幂等重试；否则这四件事要在每个工具里各写一遍。运行时的宿主形态也归执行层：容器编排走 K8s 1.35，Node 24 LTS 与 Go 1.26 是当前主线，Python 侧的数据类运行时以 PyTorch 当时主线 2.x 为参照——这些版本号只用来定位年代，不构成选型理由。</p>
+<h2 id="记忆层"><a href="#记忆层" class="headerlink" title="记忆层"></a>记忆层</h2><p>记忆层只处理一个问题：模型的上下文窗口是有限的、昂贵的、且会过期的，那么什么该在里面、什么该在外面、什么该消失。本文用三层切法。第一层是上下文窗口本身，装的是一次推理真正能看到的全部内容，它的架构问题是预算分配而非容量。第二层是会话记忆，跨越同一会话的多次运行，通常以结构化摘要、待办清单或工件引用的形态存在，特点是与租户会话同生命周期。第三层是长期记忆，跨会话、跨用户边界持久保存的偏好、事实与经验，写入需要授权，读取需要过滤。三层之间是”提升”与”降级”两条通道：反复出现且被验证的信息往上提升，过期、被证伪或触及隐私边界的信息往下降级。上下文里各部分具体怎么组织、压缩与排序，属于《Agent 上下文工程》，本文不碰；至于长期记忆怎么召回更准，本文只强调它与分层是两件事——先有层，再谈层内的检索，长期记忆的具体召回手段见《Agent 记忆检索优化》。</p>
+<p>写入与遗忘的边界比读取更难，也更值得在这一层先定下来。写入侧要看三个信号：谁有权发起写（模型自己、编排层，还是只有人能写）、写进去的东西以什么证据支撑（有无来源与时间戳）、写错了怎么撤回。默认策略应是保守的——模型可以建议写入但不能直接落库，因为错误记忆的特点是会被反复读回并自我强化，一次污染长期生效。遗忘侧要同时支持三种删除：按主体删除（某个用户的记忆全清）、按来源删除（某次错误写入的回撤）、按时间过期。一个可复核的实现要求是：每条长期记忆都能回答”从哪来、什么时候写的、被引用过几次”——这三个字段同时是治理层审计的输入，所以记忆层不是纯效率层，它是治理的落点之一。</p>
+<h2 id="评测层"><a href="#评测层" class="headerlink" title="评测层"></a>评测层</h2><p>评测层的架构职责不是”跑出分数”，而是让分数有地方挂。没有挂载点的评测会在两次迭代后变成没人信的私有脚本。三个挂载对象依次是黄金集、离线门禁、线上回灌。</p>
+<p>黄金集是一组有明确期望输出的任务，覆盖你最不希望退化的行为。它的架构要求是版本化与被引用：每个用例要记录它测的是哪一层（接入、编排、执行还是记忆），期望输出由谁确认、什么时候确认，以及它对应的真实故障编号。一份不记来源的黄金集会缓慢腐烂成”模型刚好会做的那些题”，这时分数只反映运气。离线门禁挂在两个位置：一是代码与提示变更的合并前检查，跑固定子集，反馈周期以分钟计；二是发布前的完整跑批，比较新版本与当前线上版本在同一批任务上的表现，未通过就不允许进入灰度。门禁的阈值是团队约定，示例值是”关键任务集合上退化超过 2 个百分点即阻断”（示意值）。线上回灌是把真实交互变成架构输入的唯一通道：接入层保留带运行标识的完整轨迹，用户反馈（纠正、重问、放弃）作为弱标签，每周从失败轨迹里挑出可复现样本进黄金集。回灌的价值取决于一个前置条件——轨迹必须可重放，也就是说编排层的运行状态与步骤标识要留得住，否则你只能重建环境，成本会让人放弃这件事。评测怎么做指标、怎么建评分器、怎么用人工复核校准自动判断，属于评测体系主题，本文只规定它在架构里的挂载位置。Anthropic 在其官方 engineering 栏目发过题为《agent evals》的文章，可作为这一挂载思路的当代参照。</p>
+<h2 id="治理层"><a href="#治理层" class="headerlink" title="治理层"></a>治理层</h2><p>治理层解决的是”出事之后能不能说清”和”钱花在哪能不能拦住”。四个关注点，本文把它们压回三个设计选择加一条底线。</p>
+<p>身份与凭据。第一件事是把三种主体分开：人、服务账号、智能体代理身份。智能体最危险的状态是用人的完整凭据行动——它既继承了人的所有权限，又不具备人的判断节制。可用形态是代理身份加短时凭据：由编排层为一次运行申请范围受限的令牌，作用域就是这次运行要碰的资源集合，用完即失效。跨组织的智能体互通也需要身份这一层，可点名的协作协议是 A2A（v1.0.0 距今刚过一个月）与 AGNTCY，本文只把它们记为”身份与互通有标准可对接”这一事实。</p>
+<p>审计留痕。留痕范围要按层的接口来定而不是按日志级别：接入层记录谁在什么时候提交了什么意图，编排层记录状态转移与决策依据的摘要，执行层记录每个副作用的目标、参数摘要与结果，记忆层记录写入来源与撤回。跨层串起来的还是那四个标识。载体上可复用 OpenTelemetry 的追踪语义，避免自建一套无人能读的私有格式；保真度要设 retention 与脱敏策略，因为完整留痕本身就是一种数据风险。</p>
+<p>成本与预算护栏。成本是治理对象而不是报表：预算护栏要能在运行中被触发，触发结果是降级、暂停还是拒绝，属于编排层要处理的显式事件。至少三级：步骤级（单轮工具调用上限）、运行级（一次任务的令牌与费用上限）、租户级（周期预算与并发上限），阈值都是团队约定，示例值如”单运行 20 步、单租户日预算触达 80% 时告警”（示意值）。合规义务是底线而非选择项：数据出境、留存期、可解释性、被删除权，这些要求在架构上的唯一表现是”有些层的接口必须能导出、必须能撤回”，所以它天然和记忆层、审计留痕绑在一起。安全与合规的具体控制项属于安全与合规主题，本文一句划界。治理最后一个常见误区是把它理解为”开源生态里有没有中立基金会”——事实上 MCP、AGENTS.md 与 goose 已进入开放基金会治理（AAIF 于 1 月发布公告），但这只解决标准归属，不解决你系统里的问责链，后者仍然是架构问题。</p>
+<h2 id="各层常见耦合与拆分时机"><a href="#各层常见耦合与拆分时机" class="headerlink" title="各层常见耦合与拆分时机"></a>各层常见耦合与拆分时机</h2><p>分层不是道德义务，它只在耦合造成真实故障时才值得拆。这四组是最常见的过早耦合，每组给一个可观察信号——出现信号再拆，比一开始就搭满六层要省得多。</p>
+<p><strong>编排与执行耦合</strong>。表现是编排代码里直接写着外部调用：图节点里内联一条 SQL、一个 HTTP 请求或一次文件写入。好处是快，代价是权限、沙箱、重试、幂等、审计这五件事全部散落在编排逻辑里，改一个执行细节要在十几个节点上各改一遍。信号：同一类副作用的代码片段在编排层出现第三次；或者你发现没法在不给生产凭据的情况下跑通一个编排单测。拆分时机通常在第二个租户或第二类副作用接入时。</p>
+<p><strong>记忆与上下文混用</strong>。表现是”上下文不够就往库里塞”，会话记忆、长期记忆和一次推理的上下文被当成同一个桶，写入没有来源、读取没有边界。它的故障形态很特别：系统看起来更聪明了，然后开始稳定地重复某个已被纠正过的错误。信号：一次回答里出现了当前会话没说过、也查不到来源的”事实”；或者你无法用一条查询列出某条持久记忆的写入时间与引用次数。这个信号一旦出现就必须立刻处理，因为污染是自我强化的。</p>
+<p><strong>评测被离线化</strong>。表现是评测跑在团队私有的脚本和一份没人维护的表格里，与线上轨迹、与流水线都没有连接。它不报错，只是慢慢失去发言权，最后架构决策重新变回口味。信号：出现”线上有用户抱怨但所有评测都满分”的季度；或者新用例进黄金集需要手工复制粘贴。拆分方式是把轨迹采集挪进接入层、把门禁挪进流水线，让评测层只剩用例与判据。</p>
+<p><strong>治理后置</strong>。表现是系统能跑、能上线，但智能体用的是人的凭据、日志里没有运行标识、成本只在账单上看得见。这是四种耦合里唯一会一次性造成不可逆损失的：出事时无法重建因果链，退款与合规义务无法履行。信号：需要回答”上周三那次错误写入是谁发起的”却要在三个系统里翻日志；或者某次实验的 token 消耗要到月末才知道。治理不需要提前建完，但身份透传、运行标识、预算护栏这三件事必须在有真实用户之前就有，后补的代价是改一遍所有层的接口。</p>
+<p>四组之外还有一条通则：任何”为了架构干净”而做的拆分，如果不能说出它消除了哪个信号，就只是把一次耦合换成十次远程调用。</p>
+<h2 id="按业务形态给的默认配置"><a href="#按业务形态给的默认配置" class="headerlink" title="按业务形态给的默认配置"></a>按业务形态给的默认配置</h2><p>四种业务形态的差别不在模型，而在哪一层先承受压力，以及哪一层最该先补。以下是推荐的默认配置与第一块补丁，都是”先按这个搭、出现相应信号再改”的意思。</p>
+<p><strong>对话助手</strong>。默认配置：接入层做全（SSE 为主、WebSocket 只在需要中途补充信息时启用、取消语义完整），编排层保持简单的一条代码式链，执行层只暴露读类工具，记忆层重视会话记忆。最该先补的是记忆层的写入边界——对话产品里用户会主动要求”记住这件事”，如果模型可以直接落库，你会在短时间内收到大量未经确认的偏好，之后每次召回都在放大它。</p>
+<p><strong>编码智能体</strong>。默认配置：执行层最重（细粒度工具、强沙箱、明确的出口收敛、两段式确认），编排层用声明式图或状态机把”改—测—修”的循环固定下来，接入层的流式要能表达 diff 与阶段事件。最该先补的是执行层的权限与确认门槛——编码智能体天然会碰文件系统和版本控制，一个自动 commit 或自动推送的边界不清，故障半径就是整个仓库。</p>
+<p><strong>数据分析</strong>。默认配置：记忆层的上下文预算与执行层的沙箱是主战场，编排以声明式 DAG 为主以便复用中间结果，评测的判据最容易做硬（数值可比对）。最该先补的是评测层的黄金集与口径版本化——分析型 Agent 最危险的失败不是崩溃，而是给出一个看起来合理但口径错误的结论，而这类失败只有固定口径的用例集能提前抓住。</p>
+<p><strong>流程自动化</strong>。默认配置：编排层用状态机 + 事件，与既有工作流引擎和消息中间件对齐；治理层身份、审计留痕与幂等键先行；执行层的工具粒度按审批边界切。最该先补的是治理层的身份模型——自动化流程往往要跨部门、跨系统代人办事，如果没有代理身份与范围受限凭据，就只能给每个环节发一份管理员凭据，这在审计上无法交代。</p>
+<p>这张对照还有一层意思：四种形态里”最该先补的一层”彼此不同，说明 Agent 架构没有通用的第一优先级，只有先承受压力的那一层。真正通用的建议是本文反复出现的那条——先把跨层的四个标识与两个接口（取消、留痕）定下来，其余都可以晚一点。</p>
+<h2 id="术语对齐"><a href="#术语对齐" class="headerlink" title="术语对齐"></a>术语对齐</h2><p>同一个词在不同框架的文档里指向不同东西，是分层讨论失败的主要原因。这张表把本文的用法钉住，右边是本文会遇到的同义或近义叫法。</p>
+<table>
+<thead>
+<tr>
+<th>本文用法</th>
+<th>常见同义叫法</th>
+<th>需要警惕的差异</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Agent &#x2F; 智能体</td>
+<td>AI 应用、assistant</td>
+<td>本文只指”模型 + 循环 + 工具”回路及其运行时，不泛指带模型的功能</td>
+</tr>
+<tr>
+<td>运行 run</td>
+<td>任务 task、会话回合 turn</td>
+<td>一次运行对应一次完整回路，可含多轮模型调用</td>
+</tr>
+<tr>
+<td>会话 session</td>
+<td>对话 conversation、线程 thread</td>
+<td>会话是记忆与租户边界的载体，比运行长寿</td>
+</tr>
+<tr>
+<td>步骤 step</td>
+<td>节点 node、迭代 iteration</td>
+<td>步骤是审计与预算的最小单位，节点偏图论视角</td>
+</tr>
+<tr>
+<td>编排 orchestration</td>
+<td>工作流 workflow、流水线 pipeline</td>
+<td>编排含运行时决策，工作流常指预先固定的流程</td>
+</tr>
+<tr>
+<td>规划 planning</td>
+<td>任务分解、推理</td>
+<td>规划是编排层的输入，本文不展开其内部</td>
+</tr>
+<tr>
+<td>工具 tool</td>
+<td>function call、action、capability</td>
+<td>工具的边界是权限边界，不只是函数签名</td>
+</tr>
+<tr>
+<td>上下文窗口 context</td>
+<td>prompt、工作记忆</td>
+<td>上下文是预算，不等于任何一层记忆</td>
+</tr>
+<tr>
+<td>会话记忆</td>
+<td>短期记忆、scratchpad</td>
+<td>与同一次会话同生命周期，不保证长期存活</td>
+</tr>
+<tr>
+<td>长期记忆</td>
+<td>知识库、RAG 语料、profile</td>
+<td>知识检索语料不是记忆；记忆有写入者与撤回义务</td>
+</tr>
+<tr>
+<td>黄金集</td>
+<td>评测集 eval set、基准 benchmark</td>
+<td>基准多为公共横向比较，黄金集只服务你自己的回归</td>
+</tr>
+<tr>
+<td>门禁 gate</td>
+<td>校验 check、准入</td>
+<td>门禁的效力是会阻断，只出报表的不算</td>
+</tr>
+<tr>
+<td>沙箱 sandbox</td>
+<td>隔离环境、运行时 runtime</td>
+<td>沙箱约束的是能力，不只是资源配额</td>
+</tr>
+<tr>
+<td>代理身份</td>
+<td>服务账号、机器人账号</td>
+<td>代理身份须与人的凭据、通用服务账号区分</td>
+</tr>
+</tbody></table>
+<h2 id="层-×-关键选择-×-默认方案-×-什么时候该换"><a href="#层-×-关键选择-×-默认方案-×-什么时候该换" class="headerlink" title="层 × 关键选择 × 默认方案 × 什么时候该换"></a>层 × 关键选择 × 默认方案 × 什么时候该换</h2><table>
+<thead>
+<tr>
+<th>层</th>
+<th>关键选择</th>
+<th>默认方案</th>
+<th>该换的信号</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>接入</td>
+<td>协议形态</td>
+<td>REST 提交与查询，SSE 推过程</td>
+<td>出现中途补充信息或高频双向控制，考虑 WebSocket</td>
+</tr>
+<tr>
+<td>接入</td>
+<td>标识与租户</td>
+<td>四标识透传，租户来自鉴权</td>
+<td>跨层查询要在多个系统拼接，说明透传断了</td>
+</tr>
+<tr>
+<td>接入</td>
+<td>流式与取消</td>
+<td>只流文本与阶段，取消给三态结果</td>
+<td>取消后仍有副作用落地，需下沉到执行层</td>
+</tr>
+<tr>
+<td>编排</td>
+<td>编排范式</td>
+<td>单链起步，多分支再上图</td>
+<td>状态恢复与可视化缺失导致事故，转图或状态机</td>
+</tr>
+<tr>
+<td>编排</td>
+<td>状态归属</td>
+<td>运行状态交给编排层持有</td>
+<td>进程重启丢进度，需要外部持久化</td>
+</tr>
+<tr>
+<td>编排</td>
+<td>智能体数量</td>
+<td>单智能体起步</td>
+<td>角色切换导致上下文膨胀，再考虑分工</td>
+</tr>
+<tr>
+<td>执行</td>
+<td>工具粒度</td>
+<td>按权限边界切，不按功能切</td>
+<td>同类副作用代码第三次复制，抽工具层</td>
+</tr>
+<tr>
+<td>执行</td>
+<td>权限与确认</td>
+<td>不可逆动作两段式 + 一次性凭据</td>
+<td>出现越权事故，门槛要前移到编排层</td>
+</tr>
+<tr>
+<td>执行</td>
+<td>沙箱与出口</td>
+<td>统一网关收敛出口</td>
+<td>有工具绕过网关，出口收敛即失效</td>
+</tr>
+<tr>
+<td>记忆</td>
+<td>三层划分</td>
+<td>上下文 &#x2F; 会话 &#x2F; 长期分离</td>
+<td>回答出现无来源事实，说明三层混用</td>
+</tr>
+<tr>
+<td>记忆</td>
+<td>写入与遗忘</td>
+<td>模型建议、人或策略确认才落库</td>
+<td>错误被反复召回，需按来源回撤</td>
+</tr>
+<tr>
+<td>评测</td>
+<td>黄金集与门禁</td>
+<td>版本化用例，合并前跑子集</td>
+<td>线上有抱怨而评测全满分，回灌缺失</td>
+</tr>
+<tr>
+<td>评测</td>
+<td>线上回灌</td>
+<td>轨迹可重放 + 弱标签筛选</td>
+<td>重建用例成本高于收益，先修留痕</td>
+</tr>
+<tr>
+<td>治理</td>
+<td>身份与凭据</td>
+<td>代理身份 + 短时受限令牌</td>
+<td>需要”代人办事”却无法交代授权链</td>
+</tr>
+<tr>
+<td>治理</td>
+<td>审计留痕</td>
+<td>按层留痕，复用开放追踪语义</td>
+<td>事后重建因果链需要跨三个系统</td>
+</tr>
+<tr>
+<td>治理</td>
+<td>成本护栏</td>
+<td>步骤 &#x2F; 运行 &#x2F; 租户三级预算</td>
+<td>实验消耗要到月末才发现，护栏要前置</td>
+</tr>
+</tbody></table>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>本文的全部主张可以压成三句。第一句，Agent 系统的起点是一个回路：模型决策、循环给时间、工具给作用力，其余都是这三者的延伸。第二句，用接入、编排、执行、记忆、评测、治理六层给关注点编号，任何讨论先声明在哪一层，跨层的意见才能被检验。第三句，分层的时机由信号决定而不是由审美决定——同类副作用复制到第三处、无来源的事实出现在回答里、评测满分而线上抱怨、事故后拼不出因果链，这四个信号分别指向编排执行耦合、记忆上下文混用、评测离线化与治理后置。把四个标识与取消、留痕两个跨层接口先定下来，是本文唯一愿意无条件推荐的架构动作。至于每一层内部怎么做好，请看对应的主题文章；本文只负责让你知道该去哪一层找。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li>Anthropic Engineering 栏目（含《agent evals》等文章）：<a href="https://www.anthropic.com/engineering">https://www.anthropic.com/engineering</a></li>
+<li>Model Context Protocol 官方站点与规范仓库（本文以 2025-11-25 修订版为准）：<a href="https://modelcontextprotocol.io/">https://modelcontextprotocol.io</a>、<a href="https://github.com/modelcontextprotocol/modelcontextprotocol">https://github.com/modelcontextprotocol/modelcontextprotocol</a></li>
+<li>AGENTS.md 说明站点：<a href="https://agents.md/">https://agents.md</a></li>
+<li>LangGraph（声明式图 &#x2F; 状态编排，本文参照 1.1）：<a href="https://github.com/langchain-ai/langgraph">https://github.com/langchain-ai/langgraph</a></li>
+<li>LangChain（1.x 主线，代码式链参照）：<a href="https://github.com/langchain-ai/langchain">https://github.com/langchain-ai/langchain</a></li>
+<li>OpenAI Agents SDK（0.x，代码式链参照）：<a href="https://github.com/openai/openai-agents-python">https://github.com/openai/openai-agents-python</a></li>
+<li>CrewAI（多智能体角色编排）：<a href="https://github.com/crewAIInc/crewAI">https://github.com/crewAIInc/crewAI</a></li>
+<li>AutoGen（多智能体会话式编排）：<a href="https://github.com/microsoft/autogen">https://github.com/microsoft/autogen</a></li>
+<li>Eino（Go 生态组件化编排）：<a href="https://github.com/cloudwego/eino">https://github.com/cloudwego/eino</a></li>
+<li>A2A 协议仓库（v1.0.0）：<a href="https://github.com/a2aproject/A2A">https://github.com/a2aproject/A2A</a></li>
+<li>AGNTCY（智能体互通项目）：<a href="https://agntcy.org/">https://agntcy.org</a></li>
+<li>The Linux Foundation（AAIF 相关公告发布方）：<a href="https://www.linuxfoundation.org/">https://www.linuxfoundation.org</a></li>
+<li>OpenTelemetry（分布式追踪语义）：<a href="https://opentelemetry.io/">https://opentelemetry.io</a></li>
+<li>Kubernetes（本文参照 1.35）：<a href="https://kubernetes.io/">https://kubernetes.io</a></li>
+<li>Node.js（本文参照 24 LTS）：<a href="https://nodejs.org/">https://nodejs.org</a></li>
+<li>Go（本文参照 1.26）：<a href="https://go.dev/">https://go.dev</a></li>
+<li>PyTorch（本文参照当时主线 2.x）：<a href="https://pytorch.org/">https://pytorch.org</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Agent 架构设计总览</p><p><a href="https://987763485.github.io/2026/04/19/Agent架构设计总览/">https://987763485.github.io/2026/04/19/Agent架构设计总览/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2026-04-19</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-21</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="link-muted mr-2" rel="tag" href="/tags/python/">python</a><a class="link-muted mr-2" rel="tag" href="/tags/agent/">agent</a><a class="link-muted mr-2" rel="tag" href="/tags/typescript/">typescript</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2026/04/24/AI%E7%BC%96%E7%A0%81%E5%8A%A9%E6%89%8B%E6%B7%B1%E5%BA%A6%E8%AF%84%E6%B5%8B/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">AI 编码助手深度评测</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2026/04/17/Agent%E5%8E%9F%E7%94%9F%E5%BA%94%E7%94%A8%E6%9E%B6%E6%9E%84/"><span class="level-item">Agent 原生应用架构</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

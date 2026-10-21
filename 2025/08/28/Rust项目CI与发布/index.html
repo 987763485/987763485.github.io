@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Rust 项目 CI 与发布 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="仓库长大之后，最先失控的往往不是代码，而是”改一处、坏三处”的隐性成本。本文面向要给 Rust 项目立流水线的维护者：按问题类别给持续集成（Continuous Integration，下称 CI）分层，用最低支持版本与目标矩阵把兼容性变成可验证的承诺，并说明发布为什么必须保留人工约束。"><meta property="og:type" content="blog"><meta property="og:title" content="Rust 项目 CI 与发布"><meta property="og:url" content="https://987763485.github.io/2025/08/28/Rust%E9%A1%B9%E7%9B%AECI%E4%B8%8E%E5%8F%91%E5%B8%83/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="仓库长大之后，最先失控的往往不是代码，而是”改一处、坏三处”的隐性成本。本文面向要给 Rust 项目立流水线的维护者：按问题类别给持续集成（Continuous Integration，下称 CI）分层，用最低支持版本与目标矩阵把兼容性变成可验证的承诺，并说明发布为什么必须保留人工约束。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2025-08-27T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-20T14:18:15.620Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="rust"><meta property="article:tag" content="后端开发"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2025/08/28/Rust%E9%A1%B9%E7%9B%AECI%E4%B8%8E%E5%8F%91%E5%B8%83/"},"headline":"Rust 项目 CI 与发布","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2025-08-27T16:00:00.000Z","dateModified":"2026-10-20T14:18:15.620Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"仓库长大之后，最先失控的往往不是代码，而是”改一处、坏三处”的隐性成本。本文面向要给 Rust 项目立流水线的维护者：按问题类别给持续集成（Continuous Integration，下称 CI）分层，用最低支持版本与目标矩阵把兼容性变成可验证的承诺，并说明发布为什么必须保留人工约束。"}</script><link rel="canonical" href="https://987763485.github.io/2025/08/28/Rust%E9%A1%B9%E7%9B%AECI%E4%B8%8E%E5%8F%91%E5%B8%83/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2025-08-27T16:00:00.000Z" title="8/28/2025, 12:00:00 AM">2025-08-28</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></span><span class="level-item">35 分钟读完 (大约5290个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Rust 项目 CI 与发布</h1><nav class="series-nav" aria-label="系列文章导航"><div class="series-nav-meta"><i class="fas fa-book-open" aria-hidden="true"></i><span>本文属于《<a class="series-nav-title" href="/series/rust/">Rust 学习路线</a>》第 26/68 篇</span></div><div class="series-nav-links"><a class="series-nav-link series-nav-prev" href="/2023/02/16/Rust%E5%8D%95%E5%85%83%E6%B5%8B%E8%AF%95%E4%B8%8E%E5%9F%BA%E5%87%86%E6%B5%8B%E8%AF%95/"><i class="fas fa-chevron-left" aria-hidden="true"></i><span>上一篇</span></a><a class="series-nav-link series-nav-index" href="/series/rust/">系列目录</a><a class="series-nav-link series-nav-next" href="/2021/09/17/Rust%E5%AE%8F%E5%A3%B0%E6%98%8E%E5%AE%8F%E4%B8%8E%E8%BF%87%E7%A8%8B%E5%AE%8F/"><span>下一篇</span><i class="fas fa-chevron-right" aria-hidden="true"></i></a></div></nav><div class="content"><p>仓库长大之后，最先失控的往往不是代码，而是”改一处、坏三处”的隐性成本。本文面向要给 Rust 项目立流水线的维护者：按问题类别给持续集成（Continuous Integration，下称 CI）分层，用最低支持版本与目标矩阵把兼容性变成可验证的承诺，并说明发布为什么必须保留人工约束。</p>
+<h2 id="先定目标：CI-不是”全跑一遍”"><a href="#先定目标：CI-不是”全跑一遍”" class="headerlink" title="先定目标：CI 不是”全跑一遍”"></a>先定目标：CI 不是”全跑一遍”</h2><p>流水线的第一个设计决定不是用哪台主机，而是要回答哪几类问题。正确性（correctness）问给定输入下逻辑是否给出期望结果，由单元测试（unit test）、集成测试（integration test）与属性测试（property-based testing）回答；兼容性与可编译性（compatibility 与 buildability）问在公开承诺的 Rust 版本与系统组合上是否还编得出来，由双版本编译、多目标构建与配置组合（feature）矩阵回答；分发可安装性（installability）问产物能否真的装上、跑起来，且在法律与安全上是否可接受，由产物构建、许可证门禁与安全通告（security advisory）扫描回答。</p>
+<p>分层的依据是每一类问题能在多短的时间内被回答：反馈周期由关键路径上最慢的作业决定，所以成本最低的检查不该塞进需要完整编译的作业。代价是分层带来重复，判断重复值不值得的标准是失败归因是否更清晰。</p>
+<h2 id="工具链与目标矩阵"><a href="#工具链与目标矩阵" class="headerlink" title="工具链与目标矩阵"></a>工具链与目标矩阵</h2><p>工具链层面最重要的一条实践，是在仓库里放一份工具链声明文件，让本地开发、CI 与文档构建取到同一套编译器与组件。它把通道、组件与目标从口头约定变成受版本控制的资产，解决的正是”我本地能编”这类最难查的失败：编译器版本、组件缺失、目标未安装的表现完全相同。代价是每次改通道都要显式提交并触发完整回归。</p>
+<p>稳定通道（stable）与每夜通道（nightly）要提前分工：主体跑在稳定通道，nightly 只用于确实依赖未稳定能力的场景。理由是它的失败经常来自上游变动而不是你的代码，全仓库被反复染红后团队就学会忽略红色信号。折中办法是保留一个 nightly 作业，只提示、不阻断合并。</p>
+<p>目标矩阵（target matrix）的原则只有一条：只覆盖真实用户平台。做法是从下载统计与主动给你打包的发行版维护者那里收集组合，让每一条都能回答”它服务谁”。代价是矩阵宽度直接乘以编译次数，各平台在链接器与系统库上的差异还会引入偶发失败。交叉编译（cross compilation）只讲方向：某些平台必须由厂商工具链或容器化环境补齐链接环境，把”准备环境”与”执行编译”拆成两步，能让这类失败先暴露。</p>
+<h2 id="MSRV：把兼容性写成可验证的承诺"><a href="#MSRV：把兼容性写成可验证的承诺" class="headerlink" title="MSRV：把兼容性写成可验证的承诺"></a>MSRV：把兼容性写成可验证的承诺</h2><p>最低支持 Rust 版本（MSRV，Minimum Supported Rust Version）是”这个版本及以上的编译器我能编”的公开承诺，必须显式写进文档与配置，而不是”最新版能编就行”。理由有三：用户因合规审查或发行版冻结长期停在旧版本，节奏与作者天然解耦；不声明等于把决策权交给”这台机器恰好装了什么”，问题只在下游暴露；只有声明了才能被验证并在被破坏时报警。</p>
+<p>CI 要同时回答”用 MSRV 能编吗”与”用当前稳定版能编吗”，所以这是两个作业，而不是一个作业跑两遍全量。</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 示意结构，不是某个平台的完整语法</span></span><br><span class="line"><span class="attr">jobs:</span></span><br><span class="line">  <span class="attr">check-msrv:</span></span><br><span class="line">    <span class="attr">purpose:</span> <span class="string">用声明的最低版本编译，不跑测试</span></span><br><span class="line">    <span class="attr">runs-on:</span> <span class="string">单一主流平台</span></span><br><span class="line">  <span class="attr">check-stable:</span></span><br><span class="line">    <span class="attr">purpose:</span> <span class="string">用当前稳定版本编译并跑完整测试</span></span><br><span class="line">    <span class="attr">runs-on:</span> <span class="string">目标矩阵全部条目</span></span><br></pre></td></tr></table></figure>
+
+<p>这样设的原因是 MSRV 作业的结论只关乎能否编译，把测试塞进去会让兼容性问题伪装成测试失败。代价是两个作业都触达依赖解析，此时要分清是自己的代码不兼容还是依赖的兼容窗口变了。edition（版本口径）同属 MSRV 的一部分，例如 2024 edition 随 1.85 于 2025 年 2 月 20 日进入稳定通道，切换它会同时抬高下限。</p>
+<p>依赖升级与 MSRV 是连带关系：上游某个 crate 抬高它的下限，你在锁文件（lockfile）保护下暂时感觉不到，重新解析时就会被顶上去。稳妥做法是把”忽略锁文件、解析到最新可用版本再编译”设成一个允许失败、不阻断合并的独立作业，用来提前发现上游兼容窗口的变化；代价是它会因无关的传递依赖变化而偶尔变红。</p>
+<p>判定口径要说清：MSRV 变更是破坏性变更（breaking change）的一种。只要公开声明里写了 MSRV，抬高它就让原本能够构建你这个 crate 的用户不再能够构建，这是用户可感知的能力损失，语义化版本（Semantic Versioning）意义上的处理是随主版本一起走，而不是塞进一次补丁发布。唯一值得宽容的例外是为了修复必须升级依赖才能解决的安全问题，此时仍要在变更日志里显著标注。</p>
+<h2 id="格式与静态检查门禁"><a href="#格式与静态检查门禁" class="headerlink" title="格式与静态检查门禁"></a>格式与静态检查门禁</h2><p>格式检查与 lint（静态检查）应该单列在最前面，理由不是它们重要而是它们便宜：<code>cargo fmt --check</code> 与静态检查不需要产出可执行产物，失败原因又与业务逻辑无关，放在关键路径入口能挡住一批本不该进入昂贵作业的提交。</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 门禁作业清单（示意），除标注为&quot;只提示&quot;者外均为合并阻断项</span></span><br><span class="line"><span class="attr">gate-jobs:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">fmt-check</span></span><br><span class="line">    <span class="attr">command-class:</span> <span class="string">格式一致性检查，不编译产物</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">lint</span></span><br><span class="line">    <span class="attr">command-class:</span> <span class="string">静态检查，只编译到中间产物</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">lint-unsafe-boundary</span></span><br><span class="line">    <span class="attr">command-class:</span> <span class="string">对包含不安全代码（unsafe）的模块单独收紧规则</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">feature-combination-check</span></span><br><span class="line">    <span class="attr">command-class:</span> <span class="string">按配置组合抽样编译，检查条件编译是否遗漏</span></span><br></pre></td></tr></table></figure>
+
+<p>这张清单的价值在于每一项都能独立重跑，失败归因不与其他作业混淆。代价是它们都要触达编译器前端，重复劳动会占用主机时长；配置组合只能抽样，抽哪几种必须由人显式决定。</p>
+<p>规则的严格程度要用时间换：新规则先以警告（warn）落地，给出整改期，期限内只报告不阻断，到期后升级为阻断（deny）。一刀切全部阻断的后果是历史违规让每个 PR 都变红，于是作者学会的第一件事是在文件顶部加一行豁免注释——门禁还在跑，却不再传达任何信息。</p>
+<h2 id="测试分层"><a href="#测试分层" class="headerlink" title="测试分层"></a>测试分层</h2><p>四类测试各抓不同的东西。单元测试抓函数内部的边界与漏支；集成测试抓序列化与并发这类只有组合起来才暴露的问题；属性测试（property-based testing）抓作者没想到的输入，适合解析器、编码转换这类有明确不变量的代码；文档测试（doc test）抓示例是不是已经过期，它是唯一能验证对外用法的机制。</p>
+<p>并行与分片的必要性来自单作业时长。测试默认按 CPU 并行，但总量增长到拖慢反馈时，应按用例耗时分片横向铺开。慢测试要显式标记并隔离到独立作业：关键作业里混进一个很长的用例之后，所有人都相信这个作业本该跑这么久，新引入的慢测试就此被掩盖。</p>
+<p>内存检查手段（例如 miri 一类的动态检查工具）只用于不安全代码的正确性检查，代价很高，因此只在特定作业里跑。它检查未定义行为而非逻辑对错，覆盖面取决于测试是否走到那条路径，当作通用门禁容易给出虚假安全感。</p>
+<p>覆盖率只当参考、不当门禁：它衡量的是代码被执行过，不衡量断言是否有效；一旦把百分比设成门槛，团队第一反应就是补没有断言的调用。可行的做法是看趋势与缺口位置，把低覆盖模块当作评审提示。</p>
+<h2 id="依赖治理与审计门禁"><a href="#依赖治理与审计门禁" class="headerlink" title="依赖治理与审计门禁"></a>依赖治理与审计门禁</h2><p>依赖数量要当成 CI 检查项，因为它不是风格问题而是风险敞口：每个直接依赖都带来一份传递依赖树、一组许可证。可以设一个只做计数的作业，让”这次 PR 又加了一批 crate”这个事实在评审里被看见。</p>
+<p>工具分工比选哪个工具更重要。<code>cargo tree</code> 回答依赖图长什么样，用来找重复依赖与同一 crate 的多版本共存；<code>cargo deny</code> 类工具回答许可证与来源是否符合政策；<code>cargo audit</code> 类工具回答有没有已公开的安全通告。三者结论不同，混用就会出现拿安全扫描器管许可证的事。选库阶段的评估归同期《Rust 生态 crates 推荐》一文，本篇只讲引入之后的门禁：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">引入新依赖前必须回答的五个问题</span><br><span class="line">1. 它带来的传递依赖有多少，其中有没有与现有依赖同族但不同版本的？</span><br><span class="line">2. 它的许可证是否落在本项目的允许列表内，是否需要额外条款或双重许可？</span><br><span class="line">3. 它是否包含不安全代码，若有，本项目有没有能力评审它？</span><br><span class="line">4. 它最近一次维护活动是什么时候，如果它停止维护，替换成本有多大？</span><br><span class="line">5. 我们是否只需要它的一小部分功能，这部分能否自己实现或用已有依赖覆盖？</span><br></pre></td></tr></table></figure>
+
+<p>这五个问题没有自动答案，只要求出现在提交说明或评审记录里；代价是引入变慢，换来依赖图不至于失控。</p>
+<p>许可证与安全审计要写成一等公民的策略。结构通常是三份：允许列表、禁用列表、例外记录。例外要逐条记录理由，并把这条理由当作一份架构决策记录（Architecture Decision Record，ADR）提交进仓库，注明涉及依赖与复审时点——审计的红与绿本身不含上下文，半年后没人记得某个例外为何被批准。代价是维护成本落在人身上，例外一多就像没有策略。</p>
+<p>通告检查会因为数据库更新而误报。处理办法不是关掉它，而是给它单独的通知渠道，让它进入待办而不阻塞合并；同时保留一个阻断性质，即新增或升级依赖时引入的通告不允许带病合入。至于”CI 红了却不知道是谁引入的”，要靠锁文件定位：把失败的提交与上一次解析结果做差集，就能把范围压到少数几个 crate。</p>
+<h2 id="作业顺序与缓存键"><a href="#作业顺序与缓存键" class="headerlink" title="作业顺序与缓存键"></a>作业顺序与缓存键</h2><p>把 lint、check、测试、产物构建排成一张有向图，收益不在省时间而在失败归因：上游节点不过，下游根本不启动，一次红色只对应一个结论。</p>
+<pre class="mermaid">flowchart TD
+  PR[提交 PR] --> Lint[格式与静态检查]
+  Lint --> Check[双版本与多目标编译]
+  Check --> Test[测试 多工具链分片]
+  Test --> Audit[依赖与许可证审计]
+  Audit --> Build[产物构建]
+  Build --> Tag[打标签]
+  Tag --> Publish[发布]
+  Publish --> Note[变更日志归档]</pre>
+
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 关键路径顺序示意，作业名称以团队约定为准</span></span><br><span class="line">cargo <span class="built_in">fmt</span> --check   <span class="comment"># 成本最低的检查放最前，失败即终止下游作业</span></span><br></pre></td></tr></table></figure>
+
+<p>缓存键至少要包含工具链版本与配置组合，否则会出现缓存命中却用错编译器或错开关组合的脏数据。代价是键越细命中率越低；编译耗时归同期《Rust 编译加速实践》一文。</p>
+<h2 id="产物与发布流程"><a href="#产物与发布流程" class="headerlink" title="产物与发布流程"></a>产物与发布流程</h2><p>库 crate 与二进制 crate 的发布差别决定流水线形状。库的产物是源码与文档，风险集中在兼容性与依赖解析；二进制的产物是平台相关的可执行文件，风险集中在构建环境与系统库。所以二进制项目必须先让多平台产物构建稳定。</p>
+<p>发布前的自检应当是一组独立作业，而不是靠作者自觉：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">发布前自检清单</span><br><span class="line">1. 文档能构建，且构建过程不把警告无声放过——公开接口的链接失效只有在这里才会暴露。</span><br><span class="line">2. 示例与文档测试能跑，确保对外承诺的用法还成立。</span><br><span class="line">3. 锁文件与仓库状态一致，没有未提交的解析结果。</span><br><span class="line">4. 变更日志条目齐全，破坏性变更与最低支持版本变化都写在明面上。</span><br><span class="line">5. 目标矩阵与配置组合的编译结论来自同一次提交，且全绿。</span><br></pre></td></tr></table></figure>
+
+<p>这五条的成本很低，代价是每次发布前要等一轮作业；但版本号一旦发出去就收不回来，自检是唯一还能反悔的时刻。版本号语义按既有三段式约定使用，具体递增数字本文一律不写；预发布（pre-release）标记表达”能力尚未定型”，默认解析不会选中它。发布失败怎么恢复各生态规则不同，一律以官方发布流程文档为准。</p>
+<h2 id="变更日志与破坏性变更沟通"><a href="#变更日志与破坏性变更沟通" class="headerlink" title="变更日志与破坏性变更沟通"></a>变更日志与破坏性变更沟通</h2><p>变更日志要按用户能感知的行为分组，而不是按提交或按模块分组。分组标题建议固定成新增、变更、废弃、移除、修复，外加安全一档。最低支持版本变化归入变更并要求显著标注；依赖升级只在影响公开行为时才写入；公开接口变化按其破坏性进废弃或变更。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">变更条目模板（示意）</span><br><span class="line">- 变更：某入口函数在输入为空时返回错误而不是默认值（影响：调用方要处理新分支）</span><br><span class="line">- 新增：支持某个配置组合（影响：默认关闭，需显式开启）</span><br><span class="line">- 废弃：旧接口将在下一个主版本移除（影响：请改用新接口）</span><br><span class="line">- 修复：修正一处边界判断（影响：无接口变化）</span><br><span class="line">每条必填：是否破坏性 / 是否影响最低支持版本 / 关联变更编号</span><br></pre></td></tr></table></figure>
+
+<p>模板的价值是把”要不要标记破坏性”变成一个填表动作，代价是条目变长。</p>
+<h2 id="发布的自动化与权限边界"><a href="#发布的自动化与权限边界" class="headerlink" title="发布的自动化与权限边界"></a>发布的自动化与权限边界</h2><p>自动发布必须绑定约束：由标签触发而不是由分支推送触发，只接受受保护分支上的标签，标签创建要有第二人复核。这三条把”谁能发布”从”知道密码的人”收敛成”有权限且有记录的人”。</p>
+<p>凭据的纪律是作用域最小化：发布令牌只授予发布所需的最小权限，绝不写进配置明文、构建日志或缓存键——缓存键会被其他作业读到，等于把凭据扩散到共享存储。发布作业与测试作业要分开，不复用缓存与主机：一次测试污染不该影响产物内容，产物构建主机的出网权限本就该更受约束。</p>
+<p>最后是现实问题：多数生态里已经发布的版本不能被真正删除，所谓回滚其实是发布一个修复版本，或在下游锁在旧版本上，而已发生的解析无法撤回。后果是破坏性变更的成本被后置到所有用户身上，这也正是前面那些门禁值得存在的理由。</p>
+<h2 id="可抄的检查项清单与作业对照表"><a href="#可抄的检查项清单与作业对照表" class="headerlink" title="可抄的检查项清单与作业对照表"></a>可抄的检查项清单与作业对照表</h2><p>下面两份可以直接抄进模板。第一份是检查项清单，顺序即启动顺序。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">CI 检查项清单</span><br><span class="line">1. 格式检查：不编译产物，失败即终止</span><br><span class="line">2. 静态检查：包含对不安全代码模块的收紧规则</span><br><span class="line">3. 最低支持版本编译检查：只做编译，不跑测试</span><br><span class="line">4. 稳定版本编译检查：覆盖目标矩阵全部条目</span><br><span class="line">5. 配置组合抽样编译：抽样范围由人决定</span><br><span class="line">6. 测试：单元、集成、属性、文档测试，按耗时分片</span><br><span class="line">7. 内存检查：只在特定作业跑，允许慢、允许非阻断</span><br><span class="line">8. 安全通告扫描：新增依赖阻断，历史通告转待办</span><br><span class="line">9. 许可证审计：例外必须留架构决策记录</span><br><span class="line">10. 文档构建与示例运行</span><br><span class="line">11. 产物构建：矩阵逐条出包</span><br><span class="line">12. 发布前门控：标签触发、双人复核、凭据与锁文件检查</span><br></pre></td></tr></table></figure>
+
+<p>第二份是作业对照表：越靠前的作业越该便宜、越该阻断，把慢作业放上关键路径是流水线腐烂的起点。</p>
+<table>
+<thead>
+<tr>
+<th>作业</th>
+<th>跑多快</th>
+<th>失败影响什么</th>
+<th>是否阻断合并</th>
+<th>常见误用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>格式与静态检查</td>
+<td>秒级</td>
+<td>风格与规则违规</td>
+<td>阻断</td>
+<td>全量阻断逼出豁免注释</td>
+</tr>
+<tr>
+<td>最低支持版本编译</td>
+<td>分钟级</td>
+<td>兼容承诺是否被破坏</td>
+<td>阻断</td>
+<td>在这个作业里跑测试</td>
+</tr>
+<tr>
+<td>稳定版编译与矩阵</td>
+<td>分钟级</td>
+<td>某平台编不出来</td>
+<td>阻断</td>
+<td>矩阵铺满无人认领的条目</td>
+</tr>
+<tr>
+<td>测试</td>
+<td>分钟级到十分钟级</td>
+<td>行为正确性</td>
+<td>阻断</td>
+<td>慢用例混进关键作业</td>
+</tr>
+<tr>
+<td>内存检查</td>
+<td>十分钟级以上</td>
+<td>不安全代码正确性</td>
+<td>只提示</td>
+<td>当成通用门禁</td>
+</tr>
+<tr>
+<td>依赖与许可证审计</td>
+<td>分钟级</td>
+<td>法律与安全敞口</td>
+<td>新增阻断、历史转待办</td>
+<td>数据库更新即阻塞合并</td>
+</tr>
+<tr>
+<td>文档构建</td>
+<td>分钟级</td>
+<td>对外用法失效</td>
+<td>阻断</td>
+<td>只构建不运行示例</td>
+</tr>
+<tr>
+<td>产物构建</td>
+<td>十分钟级</td>
+<td>用户能否装上跑起来</td>
+<td>发布前阻断</td>
+<td>每个 PR 都全矩阵出包</td>
+</tr>
+<tr>
+<td>发布</td>
+<td>分钟级</td>
+<td>已分发出去的版本</td>
+<td>需人工复核</td>
+<td>凭据写进明文与缓存键</td>
+</tr>
+</tbody></table>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>本文的主线是把 CI 当成三类问题的答案机器，每一类只在最便宜的位置被回答。最低支持版本是公开契约，抬高它就是破坏性变更，必须用双版本编译才算验证；目标矩阵要克制，只承诺真正服务的平台。格式、静态检查、许可证与通告审计适合做门控，但策略要留整改期和例外记录，否则门禁会退化成豁免注释。发布不可逆，所以它要由标签触发、受保护分支约束、双人复核，并与测试作业隔离。抄走清单之后的第一件事不是全部打开，而是先让每一项失败都能单独重跑、单独解释。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Rust 项目 CI 与发布</p><p><a href="https://987763485.github.io/2025/08/28/Rust项目CI与发布/">https://987763485.github.io/2025/08/28/Rust项目CI与发布/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2025-08-28</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-20</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/rust/">rust</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2025/09/04/Rustunsafe%E4%B8%8E%E8%A3%B8%E6%8C%87%E9%92%88%E5%AE%9E%E8%B7%B5/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Rust unsafe 与裸指针实践</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2025/08/21/%E6%8E%A8%E7%90%86%E6%9C%8D%E5%8A%A1%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="level-item">推理服务架构设计</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

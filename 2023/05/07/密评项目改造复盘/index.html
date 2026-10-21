@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>密评项目改造复盘 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="2022 年下半年到 2023 年初，笔者参与了一个对外业务系统的商用密码应用安全性评估（下文简称密评）整改。系统当初是按等保三级建的，密评初测时被开出一张不算短的问题清单，改造从现状盘点一路做到复测取证，中间既有算法替换的取舍，也有密钥迁移、国密 TLS 双证书、日志留痕这些琐碎却容易失分的环节。本文按时间线复盘这次改造，重点讲每一步的取舍与踩过的坑。适合负责密码改造的开发、运维与安全同学对照自"><meta property="og:type" content="blog"><meta property="og:title" content="密评项目改造复盘"><meta property="og:url" content="https://987763485.github.io/2023/05/07/%E5%AF%86%E8%AF%84%E9%A1%B9%E7%9B%AE%E6%94%B9%E9%80%A0%E5%A4%8D%E7%9B%98/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="2022 年下半年到 2023 年初，笔者参与了一个对外业务系统的商用密码应用安全性评估（下文简称密评）整改。系统当初是按等保三级建的，密评初测时被开出一张不算短的问题清单，改造从现状盘点一路做到复测取证，中间既有算法替换的取舍，也有密钥迁移、国密 TLS 双证书、日志留痕这些琐碎却容易失分的环节。本文按时间线复盘这次改造，重点讲每一步的取舍与踩过的坑。适合负责密码改造的开发、运维与安全同学对照自"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2023-05-06T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-19T03:07:11.187Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="网络安全"><meta property="article:tag" content="等级保护"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2023/05/07/%E5%AF%86%E8%AF%84%E9%A1%B9%E7%9B%AE%E6%94%B9%E9%80%A0%E5%A4%8D%E7%9B%98/"},"headline":"密评项目改造复盘","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2023-05-06T16:00:00.000Z","dateModified":"2026-10-19T03:07:11.187Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"2022 年下半年到 2023 年初，笔者参与了一个对外业务系统的商用密码应用安全性评估（下文简称密评）整改。系统当初是按等保三级建的，密评初测时被开出一张不算短的问题清单，改造从现状盘点一路做到复测取证，中间既有算法替换的取舍，也有密钥迁移、国密 TLS 双证书、日志留痕这些琐碎却容易失分的环节。本文按时间线复盘这次改造，重点讲每一步的取舍与踩过的坑。适合负责密码改造的开发、运维与安全同学对照自"}</script><link rel="canonical" href="https://987763485.github.io/2023/05/07/%E5%AF%86%E8%AF%84%E9%A1%B9%E7%9B%AE%E6%94%B9%E9%80%A0%E5%A4%8D%E7%9B%98/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2023-05-06T16:00:00.000Z" title="5/7/2023, 12:00:00 AM">2023-05-07</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a></span><span class="level-item">1 小时读完 (大约7861个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">密评项目改造复盘</h1><div class="content"><p>2022 年下半年到 2023 年初，笔者参与了一个对外业务系统的商用密码应用安全性评估（下文简称密评）整改。系统当初是按等保三级建的，密评初测时被开出一张不算短的问题清单，改造从现状盘点一路做到复测取证，中间既有算法替换的取舍，也有密钥迁移、国密 TLS 双证书、日志留痕这些琐碎却容易失分的环节。本文按时间线复盘这次改造，重点讲每一步的取舍与踩过的坑。适合负责密码改造的开发、运维与安全同学对照自己的项目来读。</p>
+<h2 id="复盘背景与边界"><a href="#复盘背景与边界" class="headerlink" title="复盘背景与边界"></a>复盘背景与边界</h2><p>先交代系统长什么样。这是一个对外的业务办理系统，前端有 Web 门户和移动端 App，后端是一组微服务，数据落在关系型库里，另有几份需要长期归档的凭证类文件。它在合规上的定位是等保三级，密评则是应关键信息基础设施相关运营要求而做的专项评估，两者不是替代关系：等保看的是整体防护做到什么程度，密评只追问密码用得对不对、有没有真正起作用。初测时测评机构的口头反馈是“密码机制有，但很多地方只是看起来合规”，这句大致概括了后来整改的主线。</p>
+<p>写作时间需要对齐一个法规上的细节。修订后的《商用密码管理条例》已经在 2023 年 4 月 27 日公布，要到 7 月 1 日才施行，本文写作时它尚未生效，因此当下现行有效的仍是 1999 年公布施行的旧条例；文中凡是涉及法规义务的地方，都只作技术背景说明，具体适用与整改要求应以正式施行文本和主管部门的解释为准。本文也不提供法律意见，不替任何单位判断“要不要评、多久评一次”这类问题。</p>
+<p>再划一下与其它专篇的边界，避免重复。算法本身合规性怎么判定，属于算法合规专题；密钥全生命周期逐环节的核查要求，属于密钥管理专题；密评到底评哪几类、四层框架怎么展开，属于评估要点专题。本文一概不重复这些标准解读，只讲一个具体项目在这些约束下“怎么改、为什么这么改、改的时候纠结了什么”。</p>
+<p>最后交代复盘的取舍口径。所有涉及产品型号、厂商、性能数字的地方，要么是示意值、要么是当时环境的粗略观测，不能当作可复现的基准；问题清单里也不去编造测评项数量与控制项编号，只按密码应用的问题类型来归类。</p>
+<h2 id="现状盘点与差距分析"><a href="#现状盘点与差距分析" class="headerlink" title="现状盘点与差距分析"></a>现状盘点与差距分析</h2><p>改造动手前，第一件事不是选算法，而是把“系统里到底有哪些地方用到了密码”摸清楚。我们的做法是让每个后端服务认领自己碰过敏感数据或做过安全运算的代码路径，汇总成一张密码应用点清单。清单的字段很朴素：位置、保护的客体、当前用的算法或协议、密钥从哪来、密钥怎么存、失败会怎样。这几列填满是一切工作的地基，密评失分最常见的不是“没做”，而是“覆盖不全、说不清楚”。</p>
+<p>盘点下来，问题集中暴露成几类。下面这张表是当时清单里比较有代表性的条目，客体做了脱敏，结论只描述现象不套用控制项编号。</p>
+<table>
+<thead>
+<tr>
+<th>应用点</th>
+<th>当时现状</th>
+<th>暴露的问题类型</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>登录口令校验</td>
+<td>单向哈希，算法可配置但默认偏弱</td>
+<td>弱算法、身份鉴别强度不足</td>
+</tr>
+<tr>
+<td>用户手机号、证件号入库</td>
+<td>数据库列明文存储</td>
+<td>敏感信息明文存储</td>
+</tr>
+<tr>
+<td>归档凭证文件</td>
+<td>落盘不加密，仅靠文件权限</td>
+<td>缺少机密性保护</td>
+</tr>
+<tr>
+<td>对外接口报文</td>
+<td>走标准 TLS，业务层无签名</td>
+<td>缺少完整性与来源真实性</td>
+</tr>
+<tr>
+<td>会话令牌签发</td>
+<td>用可预测种子生成</td>
+<td>随机数来源不合格</td>
+</tr>
+<tr>
+<td>内部服务调用</td>
+<td>长期静态凭据，多年未换</td>
+<td>密钥&#x2F;凭据轮换缺失</td>
+</tr>
+<tr>
+<td>配置中的加密密钥</td>
+<td>明文写在配置中心</td>
+<td>密钥存储不合规</td>
+</tr>
+<tr>
+<td>证书链校验</td>
+<td>部分客户端为省事关掉校验</td>
+<td>校验环节形同虚设</td>
+</tr>
+</tbody></table>
+<p>盘点只是“看见问题”，差距分析是“把问题翻译成能排期的改造项”。我们的方法是从合规性、正确性、有效性三条维度倒推：分别问“用的东西对不对”“实现对不对”“真挡得住、覆盖全不全”。每条应用点都过这三问，凡有一问答不上来就落成一条改造项，并标注它属于哪层、影响哪些服务、需要哪些证据。过程大致如下。</p>
+<pre class="mermaid">flowchart TD
+    A[逐服务盘点密码应用点] --> B[汇总成应用点清单]
+    B --> C{每条过三问}
+    C -->|合规性存疑| D[算法或产品选型整改项]
+    C -->|正确性存疑| E[实现与用法修正项]
+    C -->|有效性存疑| F[覆盖范围补齐项]
+    D --> G[排期与依赖梳理]
+    E --> G
+    F --> G
+    G --> H[改造基线与验收标准]</pre>
+
+<p>排期这一步踩过一个坑值得记下来：我们一开始想按“改动小到大”排序，结果发现把密钥管理和算法替换分开排，导致同一批代码被反复改。后来改成按“依赖链”排：凡是最终要接密码机或密码服务的改造项，先定密码能力和密钥归口，再动算法与协议，最后补证据。顺序一调，返工明显少了。差距分析真正产出的不是问题列表，而是一张“改造项—依赖—验收证据”的映射，它是后面所有章节的输入。</p>
+<h2 id="问题清单落地：四类高频问题"><a href="#问题清单落地：四类高频问题" class="headerlink" title="问题清单落地：四类高频问题"></a>问题清单落地：四类高频问题</h2><p>上一节的表是把问题“看见”，这一节把四类最典型的问题逐个拆开，讲改造时的判断与取舍。算法本身合不合规另有算法合规专题，这里只谈工程上怎么改掉。</p>
+<h3 id="弱算法：能换的换，换不动的先隔离"><a href="#弱算法：能换的换，换不动的先隔离" class="headerlink" title="弱算法：能换的换，换不动的先隔离"></a>弱算法：能换的换，换不动的先隔离</h3><p>弱算法在两类地方最常见：一是口令存储，早期实现图快用了不加盐的摘要或迭代次数极少的哈希；二是对外老接口，签名还在用长度不足的 RSA 密钥和过时的摘要组合。改造分三种处理。能对内自主决定的（服务间签名、新接口），直接切到 SM2 做签名、SM3 做摘要，口令侧改用带盐的慢哈希并把工作因子调高。对历史口令，摘要是单向的，不可能原地“换算法”，只能走惰性迁移：用户下次成功登录时，用旧方式校验通过后再以新方式重存一份，配合强制改密窗口收尾。至于和外部单位对接、对方暂不支持国密的老协议，我们不强推，先把它归到“待观察”列表并加访问隔离，避免它污染整体结论。这里有个易犯的概念错误值得点出来：口令保护本质是慢单向函数，不是加密，别把它接到可逆的对称算法上去。</p>
+<h3 id="明文存储：把加密和脱敏分清楚"><a href="#明文存储：把加密和脱敏分清楚" class="headerlink" title="明文存储：把加密和脱敏分清楚"></a>明文存储：把加密和脱敏分清楚</h3><p>手机号、证件号这类字段当初是明文入库的。整改要同时满足两个经常打架的目标：存储要加密，展示要能用。直接上字段级 SM4 加密之后，问题立刻浮现——密文列不能做范围查询，等值查询也失效。我们的落地是拆成三件事：展示层默认脱敏掩码，存储层用 SM4 加密，需要按手机号精确检索的那一类，额外维护一个用独立密钥派生的盲索引列，只用于等值匹配、不参与展示。遗留的坑是存量数据：新写入加密了，历史明文还躺在库里，测评时同样算未覆盖。回蜜（存量明文补加密）只能分批做，按数据量、冷热和备份窗口排，且迁移期要留好回滚快照，一旦派生密钥配错，整批密文会无法解开。</p>
+<h3 id="缺少完整性与来源保护"><a href="#缺少完整性与来源保护" class="headerlink" title="缺少完整性与来源保护"></a>缺少完整性与来源保护</h3><p>归档凭证文件只靠文件系统权限，接口报文只有传输层加密、业务层没有签名，这都属于“机密性勉强有、完整性与真实性缺位”。改造后，关键报文在应用层补签名或 MAC，归档目录额外生成一份摘要清单，任何一份文件被动过都能在清单比对里暴露。逐条报文都签名的开销不小，我们对高吞吐的内部流改用了按批聚合摘要再签，把签名次数降下来，代价是把“单条篡改可定位”换成了“批次级可定位”，这个权衡当时和测评老师专门确认过可接受。这里也踩坑：有段实现把完整性校验的初始向量做成了可预测的固定值，改的时候顺手把所有 nonce 来源统一收敛到合格随机源。</p>
+<h3 id="身份鉴别强度不足"><a href="#身份鉴别强度不足" class="headerlink" title="身份鉴别强度不足"></a>身份鉴别强度不足</h3><p>口令加一层哈希不等于身份鉴别到位，早期重要操作和普通操作走的是同一套单因子流程，内部服务间还长期用多年不换的静态凭据。改造上，面向人的高风险操作叠加了第二因子校验；面向服务，把共享静态口令换成了基于 SM2 短期凭证的双向 TLS 会话，凭据到期即失效、由密码服务自动重签。鉴别方式和加密&#x2F;签名方式在测评里是分别看的，别把它们混在一份证据里交，这是我们返工过一次才理顺的。</p>
+<h2 id="算法替换路径：SM-与既有算法并存"><a href="#算法替换路径：SM-与既有算法并存" class="headerlink" title="算法替换路径：SM 与既有算法并存"></a>算法替换路径：SM 与既有算法并存</h2><p>算法替换最容易被误解成“一刀切成国密”，真实的策略是分层的：对外合规边界内、由我们自主可控的部分优先切到 SM2&#x2F;SM3&#x2F;SM4；对端不受我们控制、又必须互通的老系统，允许在受控范围内短期并存；纯内部、不承载敏感性的运算不强行改动。判断“哪些必须换、哪些可并存”的口径见算法合规专题，本节只讲并存这件事在工程上怎么落。</p>
+<p>并存的核心是一个密码门面（crypto facade），调用方只声明“我要保护哪个数据域”，由门面决定用哪套算法、哪一版密钥。密文头上带一个自描述头，写明算法标识、密钥版本和加密参数，这样新老密文各按各路解、能在同一张表里共存，灰度也不用停机。下面是门面的示意骨架，算法与密钥选择逻辑用注释标出。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 示意：按数据域路由到国密或既有算法，密文自描述便于灰度与解密</span></span><br><span class="line"><span class="keyword">public</span> <span class="type">byte</span>[] <span class="title function_">seal</span><span class="params">(String dataDomain, <span class="type">byte</span>[] plain, <span class="type">byte</span>[] aad)</span> &#123;</span><br><span class="line">    <span class="type">Policy</span> <span class="variable">p</span> <span class="operator">=</span> policyRepo.activePolicy(dataDomain);   <span class="comment">// 该域当前生效的算法策略</span></span><br><span class="line">    <span class="type">byte</span> <span class="variable">keyVersion</span> <span class="operator">=</span> p.keyVersion();                  <span class="comment">// 指向密钥台账里的具体一版</span></span><br><span class="line">    <span class="type">byte</span>[] <span class="variable">nonce</span> <span class="operator">=</span> rng.nextBytes(p.nonceLen());        <span class="comment">// 统一走合格随机源</span></span><br><span class="line">    Cipher c;</span><br><span class="line">    <span class="keyword">if</span> (p.algorithm() == Alg.SM4_GCM) &#123;</span><br><span class="line">        c = Cipher.getInstance(<span class="string">&quot;SM4/GCM/NoPadding&quot;</span>, <span class="string">&quot;BC&quot;</span>);   <span class="comment">// 国密分支</span></span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        c = Cipher.getInstance(<span class="string">&quot;AES/GCM/NoPadding&quot;</span>, <span class="string">&quot;BC&quot;</span>);   <span class="comment">// 既有算法分支，仅用于受控并存域</span></span><br><span class="line">    &#125;</span><br><span class="line">    c.init(Cipher.ENCRYPT_MODE, keyStore.getKey(p.algorithm(), keyVersion),</span><br><span class="line">           <span class="keyword">new</span> <span class="title class_">GCMParameterSpec</span>(p.tagLen(), nonce));</span><br><span class="line">    <span class="type">byte</span>[] <span class="variable">body</span> <span class="operator">=</span> c.doFinal(plain);</span><br><span class="line">    <span class="keyword">return</span> header(p.algorithm(), keyVersion, nonce) + body;   <span class="comment">// aad/tag 一并参与认证</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>迁移矩阵把每类场景的目标和并存策略固定下来，避免“想到哪改到哪”。</p>
+<table>
+<thead>
+<tr>
+<th>数据&#x2F;链路</th>
+<th>改造前</th>
+<th>目标</th>
+<th>并存与灰度策略</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>字段加密（手机号等）</td>
+<td>明文</td>
+<td>SM4</td>
+<td>新写走 SM4，存量分批回蜜，密文头标版本</td>
+</tr>
+<tr>
+<td>应用层签名</td>
+<td>弱摘要组合</td>
+<td>SM2 + SM3</td>
+<td>验签双支持一段过渡期，签发只出国密</td>
+</tr>
+<tr>
+<td>口令保护</td>
+<td>弱无盐哈希</td>
+<td>带盐慢哈希</td>
+<td>登录时惰性重哈希，配合改密窗口</td>
+</tr>
+<tr>
+<td>传输链路</td>
+<td>标准 TLS</td>
+<td>国密 TLS 优先</td>
+<td>对外双栈协商，详见下一节</td>
+</tr>
+<tr>
+<td>内部报文完整性</td>
+<td>无</td>
+<td>SM3 摘要&#x2F;MAC</td>
+<td>高吞吐链路按批聚合，容忍度已与测评确认</td>
+</tr>
+</tbody></table>
+<p>灰度靠配置开关按数据域推进，而非全局一刀切；示意如下，上线时每域独立评估。</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 示意：按数据域灰度，domain 决定门面走哪条算法分支</span></span><br><span class="line"><span class="attr">crypto:</span></span><br><span class="line">  <span class="attr">policies:</span></span><br><span class="line">    <span class="attr">user_pii:</span>      &#123; <span class="attr">algorithm:</span> <span class="string">SM4_GCM</span>, <span class="attr">keyVersion:</span> <span class="number">3</span>, <span class="attr">rolloutPct:</span> <span class="number">100</span> &#125;</span><br><span class="line">    <span class="attr">legacy_report:</span> &#123; <span class="attr">algorithm:</span> <span class="string">AES_GCM</span>, <span class="attr">keyVersion:</span> <span class="number">2</span>, <span class="attr">rolloutPct:</span> <span class="number">100</span>, <span class="attr">note:</span> <span class="string">&quot;受控并存域&quot;</span> &#125;</span><br><span class="line">    <span class="attr">archive_doc:</span>   &#123; <span class="attr">algorithm:</span> <span class="string">SM4_GCM</span>, <span class="attr">keyVersion:</span> <span class="number">1</span>, <span class="attr">rolloutPct:</span> <span class="number">35</span> &#125;</span><br></pre></td></tr></table></figure>
+
+<p>并存期最容易出的三类事故：一是新密文被老代码解、或反过来，根因是自描述头没落全，解密密钥版本对不上；二是双算法并存时两套密钥都得在密码模块里备齐，漏配任一条会让对应数据域整体不可用；三是灰度回退时忘了把已加密的那批也登记进台账，导致复测时说不清某条密文到底谁生成、用哪版密钥。把这些写进验收标准，比事后补救省事得多。</p>
+<h2 id="密钥管理改造：生成、存储、轮换与密码机接入"><a href="#密钥管理改造：生成、存储、轮换与密码机接入" class="headerlink" title="密钥管理改造：生成、存储、轮换与密码机接入"></a>密钥管理改造：生成、存储、轮换与密码机接入</h2><p>密钥怎么管，逐环节的核查要求另有密钥管理专题，本节只讲我们这次是怎么把散落在配置和代码里的密钥收拢进密码机（HSM）、又怎么把轮换跑起来的。改造的触发点很直接：盘点时发现生产密钥明文躺在配置中心，测试和准生产还共用一套，且多年没换过，这在密评里几乎一眼就能定性。</p>
+<p>先立分层。我们的密钥结构做成三层，根的那层始终不出密码设备。</p>
+<pre class="mermaid">flowchart TD
+    MK[主密钥 根密钥 仅在密码机内] --> KEK[密钥加密密钥 用于包裹下层密钥]
+    KEK --> DEK1[数据密钥 字段加密 按数据域派生]
+    KEK --> DEK2[数据密钥 盲索引派生]
+    DEK1 --> CT[密文 自描述头标注密钥版本]
+    DEK2 --> IDX[盲索引列]</pre>
+
+<p>生成环节，对称密钥和非对称密钥对都改由密码机内部生成，随机源收敛到设备内的合格随机数发生器，应用侧不再有“自己拼字节当密钥”的代码。存储环节的原则是私钥和主密钥永不导出到通用运行时：应用拿到的只是一个密钥句柄或受 KEK 包裹的密文密钥，运算在设备内或以受控方式完成。配置中心里那批明文密钥，改造最后一步做了彻底清退。这一步差点漏掉：第一次“迁移完”只是把密钥复制进密码机，旧明文还留在配置里，内测时才揪出来，教训是迁移完成态必须包含“旧副本已销毁”的证据。</p>
+<p>轮换最容易设计错、也最容易在上线时炸。我们给每个数据域配了版本化密钥台账：同一时刻一个域可以有“当前加密密钥”和“仍在解密窗口内的旧密钥”，新数据用新版加密、老密文按头里的版本号选旧版解密，等老数据在正常读写里自然迁移完，旧版才下线。这样轮换不用停机重加密全表。示意一次在线轮换的状态变化。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">T0  仅 K2 生效：新写 K2，历史 K1 仍密文头标注、可读</span><br><span class="line">T1  K2 设为加密密钥，K1 保留为解密密钥：新写 K2，读写两版并存</span><br><span class="line">T2  后台按批次把 K1 密文重写为 K2（冷数据可延后）</span><br><span class="line">T3  确认无 K1 引用后，K1 从活动台账移出、归档留证</span><br></pre></td></tr></table></figure>
+
+<p>接入方式上，密码机通过一个统一 SDK 暴露给门面，应用不直连设备。可用性上做了双机集群和一个只读的备用接入点，避免密码机成为单点；配套的密钥备份与恢复做了演练，重点防“备份在、恢复流程没人会走”，真出事时常发现恢复用的分量密钥权限早被收回。分权也是改造的一部分：谁能生成、谁能用、谁能销毁拆成不同角色，密钥操作全部进审计日志，与下一节的留痕直接衔接。</p>
+<h2 id="传输层改造与国密-TLS-双证书体系"><a href="#传输层改造与国密-TLS-双证书体系" class="headerlink" title="传输层改造与国密 TLS 双证书体系"></a>传输层改造与国密 TLS 双证书体系</h2><p>传输层最初只有一条普通 TLS，链路是加密的，但从商密角度看用的是国际套件，且证书私钥是软件态。目标是把对外链路升级到国密 TLS（依据 GB&#x2F;T 38636-2020《信息安全技术 传输层密码协议（TLCP）》），同时不砸掉那些还不支持国密的老客户端。</p>
+<p>国密 TLCP 和普通 TLS 差别最大的是双证书：握手时服务端提供一张签名证书和一张加密证书，各司其职，签名证书负责身份与握手完整性，加密证书负责会话密钥的封装。对应的，密钥也得由合规 CA 签发、私钥落在密码设备里。改造时的难点不在协议本身，而在兼容过渡，我们用一个双栈网关来消化，策略大致如下。</p>
+<pre class="mermaid">flowchart TD
+    IN[入站连接请求] --> NEG{客户端能力协商}
+    NEG -->|支持国密TLCP| GM[国密链路 双证书 优先]
+    NEG -->|仅支持标准TLS| STD[标准TLS链路 受控兼容]
+    GM --> OFF[会话密钥运算卸载到密码机]
+    STD --> OFF
+    OFF --> APP[转发到内部服务 内部走mTLS]
+    STD -.-> MARK[打兼容标记 纳入待收敛清单]</pre>
+
+<p>几个坑值得记录。一是曾有环境只配了一张证书就想跑国密握手，握手直接失败，双证书缺任一张都不成；二是密码套件顺序没排好，支持国密的客户端反而被协商到了弱套件上，顺序调整后才稳定；三是证书链校验在某些调用方被为了省事关掉，这在改造里被专门恢复——协议升级到国密不等于校验自动生效，校验逻辑该在应用层还得在应用层。卸载方面，把会话密钥的封装与解封装这类不对称运算放到密码机做，网关只承担对称后的转发，既满足了私钥不出设备，也顶住了握手期不对称运算的开销。内部服务间没有全部强行上 TLCP，而是收敛到基于 SM2 短期凭证的双向 TLS，兼顾合规与落地成本。过渡期标准 TLS 那条腿并没有立刻砍掉，而是打上兼容标记进“待收敛清单”，等对端升级节奏跟上再逐步关掉。</p>
+<h2 id="日志与审计留痕"><a href="#日志与审计留痕" class="headerlink" title="日志与审计留痕"></a>日志与审计留痕</h2><p>密码改造做完还不够，密评要看这些机制的运行痕迹查不查得到。我们把和密码有关的事件单独规整成一类审计流，重点是密钥与算法层面的动作必须留痕、日志本身可信。下表是当时定下的必记事件，字段做了收敛，不涉及任何标准编号。</p>
+<table>
+<thead>
+<tr>
+<th>事件</th>
+<th>记什么</th>
+<th>为什么必须留</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>密钥生成&#x2F;销毁</td>
+<td>操作者、数据域、密钥版本、结果</td>
+<td>证明密钥归口与生命周期可控</td>
+</tr>
+<tr>
+<td>密钥使用</td>
+<td>句柄、来源调用方、用途</td>
+<td>追溯“谁在什么时候用了哪把钥匙”</td>
+</tr>
+<tr>
+<td>算法&#x2F;策略降级</td>
+<td>域、原策略、降级后、触发原因</td>
+<td>并存期防止悄悄退回弱路径</td>
+</tr>
+<tr>
+<td>握手协商结果</td>
+<td>走国密还是兼容、套件</td>
+<td>佐证传输层策略实际生效</td>
+</tr>
+<tr>
+<td>证书变更&#x2F;到期</td>
+<td>双证书、序列、更换操作</td>
+<td>双证书体系的运行证据</td>
+</tr>
+<tr>
+<td>回蜜批次</td>
+<td>数据域、区间、完成量</td>
+<td>存量明文收敛的可核查记录</td>
+</tr>
+</tbody></table>
+<p>日志自身的保护容易被忽略，却是完整性这块的失分点：审计日志如果谁都能改，“留痕”就没意义。我们对审计流做了链式摘要，每条日志把前一条的摘要算进去，配合只追加存储，改写历史会断链、当场暴露；时间源统一到可信时钟，避免用可篡改的本地时间戳。另一条红线是别把敏感明文写进日志——改造中一度有实现把带明文手机号的报文原样打进调试日志，等于一边加密一边泄密，这类问题在评审阶段就被要求清掉。权限上，审计查看权与日常运维权分离，能改配置的人不该同时能抹掉自己改配置的痕迹。这些留痕和上一节的密钥操作、下一节的证据准备是一条线串下来的：没有可信日志，改造做得再扎实也拿不出运行期证据。</p>
+<h2 id="测评流程与证据准备"><a href="#测评流程与证据准备" class="headerlink" title="测评流程与证据准备"></a>测评流程与证据准备</h2><p>这一节讲我们和测评机构打交道的这条线，侧重工程侧怎么准备证据，不复述评估要点本身。整个节奏可粗看成闭环：初测暴露差距、整改、复测确认，中间靠一份能自证的材料撑着。</p>
+<pre class="mermaid">flowchart LR
+    S[系统描述与应用点清单] --> M[测评机构初测]
+    M --> P[问题确认与优先级]
+    P --> R[按依赖链整改]
+    R --> E[证据归集与自检]
+    E --> M2[复测抽样验证]
+    M2 --> DOC[结论与遗留项登记]</pre>
+
+<p>证据准备上踩过的最大误区，是以为“改了就行”。实际测评要看的是可核查、能对应到具体应用点的材料，光有口头“我们已经上了国密”没用。我们最后归集的证据大致分几类：配置与代码的改造前后对照，说明算法、协议、校验逻辑确实生效；密钥台账导出配合密码机日志，佐证密钥从生成到销毁全程可追溯；证书侧提供双证书与签发链，用到的密码产品或服务出示其检测认证证明材料；传输层给出实际协商结果的抓样，证明国密链路真的在用；存量回蜜给出分批完成记录。这里有个反复调整的过程——证据格式起初按我们习惯整理、核对费劲，后来改成按应用点逐条对齐、一屏对一条结论，沟通顺畅许多。</p>
+<p>抽样验证阶段也给了我们一个提醒：能被抽样验到的，才是被认为真的在跑的。有段改造只在主路径生效、某条低频分支还是老逻辑，复测前我们专门补了一轮“全分支覆盖自查”。整个流程里，我们没有去追一个漂亮的通过率数字，而是把“哪些已闭环、哪些是有意保留的兼容并存、哪些是排期在后的遗留项”如实登记，测评结论反而更稳。需要重申，涉及适用范围、频次、结论怎么认定，都以现行有效法规和主管部门及测评机构口径为准，本文只复盘准备证据的方法，不构成任何合规判断。</p>
+<h2 id="性能与可用性代价"><a href="#性能与可用性代价" class="headerlink" title="性能与可用性代价"></a>性能与可用性代价</h2><p>改造不是免费的，每项密码增强都在延迟、吞吐或运维复杂度上换走点什么。下表是当时观测到的定性影响与缓解手段，具体量级随环境变化，只作方向参考、不当基准数字。</p>
+<table>
+<thead>
+<tr>
+<th>改造项</th>
+<th>代价方向</th>
+<th>缓解手段</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>国密 TLCP 握手</td>
+<td>双证书使握手交互增多、首连变慢</td>
+<td>会话复用、连接池、握手卸载到密码机</td>
+</tr>
+<tr>
+<td>不对称运算</td>
+<td>签名&#x2F;验签与密钥封装吃算力</td>
+<td>密码机卸载、批量聚合签名</td>
+</tr>
+<tr>
+<td>字段级 SM4 加密</td>
+<td>密文列不能范围查询、加解密有开销</td>
+<td>盲索引等值检索、就近缓存数据密钥</td>
+</tr>
+<tr>
+<td>存量回蜜</td>
+<td>批量重写占 IO、拉长大版本窗口</td>
+<td>分批、错峰、按冷热优先级排</td>
+</tr>
+<tr>
+<td>密钥轮换双密钥窗口</td>
+<td>同时持多版本密钥、台账变复杂</td>
+<td>版本化台账、自然迁移后收敛旧版</td>
+</tr>
+</tbody></table>
+<p>可用性上最紧的一条是密码机不能成为单点：握手期大量不对称运算依赖它，一旦不可用，对外链路会成片失败。我们因此上了双机集群、给门面加了带超时的降级与重试，并把“设备侧健康检查”接进监控，宁可短暂走兼容链路也不能整体拒绝服务。代价是这些兜底本身也要进审计、也要在证据里说清楚，否则会被质疑“降级是不是悄悄退回弱路径”。整体感受是：把重活推给密码设备、把兼容留给网关协商、把证据留给日志，性能与合规大多能同时守住，真正难的是三者交界处的取舍判断。</p>
+<h2 id="踩过的坑与经验"><a href="#踩过的坑与经验" class="headerlink" title="踩过的坑与经验"></a>踩过的坑与经验</h2><p>把反复咬人的几条浓缩一下。最大的认知坑是把密评当成“换个算法库”，其实失分点往往在覆盖不全、说不清、运行痕迹缺失，而不是算法选错。第二个是迁移的完成态容易定义得太早：密钥搬进密码机不等于完事，旧明文销毁、存量回蜜、恢复演练都得算进来，否则合规上仍是“没闭环”。第三个是兼容并存是把双刃剑，双算法、双证书、双栈链路任一处没测全，就会在灰度里翻车，而每多一条并存路径，证据和审计的复杂度都同步上涨。第四个是别把不同维度的证据混交——鉴别方式、加密方式、完整性方式各查各的，糅成一份反而两头不讨好。</p>
+<p>几条能带走的经验：先盘应用点再谈选型，地基建歪后面全是返工；改造排期按依赖链而不是按改动大小，避免同一批代码反复动；从第一天就把留痕和证据当作交付物的一部分，而不是复测前突击补；涉及兼容并存的地方一律登记成“待收敛清单”，留一个能关掉的口子。这些都不是技术难点，却是决定项目顺不顺的地方。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>这次密评改造，本质是把一堆“看起来合规”的密码用法，逐条挪到“合规、正确、有效都能拿出证据”的状态。回头看，真正吃功夫的不是算法替换本身，而是现状盘点的地基、按依赖链排期、密钥归口进密码机、国密双证书的兼容过渡，以及贯穿始终的留痕与证据准备。取舍的原则也很朴素：能自主的优先上国密，受制于对端的短期并存并登记收敛，任何降级都留痕可查。合规判定与逐环节要求请回到算法、密钥、评估要点几个专题，本文只提供一个可对照的改造样本。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li>《中华人民共和国密码法》（2020 年 1 月 1 日起施行）</li>
+<li>《商用密码管理条例》（1999 年公布施行；修订版于 2023 年 4 月 27 日公布、2023 年 7 月 1 日起施行，本文写作时尚未施行）</li>
+<li>GB&#x2F;T 22239-2019《信息安全技术 网络安全等级保护基本要求》</li>
+<li>GB&#x2F;T 39786-2021《信息安全技术 信息系统密码应用基本要求》</li>
+<li>GB&#x2F;T 38636-2020《信息安全技术 传输层密码协议（TLCP）》</li>
+<li>GB&#x2F;T 32907-2016《信息安全技术 SM4 分组密码算法》</li>
+<li>GM&#x2F;T 0003《SM2 椭圆曲线公钥密码算法》</li>
+<li>GM&#x2F;T 0004《SM3 密码杂凑算法》</li>
+<li>GM&#x2F;T 0005-2012《随机性检测规范》</li>
+<li>GB&#x2F;T 37092-2018《信息安全技术 密码模块安全要求》</li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>密评项目改造复盘</p><p><a href="https://987763485.github.io/2023/05/07/密评项目改造复盘/">https://987763485.github.io/2023/05/07/密评项目改造复盘/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2023-05-07</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-19</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a><a class="link-muted mr-2" rel="tag" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/">等级保护</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2023/05/12/RAG%E5%B7%A5%E7%A8%8B%E5%8C%96%E8%90%BD%E5%9C%B0/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">RAG 工程化落地</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2023/04/30/Rust%E7%94%9F%E5%91%BD%E5%91%A8%E6%9C%9F%E5%AE%8C%E5%85%A8%E8%A7%A3%E6%9E%90/"><span class="level-item">Rust 生命周期完全解析</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

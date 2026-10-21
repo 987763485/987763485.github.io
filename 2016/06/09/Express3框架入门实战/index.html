@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Express 3 框架入门实战 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="开头：一次自作主张的升级"><meta property="og:type" content="blog"><meta property="og:title" content="Express 3 框架入门实战"><meta property="og:url" content="https://987763485.github.io/2016/06/09/Express3%E6%A1%86%E6%9E%B6%E5%85%A5%E9%97%A8%E5%AE%9E%E6%88%98/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="开头：一次自作主张的升级"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2016-06-08T23:09:37.000Z"><meta property="article:modified_time" content="2026-10-18T04:48:50.085Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="javascript"><meta property="article:tag" content="后端开发"><meta property="article:tag" content="nodejs"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2016/06/09/Express3%E6%A1%86%E6%9E%B6%E5%85%A5%E9%97%A8%E5%AE%9E%E6%88%98/"},"headline":"Express 3 框架入门实战","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2016-06-08T23:09:37.000Z","dateModified":"2026-10-18T04:48:50.085Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"开头：一次自作主张的升级"}</script><link rel="canonical" href="https://987763485.github.io/2016/06/09/Express3%E6%A1%86%E6%9E%B6%E5%85%A5%E9%97%A8%E5%AE%9E%E6%88%98/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2016-06-08T23:09:37.000Z" title="6/9/2016, 7:09:37 AM">2016-06-09</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></span><span class="level-item">30 分钟读完 (大约4499个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Express 3 框架入门实战</h1><div class="content"><h2 id="开头：一次自作主张的升级"><a href="#开头：一次自作主张的升级" class="headerlink" title="开头：一次自作主张的升级"></a>开头：一次自作主张的升级</h2><p>先划边界。4 的队列机制、<code>app.use</code> 前缀语义、<code>express.Router</code> 那套，我在《Express 4 中间件机制完全解析》（2016-04-26）里讲过，这篇不重复；Node 0.10&#x2F;0.12 的环境与 require 解析归 2016-05-15 那篇，只一句引用；EJS 还是 Jade 的取舍归 2016-06-16 一篇；进程守护与部署归运维那篇；中间件写法的六个坑归 2016-05-24 那篇。这篇只干一件事：扒开一套 2016 年年中还在跑 Express 3 的老代码现场，讲清楚 3 自己长什么样、为什么还留着、真要把老代码升到 4 会撞上什么。</p>
+<p>2016 年 6 月初，我被拉去接手一套 2013 年上线的内部后台。原来唯一能改动它的同事离职两个月，组里就我一个碰过 Node，活落到我头上。第一周只是跑起来了事，事故出在第二周：我按新项目习惯顺手升了依赖，在项目根目录执行了 <code>npm install express --save</code>。装完重启，服务没起来，控制台一行红字：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">$ node app.js</span><br><span class="line">/Users/oldadmin/app.js:18</span><br><span class="line">app.configure(<span class="string">&#x27;development&#x27;</span>, <span class="function"><span class="title">function</span></span>()&#123;</span><br><span class="line">    ^</span><br><span class="line">TypeError: Object <span class="keyword">function</span> <span class="function"><span class="title">createApplication</span></span>() &#123;&#125; has no method <span class="string">&#x27;configure&#x27;</span></span><br><span class="line">    at Object.&lt;anonymous&gt; (/Users/oldadmin/app.js:18:5)</span><br></pre></td></tr></table></figure>
+
+<p><code>app.configure is not a function</code>。那一刻我才反应过来，<code>package.json</code> 里那句 <code>&quot;express&quot;: &quot;3.x&quot;</code> 是这套代码能跑起来的前提。回退、重装、重启，服务活了，但那十分钟我是真抓瞎——不知道这 API 什么时候没的、代码里还有多少地方依赖它。</p>
+<h2 id="为什么-2016-年了还在跑-3"><a href="#为什么-2016-年了还在跑-3" class="headerlink" title="为什么 2016 年了还在跑 3"></a>为什么 2016 年了还在跑 3</h2><p>先摆口径：2016 年年中，Express 4 已是主流，3 只剩存量。我两个新项目都开在 4 上。这套老后台留在 3，不是它比 4 好，是具体理由摁着不让动。翻完老代码，我列了这几条：</p>
+<ul>
+<li><strong>只剩一个人会动，现在那个人走了。</strong> 前后只有两位同事改过，约定全在脑子里，文档停在 2014 年。动框架版本等于让不熟的人同时改两层。</li>
+<li><strong>模板写法跟 3 绑死。</strong> 视图全是 Jade，布局直接用 Jade 自身的 <code>extends</code>&#x2F;<code>block</code>，还有走第三方 partials 中间件的老路子。这些在 3 里都顺，换到 4 布局要单独处理，页面有四十多个。</li>
+<li><strong>代码里到处是 <code>express.*</code> 命名空间的调用。</strong> <code>express.bodyParser</code>、<code>express.cookieParser</code>、<code>express.session</code>、<code>express.methodOverride</code> 全在 app.js 里挂着，好几处还把 <code>express.bodyParser()</code> 的返回值拆给别的中间件用。</li>
+<li><strong>验收环境锁系统版本。</strong> 客户机器只认某个老版本系统，Node 装到 0.10 就上不去了（细节在 2016-05-15 那篇，不展开）。框架升大版本，得连带确认它在老 Node 上还跑得动。</li>
+<li><strong>没人能签字。</strong> 后台改了要重新走验收，升级到 4 不是一行 diff 的事，是没人愿意背的回归工作量。</li>
+</ul>
+<p>这几条摞在一起，结论很清楚：3 在这套代码里不是技术选型，是一笔账。结尾有判据表。</p>
+<h2 id="3-x-的最小可跑骨架"><a href="#3-x-的最小可跑骨架" class="headerlink" title="3.x 的最小可跑骨架"></a>3.x 的最小可跑骨架</h2><p>把业务剥掉，一个 3.x 的入口长这样。这是我照着 app.js 手敲的最小版本，跑在本机 Node 0.10 上：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> express = <span class="built_in">require</span>(<span class="string">&#x27;express&#x27;</span>);</span><br><span class="line"><span class="keyword">var</span> app = <span class="title function_">express</span>();</span><br><span class="line"></span><br><span class="line">app.<span class="title function_">set</span>(<span class="string">&#x27;port&#x27;</span>, process.<span class="property">env</span>.<span class="property">PORT</span> || <span class="number">3000</span>);</span><br><span class="line">app.<span class="title function_">set</span>(<span class="string">&#x27;views&#x27;</span>, __dirname + <span class="string">&#x27;/views&#x27;</span>);</span><br><span class="line">app.<span class="title function_">set</span>(<span class="string">&#x27;view engine&#x27;</span>, <span class="string">&#x27;jade&#x27;</span>);</span><br><span class="line"></span><br><span class="line">app.<span class="title function_">use</span>(express.<span class="title function_">favicon</span>());</span><br><span class="line">app.<span class="title function_">use</span>(express.<span class="title function_">logger</span>(<span class="string">&#x27;dev&#x27;</span>));</span><br><span class="line">app.<span class="title function_">use</span>(express.<span class="title function_">static</span>(__dirname + <span class="string">&#x27;/public&#x27;</span>));</span><br><span class="line">app.<span class="title function_">use</span>(express.<span class="title function_">json</span>());</span><br><span class="line">app.<span class="title function_">use</span>(express.<span class="title function_">urlencoded</span>());</span><br><span class="line">app.<span class="title function_">use</span>(express.<span class="title function_">methodOverride</span>());</span><br><span class="line"></span><br><span class="line">app.<span class="title function_">get</span>(<span class="string">&#x27;/user/:id&#x27;</span>, <span class="keyword">function</span>(<span class="params">req, res</span>)&#123;</span><br><span class="line">  res.<span class="title function_">json</span>(&#123; <span class="attr">id</span>: req.<span class="property">params</span>.<span class="property">id</span> &#125;);</span><br><span class="line">&#125;);</span><br><span class="line"></span><br><span class="line">app.<span class="title function_">post</span>(<span class="string">&#x27;/login&#x27;</span>, <span class="keyword">function</span>(<span class="params">req, res</span>)&#123;</span><br><span class="line">  res.<span class="title function_">send</span>(&#123; <span class="attr">ok</span>: !!req.<span class="property">body</span>.<span class="property">username</span> &#125;);</span><br><span class="line">&#125;);</span><br><span class="line"></span><br><span class="line">app.<span class="title function_">use</span>(app.<span class="property">router</span>);</span><br><span class="line"></span><br><span class="line">app.<span class="title function_">listen</span>(app.<span class="title function_">get</span>(<span class="string">&#x27;port&#x27;</span>), <span class="keyword">function</span>(<span class="params"></span>)&#123;</span><br><span class="line">  <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&#x27;Express 3 ready on &#x27;</span> + app.<span class="title function_">get</span>(<span class="string">&#x27;port&#x27;</span>));</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>逐段标一句”这段到 4 里会变成什么”（4 的机制在 2016-04-26 那篇讲过，不展开）：</p>
+<ul>
+<li><code>var app = express();</code>——4 里写法一样，这行不用动。</li>
+<li><code>app.set(&#39;view engine&#39;, &#39;jade&#39;)</code>——4 里也这样设，区别在布局得靠别的办法，模板取舍归 2016-06-16 那篇一句带过。</li>
+<li><code>express.favicon()</code>、<code>express.logger()</code>——4 里没有了，要装 <code>serve-favicon</code> 和 <code>morgan</code>。</li>
+<li><code>express.static(...)</code>——4 里换成独立包 <code>serve-static</code> 挂上去。</li>
+<li><code>express.json()</code> &#x2F; <code>express.urlencoded()</code>——4 里合并进 <code>body-parser</code> 包。</li>
+<li><code>express.methodOverride()</code>——4 里换成 <code>method-override</code>。</li>
+<li><code>app.get</code> &#x2F; <code>app.post</code> 路由——4 里签名没变，变化的是它们排在哪里，见下文。</li>
+<li><code>app.use(app.router)</code>——4 里 <code>app.router</code> 这个属性直接删了，写了会报错。</li>
+<li><code>app.listen(...)</code>——4 里一样。</li>
+</ul>
+<p><code>app.configure</code> 按环境分支注册是 3 的标志性形态，4 里这个 API 整个被删，真实代价单独开一节讲。</p>
+<h2 id="中间件还挂在框架命名空间下"><a href="#中间件还挂在框架命名空间下" class="headerlink" title="中间件还挂在框架命名空间下"></a>中间件还挂在框架命名空间下</h2><p>也是新老代码长相上最好认的差别：3 时代内置中间件全住在 <code>express.*</code> 底下，<code>require(&#39;express&#39;)</code> 一次拿全；后来这几个中间件各自拆成独立包，4 里用谁就得单独 <code>npm install</code> 谁。对照表：</p>
+<table>
+<thead>
+<tr>
+<th>3.x 里的写法</th>
+<th>后来对应的独立包</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>express.bodyParser()</code></td>
+<td><code>body-parser</code></td>
+<td>json + urlencoded + multipart 三合一</td>
+</tr>
+<tr>
+<td><code>express.cookieParser(secret)</code></td>
+<td><code>cookie-parser</code></td>
+<td>解析 Cookie 并签名</td>
+</tr>
+<tr>
+<td><code>express.session(...)</code> &#x2F; <code>express.cookieSession(...)</code></td>
+<td><code>express-session</code></td>
+<td>默认内存存储那条警告也带过去了</td>
+</tr>
+<tr>
+<td><code>express.methodOverride()</code></td>
+<td><code>method-override</code></td>
+<td>表单 PUT&#x2F;DELETE 靠它</td>
+</tr>
+<tr>
+<td><code>express.static(...)</code></td>
+<td><code>serve-static</code></td>
+<td>单独装</td>
+</tr>
+<tr>
+<td><code>express.favicon()</code></td>
+<td><code>serve-favicon</code></td>
+<td>单独装</td>
+</tr>
+<tr>
+<td><code>express.logger()</code></td>
+<td><code>morgan</code></td>
+<td>名字都换了</td>
+</tr>
+<tr>
+<td><code>express.errorHandler()</code></td>
+<td>无直接替代品</td>
+<td>一般自己写错误中间件</td>
+</tr>
+</tbody></table>
+<p>读老代码我习惯全文搜 <code>express.</code>，搜出几处，升级就要补几个包。这套后台搜出 6 处，每处还得确认参数签名变没变。写法上的坑 2016-05-24 那篇列过六个，不复述。</p>
+<p>单独说 <code>express.bodyParser</code>：JSON、urlencoded、multipart 文件上传三个解析器打包在一起。老代码里很多人（包括我前任同事）根本不用文件上传，也照模板挂它，因为”教程里都这么写”。方便，代价在下一节。</p>
+<h2 id="app-configure-的真实代价"><a href="#app-configure-的真实代价" class="headerlink" title="app.configure 的真实代价"></a>app.configure 的真实代价</h2><p><code>app.configure(env, fn)</code> 的问题不在丑，在于把注册顺序藏进了环境名里。生效顺序由注册先后决定，分支注册等于本地和线上跑两条序列。这套后台就在这上面翻过车。</p>
+<p>五月底某天，测试同事说线上登录后进不去，本地却正常。看两遍代码没头绪，最后发现的现象是：线上有 session，本地没有。排查过程：</p>
+<ol>
+<li>先怀疑登录接口，本地打断点，<code>req.session</code> 明明在；</li>
+<li>对比两边启动日志，线上多打了一行 deprecated 警告，本地没有——说明进的不是同一个 configure 分支；</li>
+<li>去线上看环境变量，<code>NODE_ENV</code> 是 <code>production</code>，本地我从没设过，默认走 development 分支；</li>
+<li>打开 app.js，<code>express.cookieParser</code> 和 <code>express.session</code> 写在 <code>app.configure(&#39;production&#39;)</code> 块里，development 块只有 <code>express.errorHandler</code>——当年某次上线前临时挪过注册位置，本地这份再没人管。</li>
+</ol>
+<p>本地跑的序列和线上根本不是同一条，代码却看着是同一份。<code>app.configure</code> 让分叉名正言顺：分支里随便 <code>app.use</code>，没人提醒顺序变了。4 删掉它之后，大家改在文件顶部读 <code>process.env.NODE_ENV</code> 再决定挂什么，分支至少摊在明面上。</p>
+<h2 id="显式-app-use-app-router"><a href="#显式-app-use-app-router" class="headerlink" title="显式 app.use(app.router)"></a>显式 app.use(app.router)</h2><p>老代码里有这么一行，卡在所有内置中间件之后、路由文件 require 之前：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">app.<span class="title function_">use</span>(express.<span class="title function_">bodyParser</span>());</span><br><span class="line">app.<span class="title function_">use</span>(express.<span class="title function_">cookieParser</span>(<span class="string">&#x27;some secret&#x27;</span>));</span><br><span class="line">app.<span class="title function_">use</span>(express.<span class="title function_">session</span>());</span><br><span class="line"></span><br><span class="line">app.<span class="title function_">use</span>(app.<span class="property">router</span>);</span><br><span class="line"></span><br><span class="line"><span class="built_in">require</span>(<span class="string">&#x27;./routes&#x27;</span>)(app);</span><br></pre></td></tr></table></figure>
+
+<p>第一次看到 <code>app.use(app.router)</code> 时我不明白它在干嘛。讲到这一层就够用了：每条 <code>app.use</code> 注册的东西变成一个带路径正则的 layer，请求按注册顺序逐个尝试，命中就把剥掉前缀的 url 交给下一层。<code>app.router</code> 自己也是个 layer，装着所有 <code>app.get</code>&#x2F;<code>app.post</code> 注册进来的路由。显式挂它，等于亲手决定”路由”这一层排在队列哪一格。</p>
+<p>这也解释了上面的顺序：静态资源挂在 router 前面，命中的请求走不到路由；session 类中间件也得挂前面，业务路由才拿得到 <code>req.session</code>。这一行的位置常是当年某次修 bug 挪出来的，动之前得想清楚挪的是谁——我读过的一些 3 的老教程甚至把它写在最前面。</p>
+<p>4 里 <code>app.router</code> 这个属性没了，路由自动排在当时已注册的中间件后面（机制在 2016-04-26 那篇讲过，不重复）。升级要记住的只有一件事：老代码靠这行手工卡出来的相对次序，到 4 里得靠调语句位置重排一遍。</p>
+<h2 id="一次-bodyParser-写满-tmp-的事故"><a href="#一次-bodyParser-写满-tmp-的事故" class="headerlink" title="一次 bodyParser 写满 &#x2F;tmp 的事故"></a>一次 bodyParser 写满 &#x2F;tmp 的事故</h2><p>六月中旬一个周三上午，测试环境整个打挂，不止这套后台，同一台机器上别的服务一起出问题。我先看磁盘：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">$ <span class="built_in">df</span> -h</span><br><span class="line">Filesystem      Size  Used Avail Use% Mounted on</span><br><span class="line">/dev/sda1        47G   44G     0 100% /</span><br><span class="line">tmpfs           1.9G  1.8G  10G  100% /tmp</span><br></pre></td></tr></table></figure>
+
+<p><code>/tmp</code> 满了。老机器 <code>/tmp</code> 分区本来就小。谁在写？<code>ls -lt /tmp</code> 看一眼，全是 <code>Express-Upload-</code> 开头的临时文件，时间戳对上后台”批量导入名单”的入口。那功能一年用不了几次，业务同事那天早上传了十几个大 Excel。</p>
+<p>凶手就是 <code>express.bodyParser()</code>。三合一里 multipart 那部分，默认把每个上传文件先落到系统临时目录再删。问题是那个入口根本不需要文件解析——表单传文本，Excel 走另一个自解析的接口。照模板挂 <code>bodyParser</code>，等于给每个请求开了落盘口子，碰上异常中断的请求，临时文件就留在 <code>/tmp</code> 没人清理。日积月累，加上那天集中触发，分区写满。</p>
+<p>当期改法两条，都不动框架版本：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">app.<span class="title function_">use</span>(express.<span class="title function_">json</span>());</span><br><span class="line">app.<span class="title function_">use</span>(express.<span class="title function_">urlencoded</span>());</span><br><span class="line"></span><br><span class="line">app.<span class="title function_">use</span>(express.<span class="title function_">multipart</span>(&#123;</span><br><span class="line">  <span class="attr">tmp</span>: path.<span class="title function_">join</span>(__dirname, <span class="string">&#x27;../uploads/tmp&#x27;</span>)</span><br><span class="line">&#125;));</span><br></pre></td></tr></table></figure>
+
+<p>一是拆开三合一，通用接口只开 json 和 urlencoded；二是真要收文件的路径单独挂 <code>express.multipart</code>，临时目录指到数据盘，跟 <code>/tmp</code> 分开。清掉残留文件后机器恢复。以上是我在同一台机器上的粗略观察。教训跟 3 还是 4 关系不大，但它解释了为什么那行顺手挂的 bodyParser 没人敢随便删：你得先知道它在替谁干活。</p>
+<h2 id="express-session-的内存警告"><a href="#express-session-的内存警告" class="headerlink" title="express.session 的内存警告"></a>express.session 的内存警告</h2><p>3 的 <code>express.session()</code> 不指定 store 时用的是内置内存存储，控制台会打一条警告，大意是 memory store 只建议开发环境用、别拿到生产上（各小版本措辞略有出入，完整英文原文我贴不全）。这条 warning 第一次重启就糊在屏幕上，直到某次重启全员被踢下线，我才意识到它一直在响。</p>
+<p>为什么会泄漏：每个会话一个对象，常驻内存，过期了也不一定回收。一天几百个登录不算多，但这台机器还跑着别的服务，内存本来就紧张。为什么老项目不急着换方案，讲一下我们的决策：</p>
+<ul>
+<li>换 <code>express-session</code> 加 Redis 存储？机器上多一个 Redis 就多一个运维对象，客户验收环境根本不给装。</li>
+<li>换 MongoDB 存储？这套后台数据库都是 MySQL，为 session 引入 NoSQL，动静太大。</li>
+<li>最后选了最保守的一条：改用 <code>express.cookieSession()</code>，会话数据签名后直接放 Cookie，反正 payload 只有一个用户 id 和权限标记；再把存活时间缩短，重启踢人的问题也随之变小（Cookie 在客户端，服务端重启无所谓）。</li>
+</ul>
+<p>这条路线不装新包、不加服务，只改了 app.js 里两行注册。它是权宜之计——Cookie 体积上限、每个请求都带着会话数据这些毛病都有——但对一个”只求别再出事”的存量项目，改动面小就是最大的道理。</p>
+<h2 id="没有-Router-时怎么拆路由文件"><a href="#没有-Router-时怎么拆路由文件" class="headerlink" title="没有 Router 时怎么拆路由文件"></a>没有 Router 时怎么拆路由文件</h2><p><code>express.Router</code> 是 4 的东西，3 里没有这个对象（当年有个要手动开 feature flag 的试验版，我们没敢用）。老项目拆文件靠最土的办法：路由文件导出一个函数，把 <code>app</code> 递进去。这套后台的结构是：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// app.js 末尾</span></span><br><span class="line">app.<span class="title function_">use</span>(app.<span class="property">router</span>);</span><br><span class="line"><span class="built_in">require</span>(<span class="string">&#x27;./routes&#x27;</span>)(app);</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// routes/index.js</span></span><br><span class="line"><span class="variable language_">module</span>.<span class="property">exports</span> = <span class="keyword">function</span>(<span class="params">app</span>)&#123;</span><br><span class="line"></span><br><span class="line">  app.<span class="title function_">param</span>(<span class="string">&#x27;userId&#x27;</span>, <span class="keyword">function</span>(<span class="params">req, res, next, userId</span>)&#123;</span><br><span class="line">    db.<span class="property">user</span>.<span class="title function_">findById</span>(userId, <span class="keyword">function</span>(<span class="params">err, user</span>)&#123;</span><br><span class="line">      <span class="keyword">if</span> (err) &#123; <span class="keyword">return</span> <span class="title function_">next</span>(err); &#125;</span><br><span class="line">      <span class="keyword">if</span> (!user) &#123; <span class="keyword">return</span> <span class="title function_">next</span>(); &#125;</span><br><span class="line">      req.<span class="property">user</span> = user;</span><br><span class="line">      <span class="title function_">next</span>();</span><br><span class="line">    &#125;);</span><br><span class="line">  &#125;);</span><br><span class="line"></span><br><span class="line">  app.<span class="title function_">get</span>(<span class="string">&#x27;/&#x27;</span>, <span class="keyword">function</span>(<span class="params">req, res</span>)&#123;</span><br><span class="line">    res.<span class="title function_">render</span>(<span class="string">&#x27;dashboard&#x27;</span>, &#123; <span class="attr">title</span>: <span class="string">&#x27;后台&#x27;</span> &#125;);</span><br><span class="line">  &#125;);</span><br><span class="line"></span><br><span class="line">  app.<span class="title function_">get</span>(<span class="string">&#x27;/user/:userId&#x27;</span>, <span class="keyword">function</span>(<span class="params">req, res</span>)&#123;</span><br><span class="line">    res.<span class="title function_">render</span>(<span class="string">&#x27;user&#x27;</span>, &#123; <span class="attr">user</span>: req.<span class="property">user</span> &#125;);</span><br><span class="line">  &#125;);</span><br><span class="line"></span><br><span class="line">  app.<span class="title function_">post</span>(<span class="string">&#x27;/user/:userId/profile&#x27;</span>, <span class="keyword">function</span>(<span class="params">req, res</span>)&#123;</span><br><span class="line">    req.<span class="property">user</span>.<span class="title function_">update</span>(req.<span class="property">body</span>, <span class="keyword">function</span>(<span class="params">err</span>)&#123;</span><br><span class="line">      <span class="keyword">if</span> (err) &#123; <span class="keyword">return</span> <span class="title function_">next</span>(err); &#125;   <span class="comment">// 老代码里漏掉 err 分支的写法不止一处</span></span><br><span class="line">      res.<span class="title function_">redirect</span>(<span class="string">&#x27;/user/&#x27;</span> + req.<span class="property">params</span>.<span class="property">userId</span>);</span><br><span class="line">    &#125;);</span><br><span class="line">  &#125;);</span><br><span class="line"></span><br><span class="line">  <span class="built_in">require</span>(<span class="string">&#x27;./routes/order&#x27;</span>)(app);</span><br><span class="line">  <span class="built_in">require</span>(<span class="string">&#x27;./routes/report&#x27;</span>)(app);</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p><code>app.param</code> 是这套写法里唯一能把公共前置逻辑抽出来的口子：路径里出现 <code>:userId</code>，回调先跑，把查出来的用户挂到 <code>req</code> 上，后面每个路由省一次查询。它按参数名生效，升级时要挨个核对。</p>
+<p>没有 Router 的代价很直白：所有路由平铺在同一个 app 上，没有子路由级的中间件。某模块想单独鉴权，要么每个回调手动调检查函数，要么给路径加统一前缀再靠中间件正则去圈。老代码里两种都有。那行注释也不冤枉人——<code>next(err)</code> 忘写的地方，出错时错误处理压根轮不到。</p>
+<h2 id="一个请求在-layer-链里怎么走"><a href="#一个请求在-layer-链里怎么走" class="headerlink" title="一个请求在 layer 链里怎么走"></a>一个请求在 layer 链里怎么走</h2><p>把前面几节串起来，按这套后台的注册顺序画出来：</p>
+<pre class="mermaid">flowchart TD
+    A[请求进来] --> B[express.static]
+    B -->|没命中| C[express.bodyParser]
+    C --> D[express.cookieParser]
+    D --> E[express.session]
+    E --> F[app.router]
+    F --> G[业务路由 如 /user/:userId]
+    G -->|next 传了 err| H[express.errorHandler]
+    G -->|正常| I[res.render 或 res.send]</pre>
+
+<p>再说一遍讲到那层就够：注册顺序就是队列顺序，命中意味着剥掉前缀往下传；layer 内部正则怎么构造，细节我没跟到底，不瞎说。要留意 <code>express.errorHandler</code> 在 3 里也靠注册位置决定生效范围——挂在 router 后面才接得住路由 <code>next(err)</code> 抛出的错。</p>
+<h2 id="升级到-4-的阻障清单"><a href="#升级到-4-的阻障清单" class="headerlink" title="升级到 4 的阻障清单"></a>升级到 4 的阻障清单</h2><p>坑攒到一起就是这张表，也是本文真正想留的东西：</p>
+<table>
+<thead>
+<tr>
+<th>阻障</th>
+<th>现场表现</th>
+<th>工作量</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>内置中间件要逐个装</td>
+<td><code>express.*</code> 下的调用全部变 undefined，每个都得装独立包并对参数</td>
+<td>挂一处测一处</td>
+</tr>
+<tr>
+<td><code>app.configure</code> 直接报错</td>
+<td>启动就 TypeError，环境分支全要重写</td>
+<td>入口文件大改</td>
+</tr>
+<tr>
+<td>路由注册位置变化</td>
+<td><code>app.router</code> 没了，静态与鉴权跟路由的相对次序重排</td>
+<td>全链路回归</td>
+</tr>
+<tr>
+<td>模板变量与 <code>locals</code> 的差别</td>
+<td>全局塞进模板的变量行为对不上，布局方式也得换</td>
+<td>四十多个页面</td>
+</tr>
+<tr>
+<td>错误处理要替换</td>
+<td><code>express.errorHandler</code> 没有对应物，自己写错误中间件</td>
+<td>量不大但分散</td>
+</tr>
+<tr>
+<td>更老的遗留调用</td>
+<td><code>app.helpers</code>、<code>app.dynamicHelpers</code> 还躺在代码里，这俩是 Express 2 时代的东西，在 3 里早已失效</td>
+<td>清理或留着都是债</td>
+</tr>
+</tbody></table>
+<p>补一句：<code>app.helpers</code> 塞进模板的变量其实早取不到了，起作用的是别处的 <code>res.locals</code>。僵尸代码没人敢删，升级清单又多一项。</p>
+<h2 id="我们最后的决定与执行"><a href="#我们最后的决定与执行" class="headerlink" title="我们最后的决定与执行"></a>我们最后的决定与执行</h2><p>决定就两条：这套老后台留在 3，只做安全修补；新项目一律开在 4。为了不让这条线被顺手升级踩破，我们加了三道闸。</p>
+<p>第一道，<code>package.json</code> 里写明运行环境和框架：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;name&quot;</span><span class="punctuation">:</span> <span class="string">&quot;oldadmin&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;engines&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;node&quot;</span><span class="punctuation">:</span> <span class="string">&quot;0.10.x&quot;</span> <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;dependencies&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;express&quot;</span><span class="punctuation">:</span> <span class="string">&quot;3.x&quot;</span> <span class="punctuation">&#125;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p><code>engines</code> 在当期 npm 默认只提示不拦人，但它是给下一个接手人看的。第二道，发布脚本里加守卫，跑不过就不出包：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># pre-release 检查，放在部署命令最前面</span></span><br><span class="line">node -v | grep -q <span class="string">&#x27;^v0\.10&#x27;</span> || &#123; <span class="built_in">echo</span> <span class="string">&quot;node 版本不对&quot;</span>; <span class="built_in">exit</span> 1; &#125;</span><br><span class="line">npm <span class="built_in">ls</span> express | grep -q <span class="string">&#x27;express@3&#x27;</span> || &#123; <span class="built_in">echo</span> <span class="string">&quot;express 不在 3.x&quot;</span>; <span class="built_in">exit</span> 1; &#125;</span><br></pre></td></tr></table></figure>
+
+<p>第三道，评审里加一条：改动老项目的依赖，先跑一遍全量回归，清单归评审那篇。三道闸都不贵，贵的是没有它们，再来一次”服务起来直接打挂”。</p>
+<h2 id="结尾：什么样的老项目还能拖"><a href="#结尾：什么样的老项目还能拖" class="headerlink" title="结尾：什么样的老项目还能拖"></a>结尾：什么样的老项目还能拖</h2><table>
+<thead>
+<tr>
+<th>维度</th>
+<th>可以继续用 3</th>
+<th>必须马上走</th>
+<th>我们已经踩过的信号</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>人</td>
+<td>还有碰过这套代码的老同事</td>
+<td>唯一维护者已经离职</td>
+<td>接手人只读过文档</td>
+</tr>
+<tr>
+<td>需求</td>
+<td>基本冻结，只补安全洞</td>
+<td>新需求持续压进来</td>
+<td>导入功能开始牵扯框架</td>
+</tr>
+<tr>
+<td>环境</td>
+<td>运行时锁死升不了</td>
+<td>机器要换新 Node</td>
+<td>验收环境还停在 0.10</td>
+</tr>
+<tr>
+<td>告警</td>
+<td>控制台干净</td>
+<td>启动一屏 deprecated 警告</td>
+<td>内存存储 warning 一直响</td>
+</tr>
+<tr>
+<td>事故</td>
+<td>半年没出过事</td>
+<td>出过一次全站打挂</td>
+<td><code>/tmp</code> 写满那次</td>
+</tr>
+</tbody></table>
+<p>把话说明白：2016 年年中，Express 3 不是任何新项目该选的推荐项，它是存量项目过渡期里的一笔账。能继续放的，把三道闸装好；该走的，别等下一次 <code>app.configure is not a function</code> 才动手。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Express 3 框架入门实战</p><p><a href="https://987763485.github.io/2016/06/09/Express3框架入门实战/">https://987763485.github.io/2016/06/09/Express3框架入门实战/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2016-06-09</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/javascript/">javascript</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a><a class="link-muted mr-2" rel="tag" href="/tags/nodejs/">nodejs</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2016/06/16/EJS%E4%B8%8EJade%E6%A8%A1%E6%9D%BF%E5%BC%95%E6%93%8E%E5%AF%B9%E6%AF%94/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">EJS 与 Jade 模板引擎对比</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2016/06/07/MongoDB%E8%81%9A%E5%90%88%E6%9F%A5%E8%AF%A2%E5%AE%9E%E8%B7%B5/"><span class="level-item">MongoDB 聚合查询实践</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

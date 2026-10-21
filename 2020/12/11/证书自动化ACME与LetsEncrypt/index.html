@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>证书自动化：ACME 与 Let&#039;s Encrypt - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="手工维护 TLS 证书的日子并不遥远：申请、下载、粘贴、改配置、重启，每一步都靠人记。本文从这套流程的失效模式讲起，沿着 RFC 8555 的对象模型拆解 ACME 协议，再用 certbot 与 acme.sh 两条工具链把签发、续期、部署和监控串成一条可无人值守的流水线。读完本文，你应该能为一个多域名、含泛域名、跨多台负载均衡的站点设计出可审计的证书自动化方案，并知道它会在哪些地方出错。"><meta property="og:type" content="blog"><meta property="og:title" content="证书自动化：ACME 与 Let&#039;s Encrypt"><meta property="og:url" content="https://987763485.github.io/2020/12/11/%E8%AF%81%E4%B9%A6%E8%87%AA%E5%8A%A8%E5%8C%96ACME%E4%B8%8ELetsEncrypt/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="手工维护 TLS 证书的日子并不遥远：申请、下载、粘贴、改配置、重启，每一步都靠人记。本文从这套流程的失效模式讲起，沿着 RFC 8555 的对象模型拆解 ACME 协议，再用 certbot 与 acme.sh 两条工具链把签发、续期、部署和监控串成一条可无人值守的流水线。读完本文，你应该能为一个多域名、含泛域名、跨多台负载均衡的站点设计出可审计的证书自动化方案，并知道它会在哪些地方出错。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2020-12-11T00:12:42.000Z"><meta property="article:modified_time" content="2026-10-18T15:19:12.854Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="网络安全"><meta property="article:tag" content="计算机网络"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2020/12/11/%E8%AF%81%E4%B9%A6%E8%87%AA%E5%8A%A8%E5%8C%96ACME%E4%B8%8ELetsEncrypt/"},"headline":"证书自动化：ACME 与 Let's Encrypt","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2020-12-11T00:12:42.000Z","dateModified":"2026-10-18T15:19:12.854Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"手工维护 TLS 证书的日子并不遥远：申请、下载、粘贴、改配置、重启，每一步都靠人记。本文从这套流程的失效模式讲起，沿着 RFC 8555 的对象模型拆解 ACME 协议，再用 certbot 与 acme.sh 两条工具链把签发、续期、部署和监控串成一条可无人值守的流水线。读完本文，你应该能为一个多域名、含泛域名、跨多台负载均衡的站点设计出可审计的证书自动化方案，并知道它会在哪些地方出错。"}</script><link rel="canonical" href="https://987763485.github.io/2020/12/11/%E8%AF%81%E4%B9%A6%E8%87%AA%E5%8A%A8%E5%8C%96ACME%E4%B8%8ELetsEncrypt/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2020-12-11T00:12:42.000Z" title="12/11/2020, 8:12:42 AM">2020-12-11</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a></span><span class="level-item">1 小时读完 (大约8396个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">证书自动化：ACME 与 Let&#039;s Encrypt</h1><div class="content"><p>手工维护 TLS 证书的日子并不遥远：申请、下载、粘贴、改配置、重启，每一步都靠人记。本文从这套流程的失效模式讲起，沿着 RFC 8555 的对象模型拆解 ACME 协议，再用 certbot 与 acme.sh 两条工具链把签发、续期、部署和监控串成一条可无人值守的流水线。读完本文，你应该能为一个多域名、含泛域名、跨多台负载均衡的站点设计出可审计的证书自动化方案，并知道它会在哪些地方出错。</p>
+<h2 id="从手工运维到协议：ACME-要解决的问题"><a href="#从手工运维到协议：ACME-要解决的问题" class="headerlink" title="从手工运维到协议：ACME 要解决的问题"></a>从手工运维到协议：ACME 要解决的问题</h2><p>证书申请本身并不复杂，复杂的是把它当作长期运行的基础设施来管理。手工流程通常是这样的：年初列一张表，记下域名、到期日、负责人；到期前两周有人想起，登录 CA 控制台，填 CSR，做域名验证，下载压缩包，解压出证书和中间证书，scp 到几台服务器，改 Nginx 配置，重启。这个流程在域名少于五个、人员稳定、机器只有两台的时候可以运转，一旦规模上去，它就会以几种非常典型的方式失效。</p>
+<p>第一种是到期事故。日历提醒依赖某个人的邮箱和记忆，人员离职、项目交接、提醒被当作噪音忽略，都会让提醒失效。证书过期的故障形态又特别隐蔽：服务进程健康、端口通、监控的 TCP 探活全绿，只有真实用户看到浏览器的全站警告。很多团队是在客服工单涌进来之后才知道证书已经过期两天。</p>
+<p>第二种是链不完整。CA 下发的压缩包里通常有叶子证书、中间证书，甚至根证书。有人只把叶子证书贴进配置，桌面浏览器因为缓存了中间证书或者会去抓 AIA 地址，看起来一切正常；而移动端、Java 客户端、某些 API 网关没有这些兜底手段，握手直接失败。同一份配置在不同客户端上表现不一致，排查成本极高。</p>
+<p>第三种是版本漂移。证书被复制到十台机器，续期时只换了其中八台，剩下两台因为没重启或者被跳过，继续提供旧证书。负载均衡把请求轮流打到新旧两组后端，用户遇到的是随机出现的证书错误，复现困难。</p>
+<p>第四种是私钥管理失控：私钥被放进代码仓库、被设置成 644、被复制到开发机。证书是公开信息，私钥才是资产，但手工流程里很少有人认真对待这一点。</p>
+<p>传统商业证书一年一签，把人的记忆周期拉长到一年，问题被稀释，却没有消失。Let’s Encrypt 在 2015 年之后把免费证书的有效期定为 90 天，逻辑正好相反：缩短有效期可以降低吊销的压力，让泄露的证书更快自然失效，但代价是续期频率提高到每季度一次，有些团队甚至每周都在续。这样的频率下人不可能可靠，只有自动化才可行。</p>
+<p>ACME 就是为这件事设计的协议，全称 Automatic Certificate Management Environment，2019 年 3 月发布的 RFC 8555 是它的第二个版本，也是本文讨论的唯一版本。它把“证明域名控制权”这件事协议化：客户端向 CA 提交订单，CA 下发挑战，客户端完成挑战，CA 签发证书，整个过程都是 HTTPS 上的 JSON 请求。它的价值不在于免费，而在于把签发变成可编程、可重试、可审计的 API 调用。证书链为什么必须完整、根证书与中间证书如何校验，属于 PKI 的基础理论，本文不展开；手工执行 OpenSSL 命令的细节也有专门的文章，这里只关心如何让机器替我们完成这些动作。</p>
+<h2 id="RFC-8555-的对象模型与-JWS-请求"><a href="#RFC-8555-的对象模型与-JWS-请求" class="headerlink" title="RFC 8555 的对象模型与 JWS 请求"></a>RFC 8555 的对象模型与 JWS 请求</h2><p>理解 ACME 的第一步是分清它定义的几个对象。RFC 8555 用资源（resource）的方式组织协议，客户端拿到的不是一纸证书，而是一组有 URL、有状态、可以轮询的 JSON 文档。</p>
+<p>入口是目录（directory）。客户端启动时先 GET 一个固定地址，拿到各个端点的 URL：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;newNonce&quot;</span><span class="punctuation">:</span> <span class="string">&quot;https://acme-v02.api.letsencrypt.org/acme/new-nonce&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;newAccount&quot;</span><span class="punctuation">:</span> <span class="string">&quot;https://acme-v02.api.letsencrypt.org/acme/new-acct&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;newOrder&quot;</span><span class="punctuation">:</span> <span class="string">&quot;https://acme-v02.api.letsencrypt.org/acme/new-order&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;revokeCert&quot;</span><span class="punctuation">:</span> <span class="string">&quot;https://acme-v02.api.letsencrypt.org/acme/revoke-cert&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;keyChange&quot;</span><span class="punctuation">:</span> <span class="string">&quot;https://acme-v02.api.letsencrypt.org/acme/key-change&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;meta&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;termsOfService&quot;</span><span class="punctuation">:</span> <span class="string">&quot;https://letsencrypt.org/documents/LE-SA-v1.2-November-15-2017.pdf&quot;</span></span><br><span class="line">  <span class="punctuation">&#125;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>生产环境与测试环境的目录地址不同，这一点后文还会反复提到：生产是 <code>https://acme-v02.api.letsencrypt.org/directory</code>，测试环境是 <code>https://acme-staging-v02.api.letsencrypt.org/directory</code>。两者协议完全一致，只是签发的证书不受信任、配额宽松。</p>
+<p>账户（account）代表一个长期身份。客户端用账户私钥对请求签名，首次调用 <code>newAccount</code> 时在 JWS 的保护头里放公钥（<code>jwk</code>），CA 返回 201 和一个账户 URL；之后的请求改用 <code>kid</code> 字段引用这个 URL。这里必须强调账户密钥与证书密钥是两把完全不同的钥匙：账户密钥只用于向 CA 证明“我是同一个客户端”，证书密钥才是配置在 Web 服务器上、用于 TLS 握手的那把。账户密钥一旦泄露，攻击者可以在授权仍然有效的前提下替你申请证书，所以它和网站私钥一样需要保护。</p>
+<p>订单（order）是一次签发请求。客户端向 <code>newOrder</code> POST 一个标识符列表，CA 返回订单对象，里面有 <code>status</code>、<code>authorizations</code>、<code>finalize</code> 和最终的 <code>certificate</code> 字段。每个标识符对应一个授权（authorization），授权里列出可选的挑战（challenge），每个挑战带类型、令牌（token）和状态。客户端选一个挑战，POST 一个空对象表示“我开始验证了”，然后轮询授权状态，直到变成 valid 或 invalid。</p>
+<p>这些对象构成一条状态链：订单从 pending 开始，所有授权通过后变成 ready，客户端提交 CSR 后进入 processing，签发完成变成 valid；授权从 pending 到 valid 或 invalid；挑战从 pending 经 processing 到 valid 或 invalid。客户端本质上是一个状态机驱动器，它不需要理解密码学细节，只需要按顺序推进状态、处理错误、在超时后重试。</p>
+<pre class="mermaid">flowchart LR
+  A[newOrder 创建订单] --> B[pending 待授权]
+  B --> C[逐个完成挑战]
+  C --> D{授权全部 valid}
+  D -->|是| E[ready 可提交 CSR]
+  D -->|否| F[invalid 订单失败]
+  E --> G[finalize 提交 CSR]
+  G --> H[processing 签发中]
+  H --> I[valid 下载证书]</pre>
+
+<p>协议层还有两个容易忽略的细节。其一是 nonce：每个响应都带一个 <code>Replay-Nonce</code> 头，客户端下次签名必须把它放进保护头，CA 用过即废，这是防重放的核心机制。客户端应当缓存并并发获取 nonce，遇到 <code>urn:ietf:params:acme:error:badNonce</code> 时重试，而不是把它当成致命错误。其二是 POST-as-GET：RFC 8555 不允许用普通 GET 读取订单、授权这类资源，必须发一个 payload 为空的 JWS POST，这样请求本身也是签名的，避免了资源 URL 被第三方拿去探测。自己实现客户端时这两点最容易踩坑；用现成工具不必操心，但排错时要看懂日志里的 <code>badNonce</code> 与签名错误。</p>
+<h2 id="三种挑战类型与网络可达性"><a href="#三种挑战类型与网络可达性" class="headerlink" title="三种挑战类型与网络可达性"></a>三种挑战类型与网络可达性</h2><p>挑战是 ACME 里唯一需要“外部世界配合”的环节，也是绝大多数失败发生的地方。RFC 8555 定义了三种挑战，它们回答的是同一个问题——你能否控制这个域名——但验证的通道完全不同，因此对网络拓扑的要求也完全不同。</p>
+<p>HTTP-01 是最常用的一种。CA 从多个网络位置发起请求，访问 <code>http://&lt;域名&gt;/.well-known/acme-challenge/&lt;token&gt;</code>，期望得到一段纯文本，内容是把挑战令牌和账户密钥指纹拼起来的 key authorization。客户端要做的事情很朴素：把这段文本写进网站根目录下的对应路径。用 webroot 模式时，工具只负责往指定目录写文件，Web 服务器照常提供服务。它的限制也同样朴素：80 端口必须从公网可达，域名必须解析到这台机器，中间不能有强制跳转到非标准端口、Basic 认证或者 WAF 拦截。RFC 允许 CA 跟随 301 与 302 跳转，但跳转目标仍受端口限制，跳到 8443 这类端口就会失败。另一个高频陷阱是 AAAA 记录：域名同时有 A 和 AAAA，而机器只监听了 IPv4，CA 从 IPv6 地址连过来就是 connection refused，日志里只会写一句验证失败。</p>
+<p>DNS-01 换了一条通道：在 <code>_acme-challenge.&lt;域名&gt;</code> 下写一条 TXT 记录，值为 key authorization 的 SHA-256 摘要的 Base64URL 编码。CA 通过递归解析器查询这条记录，因此不需要站点开放任何端口，也不要求域名指向某台具体机器。它最大的优势是支持泛域名：申请 <code>*.example.com</code> 时，授权对象的 <code>wildcard</code> 字段为真，验证的是 <code>example.com</code> 的 <code>_acme-challenge</code>，而不是某个具体子域。代价是必须能改 DNS，要么手工加记录，要么把 DNS 服务商的 API 凭证交给客户端。DNS 记录的传播不是瞬时的，客户端必须等待权威服务器返回新值再触发验证，这段等待时间是 DNS-01 最主要的失败来源。</p>
+<p>TLS-ALPN-01 最少见。客户端在 443 端口上临时起一个 TLS 服务，ALPN 只协商 <code>acme-tls/1</code>，返回一张带特殊扩展的自签证书，扩展里放着 key authorization 的摘要，CA 完成握手即视为验证通过。它适合 80 端口被封、又不方便改 DNS 的环境，但要求客户端独占 443，Nginx 正在运行时无法使用，工具链的支持也最弱。</p>
+<table>
+<thead>
+<tr>
+<th>挑战类型</th>
+<th>验证通道</th>
+<th>泛域名</th>
+<th>端口要求</th>
+<th>典型场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>HTTP-01</td>
+<td>80 端口 HTTP 请求</td>
+<td>不支持</td>
+<td>80 入站</td>
+<td>单域名站点、webroot</td>
+</tr>
+<tr>
+<td>DNS-01</td>
+<td><code>_acme-challenge</code> TXT</td>
+<td>支持</td>
+<td>无</td>
+<td>泛域名、内网源站、无公网 80</td>
+</tr>
+<tr>
+<td>TLS-ALPN-01</td>
+<td>443 端口 TLS 握手</td>
+<td>不支持</td>
+<td>443 独占</td>
+<td>只有 443 的环境</td>
+</tr>
+</tbody></table>
+<p>选择挑战类型时，先问三个问题：证书里要不要泛域名，源站能不能被公网访问，DNS 能不能通过 API 修改。要泛域名就只能选 DNS-01；源站藏在 CDN 或内网后面，HTTP-01 往往也不可行；两者都受限时，DNS-01 的 CNAME 委派是常用出路，后文会专门讲。还有一个容易被忽视的细节：泛域名证书只覆盖一级子域，<code>*.example.com</code> 既不覆盖 <code>example.com</code> 本身，也不覆盖 <code>a.b.example.com</code>，申请时通常要同时写上根域。</p>
+<h2 id="Let’s-Encrypt-的配额、staging-与-90-天生命周期"><a href="#Let’s-Encrypt-的配额、staging-与-90-天生命周期" class="headerlink" title="Let’s Encrypt 的配额、staging 与 90 天生命周期"></a>Let’s Encrypt 的配额、staging 与 90 天生命周期</h2><p>Let’s Encrypt 是 ACME 协议最广泛的应用，也是很多人唯一接触过的 CA。它的服务条款、配额和证书策略直接决定了自动化方案的设计，必须在动手之前弄清楚。</p>
+<p>第一是速率限制。它按类别设置，而不是一个总数：每个注册域名每周可签发的证书数量有上限（长期公开的数字是 50），这里的“注册域名”指 <code>example.com</code> 这一级，所有子域共享同一份额度；完全相同的域名集合重复签发有单独的配额（每周 5 张），所以反复调试同一张证书会很快撞墙；验证失败按账户、按主机名、按小时计数，失败的尝试同样消耗配额；账户创建按来源 IP 限制；订单创建也有按账户的速率约束。配额的设计意图是防止滥用，而不是惩罚正常使用，绝大多数事故来自“调试时反复重试”和“脚本把同一组域名签了十几遍”。遇到 <code>too many certificates already issued</code> 或 <code>too many failed authorizations recently</code> 时，正确的反应是停下查原因，而不是换台机器继续试。</p>
+<p>第二是测试环境。Let’s Encrypt 提供一套完全独立的 staging 端点，协议行为与生产一致，配额宽松得多，签发的证书由一张不受信任的测试根签发。它的用途只有一个：验证自动化流程本身是否走得通。所有上线前联调都应指向 staging，生产配置必须确认没有残留 staging 地址。certbot 的 <code>--dry-run</code> 就是自动切到 staging 跑一遍完整流程，这个参数应当成为每次修改续期配置后的固定动作。</p>
+<p>第三是有效期。2020 年时 Let’s Encrypt 证书的有效期是 90 天，官方建议在剩余约 30 天时续期，而不是按固定日历周期。90 天意味着一年至少四次续期，任何一次失败都必须在下一个 30 天窗口内被发现，这也解释了为什么监控是方案的一部分而不是可选项。</p>
+<p>第四是证书透明。Let’s Encrypt 会把签发的每一张证书提交到 CT 日志，证书因此进入公开可查的账本。这对审计是好事，对内部域名则是坏事：任何拿到日志的人都能枚举你签发过哪些域名。所以测试域名、内部系统域名不应使用公共 CA，这不是技术限制，而是信息暴露问题。</p>
+<p>最后是服务条款。首次注册账户时需要同意当时的用户协议，客户端会把这个动作做成一个显式参数。自动化脚本里应当显式接受条款；无人值守的 cron 任务最怕遇到等待输入的提示符。</p>
+<h2 id="certbot-1-x：四种获取方式与续期机制"><a href="#certbot-1-x：四种获取方式与续期机制" class="headerlink" title="certbot 1.x：四种获取方式与续期机制"></a>certbot 1.x：四种获取方式与续期机制</h2><p>certbot 是 EFF 维护的官方客户端，2020 年前后的 1.x 版本已经完整支持 ACME v2，早期那些围绕 v1 的教程和参数都不再适用。它的安装方式取决于发行版，Debian 与 Ubuntu 上直接装包即可，Nginx 插件会一并带上：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> apt-get install certbot python3-certbot-nginx</span><br></pre></td></tr></table></figure>
+
+<p>第一次申请证书，最常见的组合是 <code>certonly</code> 加 <code>webroot</code>。<code>certonly</code> 表示只签发、不改 Web 服务器配置，适合已经有成熟配置、不希望工具插手的团队：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> certbot certonly --webroot \</span><br><span class="line">  -w /var/www/example \</span><br><span class="line">  -d example.com -d www.example.com \</span><br><span class="line">  --email ops@example.com --agree-tos --no-eff-email</span><br></pre></td></tr></table></figure>
+
+<p><code>-w</code> 指定站点根目录，certbot 会在其下创建 <code>.well-known/acme-challenge/</code> 并写入验证文件，验证完成后自动清理。多个域名可以给出多组 <code>-w</code> 与 <code>-d</code>，顺序上一一对应；所有域名指向同一目录时，一组 <code>-w</code> 就够了。</p>
+<p>如果希望 certbot 顺手改配置，可以用 <code>--nginx</code> 或 <code>--apache</code> 插件。它们会解析现有站点配置、注入 443 的监听与证书路径、补上 80 到 443 的跳转，对单机小站点很方便。代价是它会改写你的配置文件，与手工维护或配置管理生成的配置容易冲突，这类环境里 <code>certonly</code> 更可控。</p>
+<p><code>--standalone</code> 让 certbot 自己起一个临时 HTTP 服务占用 80 端口，适合机器上还没有 Web 服务器、或者 Web 服务器可以短暂停机的场景。它与正在运行的 Nginx 冲突，必须先停服务，因此不适合无人值守的续期。</p>
+<p><code>--manual</code> 完全靠人完成挑战，默认交互式地让你去 DNS 添加记录。它可以配合 <code>--manual-auth-hook</code> 与 <code>--manual-cleanup-hook</code> 调用外部脚本，从而间接实现自动化，但证书续期时仍然要求这些钩子可靠执行，否则就会卡住。把纯 <code>--manual</code> 放进 cron 是一个典型的反模式，后文还会展开。</p>
+<p>所有配置改完之后，上线前一定要跑一次演练：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">sudo</span> certbot renew --dry-run</span><br></pre></td></tr></table></figure>
+
+<p>这个命令会真的走一遍账户、订单、挑战、签发的完整流程，只是把端点换成 staging，不会消耗生产配额，也不会改动现有证书。它是验证防火墙、DNS、Web 服务器配置是否正确的性价比最高的手段。</p>
+<p>certbot 把每个证书的参数记在 <code>/etc/letsencrypt/renewal/</code> 下的配置文件里，续期时不需要重新传一遍参数：</p>
+<figure class="highlight ini"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># /etc/letsencrypt/renewal/example.com.conf（节选）</span></span><br><span class="line"><span class="section">[renewalparams]</span></span><br><span class="line"><span class="attr">authenticator</span> = webroot</span><br><span class="line"><span class="attr">webroot_path</span> = /var/www/example,</span><br><span class="line"><span class="attr">server</span> = https://acme-v02.api.letsencrypt.org/directory</span><br></pre></td></tr></table></figure>
+
+<p>续期动作本身是 <code>certbot renew</code>，它会遍历上述配置，只对剩余有效期不足 30 天的证书执行签发。Debian 与 Ubuntu 的软件包自带一个 systemd timer，每天触发两次并带随机延迟，安装后无需自己写 cron：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">systemctl list-timers --all | grep certbot</span><br><span class="line">systemctl status certbot.timer</span><br></pre></td></tr></table></figure>
+
+<p>如果发行版没有提供 timer，可以自己写一条 cron，但要注意加随机延迟，避免大量机器在同一秒请求 CA：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># /etc/cron.d/certbot-renew</span></span><br><span class="line">17 3 * * * root perl -e <span class="string">&#x27;sleep int(rand(3600))&#x27;</span> &amp;&amp; certbot renew -q</span><br></pre></td></tr></table></figure>
+
+<p>续期成功后，真正让新证书生效的是“部署”这一步，certbot 用 <code>--deploy-hook</code> 暴露这个时机。钩子只在证书确实被续期时执行，不会在“还没到期、跳过签发”时误触发：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">certbot renew --deploy-hook <span class="string">&quot;/usr/local/bin/deploy-cert.sh&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>钩子进程会拿到两个环境变量：<code>RENEWED_LINEAGE</code> 指向 <code>live/&lt;证书名&gt;</code> 目录，<code>RENEWED_DOMAINS</code> 是本次续期的域名列表。这两个变量足以让钩子做到“只重载受影响的服务”，而不是无差别重启。日常排查时，<code>certbot certificates</code> 会列出本机所有证书的域名、到期时间和存储路径，是确认“到底续没续”的第一条命令。</p>
+<h2 id="acme-sh：纯-Shell-实现与-DNS-泛域名"><a href="#acme-sh：纯-Shell-实现与-DNS-泛域名" class="headerlink" title="acme.sh：纯 Shell 实现与 DNS 泛域名"></a>acme.sh：纯 Shell 实现与 DNS 泛域名</h2><p>acme.sh 是另一个广泛使用的客户端，用纯 Shell 写成，不依赖 Python，在容器、精简系统、老旧发行版上特别顺手。它的安装就是下载脚本并执行，脚本会把自身复制到用户目录并写入一条 cron：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">curl https://get.acme.sh | sh -s email=ops@example.com</span><br><span class="line"><span class="built_in">source</span> ~/.bashrc</span><br></pre></td></tr></table></figure>
+
+<p>安装完成后，所有操作都通过 <code>~/.acme.sh/acme.sh</code> 进行。签发单域名或普通多域名证书，webroot 模式与 certbot 思路一致：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">~/.acme.sh/acme.sh --issue \</span><br><span class="line">  -d example.com -d www.example.com \</span><br><span class="line">  -w /var/www/example</span><br></pre></td></tr></table></figure>
+
+<p>泛域名则必须走 DNS-01。acme.sh 内置了大量 DNS 服务商的 API 适配，凭证通过环境变量传入，以 Cloudflare 为例：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">export</span> CF_Token=<span class="string">&quot;仅限该 zone 的 DNS 编辑权限令牌&quot;</span></span><br><span class="line">~/.acme.sh/acme.sh --issue --dns dns_cf \</span><br><span class="line">  -d example.com -d <span class="string">&#x27;*.example.com&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p>这里有两个细节值得强调。第一，<code>-d example.com</code> 与 <code>-d &#39;*.example.com&#39;</code> 要一起写，泛域名不覆盖根域；第二，传给 acme.sh 的应当是限定到单个 zone、只有 DNS 编辑权限的 API 令牌，而不是账户级全局密钥。令牌一旦泄露，攻击者可以改你的 DNS，进而劫持域名，这个风险比证书私钥泄露更大。</p>
+<p>证书签发在 <code>~/.acme.sh/&lt;域名&gt;/</code> 下，但不要直接把 Web 服务器指向这个目录。acme.sh 的推荐做法是用 <code>--install-cert</code> 把文件复制到目标位置，并登记重载命令：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">~/.acme.sh/acme.sh --install-cert -d example.com \</span><br><span class="line">  --key-file       /etc/nginx/ssl/example.com.key \</span><br><span class="line">  --fullchain-file /etc/nginx/ssl/example.com.crt \</span><br><span class="line">  --reloadcmd      <span class="string">&quot;systemctl reload nginx&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>这条命令的信息会被记住，之后每次 cron 续期成功，acme.sh 自动复制文件并执行 <code>reloadcmd</code>，不需要额外的部署脚本。安装时写入的 cron 每天跑一次 <code>--cron</code>，它内部同样只对临近到期的证书动手，并在失败时重试。</p>
+<p>acme.sh 默认把账户密钥、证书私钥和配置都放在 <code>~/.acme.sh</code> 下，目录权限是 700，这一点比自己手工建目录再 chmod 要可靠。它的升级通过 <code>--upgrade</code> 完成，升级后需要确认 cron 里的路径没有变化。与 certbot 相比，acme.sh 的优势是零依赖、DNS 适配多、部署命令一体化；劣势是日志相对简略、出错时的提示不如 certbot 友好，排错更依赖 <code>--debug</code> 输出。两者选其一即可，不要在同一台机器上让两个客户端管理同一组域名，否则续期配置会互相覆盖。</p>
+<h2 id="部署：链文件、权限与原子替换"><a href="#部署：链文件、权限与原子替换" class="headerlink" title="部署：链文件、权限与原子替换"></a>部署：链文件、权限与原子替换</h2><p>签发成功只是完成了一半，证书要真正生效，还得经过“放到正确路径、给对权限、让进程重新加载”这三步。每一步都有坑，而且坑的表现形式都是“看起来成功了”。</p>
+<p>先看文件。certbot 在 <code>/etc/letsencrypt/live/&lt;证书名&gt;/</code> 下提供四个符号链接：<code>cert.pem</code> 是叶子证书，<code>chain.pem</code> 是中间证书，<code>fullchain.pem</code> 是两者拼接，<code>privkey.pem</code> 是私钥。Web 服务器应当使用 <code>fullchain.pem</code> 与 <code>privkey.pem</code>，而不是 <code>cert.pem</code>。链文件的顺序必须是叶子在前、中间在后，顺序反了，部分客户端会直接握手失败；根证书通常不需要也不应该放进链里，客户端本地已有信任锚。</p>
+<figure class="highlight nginx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">server</span> &#123;</span><br><span class="line">    <span class="attribute">listen</span> <span class="number">443</span> ssl;</span><br><span class="line">    <span class="attribute">server_name</span> example.com;</span><br><span class="line"></span><br><span class="line">    <span class="attribute">ssl_certificate</span>     /etc/letsencrypt/live/example.com/fullchain.pem;</span><br><span class="line">    <span class="attribute">ssl_certificate_key</span> /etc/letsencrypt/live/example.com/privkey.pem;</span><br><span class="line"></span><br><span class="line">    <span class="attribute">ssl_protocols</span>       TLSv1.<span class="number">2</span> TLSv1.<span class="number">3</span>;</span><br><span class="line">    <span class="attribute">ssl_session_cache</span>   shared:SSL:<span class="number">10m</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>改完配置先做语法检查再重载。Nginx 的 reload 是平滑的，旧 worker 会把手上的连接处理完再退出，不会中断请求：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">nginx -t &amp;&amp; systemctl reload nginx</span><br></pre></td></tr></table></figure>
+
+<p>不要用 restart 代替 reload。restart 会断开监听套接字，在流量高峰表现为一批连接被重置；而 reload 只是在主进程里重新读配置、拉起新 worker。</p>
+<p>再看权限。<code>/etc/letsencrypt/live</code> 与 <code>archive</code> 的目录权限是 700，属主是 root，<code>privkey.pem</code> 是 600。这意味着只有 root 能读私钥，Web 服务器主进程以 root 启动、再降权到 worker，所以能读到；但如果你把证书路径指向一个由普通用户运行的服务，就会遇到 permission denied。正确做法不是把私钥改成 644，而是让部署脚本用 root 把文件复制到服务专用目录，属主设为服务账号，权限 600。HAProxy 这类需要把证书和私钥合并成一个文件的场景，尤其要注意复制后的属主，否则 reload 时才会报错。</p>
+<p>最后是原子替换。部署脚本的典型错误是“先删旧文件、再拷新文件”，中间有一个窗口期文件不存在，此时 reload 必然失败，服务可能带着旧配置继续跑或者直接起不来。正确顺序是：在同一文件系统内写临时文件、设好权限、用 <code>mv</code> 覆盖（同一文件系统内的 rename 是原子的），最后 reload。certbot 自己的 <code>live/</code> 符号链接切换就是原子操作，所以直接引用 <code>live/</code> 路径通常比自己复制更安全。</p>
+<p>一份可用的部署脚本大致如下，重点是失败时保留旧证书、reload 失败不影响已经生效的配置：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#!/usr/bin/env bash</span></span><br><span class="line"><span class="built_in">set</span> -euo pipefail</span><br><span class="line"></span><br><span class="line">DOMAIN=<span class="string">&quot;example.com&quot;</span></span><br><span class="line">SRC=<span class="string">&quot;/etc/letsencrypt/live/<span class="variable">$&#123;DOMAIN&#125;</span>&quot;</span></span><br><span class="line">DST=<span class="string">&quot;/etc/nginx/ssl&quot;</span></span><br><span class="line">STAMP=<span class="string">&quot;<span class="subst">$(date +%Y%m%d%H%M%S)</span>&quot;</span></span><br><span class="line"></span><br><span class="line">install -m 600 -o root -g root <span class="string">&quot;<span class="variable">$&#123;SRC&#125;</span>/privkey.pem&quot;</span>   <span class="string">&quot;<span class="variable">$&#123;DST&#125;</span>/<span class="variable">$&#123;DOMAIN&#125;</span>.key.<span class="variable">$&#123;STAMP&#125;</span>&quot;</span></span><br><span class="line">install -m 644 -o root -g root <span class="string">&quot;<span class="variable">$&#123;SRC&#125;</span>/fullchain.pem&quot;</span> <span class="string">&quot;<span class="variable">$&#123;DST&#125;</span>/<span class="variable">$&#123;DOMAIN&#125;</span>.crt.<span class="variable">$&#123;STAMP&#125;</span>&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="built_in">ln</span> -sfn <span class="string">&quot;<span class="variable">$&#123;DOMAIN&#125;</span>.key.<span class="variable">$&#123;STAMP&#125;</span>&quot;</span> <span class="string">&quot;<span class="variable">$&#123;DST&#125;</span>/<span class="variable">$&#123;DOMAIN&#125;</span>.key&quot;</span></span><br><span class="line"><span class="built_in">ln</span> -sfn <span class="string">&quot;<span class="variable">$&#123;DOMAIN&#125;</span>.crt.<span class="variable">$&#123;STAMP&#125;</span>&quot;</span> <span class="string">&quot;<span class="variable">$&#123;DST&#125;</span>/<span class="variable">$&#123;DOMAIN&#125;</span>.crt&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> ! nginx -t; <span class="keyword">then</span></span><br><span class="line">  <span class="built_in">echo</span> <span class="string">&quot;配置检查失败，回滚&quot;</span> &gt;&amp;2</span><br><span class="line">  <span class="built_in">exit</span> 1</span><br><span class="line"><span class="keyword">fi</span></span><br><span class="line"></span><br><span class="line">systemctl reload nginx</span><br></pre></td></tr></table></figure>
+
+<p>脚本每次续期都会留下带时间戳的副本，回滚时只需把符号链接指回上一个时间戳。时间戳还有一个副作用：Nginx 在 reload 时会因为路径变化重新读取文件，避免某些文件系统缓存导致的“明明换了证书却还是旧的”。</p>
+<p>多服务场景要把“部署”抽象成一份服务清单，逐个重载并逐个校验。Nginx、HAProxy、API 网关读取证书的方式不同，但流程一致：复制、检查配置、重载、探测。任何一个服务失败，都应当停止后续步骤并告警，而不是继续把错误扩散到全部节点。重载后的健康检查不要只看进程状态，要用真实握手验证：<code>openssl s_client -connect 127.0.0.1:443 -servername example.com</code> 看返回的证书主题与有效期，或者用 <code>curl --resolve example.com:443:127.0.0.1 https://example.com/</code> 确认证书链能被正常校验。只有握手通过，才算部署成功；失败则恢复上一份文件、再次 reload，并保留现场日志。</p>
+<h2 id="参考架构与故障排查"><a href="#参考架构与故障排查" class="headerlink" title="参考架构与故障排查"></a>参考架构与故障排查</h2><p>把前面几节拼起来，一个可运维的证书自动化架构包含四段：管理主机上的客户端与定时任务、CA 的 ACME 端点、验证通道（80 端口或 DNS API）、以及证书落盘后的分发与重载。管理主机不必是 Web 服务器，它可以只负责签发和分发，这样证书的生命周期与业务机器的扩缩容解耦。</p>
+<pre class="mermaid">flowchart TD
+  A[管理主机 cron/timer] --> B[certbot 或 acme.sh]
+  B --> C[ACME 目录与账户]
+  C --> D{验证通道}
+  D -->|HTTP-01| E[站点 80 端口]
+  D -->|DNS-01| F[DNS API 写入 TXT]
+  E --> G[CA 校验域名控制权]
+  F --> G
+  G --> H[签发证书]
+  H --> I[证书存储 live/ 或 ssl/]
+  I --> J[部署脚本: 原子替换]
+  J --> K[Nginx]
+  J --> L[HAProxy]
+  J --> M[API 网关]
+  I --> N[外部到期探测]
+  K --> O[握手健康检查]
+  L --> O
+  M --> O
+  O -->|失败| P[回滚并告警]</pre>
+
+<p>续期流程的失败处理要分层次。签发失败时，旧证书还在，服务不受影响，此时应当重试有限次数后告警，绝不能在脚本里删掉现有证书“重新来过”。部署失败时，同样保留旧文件，重载失败就不要继续操作其他节点。监控失败时，不要自动重签，因为重签很可能撞上速率限制，正确的动作是通知人。把“能自动修复的”和“必须人判断的”分开，是这套架构能不能长期稳定运行的关键。</p>
+<p>排错时按“挑战类型、错误码、发生位置”三条线索定位，比盲目重试有效得多。下表列出最常见的几类现象：</p>
+<table>
+<thead>
+<tr>
+<th>现象</th>
+<th>常见原因</th>
+<th>检查手段</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>HTTP-01 返回 404</td>
+<td>webroot 路径与站点根不一致；重写规则拦截 <code>.well-known</code>；文件权限不可读</td>
+<td>手工在站点根放测试文件，用公网地址访问同一路径</td>
+</tr>
+<tr>
+<td>HTTP-01 连接被拒或超时</td>
+<td>安全组未放行 80；AAAA 记录指向未监听的主机；CDN 回源未配置</td>
+<td>从外部网络 <code>curl -v http://域名/.well-known/acme-challenge/测试值</code>，并检查 A&#x2F;AAAA</td>
+</tr>
+<tr>
+<td>DNS-01 提示记录不正确</td>
+<td>传播未完成；写到了错误的 zone；存在多条冲突 TXT</td>
+<td><code>dig +short TXT _acme-challenge.域名 @权威服务器</code>，确认权威侧已生效</td>
+</tr>
+<tr>
+<td>签发被拒绝，提示 CAA</td>
+<td>域名的 CAA 记录未授权该 CA</td>
+<td><code>dig CAA 域名</code>，确认 <code>issue</code> 与 <code>issuewild</code> 包含对应 CA</td>
+</tr>
+<tr>
+<td>提示速率限制</td>
+<td>重复签发同一组域名；验证失败次数过多</td>
+<td>查 CA 的配额说明与账户历史，停止重试并等待窗口重置</td>
+</tr>
+<tr>
+<td>签名或 nonce 报错</td>
+<td>系统时间偏差过大；客户端版本过旧</td>
+<td>检查 NTP 同步状态与客户端版本</td>
+</tr>
+<tr>
+<td>浏览器报证书链不完整</td>
+<td>只部署了叶子证书，或链顺序颠倒</td>
+<td><code>openssl s_client -showcerts</code> 看返回的证书条数与顺序</td>
+</tr>
+<tr>
+<td>证书不受信任</td>
+<td>生产环境误用了 staging 证书</td>
+<td>比对签发者与 <code>certbot certificates</code> 中的路径</td>
+</tr>
+</tbody></table>
+<p>监控要覆盖三个层面。最外层是外部探测：从公网定期连接 443，读取证书的 <code>notAfter</code>，在剩余 30 天、14 天、7 天分别升级告警级别。这一层不依赖任何内部脚本是否跑成功，是最可靠的兜底。中间层是续期任务本身：检查 cron 或 timer 是否执行、退出码是否为零、日志里有没有 <code>failed</code> 与 <code>error</code>。最内层是部署结果：握手探测、证书指纹是否变化、链是否完整。三层都绿，才能说这条流水线是健康的。</p>
+<p>值得单独提的是证书透明监控。既然证书会进入 CT 日志，就可以反过来利用它：定期查询 CT 日志中出现的自家域名，如果发现一张自己没申请过的证书，说明有人可能通过其他途径完成了域名验证，这属于安全事件而不是运维故障。同样地，内部域名出现在公共 CT 日志里，也应当被当作信息泄露来处理。</p>
+<p>安全边界上有几条硬规则。账户私钥与证书私钥都按敏感文件对待，目录 700、私钥 600、属主专用账号；DNS API 令牌限定到单个 zone、只给 DNS 编辑权限，并且不落进 shell 历史（用环境变量文件或密钥管理服务注入）；不要在无人值守的任务里使用交互式 <code>--manual</code>，它会在等待输入时挂起，把一次普通续期拖成到期事故；部署钩子只做复制与重载，不在里面执行来源不明的脚本。最后定期审计续期日志与钩子内容，确认没人留下 <code>--staging</code> 或跳过验证的临时改动。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>证书自动化的核心不是某个命令，而是一条从签发、验证、落盘、部署到监控的闭环，任何一环缺失都会在 90 天的周期里暴露出来。理解 ACME 的账户、订单、授权与挑战模型，才能在工具报错时判断问题出在协议层还是网络层。选型上，单机小站点用 certbot 的 webroot 加 timer 最省事，跨云、多域名、要泛域名时 acme.sh 配合 DNS API 更灵活，但无论选哪个，都要用 staging 演练、用原子替换部署、用外部探测兜底。把“续期成功但没重载”和“只部署叶子证书”这两个最常见的坑堵住，证书这件事基本就不会再半夜叫醒你。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://datatracker.ietf.org/doc/html/rfc8555">RFC 8555: Automatic Certificate Management Environment (ACME)</a></li>
+<li><a href="https://letsencrypt.org/docs/">Let’s Encrypt Documentation</a></li>
+<li><a href="https://letsencrypt.org/docs/rate-limits/">Let’s Encrypt: Rate Limits</a></li>
+<li><a href="https://letsencrypt.org/docs/challenge-types/">Let’s Encrypt: Challenge Types</a></li>
+<li><a href="https://certbot.eff.org/docs/">Certbot Documentation</a></li>
+<li><a href="https://github.com/acmesh-official/acme.sh">acme.sh GitHub Repository</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>证书自动化：ACME 与 Let&#039;s Encrypt</p><p><a href="https://987763485.github.io/2020/12/11/证书自动化ACME与LetsEncrypt/">https://987763485.github.io/2020/12/11/证书自动化ACME与LetsEncrypt/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2020-12-11</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a><a class="link-muted mr-2" rel="tag" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/">计算机网络</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2020/12/18/Ansible%E8%87%AA%E5%8A%A8%E5%8C%96%E8%BF%90%E7%BB%B4%E5%85%A5%E9%97%A8/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Ansible 自动化运维入门</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2020/12/06/Redis%E6%95%B0%E6%8D%AE%E7%B1%BB%E5%9E%8B%E4%B8%8E%E4%BD%BF%E7%94%A8%E5%9C%BA%E6%99%AF/"><span class="level-item">Redis 数据类型与使用场景</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

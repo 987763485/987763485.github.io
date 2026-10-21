@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>向量数据库选型对比 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="Milvus 的接口用法在入门那篇讲过，索引、分片、副本与监控怎么运维也在部署那篇展开过。本文只做另一件事：选型判断。先把需求侧的六项约束写成可判定的条件，再分清四种产品形态的责任边界，然后沿索引、元数据过滤、混合检索、多租户、一致性与写入实时性、运维成本逐条比对，最后给一次从需求倒推的推演和一张决策清单。本文不给基准测试数字与排名；不能确定在你所用版本上已经可用的能力，一律写成需要核实并实测。"><meta property="og:type" content="blog"><meta property="og:title" content="向量数据库选型对比"><meta property="og:url" content="https://987763485.github.io/2023/07/25/%E5%90%91%E9%87%8F%E6%95%B0%E6%8D%AE%E5%BA%93%E9%80%89%E5%9E%8B%E5%AF%B9%E6%AF%94/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="Milvus 的接口用法在入门那篇讲过，索引、分片、副本与监控怎么运维也在部署那篇展开过。本文只做另一件事：选型判断。先把需求侧的六项约束写成可判定的条件，再分清四种产品形态的责任边界，然后沿索引、元数据过滤、混合检索、多租户、一致性与写入实时性、运维成本逐条比对，最后给一次从需求倒推的推演和一张决策清单。本文不给基准测试数字与排名；不能确定在你所用版本上已经可用的能力，一律写成需要核实并实测。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2023-07-24T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-19T04:36:42.390Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="大模型"><meta property="article:tag" content="python"><meta property="article:tag" content="typescript"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2023/07/25/%E5%90%91%E9%87%8F%E6%95%B0%E6%8D%AE%E5%BA%93%E9%80%89%E5%9E%8B%E5%AF%B9%E6%AF%94/"},"headline":"向量数据库选型对比","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2023-07-24T16:00:00.000Z","dateModified":"2026-10-19T04:36:42.390Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"Milvus 的接口用法在入门那篇讲过，索引、分片、副本与监控怎么运维也在部署那篇展开过。本文只做另一件事：选型判断。先把需求侧的六项约束写成可判定的条件，再分清四种产品形态的责任边界，然后沿索引、元数据过滤、混合检索、多租户、一致性与写入实时性、运维成本逐条比对，最后给一次从需求倒推的推演和一张决策清单。本文不给基准测试数字与排名；不能确定在你所用版本上已经可用的能力，一律写成需要核实并实测。"}</script><link rel="canonical" href="https://987763485.github.io/2023/07/25/%E5%90%91%E9%87%8F%E6%95%B0%E6%8D%AE%E5%BA%93%E9%80%89%E5%9E%8B%E5%AF%B9%E6%AF%94/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2023-07-24T16:00:00.000Z" title="7/25/2023, 12:00:00 AM">2023-07-25</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></span><span class="level-item">1 小时读完 (大约7798个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">向量数据库选型对比</h1><div class="content"><p>Milvus 的接口用法在入门那篇讲过，索引、分片、副本与监控怎么运维也在部署那篇展开过。本文只做另一件事：选型判断。先把需求侧的六项约束写成可判定的条件，再分清四种产品形态的责任边界，然后沿索引、元数据过滤、混合检索、多租户、一致性与写入实时性、运维成本逐条比对，最后给一次从需求倒推的推演和一张决策清单。本文不给基准测试数字与排名；不能确定在你所用版本上已经可用的能力，一律写成需要核实并实测。</p>
+<h2 id="选型前先落实六项约束"><a href="#选型前先落实六项约束" class="headerlink" title="选型前先落实六项约束"></a>选型前先落实六项约束</h2><p>选型失败最常见的原因不是产品不好，而是比较开始得太早。手上只有一句“要做向量检索”，就把五六款产品的功能表逐格打勾，这种比法几乎必然得出“功能最多的最好”，而功能最多通常意味着依赖组件最多。正确的顺序是先把自己的约束写成可判定的条件，让多数候选直接出局。</p>
+<h3 id="数据规模：算字节而不是报条数"><a href="#数据规模：算字节而不是报条数" class="headerlink" title="数据规模：算字节而不是报条数"></a>数据规模：算字节而不是报条数</h3><p>规模要换算成字节，内存和磁盘只认字节。原始向量的下界是条数乘维度乘分量字节数，float32 是当时的常见默认，每个分量 4 字节。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 原始向量占用估算，注意这只是下界，不含索引结构与元数据</span></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">raw_bytes</span>(<span class="params">count: <span class="built_in">int</span>, dim: <span class="built_in">int</span>, bytes_per_value: <span class="built_in">int</span> = <span class="number">4</span></span>) -&gt; <span class="built_in">float</span>:</span><br><span class="line">    <span class="keyword">return</span> count * dim * bytes_per_value / (<span class="number">1024</span> ** <span class="number">3</span>)  <span class="comment"># 返回 GiB</span></span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(<span class="string">f&quot;<span class="subst">&#123;raw_bytes(<span class="number">10_000_000</span>, <span class="number">768</span>):<span class="number">.1</span>f&#125;</span> GiB&quot;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>一千万条 768 维向量的裸数据就是一个可观的内存量，还没算 HNSW 的邻接表、IVF 的聚类中心与倒排链、原始向量副本和元数据列。工程上要在下界上乘一个放大系数，系数只能拿真实数据建一次索引量出来；量化压缩能让内存下降一到两个数量级，但那是结构性差异的说法，不是对某款产品的承诺。年增长率、保留策略和副本数也要一起代入。</p>
+<h3 id="查询负载：QPS、top-k-与延迟预算"><a href="#查询负载：QPS、top-k-与延迟预算" class="headerlink" title="查询负载：QPS、top_k 与延迟预算"></a>查询负载：QPS、top_k 与延迟预算</h3><p>平均 QPS、峰值 QPS、延迟口径必须分开写下来。写“要快”没有意义，要写成“检索阶段 p95 不超过某个预算”，而预算通常从上往下倒推：端到端体验目标扣掉模型生成、网络与序列化、重排序，剩下的才是向量检索的份额。另外两个容易漏的变量是 top_k 和批量形态：k 取 10 与取 100 的代价不在一个量级，一次一条与一次打包一百条对分片与线程模型的要求也完全不同。</p>
+<h3 id="过滤复杂度：这是最容易被低估的一格"><a href="#过滤复杂度：这是最容易被低估的一格" class="headerlink" title="过滤复杂度：这是最容易被低估的一格"></a>过滤复杂度：这是最容易被低估的一格</h3><p>很多团队把过滤当成“加个 WHERE 的事”，但它对选型的影响比索引类型还大。可按四档自评估：完全没有过滤；低基数枚举，比如文档语言、状态字段；高基数，比如按部门标识、权限标签集合做等值或包含判断；范围与逻辑组合，多字段 AND&#x2F;OR 嵌套。基数越高、组合越复杂，“先取近似 Top-K 再过滤”就越危险，原因见后文过滤一节。还要写清选择率：筛掉 99% 与筛掉 1% 的两个条件，最优执行路径可能刚好相反。</p>
+<h3 id="一致性要求：谁需要立刻看见新数据"><a href="#一致性要求：谁需要立刻看见新数据" class="headerlink" title="一致性要求：谁需要立刻看见新数据"></a>一致性要求：谁需要立刻看见新数据</h3><p>三个问题：写入后多久必须能被检索到；同一客户端写完立刻查，是否必须看见自己刚写的那条；相似查询的结果是否必须可复现。它们决定你能否接受最终一致，也决定要不要为强一致付协调与刷盘的代价。</p>
+<h3 id="团队运维能力与变更频率"><a href="#团队运维能力与变更频率" class="headerlink" title="团队运维能力与变更频率"></a>团队运维能力与变更频率</h3><p>最后一项约束常常最诚实：团队里有没有人值班、能不能处理一次跨节点的数据不一致、有没有做过备份恢复演练。变更频率也要评估——embedding 模型换一次就是全量向量重建，这是选型阶段必须演练过的动作。如果受合规约束必须私有化部署，托管服务这一整类候选直接出局。</p>
+<table>
+<thead>
+<tr>
+<th>约束</th>
+<th>要落成的形式</th>
+<th>直接影响的选型维度</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>数据规模</td>
+<td>条数、维度、字节量、增长率</td>
+<td>是否需要磁盘索引、量化、分片</td>
+</tr>
+<tr>
+<td>查询负载</td>
+<td>峰值 QPS、top_k、p95 预算</td>
+<td>副本数、搜索参数可调性</td>
+</tr>
+<tr>
+<td>过滤复杂度</td>
+<td>四档分类加选择率</td>
+<td>前置还是后置过滤、payload 索引</td>
+</tr>
+<tr>
+<td>一致性</td>
+<td>可见延迟、读己之写</td>
+<td>一致性级别、刷盘策略</td>
+</tr>
+<tr>
+<td>运维能力</td>
+<td>值班、演练、依赖组件数</td>
+<td>专用集群、嵌入式还是托管</td>
+</tr>
+<tr>
+<td>变更频率</td>
+<td>重建耗时、全量重嵌入周期</td>
+<td>索引构建速度与灰度能力</td>
+</tr>
+</tbody></table>
+<h2 id="四种形态对应四种责任边界"><a href="#四种形态对应四种责任边界" class="headerlink" title="四种形态对应四种责任边界"></a>四种形态对应四种责任边界</h2><p>先按形态分类再排开比较，更有助于决策。形态决定的是责任边界：内存归谁管、索引正确性归谁管、扩缩容归谁管、数据丢了谁负责。</p>
+<pre class="mermaid">flowchart TD
+    A[向量检索需求] --> B[专用向量数据库]
+    A --> C[现有数据库的扩展]
+    A --> D[对象存储加工自建索引]
+    A --> E[托管 SaaS]
+    B --> B1[Milvus 2.2 / Qdrant 1.x / Weaviate 1.x]
+    C --> C1[pgvector 0.4 挂在 PostgreSQL 15 上]
+    D --> D1[FAISS / hnswlib / ScaNN / DiskANN 库]
+    E --> E1[Pinecone 等托管服务]
+    C --> F[事务与备份复用原有数据库]
+    D --> G[全部工程责任自己承担]
+    E --> H[依赖外部网络与供应商]</pre>
+
+<h3 id="专用向量数据库：为向量重写了存储与执行"><a href="#专用向量数据库：为向量重写了存储与执行" class="headerlink" title="专用向量数据库：为向量重写了存储与执行"></a>专用向量数据库：为向量重写了存储与执行</h3><p>Milvus、Qdrant、Weaviate 的共同点是把向量当成一等公民：索引面向向量，搜索请求原生带近似语义与 top_k，元数据过滤走自己的执行路径，分片与副本按向量分布设计。价值是一次性解决向量检索的工程问题，代价是多出一个全新服务，有自己一套配置、指标、升级流程与故障模式。架构差别也不小：Milvus 2.2 是存算分离、依赖对象存储与消息队列的分布式架构，另有单机部署形态；Qdrant、Weaviate 更偏单机或简单集群起步。要区分“产品支持分布式”和“你能负担分布式运维”，这两句在很多评审里被混着用。</p>
+<h3 id="现有数据库的扩展：pgvector-把向量变成一列"><a href="#现有数据库的扩展：pgvector-把向量变成一列" class="headerlink" title="现有数据库的扩展：pgvector 把向量变成一列"></a>现有数据库的扩展：pgvector 把向量变成一列</h3><p>pgvector 是 PostgreSQL 的扩展，把向量作为列类型放进普通表，索引用 <code>ivfflat</code> 或 HNSW（0.4 版本已支持 HNSW）。它的杀手级优势不是检索性能，而是复用：数据、事务、权限、备份、连接池、监控全是现成的，过滤就是一句普通 SQL，不必跨系统同步两份数据。当向量只是既有业务表上的附属检索维度时，这个优势往往压倒一切。局限同样清楚：受所在数据库单实例规模的天花板约束，内存型索引与业务负载同处一个进程容易互相干扰；能不能装进你在用的托管数据库，取决于对方的镜像与白名单，必须逐个核实。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 示意：在既有业务表上增加向量列与 HNSW 索引</span></span><br><span class="line"><span class="keyword">CREATE</span> EXTENSION IF <span class="keyword">NOT</span> <span class="keyword">EXISTS</span> vector;</span><br><span class="line"></span><br><span class="line"><span class="keyword">ALTER TABLE</span> doc_chunk <span class="keyword">ADD</span> <span class="keyword">COLUMN</span> embedding vector(<span class="number">768</span>);</span><br><span class="line"></span><br><span class="line"><span class="keyword">CREATE</span> INDEX idx_chunk_embedding <span class="keyword">ON</span> doc_chunk</span><br><span class="line">  <span class="keyword">USING</span> hnsw (embedding vector_cosine_ops) <span class="keyword">WITH</span> (m <span class="operator">=</span> <span class="number">16</span>, ef_construction <span class="operator">=</span> <span class="number">64</span>);</span><br><span class="line"></span><br><span class="line"><span class="keyword">SELECT</span> id, content</span><br><span class="line">  <span class="keyword">FROM</span> doc_chunk</span><br><span class="line"> <span class="keyword">WHERE</span> tenant_id <span class="operator">=</span> <span class="number">42</span> <span class="keyword">AND</span> status <span class="operator">=</span> <span class="string">&#x27;published&#x27;</span></span><br><span class="line"> <span class="keyword">ORDER</span> <span class="keyword">BY</span> embedding <span class="operator">&lt;=&gt;</span> $<span class="number">1</span></span><br><span class="line"> LIMIT <span class="number">20</span>;</span><br></pre></td></tr></table></figure>
+
+<h3 id="对象存储加工自建索引：把库当零件用"><a href="#对象存储加工自建索引：把库当零件用" class="headerlink" title="对象存储加工自建索引：把库当零件用"></a>对象存储加工自建索引：把库当零件用</h3><p>第三类不采购数据库，只采购一个检索库：FAISS、hnswlib、ScaNN、DiskANN，向量文件放对象存储或本地磁盘，在自己的进程或自建服务里加载索引，元数据另存，过滤与归并在应用代码里做。上限最高——索引结构、内存布局、分片粒度、冷启动策略全部可控；下限也最低——增删改的索引语义、并发与内存管理、持久化与恢复、多租户隔离全是你的责任，这些代码还会长期留在仓库里等人接手。选它之前要诚实回答一句：我们要的是一个检索引擎，还是要维护一个检索引擎。</p>
+<h3 id="托管-SaaS：把责任换成了依赖"><a href="#托管-SaaS：把责任换成了依赖" class="headerlink" title="托管 SaaS：把责任换成了依赖"></a>托管 SaaS：把责任换成了依赖</h3><p>Pinecone 这类托管服务把容量、副本、扩缩容、可用性都收进供应商，你只面对一个 HTTP 接口和命名空间，适合快速起步、团队小、不想碰基础设施的场景。要计入的代价有四类：查询跨越外部网络，延迟下界由网络决定；数据必须出门，敏感场景常在第一关就过不了；配额、限流、可用区分布只能靠文档与工单了解；长期依赖——数据可以导出，但你为它写的调用与容错逻辑很难平移。这些不是缺点，是交换条件。</p>
+<h3 id="一句话概括形态差异"><a href="#一句话概括形态差异" class="headerlink" title="一句话概括形态差异"></a>一句话概括形态差异</h3><p>专用库解决“向量检索怎么做才好”，扩展解决“能不能不新增一个系统”，自建解决“我要完全控制”，托管解决“我不想养这套东西”。认清这四种责任边界，多数候选会自动出局。</p>
+<h2 id="索引类型：内存、召回与构建时间的三角"><a href="#索引类型：内存、召回与构建时间的三角" class="headerlink" title="索引类型：内存、召回与构建时间的三角"></a>索引类型：内存、召回与构建时间的三角</h2><p>索引类型同时决定四件事：常驻内存、召回上限、建索引耗时、查询可调精度。这四项不可能同时最优，改善一项通常要付另一项，所以本文把它画成一个三角形。</p>
+<pre class="mermaid">flowchart TD
+    M[内存占用低] --> Q[查询召回高]
+    Q --> B[构建时间短]
+    B --> M
+    X[没有任何索引能同时占住三个顶点]</pre>
+
+<h3 id="HNSW：用内存换低延迟与高召回"><a href="#HNSW：用内存换低延迟与高召回" class="headerlink" title="HNSW：用内存换低延迟与高召回"></a>HNSW：用内存换低延迟与高召回</h3><p>HNSW 是图索引：把向量组织成多层可导航的小世界图，查询时从上层稀疏图粗定位、到底层稠密图细搜索，每次扩展多少候选由 <code>ef</code>（或 <code>ef_search</code>）控制，构建时每个节点连多少条边由 <code>M</code>、<code>efConstruction</code> 控制。它查询路径短、单跳代价小，同等召回下延迟表现好，且支持增量插入，不必为新数据重建索引。代价是图结构通常连原始向量一起常驻内存，参数调大会同时推高内存与构建时间。删除在图索引上普遍是标记而非物理擦除，长期高频增删会让索引质量退化，重建的控制手段各家不同，需要核实。</p>
+<h3 id="IVF-系列：先聚类再探桶"><a href="#IVF-系列：先聚类再探桶" class="headerlink" title="IVF 系列：先聚类再探桶"></a>IVF 系列：先聚类再探桶</h3><p>IVF 走的是另一条路：训练阶段把全量向量聚成 <code>nlist</code> 个簇，查询时只与最近的 <code>nprobe</code> 个簇做暴力比较。内存上可以只存聚类中心加压缩编码，因而天然适合量化。IVF_FLAT 在簇里保留原始向量，召回高、内存高；IVF_PQ 把向量切成子段量化成码本 ID，内存能下降一到两个数量级，但距离变成近似距离，召回损失要靠重排补救；IVF_SQ8 一类标量量化用更少位宽表示分量，在压缩率与精度之间相对居中。弱点是训练需要足够多样本，数据量太小或分布漂移时聚类质量不稳，<code>nlist</code>、<code>nprobe</code> 还要随规模重新评估；新增数据会先进入尚未合入正式索引的增量区，这段精度较低的行为要写进召回评估。</p>
+<h3 id="DiskANN-类：把大头放磁盘"><a href="#DiskANN-类：把大头放磁盘" class="headerlink" title="DiskANN 类：把大头放磁盘"></a>DiskANN 类：把大头放磁盘</h3><p>当规模大到内存装不下、又不愿为此摊开太多分片时，磁盘索引是一等选项。DiskANN 这类设计把图与向量放在 SSD 上，内存只保留压缩编码与导航结构，用少量随机读换很大的单机容量。它的价值是内存成本，代价是延迟强依赖本地 SSD 的随机读性能与页缓存命中，冷启动、混部争抢 IO、云盘抖动都会直接反映到 p99。所以判断依据不是“支持不支持磁盘索引”，而是两个具体问题：数据能不能装进内存并留出安全余量；装不进时，能不能给它独占的本地 NVMe。</p>
+<table>
+<thead>
+<tr>
+<th>索引族</th>
+<th>内存</th>
+<th>召回上限</th>
+<th>构建时间</th>
+<th>增量写入</th>
+<th>典型适用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>暴力 Flat</td>
+<td>全量常驻</td>
+<td>精确</td>
+<td>极短</td>
+<td>简单</td>
+<td>十万级以下、要求 100% 召回或做基线</td>
+</tr>
+<tr>
+<td>HNSW</td>
+<td>高</td>
+<td>高，靠 ef 连续调节</td>
+<td>较长</td>
+<td>支持</td>
+<td>内存够、延迟敏感的在线检索</td>
+</tr>
+<tr>
+<td>IVF_FLAT</td>
+<td>高</td>
+<td>高</td>
+<td>需训练</td>
+<td>支持但有精度窗口</td>
+<td>中大规模、可接受调 nprobe</td>
+</tr>
+<tr>
+<td>IVF_PQ</td>
+<td>低</td>
+<td>受量化限制，靠重排补救</td>
+<td>需训练</td>
+<td>支持</td>
+<td>内存预算紧张、规模大</td>
+</tr>
+<tr>
+<td>DiskANN 类</td>
+<td>低</td>
+<td>中高</td>
+<td>长</td>
+<td>视实现</td>
+<td>单机装不下、有本地 NVMe</td>
+</tr>
+</tbody></table>
+<p>表里的相对关系是结构性的，具体产品在具体数据上的取值只能实测。第二层权衡是参数属于查询期可调还是建库期固定：<code>ef</code>、<code>nprobe</code> 大多能按请求传，用延迟换召回；<code>M</code>、<code>nlist</code>、<code>efConstruction</code>、量化位数在建库时决定，改动意味着重建。评审时建议按候选产品把这张表重画一遍。</p>
+<h2 id="元数据过滤：前置与后置决定了结果对不对"><a href="#元数据过滤：前置与后置决定了结果对不对" class="headerlink" title="元数据过滤：前置与后置决定了结果对不对"></a>元数据过滤：前置与后置决定了结果对不对</h2><p>过滤最容易出正确性问题。分歧只有一个：过滤条件在搜索过程的哪个阶段生效。</p>
+<h3 id="两种顺序的机制与后果"><a href="#两种顺序的机制与后果" class="headerlink" title="两种顺序的机制与后果"></a>两种顺序的机制与后果</h3><p>后置过滤先按相似度取回 top_k 个候选，再丢掉不合格的。实现简单，但结果条数没有保证：条件筛掉 99% 数据时，取回 20 个可能只剩 0 个。更隐蔽的是分布偏差：近似索引返回的候选本身就不均匀，某些租户、类别、时间段会被系统性筛薄，你以为召回率是 0.9，过滤条件下的有效召回却远低于整体口径。</p>
+<p>前置过滤先用条件确定合法候选集合，或在搜索过程中同步判断，再在这个子集上做近邻搜索。结果条数有保障，代价是过滤集合与图或倒排结构的交集可能不连通：HNSW 上如果只剩一小片孤立节点满足条件，贪心搜索甚至到不了那里，于是延迟上升或召回下降。两种顺序都不免费，问题是在你的过滤形态与选择率下，这套实现会退化成哪种行为。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 示意：过滤选择率很低时，后置过滤会拿不满 top_k</span></span><br><span class="line">candidates = index.search(query, k=<span class="number">20</span>)          <span class="comment"># 不带条件的近邻</span></span><br><span class="line">kept = [c <span class="keyword">for</span> c <span class="keyword">in</span> candidates <span class="keyword">if</span> allow(c)]      <span class="comment"># 事后筛掉绝大部分</span></span><br><span class="line"><span class="keyword">assert</span> <span class="built_in">len</span>(kept) &lt;= <span class="number">20</span>                          <span class="comment"># 可能远小于 20</span></span><br></pre></td></tr></table></figure>
+
+<p>所以要分别测带过滤的召回率与结果条数达标率：只看整体 recall@k 的评测在过滤场景下几乎无效，因为它被大量无条件查询主导。</p>
+<h3 id="各形态在这件事上的天然差异"><a href="#各形态在这件事上的天然差异" class="headerlink" title="各形态在这件事上的天然差异"></a>各形态在这件事上的天然差异</h3><p>pgvector 这类扩展把过滤交给宿主数据库执行器：<code>WHERE</code> 与向量索引扫描如何配合、不满足条件时是否继续往下扫，取决于数据库的扫描策略。0.4 引入的迭代式索引扫描就是为“过滤后结果不足”准备的，代价是用扫描轮数换结果完整性。这类能力是否在你的版本与索引类型上生效要核实，对低选择率过滤的成本要实测。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- pgvector 0.4：过滤条件下结果不足时，可尝试迭代式扫描</span></span><br><span class="line"><span class="keyword">SET</span> hnsw.iterative_scans <span class="operator">=</span> <span class="keyword">on</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">SELECT</span> id <span class="keyword">FROM</span> doc_chunk</span><br><span class="line"> <span class="keyword">WHERE</span> dept_id <span class="operator">=</span> <span class="keyword">ANY</span>($<span class="number">1</span>) <span class="keyword">AND</span> updated_at <span class="operator">&gt;</span> now() <span class="operator">-</span> <span class="type">interval</span> <span class="string">&#x27;30 days&#x27;</span></span><br><span class="line"> <span class="keyword">ORDER</span> <span class="keyword">BY</span> embedding <span class="operator">&lt;=&gt;</span> $<span class="number">2</span></span><br><span class="line"> LIMIT <span class="number">20</span>;</span><br></pre></td></tr></table></figure>
+
+<p>专用向量数据库通常把元数据当独立子系统：哪些字段建了索引、过滤是在数据块级别剪枝还是在图遍历时逐点判断、多条件组合支持到什么程度，这些细节让同一句过滤在不同产品上的性能差距非常大。通用规律是等值且低基数的字段（比如租户 ID）适合做数据布局切分，比事后过滤更有效；范围条件与数组包含更接近逐点判断。各产品支持到哪一档、语法是什么，本文不列表，请以官方文档核实并用自己的数据实测。</p>
+<p>自建索引时这件事完全回到你自己手上：常见做法是先由外部存储算出合法 ID 集合，再映射到索引内部。索引本身不认识过滤条件时，“过滤后不足 top_k 怎么办”就得自己回答，通常手段是放大候选数、按过滤集合分片建索引，或按租户拆索引，三种手段都会明显放大成本。</p>
+<h2 id="混合检索与多租户"><a href="#混合检索与多租户" class="headerlink" title="混合检索与多租户"></a>混合检索与多租户</h2><h3 id="向量加关键词：三种做法对应三种代价"><a href="#向量加关键词：三种做法对应三种代价" class="headerlink" title="向量加关键词：三种做法对应三种代价"></a>向量加关键词：三种做法对应三种代价</h3><p>纯向量检索有一类稳定的失败模式：专有名词、型号、代码片段、精确数字在语义空间里未必相近，靠 embedding 召不回来。把关键词通道（BM25 一类稀疏检索）与向量通道组合是很多 RAG 场景的刚需，组合位置有三种：引擎内双通道，同一存储里同时维护稀疏与稠密索引，一条请求里两路各出一批结果再融合；应用层融合，关键词走既有搜索引擎、向量走向量库，结果在业务代码里融合；召回后重排，先任一路召回再交给交叉编码器，细节属于重排序那篇文章。</p>
+<p>怎么选看三个问题：融合策略是否需要反复调整，需要的话应用层最灵活、引擎内最省往返；关键词索引的中文分词与自定义词典能否覆盖你的领域，不能覆盖则“支持混合检索”打勾也没用；两路分数如何归一化，只能靠评测集定。年代约束也要强调：2023 年年中各家对稀疏向量、全文检索与融合排序的支持程度差别很大，有的仍在预览，务必核实你所用的版本。</p>
+<h3 id="多租户：隔离粒度决定成本曲线"><a href="#多租户：隔离粒度决定成本曲线" class="headerlink" title="多租户：隔离粒度决定成本曲线"></a>多租户：隔离粒度决定成本曲线</h3><p>多租户有两种完全不同的动机：业务上真需要按客户隔离数据与配额；或者想用租户维度把搜索空间切小，让高基数过滤变成数据布局问题。两者的最优粒度不一样。</p>
+<p>粒度从粗到细大致是独立实例、独立数据库或集合、分区或命名空间、同一索引里的租户字段。越粗隔离越强、爆炸半径越小，但对象数量随租户数线性膨胀，索引、分片、元数据、连接的开销都跟着放大；越细越省资源，但一个大租户就能把邻居的延迟拖下去。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 命名空间形态：同一个索引内按租户切分，查询必须带命名空间</span></span><br><span class="line">res = index.query(</span><br><span class="line">    vector=query_vec,</span><br><span class="line">    namespace=<span class="string">&quot;tenant_1024&quot;</span>,</span><br><span class="line">    top_k=<span class="number">20</span>,</span><br><span class="line">    include_metadata=<span class="literal">True</span>,</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p>Milvus 的 collection 与 partition、Qdrant 的 collection 与 payload 分区、Weaviate 的 class、pgvector 的表与 schema、托管服务的命名空间都能承载租户概念，但语义与代价并不等价：能否独立扩缩容、能否单独删除或迁移、大租户会不会形成热点、租户数有没有上限，都要逐项问清。租户上千且规模悬殊时，“每租户一个集合”和“每租户一个字段值”会导向完全不同的运维体验。</p>
+<h2 id="一致性、持久化与写入实时性"><a href="#一致性、持久化与写入实时性" class="headerlink" title="一致性、持久化与写入实时性"></a>一致性、持久化与写入实时性</h2><p>这三件事常被合并成“支不支持实时更新”一句，其实可以分三层评估。</p>
+<p>第一层是写入可见性：数据写进来了，什么时候能被检索到。常见做法是写入即进入可搜索的内存区，但这个区还没合入正式索引，搜索时怎么处理它直接决定新数据的召回质量。工程上更该关心“搜得到但搜不准”的窗口有多长，能不能用参数或显式操作压缩。</p>
+<p>第二层是读取一致性：同一查询在不同节点、不同时刻返回的结果是否一致，是否保证读己之写。有的产品把一致性级别做成可选项，越强通常意味着越多的协调或等待；有的产品只描述默认行为，不给显式选择。这层要对照前文约束判断：更新后五分钟可检索就够，就不必为强一致付常驻代价；若要求改完立刻生效（比如权限撤回要进入检索过滤），就必须专门验证。</p>
+<p>第三层是持久化与恢复语义：数据落在哪里、多久落一次盘、进程崩溃后丢多少、恢复要多久才能重新服务。这三问决定备份恢复演练怎么做，具体操作属于部署那篇文章，但选型时要当成约束——向量索引通常能从原始数据重建，重建时长是恢复时间的下界，而恢复时间是唯一在你最需要时才暴露的指标。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 选型验证用的一组动作，不是产品命令，形态按各家文档替换</span></span><br><span class="line"><span class="comment"># 1) 写入一条新数据，立刻查询，记录可见延迟</span></span><br><span class="line"><span class="comment"># 2) kill 数据节点进程，重启，记录可服务时间与丢失窗口</span></span><br><span class="line"><span class="comment"># 3) 用备份恢复到新环境，记录端到端耗时与结果一致性</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="运维成本与二次开发"><a href="#运维成本与二次开发" class="headerlink" title="运维成本与二次开发"></a>运维成本与二次开发</h2><h3 id="依赖组件数量与故障面"><a href="#依赖组件数量与故障面" class="headerlink" title="依赖组件数量与故障面"></a>依赖组件数量与故障面</h3><p>只数“要不要多部署一个服务”不够，要数完整链路：某些架构的向量库除自身进程外，还依赖对象存储、消息队列、元数据存储与若干角色节点，每一环都要有监控、告警、容量规划与升级流程，任何一环出问题都表现为检索不可用。嵌入式形态依赖复用既有数据库那一套，这项优势明显；托管服务则把依赖换成外部不可控项。评估方法很实际：把候选方案画成组件图，逐个问谁值班、谁是单点、备份在哪、上次演练什么时候，答不上来的格子就是隐性成本。</p>
+<h3 id="扩缩容、备份与再平衡"><a href="#扩缩容、备份与再平衡" class="headerlink" title="扩缩容、备份与再平衡"></a>扩缩容、备份与再平衡</h3><p>关注三件事：扩容是否在线、是否需要数据重分布、重分布期间查询是否降级；缩容与冷热分层是否可行；备份恢复走原生快照还是靠导出重建。这几项的差别在选型时看着抽象，出一次事故就非常具体。</p>
+<h3 id="许可、客户端与可替换性"><a href="#许可、客户端与可替换性" class="headerlink" title="许可、客户端与可替换性"></a>许可、客户端与可替换性</h3><p>Milvus、Qdrant 采用 Apache-2.0，Weaviate 是 BSD 系许可，pgvector 跟随 PostgreSQL 许可，托管服务是商业条款，具体条款与例外请以仓库和官网核实；许可影响的是你能不能分发、能不能做二次闭源改造。此外看客户端语言是否覆盖你的技术栈、REST 与 gRPC 是否完整、有没有批量导入与运维工具，这些决定能不能改；若要把某款产品深嵌核心链路，值得花一天读它的接口设计，再判断将来换掉的代价。</p>
+<h2 id="从需求倒推的一次推演"><a href="#从需求倒推的一次推演" class="headerlink" title="从需求倒推的一次推演"></a>从需求倒推的一次推演</h2><p>把前面的维度串起来走一遍。场景：企业内部知识问答，初期约八百万条 768 维向量，年增三四倍；峰值 QPS 几十量级；过滤既按部门与密级做高基数筛选，又按更新时间做范围限定；新文档发布后几分钟内可检索就够；团队三名后端，无分布式存储值班经验；数据不得出内网。</p>
+<p>第一步排除：数据不出网，托管服务出局；养不起多组件集群，重量级分布式评为高风险，但规模会涨，不能直接划掉。</p>
+<p>第二步检验最省的那条路：嵌入式方案运维成本最低，就拿它做定量检验。按第一节的式子算出单机内存需求的量级，还要留出数据库自身的共享缓冲、业务负载以及重建期间双份索引的空间；估算若接近机器规格上限，今天能跑不代表明年能跑。</p>
+<p>第三步看过滤，这是本场景真正的杀手：高基数密级标签加时间范围是选择率偏低的典型组合，必须实测带过滤的召回率与结果条数达标率；结果不足时靠迭代式扫描能凑齐，却会拉长扫描成本，这笔成本能否被延迟预算吸收只有实测知道。</p>
+<p>第四步留出口：结论不写成“永久选某一款”，而写成带条件的判断——当前规模下用低成本方案，同时约定触发重建或迁移的量化条件（内存水位、过滤后召回率、p95 延迟、重建耗时），并把向量访问收在一层检索接口之后，换引擎只改适配层。第五步把候选缩到两三个，用同一份评测集、同一套硬件、同一组过滤条件各跑一遍，测召回、延迟、内存峰值与构建时长。得到的不是排名，而是“在我们的约束下谁先撑不住”。</p>
+<h2 id="决策清单"><a href="#决策清单" class="headerlink" title="决策清单"></a>决策清单</h2><p>不排序，只列必答题，每一项都填自己的数字与实测结果。</p>
+<ul>
+<li>规模：当前条数、维度、含索引与元数据的字节量，一年后与三年后的估算。</li>
+<li>负载：峰值 QPS、top_k、检索阶段 p95 与 p99 预算、是否有批量查询。</li>
+<li>过滤：属于哪一档、典型选择率、带过滤的召回率与结果条数达标率。</li>
+<li>索引：各候选索引的内存与构建时长实测、哪些参数查询期可调、删除堆积是否退化。</li>
+<li>实时性：新数据可见延迟、可见但不准的窗口长度、更新与删除语义。</li>
+<li>一致性：是否需要读己之写、权限撤回多久生效、崩溃后允许丢多少数据。</li>
+<li>多租户：隔离粒度、单租户热点、租户数量上限、能否单独删除与迁移。</li>
+<li>混合检索：稀疏与关键词通道在目标版本是否可用、融合策略能否反复调整。</li>
+<li>合规与运维：数据是否必须留在自有环境、组件清单与值班归属、在线扩缩容与重分布、备份恢复演练耗时。</li>
+<li>生态与退出：许可条款、客户端语言、运维工具；换引擎要改几处代码、评测集能否复用、能否双跑对比。</li>
+</ul>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>选型顺序应该是先约束后产品：把规模、负载、过滤、一致性、运维能力写成可判定的条件，让候选自己出局，剩下的再细比。形态差异比功能差异重要，因为它决定责任边界；索引类型是内存、召回与构建时间的三角，取舍取决于你能给出多少内存与多少本地磁盘；元数据过滤决定结果对不对，必须在真实选择率下测带过滤的召回；混合检索、多租户、写入实时性与一致性要按所用版本核实，不能用宣传语代替文档。最后一句：横向对比要用自己的数据、自己的评测集、自己的硬件实跑一遍，数字不进表格就不算结论。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://milvus.io/docs">Milvus 官方文档</a></li>
+<li><a href="https://qdrant.tech/documentation/">Qdrant 官方文档</a></li>
+<li><a href="https://weaviate.io/developers/weaviate">Weaviate 官方文档</a></li>
+<li><a href="https://github.com/pgvector/pgvector">pgvector 项目主页</a></li>
+<li><a href="https://docs.pinecone.io/">Pinecone 官方文档</a></li>
+<li><a href="https://github.com/facebookresearch/faiss">FAISS 项目主页</a></li>
+<li><a href="https://github.com/nmslib/hnswlib">hnswlib 项目主页</a></li>
+<li><a href="https://github.com/microsoft/DiskANN">DiskANN 项目主页</a></li>
+<li><a href="https://github.com/erikbern/ann-benchmarks">ann-benchmarks 项目主页</a></li>
+<li><a href="https://www.postgresql.org/docs/">PostgreSQL 官方文档</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>向量数据库选型对比</p><p><a href="https://987763485.github.io/2023/07/25/向量数据库选型对比/">https://987763485.github.io/2023/07/25/向量数据库选型对比/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2023-07-25</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-19</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="link-muted mr-2" rel="tag" href="/tags/python/">python</a><a class="link-muted mr-2" rel="tag" href="/tags/typescript/">typescript</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2023/08/01/Rust%E9%A1%B9%E7%9B%AE%E4%B8%AD%E7%9A%84%E9%94%99%E8%AF%AF%E7%A0%81%E4%BD%93%E7%B3%BB/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Rust 项目中的错误码体系</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2023/07/20/%E5%BC%80%E6%BA%90%E7%BB%84%E4%BB%B6%E6%BC%8F%E6%B4%9E%E6%B2%BB%E7%90%86/"><span class="level-item">开源组件漏洞治理</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

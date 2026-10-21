@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Micro Frontends 微前端架构 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="微前端这个词已经被用滥了：它既被当成架构升级的勋章，也被当成组织问题的止痛药。本文不论证它先进，而是把它放回工程语境，比较六类集成方式各能解决什么、又引入什么新问题，并讲清外壳、样式隔离、共享依赖、通信契约与发布回滚这些落地环节。适合正在评估要不要上的负责人，也适合被两个团队协作同一个页面卡住的开发者。"><meta property="og:type" content="blog"><meta property="og:title" content="Micro Frontends 微前端架构"><meta property="og:url" content="https://987763485.github.io/2024/10/16/MicroFrontends%E5%BE%AE%E5%89%8D%E7%AB%AF%E6%9E%B6%E6%9E%84/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="微前端这个词已经被用滥了：它既被当成架构升级的勋章，也被当成组织问题的止痛药。本文不论证它先进，而是把它放回工程语境，比较六类集成方式各能解决什么、又引入什么新问题，并讲清外壳、样式隔离、共享依赖、通信契约与发布回滚这些落地环节。适合正在评估要不要上的负责人，也适合被两个团队协作同一个页面卡住的开发者。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2024-10-15T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-20T04:58:47.700Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="web前端"><meta property="article:tag" content="typescript"><meta property="article:tag" content="react"><meta property="article:tag" content="vue"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2024/10/16/MicroFrontends%E5%BE%AE%E5%89%8D%E7%AB%AF%E6%9E%B6%E6%9E%84/"},"headline":"Micro Frontends 微前端架构","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2024-10-15T16:00:00.000Z","dateModified":"2026-10-20T04:58:47.700Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"微前端这个词已经被用滥了：它既被当成架构升级的勋章，也被当成组织问题的止痛药。本文不论证它先进，而是把它放回工程语境，比较六类集成方式各能解决什么、又引入什么新问题，并讲清外壳、样式隔离、共享依赖、通信契约与发布回滚这些落地环节。适合正在评估要不要上的负责人，也适合被两个团队协作同一个页面卡住的开发者。"}</script><link rel="canonical" href="https://987763485.github.io/2024/10/16/MicroFrontends%E5%BE%AE%E5%89%8D%E7%AB%AF%E6%9E%B6%E6%9E%84/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2024-10-15T16:00:00.000Z" title="10/16/2024, 12:00:00 AM">2024-10-16</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/">前端开发</a></span><span class="level-item">27 分钟读完 (大约4025个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Micro Frontends 微前端架构</h1><div class="content"><p>微前端这个词已经被用滥了：它既被当成架构升级的勋章，也被当成组织问题的止痛药。本文不论证它先进，而是把它放回工程语境，比较六类集成方式各能解决什么、又引入什么新问题，并讲清外壳、样式隔离、共享依赖、通信契约与发布回滚这些落地环节。适合正在评估要不要上的负责人，也适合被两个团队协作同一个页面卡住的开发者。</p>
+<h2 id="先判断该不该拆"><a href="#先判断该不该拆" class="headerlink" title="先判断该不该拆"></a>先判断该不该拆</h2><p>微前端站得住的动因只有两个。其一是多个团队要对同一段体验负责，却不愿共享同一条发布列车：报表团队按周发版，交易团队被合规流程绑住，并进一条流水线后慢的一方一定拖住快的一方。其二是技术栈共存：仓库里有一批只能维护、没人敢重写的旧页面，新页面又要用 React 18 或 Vue 3 写，强行统一的成本远高于让两者并存。至于“后端在拆微服务，所以前端也该拆”，这个推理并不成立，服务端的边界划分是另一个话题，本文只借用它的同一个动因：按团队边界拆，不按技术时髦度拆。</p>
+<p>动手之前，用三个问题打分。</p>
+<p>团队数：稳定贡献团队是否在三个及以上，且协作成本已经体现在交付周期上；单个团队上微前端，等于把跨进程调试和网络延迟引进自己的仓库。</p>
+<p>发布频率：各部分是否真的节奏不同；所有页面每周都由同一批人发布时，独立部署的收益接近于零。</p>
+<p>耦合度：页面之间共享了多少数据与交互；拆开一个共用八个全局状态、互相靠私有事件驱动的页面，只会得到分布式单体。</p>
+<p>三条都弱，结论就是不需要微前端，需要的是把模块边界划清楚：构建慢、包体大、依赖冲突属于工程化症状，monorepo 的组织方式在《Turborepo 与 pnpm monorepo 实践》里已经写透，本文不讨论包管理。</p>
+<h2 id="六种集成方式的谱系与代价"><a href="#六种集成方式的谱系与代价" class="headerlink" title="六种集成方式的谱系与代价"></a>六种集成方式的谱系与代价</h2><table>
+<thead>
+<tr>
+<th>方式</th>
+<th>能解决</th>
+<th>代价</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>构建时聚合（npm 包）</td>
+<td>能力复用、统一视觉</td>
+<td>不能独立发布，消费方重新构建</td>
+</tr>
+<tr>
+<td>iframe</td>
+<td>硬隔离，与技术栈彻底解耦</td>
+<td>尺寸同步、弹层裁剪、路由与登录态</td>
+</tr>
+<tr>
+<td>Web Components</td>
+<td>框架无关元素，样式边界清晰</td>
+<td>Shadow DOM 限制、服务端渲染</td>
+</tr>
+<tr>
+<td>路由接管式集成</td>
+<td>统一 URL 与导航权限</td>
+<td>靠生命周期约定，隔离最弱</td>
+</tr>
+<tr>
+<td>共享依赖式集成</td>
+<td>公共依赖只加载一次</td>
+<td>版本协商、与构建工具耦合</td>
+</tr>
+<tr>
+<td>后端模板拼装</td>
+<td>复用服务端区块与缓存</td>
+<td>交互状态难共享，仍是多页</td>
+</tr>
+</tbody></table>
+<p>构建时聚合最被低估：把按钮、表格、埋点封装成包，团队边界照样清晰，且不引入运行时复杂度，代价是每次改动都要消费方重新构建上线——很多号称“微前端”的项目做的正是这件事，也确实够用。iframe 反过来把隔离做到最彻底，浏览器天然替你做了样式与全局对象的沙箱，遗留区块整块嵌进来往往最省事，代价是内容高度要回传父页、浮层被裁在框架内、URL 不再反映内部状态。</p>
+<p>路由接管式集成（single-spa 与 qiankun 这一路）由外壳按前缀决定挂载哪个应用，应用导出挂载与卸载生命周期；它换来统一的地址、菜单与权限判断，代价是隔离最弱：全局样式、全局变量和事件名共享同一个 <code>window</code>，约定不写清楚就互相污染。</p>
+<p>共享依赖式集成（Webpack 5 的模块联邦，Vite 5 下为插件形态）让多个应用共用同一份 React 与工具库，其配置字段与机制细节留给《前端微服务与模块联邦》，本文只在谱系里给它定位。import maps 能把裸模块名解析成具体 URL，但主流内核近两年才陆续支持，起点版本差异大，存量浏览器仍要靠垫片，目前宜作补充手段而非地基；SystemJS 已退到历史位置，它在前两者之前承担运行时加载，如今主要作为兼容层存在。</p>
+<h2 id="公共外壳要薄到什么程度"><a href="#公共外壳要薄到什么程度" class="headerlink" title="公共外壳要薄到什么程度"></a>公共外壳要薄到什么程度</h2><p>外壳（shell）承载导航、权限、布局和子应用装载，最容易犯的错误是越做越厚。健康的分工是：外壳只管与业务无关的骨架——地址归属、菜单、登录态、错误兜底、主题变量；页面内的状态与接口调用留在子应用。判断标准很实际：外壳的发布频率应明显低于任何子应用，每周都要改就说明业务逻辑漏了进去。</p>
+<p>路由归属必须唯一。地址由外壳解析并派发，子应用只声明自己的前缀和内部路由，不允许两个应用争同一段前缀。菜单与权限同理：可见性由外壳按角色裁剪，能进哪个前缀、能调哪类接口随会话下发，子应用拿到的是只读清单而不是判定规则。</p>
+<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 应用清单由外壳在启动时拉取，字段刻意保持极少</span></span><br><span class="line"><span class="keyword">type</span> <span class="title class_">AppEntry</span> = &#123;</span><br><span class="line">  <span class="attr">prefix</span>: <span class="built_in">string</span>;      <span class="comment">// 归属前缀，如 /report</span></span><br><span class="line">  <span class="attr">name</span>: <span class="built_in">string</span>;</span><br><span class="line">  <span class="attr">version</span>: <span class="built_in">string</span>;     <span class="comment">// 灰度与回滚的抓手</span></span><br><span class="line">  <span class="attr">entry</span>: <span class="built_in">string</span>;       <span class="comment">// 远端入口地址</span></span><br><span class="line">  <span class="attr">fallback</span>: <span class="string">&#x27;blank&#x27;</span> | <span class="string">&#x27;errorPage&#x27;</span> | <span class="string">&#x27;redirect&#x27;</span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>加载与降级要当常态而非异常：入口脚本 404、版本不存在、远端超时、应用内部抛错，四种情况都要有确定行为。默认是局部降级——单个应用失败时保留外壳与其他应用，只在出问题的区域给出重试入口；只有外壳自身起不来才整页兜底。</p>
+<pre class="mermaid">flowchart TD
+  URL[地址变化] --> Shell[公共外壳]
+  Shell --> List[应用清单 前缀与版本]
+  List --> Match{前缀匹配}
+  Match -->|/report| AppA[报表子应用 React 18]
+  Match -->|/trade| AppB[交易子应用 Vue 3]
+  Match -->|无匹配| NotFound[外壳兜底页]
+  AppA --> Lazy[异步拉取入口与骨架屏]
+  AppB --> Lazy
+  Lazy --> Ok{挂载是否成功}
+  Ok -->|成功| Keep[按策略保活或卸载]
+  Ok -->|失败| Degrade[局部降级与重试]</pre>
+
+<h2 id="样式隔离与主题下发"><a href="#样式隔离与主题下发" class="headerlink" title="样式隔离与主题下发"></a>样式隔离与主题下发</h2><p>Shadow DOM 的隔离最强，也最容易被误判：任何渲染到 <code>document.body</code> 的内容都跑出了 shadow 根，浮层类组件会失去作用域，依赖全局类名的第三方库也会失效。所以只有子应用完全自控 DOM 时才值得用它。</p>
+<p>更常用的是构建期作用域方案：CSS Modules 把类名哈希化，天然避免冲突；全局栈用 BEM 加团队前缀。真正难处理的是加载顺序——两个应用都引入同一种 reset，谁后加载谁覆盖，表现为进入某个页面后另一个页面的按钮变了颜色。这要靠约定解决：全局 reset 只由外壳出一份。</p>
+<p>主题与全局变量下发用 CSS 自定义属性最省事，外壳在根节点声明一组带前缀的变量，子应用只读不写：</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">style</span>&gt;</span><span class="language-css"></span></span><br><span class="line"><span class="language-css">  <span class="selector-pseudo">:root</span> &#123; <span class="attr">--shell-color-primary</span>: <span class="number">#2f6fed</span>; <span class="attr">--shell-radius</span>: <span class="number">4px</span>; &#125;</span></span><br><span class="line"><span class="language-css"></span><span class="tag">&lt;/<span class="name">style</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">div</span> <span class="attr">id</span>=<span class="string">&quot;app-report&quot;</span>&gt;</span><span class="tag">&lt;/<span class="name">div</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>还有两个高频事故：弹层挂到 <code>body</code> 会让作用域样式全部失效，必须显式指定挂载容器；字体这类全局资源要由外壳统一装载，否则各应用请求一份，视觉不一致还打爆缓存。</p>
+<h2 id="共享依赖与版本冲突"><a href="#共享依赖与版本冲突" class="headerlink" title="共享依赖与版本冲突"></a>共享依赖与版本冲突</h2><p>有些依赖必须全局单例，React 最典型。同一页面出现两份 React，轻则 <code>Invalid hook call</code>，重则 Context 跨实例失效、<code>ref</code> 转发链断裂。路由库有两份就各维护一份历史状态，地址栏与应用视图错位；状态库有两份，两个组件订阅同名 store 却读到不同数据，看着像偶发的数据不同步，实为多实例。</p>
+<p>约定要分两处落。构建期把 React、渲染器、路由外部化，由外壳或统一装载器提供，子应用声明为同行依赖，并在流水线里校验实际解析到的版本。运行期靠按模块名解析的装载层兜底，让所有应用指向同一份实例；启动时做显式校验，不一致就拒绝挂载并上报，而不是带病运行。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 外壳在装载每个子应用前做一次单例校验（示意，非性能承诺）</span></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">assertSingleton</span>(<span class="params">name, expected</span>) &#123;</span><br><span class="line">  <span class="keyword">const</span> got = <span class="variable language_">window</span>.<span class="property">__MF_REGISTRY__</span> &amp;&amp; <span class="variable language_">window</span>.<span class="property">__MF_REGISTRY__</span>[name];</span><br><span class="line">  <span class="keyword">if</span> (got &amp;&amp; got !== expected) &#123;</span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">error</span>(<span class="string">&#x27;[shell] &#x27;</span> + name + <span class="string">&#x27; 出现多版本实例，已阻止挂载&#x27;</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>兼容窗口同样要约定：外壳同时支持子应用的一前一后两个版本，超出范围就拒绝装配并给出可读原因。</p>
+<h2 id="通信与状态：把契约写成显式的东西"><a href="#通信与状态：把契约写成显式的东西" class="headerlink" title="通信与状态：把契约写成显式的东西"></a>通信与状态：把契约写成显式的东西</h2><p>三类手段按稳定性排序是 URL、只读状态下发、事件总线。</p>
+<p>URL 是最被低估的跨应用契约，天然可分享、可前进后退：把在编辑哪条记录放进地址，各应用解析同一份信息。只读状态下发指外壳把用户、租户、主题、权限清单作为属性交给子应用，只读不回写；要改就走显式的意图回调，由外壳决定副作用。</p>
+<p>事件总线最容易写也最容易烂：问题在于名字不受约束，一处发出订单已变更这类通用事件，别处遗留的监听就会接住它。我们见过两个应用除私有事件外还共用挂在 <code>window</code> 上的全局对象，A 提交后 B 的旧监听触发同一次请求，页面重复写入，排查要跨三个源映射，一天定不到根因。</p>
+<p>约束办法很朴素：事件清单像接口一样纳入评审，名字带前缀，载荷由共享类型包约束，每个跨应用事件都能被 grep 到唯一发布方。</p>
+<h2 id="路由归属与深链"><a href="#路由归属与深链" class="headerlink" title="路由归属与深链"></a>路由归属与深链</h2><p>前缀是公共 API。给每个应用一段稳定前缀，一段前缀只归一个应用，不要用通配兜底把未知路径随便派出去；将来迁移或改名，必须在保留期内挂显式重定向，否则收藏的深链会静默变 404。</p>
+<p>切换时的加载与卸载要写清策略。首次进入前缀再拉入口并配骨架屏，避免外壳启动就把所有应用请求一遍；保活换来返回时的即时感，代价是内存、定时器与订阅全在跑，页面一多就失控。卸载不是把容器清空：挂在 <code>body</code> 的浮层节点、全局监听、轮询任务都要回收，否则第二次进入同一个应用会看到双份行为。</p>
+<p>404 归属要唯一：匹配不到前缀的地址由外壳渲染兜底页，应用内部的 404 只出现在自己的视图区域，不改写整体地址语义。历史操作统一由外壳封装一层，禁止子应用直接改整页地址——那会退化成一次全量刷新，共享依赖白加载——并且要记住滚动位置。</p>
+<h2 id="部署、灰度与回滚"><a href="#部署、灰度与回滚" class="headerlink" title="部署、灰度与回滚"></a>部署、灰度与回滚</h2><p>独立发布的前提是信任有边界。契约测试是第一道：前缀、跨应用事件名、下发属性的结构各写一组自动化冒烟，跑在发布流水线上，任何一方破坏契约就先在 CI 里红。第二道是版本兼容窗口——外壳支持范围内的子应用版本，子应用也假定外壳可能是上一版，双方都不做同时上线的假设。</p>
+<p>灰度与回滚的控制点最好集中在外壳。应用清单按用户或租户分桶，不同桶指向不同版本入口；回滚就是把某个桶的条目改回上一个已验证版本，不必重新发布任何子应用。这要求清单能秒级生效。</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;apps&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span></span><br><span class="line">    <span class="punctuation">&#123;</span> <span class="attr">&quot;prefix&quot;</span><span class="punctuation">:</span> <span class="string">&quot;/report&quot;</span><span class="punctuation">,</span> <span class="attr">&quot;version&quot;</span><span class="punctuation">:</span> <span class="string">&quot;2.7.1&quot;</span><span class="punctuation">,</span> <span class="attr">&quot;entry&quot;</span><span class="punctuation">:</span> <span class="string">&quot;/report/2.7.1/entry.js&quot;</span> <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="punctuation">&#123;</span> <span class="attr">&quot;prefix&quot;</span><span class="punctuation">:</span> <span class="string">&quot;/trade&quot;</span><span class="punctuation">,</span> <span class="attr">&quot;version&quot;</span><span class="punctuation">:</span> <span class="string">&quot;1.14.0&quot;</span><span class="punctuation">,</span> <span class="attr">&quot;entry&quot;</span><span class="punctuation">:</span> <span class="string">&quot;/trade/1.14.0/entry.js&quot;</span> <span class="punctuation">&#125;</span></span><br><span class="line">  <span class="punctuation">]</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;buckets&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;beta&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;/trade&quot;</span><span class="punctuation">:</span> <span class="string">&quot;1.13.2&quot;</span> <span class="punctuation">&#125;</span> <span class="punctuation">&#125;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>产物与 CDN 的关系要分清：带内容哈希的静态资源可以长缓存，不带哈希的清单与入口必须短缓存或不缓存，否则回滚之后浏览器仍拿到旧引用，出现改了但线上没变这种最难查的现象。</p>
+<h2 id="什么时候不该用"><a href="#什么时候不该用" class="headerlink" title="什么时候不该用"></a>什么时候不该用</h2><p>一句话判据：拆开的收益主要体现在组织而不是技术上时可以做，只想解决构建慢或代码乱，做了只会更糟。</p>
+<table>
+<thead>
+<tr>
+<th>团队规模</th>
+<th>页面耦合度</th>
+<th>技术栈统一度</th>
+<th>建议形态</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>一到两个团队</td>
+<td>高，页面共享大量状态</td>
+<td>已统一</td>
+<td>单体加清晰模块边界，必要时配 monorepo</td>
+</tr>
+<tr>
+<td>三个以上团队</td>
+<td>中，以页面为单位弱耦合</td>
+<td>部分需要共存</td>
+<td>路由接管式或共享依赖式运行时集成</td>
+</tr>
+<tr>
+<td>多个外部团队</td>
+<td>低，区块级拼装</td>
+<td>完全不约束</td>
+<td>iframe 或 Web Components 做硬隔离</td>
+</tr>
+<tr>
+<td>一个团队但遗留栈</td>
+<td>高</td>
+<td>旧栈无法重写</td>
+<td>外壳包住旧区块，新页面统一技术栈</td>
+</tr>
+</tbody></table>
+<p>常见反效果要提前写进评审材料：依赖被打成多份，体积不降反升；体验割裂，导航、加载态与错误提示在不同区域风格不一；调试链路变长，一次点击要跨三个应用与两套框架的源映射；首屏要先等外壳再等子应用。这些能靠约定压制，却压不掉组织本身的问题——只有一个团队时，复杂度没有任何收益去对冲。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>微前端的正当动因是团队独立交付与遗留栈共存，不是架构审美。先按团队数、发布频率、耦合度决定要不要做，再从六类方式里选最保守的那一种：能用构建时聚合解决的不上运行时，能用路由接管的不上自定义元素，iframe 留给不打算统一的区块。真正要花力气的是四件乏味的事：把外壳做薄，把单例依赖约定成全局，把跨应用通信写成可 grep 的契约，把清单与入口的缓存策略调对。回滚能力要比发布能力先到位——装配失败影响的是整个页面，不是某个组件。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Micro Frontends 微前端架构</p><p><a href="https://987763485.github.io/2024/10/16/MicroFrontends微前端架构/">https://987763485.github.io/2024/10/16/MicroFrontends微前端架构/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2024-10-16</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-20</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/web%E5%89%8D%E7%AB%AF/">web前端</a><a class="link-muted mr-2" rel="tag" href="/tags/typescript/">typescript</a><a class="link-muted mr-2" rel="tag" href="/tags/react/">react</a><a class="link-muted mr-2" rel="tag" href="/tags/vue/">vue</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2024/10/21/%E5%89%8D%E7%AB%AF%E6%80%A7%E8%83%BD%E9%A2%84%E7%AE%97%E5%AE%9E%E8%B7%B5/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">前端性能预算实践</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2024/10/14/Tauri%E8%BD%BB%E9%87%8F%E7%BA%A7%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8%E5%AE%9E%E8%B7%B5/"><span class="level-item">Tauri 轻量级桌面应用实践</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

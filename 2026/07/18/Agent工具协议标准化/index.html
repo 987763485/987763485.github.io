@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Agent 工具协议标准化 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="工具协议这两年冒出来不少，争论也多，但评价它们的尺子其实一直没变：第三方能不能安全地扩展，宿主在升级时会不会被打穿。本文把”工具协议标准化”拆成三层——描述与发现、调用与结果、身份与授权——逐层讨论该定什么标准、怎么管版本、迁移节奏怎么排。协议自身的生态与供应链问题另有专文，这里不展开。"><meta property="og:type" content="blog"><meta property="og:title" content="Agent 工具协议标准化"><meta property="og:url" content="https://987763485.github.io/2026/07/18/Agent%E5%B7%A5%E5%85%B7%E5%8D%8F%E8%AE%AE%E6%A0%87%E5%87%86%E5%8C%96/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="工具协议这两年冒出来不少，争论也多，但评价它们的尺子其实一直没变：第三方能不能安全地扩展，宿主在升级时会不会被打穿。本文把”工具协议标准化”拆成三层——描述与发现、调用与结果、身份与授权——逐层讨论该定什么标准、怎么管版本、迁移节奏怎么排。协议自身的生态与供应链问题另有专文，这里不展开。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2026-07-17T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-20T17:12:59.242Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="大模型"><meta property="article:tag" content="python"><meta property="article:tag" content="agent"><meta property="article:tag" content="typescript"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2026/07/18/Agent%E5%B7%A5%E5%85%B7%E5%8D%8F%E8%AE%AE%E6%A0%87%E5%87%86%E5%8C%96/"},"headline":"Agent 工具协议标准化","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2026-07-17T16:00:00.000Z","dateModified":"2026-10-20T17:12:59.242Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"工具协议这两年冒出来不少，争论也多，但评价它们的尺子其实一直没变：第三方能不能安全地扩展，宿主在升级时会不会被打穿。本文把”工具协议标准化”拆成三层——描述与发现、调用与结果、身份与授权——逐层讨论该定什么标准、怎么管版本、迁移节奏怎么排。协议自身的生态与供应链问题另有专文，这里不展开。"}</script><link rel="canonical" href="https://987763485.github.io/2026/07/18/Agent%E5%B7%A5%E5%85%B7%E5%8D%8F%E8%AE%AE%E6%A0%87%E5%87%86%E5%8C%96/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2026-07-17T16:00:00.000Z" title="7/18/2026, 12:00:00 AM">2026-07-18</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></span><span class="level-item">1 小时读完 (大约8076个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Agent 工具协议标准化</h1><nav class="series-nav" aria-label="系列文章导航"><div class="series-nav-meta"><i class="fas fa-book-open" aria-hidden="true"></i><span>本文属于《<a class="series-nav-title" href="/series/agent/">Agent 智能体开发</a>》第 18/55 篇</span></div><div class="series-nav-links"><a class="series-nav-link series-nav-prev" href="/2026/06/29/Agent%E5%B7%A5%E4%BD%9C%E6%B5%81%E7%BC%96%E6%8E%92%E5%AF%B9%E6%AF%94/"><i class="fas fa-chevron-left" aria-hidden="true"></i><span>上一篇</span></a><a class="series-nav-link series-nav-index" href="/series/agent/">系列目录</a><a class="series-nav-link series-nav-next" href="/2026/09/03/Agent%E5%B7%A5%E5%85%B7%E7%94%9F%E6%80%81%E4%B8%8EMCPServer/"><span>下一篇</span><i class="fas fa-chevron-right" aria-hidden="true"></i></a></div></nav><div class="content"><p>工具协议这两年冒出来不少，争论也多，但评价它们的尺子其实一直没变：第三方能不能安全地扩展，宿主在升级时会不会被打穿。本文把”工具协议标准化”拆成三层——描述与发现、调用与结果、身份与授权——逐层讨论该定什么标准、怎么管版本、迁移节奏怎么排。协议自身的生态与供应链问题另有专文，这里不展开。</p>
+<h2 id="立论：竞争不在语法，而在扩展与升级"><a href="#立论：竞争不在语法，而在扩展与升级" class="headerlink" title="立论：竞争不在语法，而在扩展与升级"></a>立论：竞争不在语法，而在扩展与升级</h2><p>比较两个工具协议时，工程师习惯先抠表面功夫：schema 用 JSON 还是 YAML，传输走 RPC 还是 REST，字段命名是驼峰还是下划线。这些差异确实影响开发体验，但它们从来不是生死原因。序列化领域的历史早就给过教训：编码方案之争的胜出者，往往不是字节布局最优雅的那一个，而是把生态挂在自己身上、并且升级路径最平滑的那一个。工具协议服从同一条规律。</p>
+<p>真正决定一个工具协议成败的问题只有两个。第一个问题是：第三方能不能安全地扩展。协议一旦进入生产环境，它的价值主要由别人贡献的能力来实现——各种连接器、服务器、工具集。如果协议没有给出明确的扩展点、权限边界和版本协商机制，第三方扩展就只能靠猜宿主的实现行为来对接，耦合迟早烂掉；更糟的是，猜错的那部分往往恰好落在安全边界上。第二个问题是：升级时会不会打穿宿主。宿主夹在中间，上面是模型，下面是真实系统，协议来一次破坏性变更，就可能让历史上注册过的全部工具在一夜之间语义漂移。一个协议的升级纪律能不能把影响半径约束在可预期的范围里，是企业敢把资产押上去的根本原因。</p>
+<p>围绕这两个问题，本文提出一个三层框架。第一层是描述与发现，解决”这个能力是什么、去哪里找到它”；第二层是调用与结果，解决”怎么把它执行掉、拿回来的东西如何消费”；第三层是身份与授权，解决”谁有权执行这次调用、事后如何追责”。三层的标准化工各不同，互相纠缠正是许多协议失败的共同根源：有的协议在第一层做得很漂亮，结果语义全靠字符串约定；有的协议把授权做成装饰，委托链一长就形同虚设。把三层拆干净，是讨论标准化的第一步。</p>
+<h2 id="第一层：描述与发现"><a href="#第一层：描述与发现" class="headerlink" title="第一层：描述与发现"></a>第一层：描述与发现</h2><p>描述层的头号误区，是把函数签名当成协议。签名只回答”参数叫什么、类型是什么、返回什么”，而调用方在真实系统里做决策需要的信息远不止这些：这个操作是读还是写，有没有副作用，重试是否安全，一次调用大致消耗多少成本，延迟量级有多大，依赖哪些外部系统。这些信息如果不进 schema，就只能散落在人类撰写的描述文本里、或者宿主的私有配置里，可移植性无从谈起——换一家宿主，这些隐含知识全部丢失。标准化的正确做法，是把它们提升为描述层的正式字段。类型与约束的表达可以直接复用 JSON Schema、OpenAPI 这一层已经成熟的契约技术，本文不再重复它们与 gRPC&#x2F;Protobuf、AsyncAPI 的基础对比（那是序列化与接口契约专文的范围）；但副作用标注、幂等性提示、成本与延迟分级这类字段，必须由工具协议自己定义，任何通用 schema 语言都替你想不到。</p>
+<p>发现层要解决的是”一个客户端怎么知道某个服务器到底实现了协议的哪一部分”。认真的协议不会让客户端靠猜测行事，而是定义一组能力声明：建立连接时双方交换各自支持的可选能力，之后任何一方都只走对方声明过的路径。能力协商的价值在版本演进时才真正显现：协议新增了某个方法，老服务器不支持，能力声明天然构成兼容围栏，客户端自动退回旧行为，不需要为每个小增补都升一次协议大版本。反过来说，没有能力协商机制的协议，版本演进只剩两条路：要么破坏性变更一刀切，要么在文档里写满”某些服务器可能不支持”的免责声明——两条都是灾难。</p>
+<p>版本与兼容矩阵是描述层的第三块地基。工具描述一旦发布就不能随意改动：改参数名、增删枚举值、收紧约束，三者的破坏性权重完全不同，标准必须明确哪些改动需要走大版本、哪些允许搭车小版本。还有一个容易被忽视的原则：版本号应该约束协议本身，而不是某个产品的功能进度。把”我们支持了某某版本”当成产品能力宣传，是本篇第 9 节要单独批评的误区。</p>
+<p>把三层的标准化对象放在一起对照，层次差异会更清楚：</p>
+<table>
+<thead>
+<tr>
+<th>对照维度</th>
+<th>描述与发现层</th>
+<th>调用与结果层</th>
+<th>身份与授权层</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>核心问题</td>
+<td>能力如何声明、如何被找到</td>
+<td>调用如何执行、结果如何消费</td>
+<td>权限如何传递、事后如何追责</td>
+</tr>
+<tr>
+<td>主要标准化对象</td>
+<td>schema 字段、能力集、版本协商</td>
+<td>结果类型、错误语义、流式与取消</td>
+<td>委托主体、范围、凭据生命周期、审计</td>
+</tr>
+<tr>
+<td>常见失败模式</td>
+<td>把函数签名当协议，副作用信息全靠文本约定</td>
+<td>错误压成字符串，取消信号不统一</td>
+<td>凭据层层透传，权限只靠口头约定</td>
+</tr>
+<tr>
+<td>相邻既有契约技术</td>
+<td>JSON Schema、OpenAPI、AsyncAPI</td>
+<td>gRPC 与 Protobuf 的错误码和截止时间模式</td>
+<td>OAuth 2.0 家族、工作负载身份</td>
+</tr>
+<tr>
+<td>标准断裂时的可移植性损害</td>
+<td>低：工具无法被发现，模型只能盲猜</td>
+<td>中：宿主被迫堆积适配分支</td>
+<td>高：安全事故直接打穿宿主</td>
+</tr>
+</tbody></table>
+<p>表格最后一行值得多说一句：三层里恰恰是授权层最不能”各自表述”。描述写错了顶多调用失败，权限模型没标准化，出事就是数据泄露和资金事故。这也是为什么本文把身份与授权单独列为第三层，而不是把它塞进调用的细节里。</p>
+<h2 id="第二层：调用与结果"><a href="#第二层：调用与结果" class="headerlink" title="第二层：调用与结果"></a>第二层：调用与结果</h2><p>调用层标准化的第一件事，是给结果建立类型系统，而不是默认”返回一段文本”。合理的结果类型至少分四种。文本：直接供模型消费的自然语言内容，注意是”供模型读”而不是”供日志看”。结构化：带显式编码并引用某个 schema 的数据，让宿主可以程序化处理而不是再让模型解析一遍。二进制：必须携带媒体类型与规模信息，把图片或者文件编码成长字符串塞进文本结果里，是协议早期实现常见的自毁行为——它同时浪费上下文、破坏缓存键、模糊权限边界。引用：只返回一个句柄，内容物化需要第二次显式拉取。引用型结果在授权上意义特殊：一次调用可以”知道存在”某份数据而不”拿到”它，为下游的最小权限留出操作空间。</p>
+<p>第二件事是错误语义。本文主张所有工具协议都应把错误收敛到三态。可重试：请求大概率没有产生副作用，或者副作用本身幂等，换个时间再打一次是安全的。不可重试：语义上失败，参数错了、权限不够、对象不存在，重试只会刷日志。未知：请求可能已经执行、也可能压根没到达——连接断了、超时了、响应丢了，此时调用方对”世界被改了没有”处于无知状态。把三态压扁成一个错误字符串，或者用一个统一的重试循环吞掉所有失败，是 Agent 系统重复扣款、重复发货这类事故的头号来源。标准化的底线是：让调用方有能力区分”确定没发生”和”不知道发没发生”，并且协议鼓励服务器在错误响应里显式声明后者。</p>
+<p>第三件事是流式、取消、超时与幂等键。长任务的输出应当可以分段消费：中间进度、部分结果、完成信号各有各的形态，宿主才能决定哪些进上下文、哪些只进监控。取消信号必须沿调用链一致传播——客户端发出取消之后，要么服务器真的停手并确认，要么明确告知”无法停止、已产生的副作用清单如下”，不允许静默忽略。超时是双方共同决定的：宿主有硬超时，服务器可以有自报的预估时长，生效的应该是更严格的那个。幂等键则应该由协议层定义为写操作的正式字段，而不是各家宿主塞在参数里的私有约定；服务器被要求在合理窗口内对相同键返回相同结果。</p>
+<p>下面用一段伪码把这些要点钉住。字段名均为本文自拟，只为讨论结构，不对应任何真实协议：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">call_request &#123;</span><br><span class="line">  tool_id           # 稳定的工具标识</span><br><span class="line">  arguments         # 按已发布 schema 校验过的参数</span><br><span class="line">  idempotency_key   # 写操作必填，读操作可省</span><br><span class="line">  timeout_ms        # 宿主侧硬超时</span><br><span class="line">  accept            # 本调用方可消费的结果类型集合</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">call_result &#123;</span><br><span class="line">  status            # ok | retryable | fatal | unknown 四态之一</span><br><span class="line">  content           # 数组，元素类型限定为 text / structured / binary / reference</span><br><span class="line">  error &#123;</span><br><span class="line">    class           # 机器可读错误类</span><br><span class="line">    message         # 人类可读说明，禁止携带凭据</span><br><span class="line">    retry_after_ms  # 仅 retryable 有意义</span><br><span class="line">    side_effect_maybe_applied  # unknown 态的核心字段：副作用可能已发生</span><br><span class="line">  &#125;</span><br><span class="line">  stream_cursor     # 断线续传或取消后对账用的游标</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这段结构里真正的重点只有三处。其一，status 与 content 分离，错误不是内容的特例而是独立语义。其二，unknown 是一个显式状态而不是让调用方去猜。其三，错误里那个”副作用是否可能已发生”的声明字段——它是模型决定要不要重试、人类决定要不要对账的唯一可靠依据，而这类信息恰恰是”把函数签名当协议”永远带不出来的。</p>
+<h2 id="第三层：身份与授权"><a href="#第三层：身份与授权" class="headerlink" title="第三层：身份与授权"></a>第三层：身份与授权</h2><p>工具调用天然是一条跨信任域的委托链：用户授权宿主，宿主驱动客户端，客户端调用服务器，服务器再伸手进入外部系统。每一跳都带着上一跳给不了的上下文，也带着下一跳不该看到的信息。标准化的要求可以浓缩成一句话：权限沿链条只能收窄，不能放大。用图来摆信任边界：</p>
+<pre class="mermaid">flowchart TD
+    U[用户] -->|登录与总授权| H[宿主运行时]
+    subgraph B1[信任域一：宿主进程]
+        C[协议客户端]
+    end
+    H --> C
+    subgraph B2[信任域二：服务器进程]
+        S[协议服务器]
+    end
+    C -->|能力声明 + 短时效令牌| S
+    subgraph B3[信任域三：外部系统]
+        X[账号 / 数据 / 资金]
+    end
+    S -->|以授权范围的最小必要子集换取访问| X
+    X -.->|结果回传，凭据永不回流| S
+    S -.-> C</pre>
+
+<p>范围与最小权限是授权层第一个要标准化的概念。协议至少要支持”每次调用可以携带比总授权更小的范围声明”，让服务器可以断言这次操作只使用了被授予范围的哪个子集；一个所有调用共享同一枚全局令牌的架构里，”最小权限”只是修辞。令牌的生命周期是第二个：签发在哪里、多久轮换、什么时候必须失效，标准未必能规定具体时长，但必须规定”凭据不得出现在三个位置”——模型的上下文窗口、任何一层的日志、以及缓存键的组成部分。这三个禁区的操作细节在权限控制的专文里已有展开，本文只强调标准化的一面：如果协议文本不写死这条禁令，宿主实现者与服务器实现者会各凭运气，安全审计就没有共同的参照物。第三个要标准化的是审计的可重建性：谁、经由哪条委托链、用什么参数调用了哪个工具、外部系统实际发生了什么、结果是什么——协议层要留足钩子，使得这些事件可以事后重建。可重建，是企业敢把核心系统接入协议生态的前提，也是出事故时定责的唯一依据。</p>
+<p>授权侧的标准化目前有一个可引用的动态：官方已给出修订候选稿（RC，2026-05-29），方向包括把异步任务归入扩展、新增发现类方法、去掉会话与初始化握手的强绑定、强化授权侧对签发方的校验、以客户端身份元数据文档取代动态注册、把 HTTP+SSE 传输与 Roots、Sampling 原语列入废弃清单并给出约 12 个月的移除窗口——注意，这一切都是草案，可能变动。本文刻意不写具体端点与字段拼写，因为草案阶段的细节正是最不该被工程团队抄进代码的部分。真正值得现在就开始做的，是把自家实现里对”签发方校验”和”客户端身份注册”的依赖梳理出来，等草案定稿时你才知道自己要动多少地方。</p>
+<h2 id="工具层与协作层不是一件事"><a href="#工具层与协作层不是一件事" class="headerlink" title="工具层与协作层不是一件事"></a>工具层与协作层不是一件事</h2><p>拆完三层，就能看清一个常被混淆的分界：工具层协议解决”怎么调用一个能力”，协作层协议解决”怎么找到并交接一个任务”。前者的单位是一次调用与一份结果，后者的单位是一个待办从提出方流转到执行方再流回来。两层各有各的标准化难题，硬用一层协议同时回答两个问题，通常两头都做不好。本文通篇讨论的是工具层；协作层这边，可以点名的已核实时间线只有 A2A 一条：2025-04-09 公开宣布，2025-06-23 进入 Linux Foundation，2025-07-30 发布 v0.3.0，2026-03-12 发布 v1.0.0，2026-05-26 发布 v1.0.1——最后两个节点都早于本文写作日，属于可陈述的事实。此外 AGNTCY 于 2025-07-29 对外公布，Agent Skills 于 2025-10-16 发布、其规格放在 anthropics&#x2F;skills 仓库的 spec 目录里。除这些之外，若干组织各自提出过协议，尚未收敛，本文不为它们编造名字或代号。</p>
+<p>回到工具层，真正影响工程决策的是三种封装形态的可移植性边界各不相同。第一种是宿主私有函数调用：模型直接以宿主定义的形式发起调用，链路最短、迭代最快，但它只在一家宿主内生效，换宿主或者换模型供应商就得全部重来。各 agent 框架大体走这条路——就当期版本口径而言，LangChain 已到 1.3、LangGraph 到 1.2，OpenAI Agents SDK 仍处于 0.x 的快节奏阶段，CrewAI、AutoGen、Eino 各有自己的定位与生态位；本文不重复它们的接口细节，只指出共同点：框架内函数调用格式的互换性，从来不是这些工具要解决的问题。第二种是协议工具：走标准的客户端与服务器模型，跨宿主复用的前提是宿主实现了协议、并且工具描述停留在各宿主能力交集之内——你在描述层用了某个只有某家宿主才理解的字段，可移植性立刻归零。第三种是技能包：封装的不是”一个能力入口”，而是”做法”本身——流程说明、脚本、参考资料打包分发，可移植性看着最强，实则最依赖执行环境的文件系统与运行能力，标准化的边界因此落在运行时而不是接口上。三种形态没有优劣之分，只有边界之分；把它们混在一个清单里比较”哪个更标准”，是提问方式错了。</p>
+<h2 id="治理主体与变更流程"><a href="#治理主体与变更流程" class="headerlink" title="治理主体与变更流程"></a>治理主体与变更流程</h2><p>协议标准化绕不开的一个问题是：谁有权在什么时候改变协议。这决定了工程团队能不能做长期规划。标准由基金会或者联盟托管，与由单一公司维护，差别不在名义而在流程：变更提案谁能提、评审要走多久、决议记录在哪里、弃用政策有没有最低保护窗口、参考实现是否随协议同步演进、有没有一致性测试套件把规范文字钉死成可执行判据。文档可以模糊，测试套件不能模糊——一个协议有没有”符合性测试”，是区分”有治理的标准”与”有站点的库”的最硬指标。</p>
+<p>已核实的治理节点是这样。Agentic AI Foundation 在 2025-12-09 发布公告，目前托管 MCP、AGENTS.md 与 goose 三个项目；这为 MCP 的变更流程提供了明确的受理主体，也是把 2026 年中的候选稿视为”有治理的演进”而非”单方改接口”的底气所在。A2A 一侧的治理主体则是 Linux Foundation，时间线见上一节。除此之外的多数协议，治理主体未定，本文不做推断。</p>
+<p>发现层的基础设施同样需要治理视角。MCP 的注册表项目目前仍是预览状态，API 冻结在 v0.1，整体仍在演进——这句话的含义是：它可以作为今天试验发现机制的参照，但不能作为明天生产依赖的承诺。注册表标准化的对象是”怎么登记、怎么查询、元数据长什么样”，它天然管不到”登记的东西是否安全”——这一点放到第 9 节的误区里再批评。最后说一句与模型的关系以免跑题：协议标准化与具体模型版本基本无关，本文涉及的模型仅按官方当期口径点名——Claude 侧有 Opus 4.6、4.7、4.8 与 Sonnet 4.6，以及 2026-07-09 起用的 Fable 5 与 Mythos 5；其余厂商的型号与日期一律以官方当期公布为准，本文不做罗列。任何把”该选哪个协议”论证成”某个模型更强所以无所谓”的说法，保质期都不会超过一个季度。</p>
+<h2 id="弃用与迁移的节奏"><a href="#弃用与迁移的节奏" class="headerlink" title="弃用与迁移的节奏"></a>弃用与迁移的节奏</h2><p>先对齐口径。截至本文写作（2026-07-18），MCP 官方已发布的最新修订是 2025-11-25 版，其把异步 Tasks 与 Extensions 纳入标准的主线方向已被社区反复引用；下一次修订的正式文本尚未发布，本文不猜测其内容。能作为既成事实陈述的，只到 2025-11-25 版为止；2026-05-29 的候选稿（RC）给出的所有方向——包括把 HTTP+SSE 传输与 Roots、Sampling 列入废弃清单、并给出约 12 个月移除窗口——在定稿之前一律按草案对待。这个区分不是学究气：把草案当事实排进迁移计划，和把事实当草案无限拖延，是节奏失控的两个对称方向。</p>
+<p>废弃清单加上移除窗口，应该被翻译成一份工程排期而不是新闻。可行的节奏大致五步。第一步在废弃公告当日：盘点自家使用面——哪些工具、哪些宿主路径、哪些集成方踩在将被移除的能力上，产出一张影响清单。第二步在窗口的前三分之一：冻结新增依赖，新代码一律走替代路径，存量代码允许继续运行但挂上监控。第三步在中间三分之一：双轨运行，新旧两条路径同时在线，用契约测试把”同一批调用在两条路径上的语义等价”固化为可重复执行的验证。第四步在窗口末尾三分之一：灰度关闭旧轨道，从最低流量的集成方开始，每关一段观察一个完整业务周期。第五步在移除生效后：保留一层薄薄的适配器和整套测试夹具一段时间，专门用来对付没及时升级的长尾接入方——适配器的寿命以事故回溯的需要为准，而不是以协议文档为准。</p>
+<p>双轨期的核心工件是一张兼容矩阵：行是协议版本与传输方式，列是自家宿主的关键能力（发现、调用、流式、取消、授权刷新），单元格只允许三种状态——支持、已废弃、已移除。矩阵的价值不在于穷举，而在于强迫每个单元格有人签字。矩阵里的阈值——比如”旧轨道流量降到多少才允许进入下一步”——用团队约定示例即可，例如”连续两周低于总调用量的 5%（团队约定示例，非行业标准）”；切流比例与回滚条件同理，写清是示意值。验证方法上，三件套缺一不可：一致性测试确认你符合协议文本，流量回放确认历史调用在新轨道上结果可比，金丝雀发布确认真实世界的分布没有暗坑。只做完第一件就宣布迁移成功的团队，通常在第三个月收到回滚请求。</p>
+<h2 id="标准化成熟度自评表"><a href="#标准化成熟度自评表" class="headerlink" title="标准化成熟度自评表"></a>标准化成熟度自评表</h2><p>下面这张表供读者直接抄进自己的协作空间，逐层回答五个问题，把”你现在的做法”一栏如实填写——本文刻意不预填任何结论或数值，因为差距只有对照自家系统才看得出来。评分口径也建议团队自己约定，不要抄别家的。</p>
+<table>
+<thead>
+<tr>
+<th>层次</th>
+<th>问题</th>
+<th>你现在的做法</th>
+<th>差距</th>
+<th>下一步</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>描述与发现</td>
+<td>工具描述里有没有副作用、幂等、成本字段？</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>描述与发现</td>
+<td>有没有能力协商机制，还是靠文档免责声明？</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>描述与发现</td>
+<td>工具描述的变更走什么评审、有没有兼容矩阵？</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>调用与结果</td>
+<td>结果类型是否区分文本、结构化、二进制、引用？</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>调用与结果</td>
+<td>错误是否能区分可重试、不可重试、未知三态？</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>调用与结果</td>
+<td>取消与超时沿调用链是否一致传播？</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>身份与授权</td>
+<td>委托链每一跳能否收窄范围而非放大？</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>身份与授权</td>
+<td>令牌生命周期有无明确规范与轮换证据？</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>身份与授权</td>
+<td>事故后能否重建”谁经何链调用了什么”？</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>治理与迁移</td>
+<td>废弃公告到移除窗口的排期有无负责人签字？</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>治理与迁移</td>
+<td>双轨期验证是否覆盖一致测试、回放、灰度？</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>治理与迁移</td>
+<td>依赖的是已发布修订还是草案？草案有无隔离层？</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<p>填表的顺序建议从最后四行倒着来：先确认你依赖的是事实还是草案，再确认迁移有无排期，最后才回头修协议实现本身的层次缺口。多数团队会发现，最难填的不是技术行，而是治理行——因为”谁签字”这个问题往往没有现成答案。</p>
+<h2 id="四个常见误区"><a href="#四个常见误区" class="headerlink" title="四个常见误区"></a>四个常见误区</h2><p>第一个误区：把注册表当安全审核。注册表索引的是元数据——名称、描述、schema、来源地址；它不签名、不审计、不保证发布者和代码作者的意图。装上注册表里任何一个工具，本质仍然是执行一段第三方代码。发现层的标准化解决”找得到、对得上”，信任的锚点必须建立在发现层之外：来源验证、发布流程、运行隔离，缺一件都不能因为”它是从注册表里装的”而豁免。</p>
+<p>第二个误区：把 schema 当权限模型。schema 描述”参数应该长什么样”，权限决定”谁能发起哪类调用”；在字段旁边写一个看似严厉的说明文字，不构成任何执行。真正的执行发生在服务器侧与委托链上——校验范围、核对签发方、拒绝越权调用。一个描述层再精致的协议，如果授权层只有约定没有执行点，它的”安全”二字就是纸糊的。</p>
+<p>第三个误区：把协议版本当产品能力。宣称”我们已支持某年某月修订”只说明兼容性契约的立场，不说明用户能多做任何一件事。能力在产品层面是连续光谱——有没有实现某个可选扩展、错误三态做没做全、授权刷新顺不顺滑——这些都与版本号的数字没有对应关系。把版本号印在产品页上，然后让客户按版本号做采购判断，是把工程语言冒充成价值语言。</p>
+<p>第四个误区：以为标准化能解决任务的可验证性。协议能保证”调用被正确地发出与回执”，不能保证”事情做对了”。模型选错工具、参数语义正确但意图错误、结果真实但对任务无益——这三类失败都在协议射程之外。评测怎么做，官方工程栏目已有专门文章讨论 agent 评测的方法，结论同样是标准化只能解决评测数据可复现的那一角。三层协议建得再齐整，任务验证仍然是独立的学科，不要指望前者替代后者。</p>
+<h2 id="与相邻主题的划界"><a href="#与相邻主题的划界" class="headerlink" title="与相邻主题的划界"></a>与相邻主题的划界</h2><p>与 MCP 生态：协议自身的生态、原语用法与供应链问题另有专文，入门视角可参见更早的 MCP 介绍文章，本文只谈三层标准化的议题。与工具调用机制：模型侧如何决定调用哪个工具、调用循环如何编排，是工具调用主题的范畴；本文把”调用已经决定”当作给定，只讨论决定之后的协议约束。与协作协议及经济问题：跨智能体的任务流转与市场机制另有专文，本文只在前面《工具层与协作层不是一件事》一节把两层的边界切清楚，不延伸到交易与计价。与序列化协议对比：JSON Schema、OpenAPI、Protobuf、AsyncAPI 在编码与契约表达上的差异是专门主题，本文只在需要时引用一句，不重开对比。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>工具协议之间的竞争，表面在语法，实质在两个更深的位置：第三方能否安全扩展，升级时能否不打穿宿主。把标准化拆成三层来谈——描述与发现负责”说清楚能力是什么”，调用与结果负责”执行得可预期”，身份与授权负责”责任可重建”——每一层都有自己成熟的工程问题与对应的失败模式，混层讨论是多数争论无疾而终的原因。对事实与草案保持口径纪律：已发布修订才是地基，候选稿只配隔离层；废弃公告、移除窗口、双轨矩阵与三件套验证，是把节奏落到排期的最小单元。最后把那张空白的成熟度自评表留给读者：标准化不是选出来的，是按层量出来、再一寸寸补上去的。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li>Model Context Protocol 规范与修订记录，官方站点：<a href="https://modelcontextprotocol.io/">https://modelcontextprotocol.io</a></li>
+<li>MCP Registry（预览），官方站点：<a href="https://modelcontextprotocol.io/">https://modelcontextprotocol.io</a></li>
+<li>Agentic AI Foundation 公告（2025-12-09），官方公告渠道</li>
+<li>A2A 协议项目与版本记录，Linux Foundation 下属项目主页</li>
+<li>AGNTCY 项目（2025-07-29 公告），项目主页</li>
+<li>Agent Skills 规格（2025-10-16），仓库 anthropics&#x2F;skills 的 spec 目录：<a href="https://github.com/anthropics/skills">https://github.com/anthropics/skills</a></li>
+<li>《Code execution with MCP》，Anthropic 官方工程栏目</li>
+<li>《Long-running harnesses》，Anthropic 官方工程栏目</li>
+<li>《Agent evals》，Anthropic 官方工程栏目</li>
+<li>《Managed agents》，Anthropic 官方工程栏目</li>
+<li>《How we contain Claude》（2026-06-24 起用），Anthropic 官方工程栏目</li>
+<li>JSON Schema 规范，官方站点：<a href="https://json-schema.org/">https://json-schema.org</a></li>
+<li>OpenAPI Specification，项目主页：<a href="https://www.openapis.org/">https://www.openapis.org</a></li>
+<li>gRPC 与 Protocol Buffers，项目主页：<a href="https://grpc.io/">https://grpc.io</a></li>
+<li>AsyncAPI 规范，项目主页：<a href="https://www.asyncapi.com/">https://www.asyncapi.com</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Agent 工具协议标准化</p><p><a href="https://987763485.github.io/2026/07/18/Agent工具协议标准化/">https://987763485.github.io/2026/07/18/Agent工具协议标准化/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2026-07-18</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-21</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="link-muted mr-2" rel="tag" href="/tags/python/">python</a><a class="link-muted mr-2" rel="tag" href="/tags/agent/">agent</a><a class="link-muted mr-2" rel="tag" href="/tags/typescript/">typescript</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2026/07/23/AI%E5%BA%94%E7%94%A8%E5%AE%89%E5%85%A8%E9%98%B2%E6%8A%A4/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">AI 应用安全防护</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2026/07/11/%E6%A8%A1%E5%9E%8B%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8D%8F%E8%AE%AE%E7%94%9F%E6%80%81/"><span class="level-item">模型上下文协议生态</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

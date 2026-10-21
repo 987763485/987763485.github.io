@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Rust 项目中的错误码体系 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="本文讨论一条容易被跳过、却最影响线上协作的链路：一个库函数返回的 StoreError，经过几层折叠，如何变成调用方看到的 {&amp;quot;code&amp;quot;: &amp;quot;ORD-ST-3007&amp;quot;}。适合已经写过 Result&amp;lt;T, Box&amp;lt;dyn Error&amp;gt;&amp;gt;、开始对服务对外接口负责的人。读完应该能拿出三样东西：一份错误分层模型、一张错误码表、一个稳定的错误"><meta property="og:type" content="blog"><meta property="og:title" content="Rust 项目中的错误码体系"><meta property="og:url" content="https://987763485.github.io/2023/08/01/Rust%E9%A1%B9%E7%9B%AE%E4%B8%AD%E7%9A%84%E9%94%99%E8%AF%AF%E7%A0%81%E4%BD%93%E7%B3%BB/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="本文讨论一条容易被跳过、却最影响线上协作的链路：一个库函数返回的 StoreError，经过几层折叠，如何变成调用方看到的 {&amp;quot;code&amp;quot;: &amp;quot;ORD-ST-3007&amp;quot;}。适合已经写过 Result&amp;lt;T, Box&amp;lt;dyn Error&amp;gt;&amp;gt;、开始对服务对外接口负责的人。读完应该能拿出三样东西：一份错误分层模型、一张错误码表、一个稳定的错误"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2023-07-31T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-19T04:35:38.357Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="rust"><meta property="article:tag" content="后端开发"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2023/08/01/Rust%E9%A1%B9%E7%9B%AE%E4%B8%AD%E7%9A%84%E9%94%99%E8%AF%AF%E7%A0%81%E4%BD%93%E7%B3%BB/"},"headline":"Rust 项目中的错误码体系","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2023-07-31T16:00:00.000Z","dateModified":"2026-10-19T04:35:38.357Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"本文讨论一条容易被跳过、却最影响线上协作的链路：一个库函数返回的 StoreError，经过几层折叠，如何变成调用方看到的 {&quot;code&quot;: &quot;ORD-ST-3007&quot;}。适合已经写过 Result&lt;T, Box&lt;dyn Error&gt;&gt;、开始对服务对外接口负责的人。读完应该能拿出三样东西：一份错误分层模型、一张错误码表、一个稳定的错误"}</script><link rel="canonical" href="https://987763485.github.io/2023/08/01/Rust%E9%A1%B9%E7%9B%AE%E4%B8%AD%E7%9A%84%E9%94%99%E8%AF%AF%E7%A0%81%E4%BD%93%E7%B3%BB/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2023-07-31T16:00:00.000Z" title="8/1/2023, 12:00:00 AM">2023-08-01</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></span><span class="level-item">1 小时读完 (大约9119个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Rust 项目中的错误码体系</h1><nav class="series-nav" aria-label="系列文章导航"><div class="series-nav-meta"><i class="fas fa-book-open" aria-hidden="true"></i><span>本文属于《<a class="series-nav-title" href="/series/rust/">Rust 学习路线</a>》第 22/68 篇</span></div><div class="series-nav-links"><a class="series-nav-link series-nav-prev" href="/2021/02/21/Rust%E9%94%99%E8%AF%AF%E5%A4%84%E7%90%86%E5%9C%A8%E4%B8%9A%E5%8A%A1%E4%BB%A3%E7%A0%81%E4%B8%AD%E7%9A%84%E7%BB%84%E7%BB%87/"><i class="fas fa-chevron-left" aria-hidden="true"></i><span>上一篇</span></a><a class="series-nav-link series-nav-index" href="/series/rust/">系列目录</a><a class="series-nav-link series-nav-next" href="/2025/06/07/Rust%E9%94%99%E8%AF%AF%E5%A4%84%E7%90%86%E7%94%9F%E6%80%81thiserror%E4%B8%8Eanyhow/"><span>下一篇</span><i class="fas fa-chevron-right" aria-hidden="true"></i></a></div></nav><div class="content"><p>本文讨论一条容易被跳过、却最影响线上协作的链路：一个库函数返回的 <code>StoreError</code>，经过几层折叠，如何变成调用方看到的 <code>{&quot;code&quot;: &quot;ORD-ST-3007&quot;}</code>。适合已经写过 <code>Result&lt;T, Box&lt;dyn Error&gt;&gt;</code>、开始对服务对外接口负责的人。读完应该能拿出三样东西：一份错误分层模型、一张错误码表、一个稳定的错误转换器。</p>
+<h2 id="为什么要把库错误映射成对外错误码"><a href="#为什么要把库错误映射成对外错误码" class="headerlink" title="为什么要把库错误映射成对外错误码"></a>为什么要把库错误映射成对外错误码</h2><p>大多数 Rust 项目的错误代码是这样长起来的。最初 <code>src/error.rs</code> 里只有一个枚举、几个变体，够用。后来加了数据库、上游调用、缓存，变体从 5 个涨到 40 个，中间层又开始用 <code>anyhow::Error</code> 打包上传。到这一步，进程内部的错误表达很丰富，对外接口却只有一种呈现：把某个错误的 <code>Display</code> 字符串塞进响应体的 <code>message</code> 字段。</p>
+<p>这种“用文本当契约”的做法迟早爆雷。笔者在库存服务里见过真实例子：下游把超时错误原样写进 500 响应，<code>message</code> 是 <code>connection closed before message completed</code>。前端为了区分提示写了一个按文本包含关系判断的分支。半年后底层连接库升级，文案换了说法，分支静默失效，可重试的瞬时故障被提示成“下单失败，请稍后再试”，用户大量重复提交。文本不是稳定契约：它为人而写，会随依赖版本变化，而调用方的代码恰恰依赖它不变。</p>
+<p>错误码解决的第一件事，是给调用方一个可编程分支的枚举值。客户端拿到 <code>ORD-INV-5001</code> 就知道该提示“该规格库存不足”，拿到 <code>ORD-UP-2004</code> 就知道该退避重试。这些分支写在一个字符串常量上，可搜索、可统计、可写进联调文档，而且我们能承诺它三年不变。</p>
+<p>第二件事是划清责任边界。一次失败可能涉及五六个组件，调用方只需要一句话：“这件事算谁的、你该做什么”。库存不足属于调用方可修，连接池耗尽属于我方容量问题，对外只给一个“暂不可用”级别的码，不解释是哪个池子。</p>
+<p>第三件事是可观测性。日志文本无法稳定聚合，错误码可以：值班看到 <code>ORD-ST-3007</code> 从零突增到每分钟两百次，比看到刷屏的乱串消息有用得多。这部分在第 8 节展开。</p>
+<p>错误码也不能由状态码替代。HTTP 状态码有限、颗粒很粗，400 与 422 的边界几乎不可判定；同一个 409 里可能藏着“库存不足”与“这张券已核销”两种完全不同的处置。也别用 <code>code: 0</code> 这种全局大杂烩：所有错误挤在同一个数字上，等于没有分层。</p>
+<p>所以本篇的核心命题是：<strong>库错误回答“哪里出了什么问题”，对外错误码回答“调用方现在该做什么”</strong>。两者隔着几个抽象层，把前者折叠成后者本身就是设计工作。</p>
+<h2 id="错误的四层模型"><a href="#错误的四层模型" class="headerlink" title="错误的四层模型"></a>错误的四层模型</h2><p>要谈映射，先要谈分层。笔者在项目里用四层，切分依据是一条：<strong>这一层的错误，是给谁看的</strong>。</p>
+<p><strong>领域错误</strong>（domain）表示业务规则不成立：库存不足、状态机不允许这次迁移、金额超出限额。它与传输和存储无关，换成命令行程序也依然存在；数量最少但语义最贵，每一个都要能在产品文档里找到对应说明。</p>
+<p><strong>应用错误</strong>（application）是“一次用例执行失败”的原因集合，也是用例边界的收口层。它把领域错误与基础设施错误归拢成同一种类型，补上只有用例才有的信息：能不能重试、属于哪个 trace、涉及哪个业务对象。它还负责判定责任归属：同一个超时，发生在扣库存那一步与发通知那一步，答复并不相同。</p>
+<p><strong>基础设施错误</strong>（infrastructure）来自存储、上游 RPC、消息队列、缓存。它是错误发生的现场，首要职责是把底层库的错误作为 <code>source</code> 逐层包好，保留因果链。它不该知道“订单”——<code>StoreError</code> 里出现 <code>order_not_found</code> 这类业务词，说明分层已被污染。</p>
+<p><strong>对外协议错误</strong>（wire）只存在于进程边界。它是那个 JSON 响应体、那个 gRPC <code>Status</code>、那个错误码字符串与状态码的组合。请求一进进程它就消失，请求一出进程它才出现。</p>
+<p>四层的关系是自下而上折叠，而不是互相转换：</p>
+<pre class="mermaid">flowchart TD
+    L[底层库错误 StoreError UpstreamError] --> I[基础设施错误 InfraError]
+    I --> A[应用错误 AppError]
+    D[领域错误 DomainError] --> A
+    A --> W[对外协议错误 WireError]
+    W --> R[HTTP 响应体 或 gRPC Status]</pre>
+
+<p>从这个图里能读出三条纪律。</p>
+<p>其一，<strong>折叠只能向上，不能向下</strong>。基础设施错误可以在应用层被解释成“服务暂时不可用”，但不能把领域错误降级成一条内部警告、悄悄替用户把库存扣下去。向下解释往往意味着掩盖。</p>
+<p>其二，<strong>每层只允许紧邻感知下两层</strong>。如果 HTTP handler 里出现 <code>match store_err { StoreError::PoolTimeout =&gt; ... }</code>，说明协议层越过应用层直接理解存储细节，换一次驱动就要改一遍接口代码。跨层感知是体系腐化的开始。</p>
+<p>其三，<strong>依赖方向必须单向</strong>。领域模块不得引用基础设施的错误类型，基础设施也不得引用领域，能缝合两者的只有应用层。这条纪律由编译器把关：谁 <code>use</code> 了谁的类型，谁就依赖谁。</p>
+<h3 id="每一层该携带什么信息"><a href="#每一层该携带什么信息" class="headerlink" title="每一层该携带什么信息"></a>每一层该携带什么信息</h3><p>分层之后，第二个问题是每层的错误值里放什么。下表横着看是字段、竖着看是层级，空白表示该层不该有这个字段。</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>领域错误</th>
+<th>应用错误</th>
+<th>基础设施错误</th>
+<th>对外协议错误</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>可读消息</td>
+<td>有</td>
+<td>有</td>
+<td>有</td>
+<td>面向用户的文案</td>
+</tr>
+<tr>
+<td>稳定错误码</td>
+<td>有</td>
+<td>有</td>
+<td>有</td>
+<td>唯一对外的那一个</td>
+</tr>
+<tr>
+<td>因果链 <code>source</code></td>
+<td>可无</td>
+<td>有</td>
+<td>必有</td>
+<td>无</td>
+</tr>
+<tr>
+<td>可重试标志</td>
+<td>由码决定</td>
+<td>有</td>
+<td>有</td>
+<td>有</td>
+</tr>
+<tr>
+<td>trace 关联 id</td>
+<td>无</td>
+<td>有</td>
+<td>无</td>
+<td>有</td>
+</tr>
+<tr>
+<td>业务上下文键</td>
+<td>有</td>
+<td>有</td>
+<td>无</td>
+<td>视情况</td>
+</tr>
+<tr>
+<td>传输状态码</td>
+<td>无</td>
+<td>无</td>
+<td>无</td>
+<td>有</td>
+</tr>
+</tbody></table>
+<p>下面逐条说明为什么这样分配。</p>
+<p><strong>可读消息</strong>给人看，不给程序判断。每层保留一句完整、能独立读懂的话，例如 <code>库存行加锁失败，sku=9021</code>。但它不进对外响应体：内部消息里常有表名、主机名、SQL 片段，泄出去是信息暴露。对外给的是由码决定的用户文案。</p>
+<p><strong>稳定错误码</strong>四层都有，命名空间不同，只有边界那一层的码进响应体。这一点容易被误解成“码只在最后生成”：其实内部有码，日志才能按码聚合，第 8 节的分布监控才成立。</p>
+<p><strong>因果链 <code>source</code></strong> 是标准库 <code>Error</code> trait 的内建能力。领域错误往往没有原因，“库存不足”不是哪个底层错误导致的，而是规则判定结果；基础设施错误必然有原因，因为它本身就是对底层错误的包装。</p>
+<p><strong>可重试标志</strong>回答“客户端再来一次有没有意义”。取值应完全由错误码推导，不能从文本猜。显式放进错误值，是为了让网关、SDK、队列消费者共用同一份判定。</p>
+<p><strong>trace 关联 id</strong> 只在应用层产生与传播：入站请求头带来就沿用，没带就生成，之后写进日志字段与响应头。领域层不该知道它，否则领域代码就染上了传输上下文。</p>
+<p><strong>业务上下文键</strong>是结构化的排障线索，如 <code>sku_id</code>、<code>tenant_id</code>、<code>attempt</code>，以字段形式存在而不是拼进消息文本，日志后端才能索引。而<strong>传输状态码</strong>只在协议层出现，因为只有它知道自己走的是 HTTP 还是 gRPC。</p>
+<p>这一节的用法是：评审“加个错误”的改动时按字段提问——码是什么、消息是什么、原因链是谁、能不能重试、上下文键放哪。五个问题答完，错误就设计完了。</p>
+<h2 id="错误码的设计原则"><a href="#错误码的设计原则" class="headerlink" title="错误码的设计原则"></a>错误码的设计原则</h2><p>有了分层，接下来是给码定规矩。下面五条按重要程度排序，第一条几乎无法挽回，后面四条能靠工具补救。</p>
+<h3 id="稳定是第一位属性"><a href="#稳定是第一位属性" class="headerlink" title="稳定是第一位属性"></a>稳定是第一位属性</h3><p>一个错误码发出去就成了一份公开契约，约束强度不低于函数签名。原则是：<strong>一个码只有一个语义，语义变了就发新码，绝不让同一个码的含义悄悄漂移</strong>。</p>
+<p>举个会踩的坑。最初 <code>ORD-UP-2004</code> 定义为“上游调用超时”，后来有人加了句“上游返回 5xx 也算”，于是一个码横跨两种处置：超时应退避重试，某些 5xx 却表示请求已处理、重试会造成重复。若当时按语义拆成 <code>2004</code> 与 <code>2005</code>，各自策略都能写清楚。</p>
+<p>因此码的增删改要纳入变更评审：新增当作向后兼容的小版本，删除或改语义当作破坏性变更。第 9 节给出具体做法。</p>
+<h3 id="用命名空间分段"><a href="#用命名空间分段" class="headerlink" title="用命名空间分段"></a>用命名空间分段</h3><p>推荐的结构是三段：<code>{服务}-{子域}-{四位数字}</code>，例如 <code>ORD-INV-1001</code>。服务前缀解决跨团队撞号，子域前缀让日志里一行码就能定位出处，数字段承载类别。</p>
+<p>数字段建议这样划分：</p>
+<table>
+<thead>
+<tr>
+<th>号段</th>
+<th>类别</th>
+<th>谁的问题</th>
+<th>调用方典型处置</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1xxx</td>
+<td>参数与前置校验</td>
+<td>调用方</td>
+<td>改输入，不重试</td>
+</tr>
+<tr>
+<td>2xxx</td>
+<td>上游依赖不可用</td>
+<td>依赖方</td>
+<td>退避后重试</td>
+</tr>
+<tr>
+<td>3xxx</td>
+<td>存储与基础设施</td>
+<td>我方</td>
+<td>稍后重试，或降级</td>
+</tr>
+<tr>
+<td>4xxx</td>
+<td>权限与可见性</td>
+<td>调用方身份</td>
+<td>换凭据，不重试</td>
+</tr>
+<tr>
+<td>5xxx</td>
+<td>领域规则不成立</td>
+<td>业务状态</td>
+<td>换选择或换时间</td>
+</tr>
+<tr>
+<td>7xxx</td>
+<td>限流与配额</td>
+<td>我方容量</td>
+<td>按提示时间重试</td>
+</tr>
+<tr>
+<td>9xxx</td>
+<td>服务端内部缺陷</td>
+<td>我方</td>
+<td>不重试，带 trace 报障</td>
+</tr>
+</tbody></table>
+<p>每个号段内部要预留空洞，不要连着编满：<code>1001</code> 之后跳到 <code>1010</code>，是为了让 <code>1002</code> 到 <code>1009</code> 容纳评审时才想到的同族情形。</p>
+<h3 id="不要把内部实现细节编码进码"><a href="#不要把内部实现细节编码进码" class="headerlink" title="不要把内部实现细节编码进码"></a>不要把内部实现细节编码进码</h3><p>这里有个容易误读的地方：足够具体才能指导处置，但足够具体不等于暴露实现。标准是——<strong>调用方拿到码之后能做的事会不会因此变化；不会，就不该进对外码</strong>。</p>
+<p>“库存行加锁失败”与“连接池水位达到上限”，调用方的处置完全相同：稍后重试。给它们两个码，除了把内部拓扑告诉外面没有收益。内部码表可以细，对外码表必须粗。</p>
+<p>我们的做法是把码表分成“可对外”与“内部专用”两个集合，由转换器把关。<code>ORD-ST-3007</code>（存储不可用）允许出现在响应里；<code>ORD-ST-3012</code>（连接池水位）只在日志与监控里存在，对外折叠成 <code>3007</code>。折叠关系写死在映射表里。</p>
+<p>另一类暴露是权限错误：对不存在的资源给 404、对无权的资源给 403，等于把“这个资源存在”泄漏给越权尝试者。这类取舍必须显式写进码表注释。</p>
+<h3 id="与-HTTP、gRPC-状态码的映射"><a href="#与-HTTP、gRPC-状态码的映射" class="headerlink" title="与 HTTP、gRPC 状态码的映射"></a>与 HTTP、gRPC 状态码的映射</h3><p>状态码与错误码是两层粗细：状态码给网关、SDK、重试库这些通用中间件看，错误码给业务客户端看。规则是<strong>允许多个码共享一个状态码，绝不允许一个码对应多个状态码</strong>。</p>
+<table>
+<thead>
+<tr>
+<th>错误码类别</th>
+<th>HTTP 状态</th>
+<th>gRPC 状态</th>
+<th>可重试</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1xxx 参数校验</td>
+<td>400 &#x2F; 422</td>
+<td><code>INVALID_ARGUMENT</code></td>
+<td>否</td>
+</tr>
+<tr>
+<td>4xxx 权限</td>
+<td>403</td>
+<td><code>PERMISSION_DENIED</code></td>
+<td>否</td>
+</tr>
+<tr>
+<td>4xxx 未认证</td>
+<td>401</td>
+<td><code>UNAUTHENTICATED</code></td>
+<td>否</td>
+</tr>
+<tr>
+<td>2xxx 上游超时</td>
+<td>504</td>
+<td><code>DEADLINE_EXCEEDED</code></td>
+<td>是</td>
+</tr>
+<tr>
+<td>2xxx &#x2F; 3xxx 依赖不可用</td>
+<td>503</td>
+<td><code>UNAVAILABLE</code></td>
+<td>是</td>
+</tr>
+<tr>
+<td>5xxx 乐观锁冲突</td>
+<td>409</td>
+<td><code>ABORTED</code></td>
+<td>是，重试整个事务</td>
+</tr>
+<tr>
+<td>5xxx 业务规则不成立</td>
+<td>409</td>
+<td><code>FAILED_PRECONDITION</code></td>
+<td>否</td>
+</tr>
+<tr>
+<td>7xxx 限流与配额</td>
+<td>429</td>
+<td><code>RESOURCE_EXHAUSTED</code></td>
+<td>是，按 <code>Retry-After</code></td>
+</tr>
+<tr>
+<td>9xxx 内部缺陷</td>
+<td>500</td>
+<td><code>INTERNAL</code></td>
+<td>谨慎，仅幂等接口</td>
+</tr>
+</tbody></table>
+<p>这张表必须存在于代码里而不是文档里：第 5 节的转换器会把它编译成 <code>match</code>，并由测试保证不漂移。</p>
+<p>顺带说明，本文只谈 Rust 侧的组织方式，服务框架里 <code>IntoResponse</code> 之类的具体接线属于实现细节，不在这里展开。</p>
+<h3 id="把码表当代码管理"><a href="#把码表当代码管理" class="headerlink" title="把码表当代码管理"></a>把码表当代码管理</h3><p>三条落地手段：码常量集中定义，不散落在各模块字面量里；加测试断言全表无重复码，把两个人挑了同一个编号挡在 CI 里；新增码同步补文档条目，让码表与接口文档同源。</p>
+<h2 id="用-newtype-与-thiserror-组织库错误"><a href="#用-newtype-与-thiserror-组织库错误" class="headerlink" title="用 newtype 与 thiserror 组织库错误"></a>用 newtype 与 thiserror 组织库错误</h2><p>原则讲完，落到 Rust 代码。2023 年这一层有两个成熟工具：<code>thiserror</code>（1.0 系列）在库内部定义可匹配的具体错误类型，<code>anyhow</code> 在应用顶层收集错误。分工很明确：<strong>可复用的 crate 不要对外返回 <code>anyhow::Error</code></strong>，调用方无法对不透明的错误包做 <code>match</code>，那等于强迫所有人解析文本。</p>
+<h3 id="为什么需要-newtype"><a href="#为什么需要-newtype" class="headerlink" title="为什么需要 newtype"></a>为什么需要 newtype</h3><p>新手常犯的写法是让上层错误直接 <code>#[from]</code> 第三方库的错误类型：</p>
+<figure class="highlight rust"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 反面写法：把驱动错误直接挂进应用错误</span></span><br><span class="line"><span class="meta">#[derive(Debug, thiserror::Error)]</span></span><br><span class="line"><span class="keyword">pub</span> <span class="keyword">enum</span> <span class="title class_">AppError</span> &#123;</span><br><span class="line">    <span class="meta">#[error(<span class="string">&quot;查询失败&quot;</span>)]</span></span><br><span class="line">    <span class="title function_ invoke__">Query</span>(<span class="meta">#[from]</span> DriverError),</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>问题不在于编译，而在于语义失控。驱动的错误枚举由不得我们控制：它新增一个变体，我们的 <code>AppError</code> 语义面就悄悄变大，而所有 <code>DriverError</code> 都被折叠成同一个 <code>Query</code>，粒度全看对方心情。</p>
+<p>newtype 的做法是在中间立一层本地错误类型，把外部错误“捕获”进来，只保留我们关心的少数几种情形，其余一律归入兜底变体。</p>
+<figure class="highlight rust"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">use</span> thiserror::Error;</span><br><span class="line"></span><br><span class="line"><span class="comment">/// 假想的驱动错误，变体不受我们控制</span></span><br><span class="line"><span class="keyword">pub</span> <span class="keyword">enum</span> <span class="title class_">DriverError</span> &#123;</span><br><span class="line">    TimedOut &#123; elapsed_ms: <span class="type">u64</span> &#125;,</span><br><span class="line">    Conflict &#123; index: <span class="type">String</span> &#125;,</span><br><span class="line">    PoolEmpty,</span><br><span class="line">    <span class="title function_ invoke__">Other</span>(<span class="type">String</span>),</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/// 基础设施层：只暴露我们能解释的三种情形</span></span><br><span class="line"><span class="meta">#[derive(Debug, Error)]</span></span><br><span class="line"><span class="keyword">pub</span> <span class="keyword">enum</span> <span class="title class_">StoreError</span> &#123;</span><br><span class="line">    <span class="meta">#[error(<span class="string">&quot;存储操作超时（&#123;elapsed_ms&#125; ms）&quot;</span>)]</span></span><br><span class="line">    Timeout &#123;</span><br><span class="line">        elapsed_ms: <span class="type">u64</span>,</span><br><span class="line">        <span class="meta">#[source]</span></span><br><span class="line">        cause: <span class="type">Box</span>&lt;<span class="keyword">dyn</span> std::error::Error + <span class="built_in">Send</span> + <span class="built_in">Sync</span>&gt;,</span><br><span class="line">    &#125;,</span><br><span class="line"></span><br><span class="line">    <span class="meta">#[error(<span class="string">&quot;唯一键冲突: &#123;index&#125;&quot;</span>)]</span></span><br><span class="line">    Duplicate &#123;</span><br><span class="line">        index: <span class="type">String</span>,</span><br><span class="line">        <span class="meta">#[source]</span></span><br><span class="line">        cause: <span class="type">Box</span>&lt;<span class="keyword">dyn</span> std::error::Error + <span class="built_in">Send</span> + <span class="built_in">Sync</span>&gt;,</span><br><span class="line">    &#125;,</span><br><span class="line"></span><br><span class="line">    <span class="comment">/// 兜底：所有无法解释的情形，语义上等价于&quot;依赖不可用&quot;</span></span><br><span class="line">    <span class="meta">#[error(<span class="string">&quot;存储不可用&quot;</span>)]</span></span><br><span class="line">    Unavailable &#123;</span><br><span class="line">        <span class="meta">#[source]</span></span><br><span class="line">        cause: <span class="type">Box</span>&lt;<span class="keyword">dyn</span> std::error::Error + <span class="built_in">Send</span> + <span class="built_in">Sync</span>&gt;,</span><br><span class="line">    &#125;,</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">impl</span> <span class="title class_">StoreError</span> &#123;</span><br><span class="line">    <span class="comment">/// 唯一的入口：外部错误只能从这里进来</span></span><br><span class="line">    <span class="title function_ invoke__">pub</span>(<span class="keyword">crate</span>) <span class="keyword">fn</span> <span class="title function_">capture</span>(err: DriverError) <span class="punctuation">-&gt;</span> <span class="keyword">Self</span> &#123;</span><br><span class="line">        <span class="keyword">let</span> <span class="variable">msg</span> = err.<span class="title function_ invoke__">to_string</span>();</span><br><span class="line">        <span class="keyword">let</span> <span class="variable">boxed</span>: <span class="type">Box</span>&lt;<span class="keyword">dyn</span> std::error::Error + <span class="built_in">Send</span> + <span class="built_in">Sync</span>&gt; = <span class="type">Box</span>::<span class="title function_ invoke__">new</span>(msg);</span><br><span class="line">        <span class="keyword">match</span> err &#123;</span><br><span class="line">            DriverError::TimedOut &#123; elapsed_ms &#125; =&gt; <span class="keyword">Self</span>::Timeout &#123;</span><br><span class="line">                elapsed_ms,</span><br><span class="line">                cause: boxed,</span><br><span class="line">            &#125;,</span><br><span class="line">            DriverError::Conflict &#123; index &#125; =&gt; <span class="keyword">Self</span>::Duplicate &#123; index, cause: boxed &#125;,</span><br><span class="line">            DriverError::PoolEmpty | DriverError::<span class="title function_ invoke__">Other</span>(_) =&gt; <span class="keyword">Self</span>::Unavailable &#123; cause: boxed &#125;,</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>上面把 <code>DriverError</code> 转成字符串再装箱，只是为了让片段独立成立；真实项目里驱动类型通常实现了 <code>std::error::Error</code>，可以直接 <code>Box::new(err)</code> 保留完整原因链——保留原因链正是这一层的职责。</p>
+<p><code>capture</code> 是关键设计：它把外部世界收敛到我们的语义，也给了一次性做分类、打点、脱敏的机会。有了唯一入口，新增驱动变体时编译器虽不强制处理，分类逻辑却集中在一处，审查能看到全貌。</p>
+<p>上游那层同理，把第三方客户端库的错误收拢成我们自己认识的三种情形：</p>
+<figure class="highlight rust"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#[derive(Debug, Error)]</span></span><br><span class="line"><span class="keyword">pub</span> <span class="keyword">enum</span> <span class="title class_">UpstreamError</span> &#123;</span><br><span class="line">    <span class="meta">#[error(<span class="string">&quot;调用超时（&#123;elapsed_ms&#125; ms）&quot;</span>)]</span></span><br><span class="line">    Timeout &#123; elapsed_ms: <span class="type">u64</span> &#125;,</span><br><span class="line"></span><br><span class="line">    <span class="meta">#[error(<span class="string">&quot;上游返回异常状态: &#123;status&#125;&quot;</span>)]</span></span><br><span class="line">    BadStatus &#123; status: <span class="type">u16</span> &#125;,</span><br><span class="line"></span><br><span class="line">    <span class="meta">#[error(<span class="string">&quot;上游响应无法解析&quot;</span>)]</span></span><br><span class="line">    Decode,</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="from-与-source-的取舍"><a href="#from-与-source-的取舍" class="headerlink" title="#[from] 与 #[source] 的取舍"></a><code>#[from]</code> 与 <code>#[source]</code> 的取舍</h3><p><code>thiserror</code> 的 <code>#[from]</code> 会同时生成 <code>From</code> 并把该字段登记为 <code>source()</code>，写起来省事，但同一个源类型只允许出现一次，否则生成的 <code>From</code> 冲突。这个限制本身就是 newtype 的另一个动机。</p>
+<p>因此在跨层折叠处我更倾向显式写 <code>#[source]</code>，自己按需实现 <code>From</code>：</p>
+<figure class="highlight rust"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">use</span> crate::domain::DomainError;</span><br><span class="line"><span class="keyword">use</span> crate::infra::store::StoreError;</span><br><span class="line"><span class="keyword">use</span> crate::infra::upstream::UpstreamError;</span><br><span class="line"></span><br><span class="line"><span class="comment">/// 应用层：一次用例执行的失败原因集合</span></span><br><span class="line"><span class="meta">#[derive(Debug, Error)]</span></span><br><span class="line"><span class="keyword">pub</span> <span class="keyword">enum</span> <span class="title class_">AppError</span> &#123;</span><br><span class="line">    <span class="meta">#[error(transparent)]</span></span><br><span class="line">    <span class="title function_ invoke__">Domain</span>(<span class="meta">#[from]</span> DomainError),</span><br><span class="line"></span><br><span class="line">    <span class="meta">#[error(<span class="string">&quot;库存读取失败&quot;</span>)]</span></span><br><span class="line">    Store &#123;</span><br><span class="line">        <span class="meta">#[source]</span></span><br><span class="line">        cause: StoreError,</span><br><span class="line">        sku_id: <span class="type">u64</span>,</span><br><span class="line">    &#125;,</span><br><span class="line"></span><br><span class="line">    <span class="meta">#[error(<span class="string">&quot;风控上游调用失败&quot;</span>)]</span></span><br><span class="line">    <span class="title function_ invoke__">Upstream</span>(<span class="meta">#[source]</span> UpstreamError),</span><br><span class="line"></span><br><span class="line">    <span class="meta">#[error(<span class="string">&quot;参数 &#123;field&#125; 不合法&quot;</span>)]</span></span><br><span class="line">    InvalidInput &#123;</span><br><span class="line">        field: <span class="type">String</span>,</span><br><span class="line">        issues: <span class="type">Vec</span>&lt;FieldIssue&gt;,</span><br><span class="line">    &#125;,</span><br><span class="line"></span><br><span class="line">    <span class="comment">/// 权限类：与&quot;资源不存在&quot;共用对外码，避免泄漏存在性</span></span><br><span class="line">    <span class="meta">#[error(<span class="string">&quot;越权访问 &#123;resource&#125;&quot;</span>)]</span></span><br><span class="line">    Forbidden &#123; resource: &amp;<span class="symbol">&#x27;static</span> <span class="type">str</span> &#125;,</span><br><span class="line"></span><br><span class="line">    <span class="comment">/// 未归类兜底：只有第 5 节的边界折叠会写入</span></span><br><span class="line">    <span class="meta">#[error(<span class="string">&quot;未归类错误&quot;</span>)]</span></span><br><span class="line">    Unknown,</span><br><span class="line"></span><br><span class="line">    <span class="comment">/// 不变量被破坏：见第 6 节，这类不应出现在正常路径</span></span><br><span class="line">    <span class="meta">#[error(<span class="string">&quot;内部不变量被破坏: &#123;0&#125;&quot;</span>)]</span></span><br><span class="line">    <span class="title function_ invoke__">InvariantBroken</span>(&amp;<span class="symbol">&#x27;static</span> <span class="type">str</span>),</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/// 出错现场才知道 sku_id，所以故意不实现 From&lt;StoreError&gt;，</span></span><br><span class="line"><span class="comment">/// 让调用方必须显式构造，把业务上下文键带上。</span></span><br><span class="line"><span class="keyword">impl</span> <span class="title class_">AppError</span> &#123;</span><br><span class="line">    <span class="keyword">pub</span> <span class="keyword">fn</span> <span class="title function_">store_failed</span>(sku_id: <span class="type">u64</span>, cause: StoreError) <span class="punctuation">-&gt;</span> <span class="keyword">Self</span> &#123;</span><br><span class="line">        <span class="keyword">Self</span>::Store &#123; cause, sku_id &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/// 调用点：? 只能用在无需补上下文的地方，其余显式构造</span></span><br><span class="line"><span class="keyword">async</span> <span class="keyword">fn</span> <span class="title function_">load_stock</span>(sku_id: <span class="type">u64</span>) <span class="punctuation">-&gt;</span> <span class="type">Result</span>&lt;<span class="type">u32</span>, AppError&gt; &#123;</span><br><span class="line">    <span class="keyword">let</span> <span class="variable">qty</span> = store::<span class="title function_ invoke__">query_locked</span>(sku_id)</span><br><span class="line">        .<span class="title function_ invoke__">map_err</span>(|e| AppError::<span class="title function_ invoke__">store_failed</span>(sku_id, StoreError::<span class="title function_ invoke__">capture</span>(e)))?;</span><br><span class="line">    <span class="title function_ invoke__">Ok</span>(qty)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>transparent</code> 让领域错误穿过应用层时保持自己的 <code>Display</code> 与 <code>source</code>，不被包装压扁；<code>AppError::Store</code> 则刻意加了自己的消息，因为“库存读取失败”才是值班的定位起点。</p>
+<p>这里刻意不为 <code>StoreError</code> 提供 blanket <code>From</code>，好让编译器逼调用方在出错现场把 <code>sku_id</code> 补上。随手实现 <code>From</code> 之后，<code>?</code> 就能一路静默上传，上下文在最该留痕的几个调用点丢失。</p>
+<h3 id="把原因链打出来"><a href="#把原因链打出来" class="headerlink" title="把原因链打出来"></a>把原因链打出来</h3><p><code>source()</code> 链是这一层的成果，值得留一个小工具统一打印，避免各处 <code>unwrap</code> 出半截信息：</p>
+<figure class="highlight rust"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/// 把 e &lt;- e1 &lt;- e2 拼成一行，供日志使用</span></span><br><span class="line"><span class="keyword">pub</span> <span class="keyword">fn</span> <span class="title function_">describe</span>(err: &amp;<span class="keyword">dyn</span> std::error::Error) <span class="punctuation">-&gt;</span> <span class="type">String</span> &#123;</span><br><span class="line">    <span class="keyword">let</span> <span class="keyword">mut </span><span class="variable">parts</span> = <span class="built_in">vec!</span>[err.<span class="title function_ invoke__">to_string</span>()];</span><br><span class="line">    <span class="keyword">let</span> <span class="keyword">mut </span><span class="variable">current</span> = err.<span class="title function_ invoke__">source</span>();</span><br><span class="line">    <span class="keyword">while</span> <span class="keyword">let</span> <span class="variable">Some</span>(e) = current &#123;</span><br><span class="line">        parts.<span class="title function_ invoke__">push</span>(e.<span class="title function_ invoke__">to_string</span>());</span><br><span class="line">        current = e.<span class="title function_ invoke__">source</span>();</span><br><span class="line">    &#125;</span><br><span class="line">    parts.<span class="title function_ invoke__">join</span>(<span class="string">&quot; &lt;- &quot;</span>)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>用单行连接而不是多行堆栈是有意的：多行文本会破坏行式采集。确实需要回溯时单独放一个字段，或者用 <code>std::backtrace::Backtrace</code>（1.65 起稳定）在捕获点取一次。</p>
+<h3 id="展示文本与码的一致性"><a href="#展示文本与码的一致性" class="headerlink" title="展示文本与码的一致性"></a>展示文本与码的一致性</h3><p>最后一条纪律：<code>#[error(&quot;...&quot;)]</code> 的文案里<strong>不要出现错误码</strong>。码是结构化字段，由映射表决定；文案给人读。两者混在一起，改文案就改了码。一致性靠测试保证。</p>
+<h2 id="把内部错误转成对外响应"><a href="#把内部错误转成对外响应" class="headerlink" title="把内部错误转成对外响应"></a>把内部错误转成对外响应</h2><p>第四层是整套体系的出口，类型很朴素：一个可序列化结构体加一个纯函数转换器。强调纯函数，是因为带副作用的转换没法在单元测试里断言，而最需要断言的恰恰是这个映射。</p>
+<p>先看对外类型本身。</p>
+<figure class="highlight rust"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">use</span> serde::Serialize;</span><br><span class="line"></span><br><span class="line"><span class="comment">/// 校验类错误的字段级细节，只在 422 场景出现</span></span><br><span class="line"><span class="meta">#[derive(Debug, Serialize)]</span></span><br><span class="line"><span class="keyword">pub</span> <span class="keyword">struct</span> <span class="title class_">FieldIssue</span> &#123;</span><br><span class="line">    <span class="keyword">pub</span> field: <span class="type">String</span>,</span><br><span class="line">    <span class="keyword">pub</span> issue: &amp;<span class="symbol">&#x27;static</span> <span class="type">str</span>,</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/// 对外协议错误：出了进程边界才有意义</span></span><br><span class="line"><span class="meta">#[derive(Debug, Serialize)]</span></span><br><span class="line"><span class="meta">#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]</span></span><br><span class="line"><span class="keyword">pub</span> <span class="keyword">struct</span> <span class="title class_">WireError</span> &#123;</span><br><span class="line">    <span class="keyword">pub</span> code: &amp;<span class="symbol">&#x27;static</span> <span class="type">str</span>,</span><br><span class="line">    <span class="keyword">pub</span> status: <span class="type">u16</span>,</span><br><span class="line">    <span class="comment">/// 面向用户的文案，由码推导，绝不复制内部 Display</span></span><br><span class="line">    <span class="keyword">pub</span> message: <span class="type">String</span>,</span><br><span class="line">    <span class="meta">#[serde(skip_serializing_if = <span class="string">&quot;Option::is_none&quot;</span>)]</span></span><br><span class="line">    <span class="keyword">pub</span> trace_id: <span class="type">Option</span>&lt;<span class="type">String</span>&gt;,</span><br><span class="line">    <span class="meta">#[serde(skip_serializing_if = <span class="string">&quot;Option::is_none&quot;</span>)]</span></span><br><span class="line">    <span class="keyword">pub</span> retry_after_secs: <span class="type">Option</span>&lt;<span class="type">u64</span>&gt;,</span><br><span class="line">    <span class="meta">#[serde(skip_serializing_if = <span class="string">&quot;Vec::is_empty&quot;</span>)]</span></span><br><span class="line">    <span class="keyword">pub</span> details: <span class="type">Vec</span>&lt;FieldIssue&gt;,</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>字段形状各家不同，可参考 RFC 7807 的 Problem Details 思路，但不必照搬。重要的是分工：<strong>码用于程序分支，文案用于展示，trace 用于跨系统对齐，重试提示把策略交给标准机制，details 承载结构化补充</strong>。</p>
+<p>然后是转换器。它的核心是一条 <code>match</code>，输入应用层错误，输出一组码与状态：</p>
+<figure class="highlight rust"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">pub</span> <span class="keyword">fn</span> <span class="title function_">to_wire</span>(err: &amp;AppError, trace_id: <span class="type">Option</span>&lt;<span class="type">String</span>&gt;) <span class="punctuation">-&gt;</span> WireError &#123;</span><br><span class="line">    <span class="keyword">let</span> (code, status, message, retry_after) = <span class="keyword">match</span> err &#123;</span><br><span class="line">        AppError::<span class="title function_ invoke__">Domain</span>(DomainError::InsufficientStock &#123; sku_id, .. &#125;) =&gt; (</span><br><span class="line">            <span class="string">&quot;ORD-INV-5001&quot;</span>,</span><br><span class="line">            <span class="number">409</span>,</span><br><span class="line">            <span class="built_in">format!</span>(<span class="string">&quot;所选规格暂时缺货（&#123;sku_id&#125;）&quot;</span>),</span><br><span class="line">            <span class="literal">None</span>,</span><br><span class="line">        ),</span><br><span class="line">        AppError::<span class="title function_ invoke__">Domain</span>(DomainError::StateNotAllowed &#123; from, to &#125;) =&gt; (</span><br><span class="line">            <span class="string">&quot;ORD-INV-5002&quot;</span>,</span><br><span class="line">            <span class="number">409</span>,</span><br><span class="line">            <span class="built_in">format!</span>(<span class="string">&quot;当前订单状态不允许该操作（&#123;from&#125; -&gt; &#123;to&#125;）&quot;</span>),</span><br><span class="line">            <span class="literal">None</span>,</span><br><span class="line">        ),</span><br><span class="line">        AppError::InvalidInput &#123; .. &#125; =&gt; (</span><br><span class="line">            <span class="string">&quot;ORD-INV-1003&quot;</span>,</span><br><span class="line">            <span class="number">422</span>,</span><br><span class="line">            <span class="string">&quot;请求参数不合法&quot;</span>.<span class="title function_ invoke__">to_string</span>(),</span><br><span class="line">            <span class="literal">None</span>,</span><br><span class="line">        ),</span><br><span class="line">        AppError::<span class="title function_ invoke__">Upstream</span>(UpstreamError::Timeout &#123; .. &#125;) =&gt; (</span><br><span class="line">            <span class="string">&quot;ORD-UP-2004&quot;</span>,</span><br><span class="line">            <span class="number">504</span>,</span><br><span class="line">            <span class="string">&quot;服务繁忙，请稍后重试&quot;</span>.<span class="title function_ invoke__">to_string</span>(),</span><br><span class="line">            <span class="title function_ invoke__">Some</span>(<span class="number">1</span>),</span><br><span class="line">        ),</span><br><span class="line">        AppError::Store &#123; cause, .. &#125; =&gt; <span class="keyword">match</span> cause &#123;</span><br><span class="line">            StoreError::Timeout &#123; .. &#125; | StoreError::Unavailable &#123; .. &#125; =&gt; (</span><br><span class="line">                <span class="string">&quot;ORD-ST-3007&quot;</span>,</span><br><span class="line">                <span class="number">503</span>,</span><br><span class="line">                <span class="string">&quot;服务暂不可用，请稍后重试&quot;</span>.<span class="title function_ invoke__">to_string</span>(),</span><br><span class="line">                <span class="title function_ invoke__">Some</span>(<span class="number">2</span>),</span><br><span class="line">            ),</span><br><span class="line">            <span class="comment">// 唯一键冲突对外是业务规则，不是基础设施问题</span></span><br><span class="line">            StoreError::Duplicate &#123; .. &#125; =&gt; (</span><br><span class="line">                <span class="string">&quot;ORD-INV-5003&quot;</span>,</span><br><span class="line">                <span class="number">409</span>,</span><br><span class="line">                <span class="string">&quot;请勿重复提交&quot;</span>.<span class="title function_ invoke__">to_string</span>(),</span><br><span class="line">                <span class="literal">None</span>,</span><br><span class="line">            ),</span><br><span class="line">        &#125;,</span><br><span class="line">        AppError::Forbidden &#123; .. &#125; =&gt; (<span class="string">&quot;ORD-AUTH-4001&quot;</span>, <span class="number">403</span>, <span class="string">&quot;无权访问该资源&quot;</span>.<span class="title function_ invoke__">to_string</span>(), <span class="literal">None</span>),</span><br><span class="line">        <span class="comment">// 上游返回异常状态：语义上是&quot;暂不可处理&quot;，不是调用方的错</span></span><br><span class="line">        AppError::<span class="title function_ invoke__">Upstream</span>(UpstreamError::BadStatus &#123; .. &#125;)</span><br><span class="line">        | AppError::<span class="title function_ invoke__">Upstream</span>(UpstreamError::Decode) =&gt; (</span><br><span class="line">            <span class="string">&quot;ORD-UP-2005&quot;</span>,</span><br><span class="line">            <span class="number">503</span>,</span><br><span class="line">            <span class="string">&quot;服务繁忙，请稍后重试&quot;</span>.<span class="title function_ invoke__">to_string</span>(),</span><br><span class="line">            <span class="title function_ invoke__">Some</span>(<span class="number">1</span>),</span><br><span class="line">        ),</span><br><span class="line">        AppError::<span class="title function_ invoke__">InvariantBroken</span>(_) | AppError::Unknown =&gt; (</span><br><span class="line">            <span class="string">&quot;ORD-INT-9001&quot;</span>,</span><br><span class="line">            <span class="number">500</span>,</span><br><span class="line">            <span class="string">&quot;服务内部错误，请联系支持并提供请求编号&quot;</span>.<span class="title function_ invoke__">to_string</span>(),</span><br><span class="line">            <span class="literal">None</span>,</span><br><span class="line">        ),</span><br><span class="line">    &#125;;</span><br><span class="line"></span><br><span class="line">    WireError &#123;</span><br><span class="line">        code,</span><br><span class="line">        status,</span><br><span class="line">        message,</span><br><span class="line">        trace_id,</span><br><span class="line">        retry_after_secs: retry_after,</span><br><span class="line">        details: <span class="title function_ invoke__">validation_details</span>(err),</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这里有两个刻意的写法值得说明。</p>
+<p>第一，<strong><code>match</code> 尽量穷尽变体，而不是随手写一个 <code>_ =&gt; 500</code></strong>。穷尽之后，新增 <code>AppError</code> 变体会立刻编译失败，逼着回答“这个变体对外是什么码”，这是把设计决策固化进编译器的机会。确实需要兜底时，把它做成显式列举的 <code>AppError::Unknown</code>，而不是让通配静默归入 500。</p>
+<p>第二，<strong><code>StoreError::Duplicate</code> 被重新归入领域段 5xxx</strong>。前面说折叠不能向下，这里不算违反：唯一键冲突在语义上从来就是“业务规则不成立”，只是恰好在存储层被观察到。判据仍是调用方的处置——遇到重复提交不会去查存储，而是去掉重试逻辑。这类跨层改判必须写进码表注释。</p>
+<p>映射表要能被测试覆盖，否则它一定会漂移。至少加两类测试：</p>
+<figure class="highlight rust"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#[test]</span></span><br><span class="line"><span class="keyword">fn</span> <span class="title function_">store_timeout_maps_to_503_with_retry_hint</span>() &#123;</span><br><span class="line">    <span class="keyword">let</span> <span class="variable">err</span> = AppError::<span class="title function_ invoke__">store_failed</span>(</span><br><span class="line">        <span class="number">9021</span>,</span><br><span class="line">        StoreError::Unavailable &#123; cause: <span class="type">Box</span>::<span class="title function_ invoke__">new</span>(std::io::Error::<span class="title function_ invoke__">new</span>(std::io::ErrorKind::Other, <span class="string">&quot;pool empty&quot;</span>)) &#125;,</span><br><span class="line">    );</span><br><span class="line">    <span class="keyword">let</span> <span class="variable">wire</span> = <span class="title function_ invoke__">to_wire</span>(&amp;err, <span class="title function_ invoke__">Some</span>(<span class="string">&quot;trace-abc&quot;</span>.<span class="title function_ invoke__">into</span>()));</span><br><span class="line">    <span class="built_in">assert_eq!</span>(wire.code, <span class="string">&quot;ORD-ST-3007&quot;</span>);</span><br><span class="line">    <span class="built_in">assert_eq!</span>(wire.status, <span class="number">503</span>);</span><br><span class="line">    <span class="built_in">assert_eq!</span>(wire.retry_after_secs, <span class="title function_ invoke__">Some</span>(<span class="number">2</span>));</span><br><span class="line">    <span class="comment">// 内部消息不得出现在对外文案里</span></span><br><span class="line">    <span class="built_in">assert!</span>(!wire.message.<span class="title function_ invoke__">contains</span>(<span class="string">&quot;pool&quot;</span>));</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="meta">#[test]</span></span><br><span class="line"><span class="keyword">fn</span> <span class="title function_">codes_are_unique_across_the_table</span>() &#123;</span><br><span class="line">    <span class="comment">// CODE_TABLE 是与 to_wire 同源维护的静态表</span></span><br><span class="line">    <span class="keyword">let</span> <span class="keyword">mut </span><span class="variable">seen</span> = std::collections::HashSet::<span class="title function_ invoke__">new</span>();</span><br><span class="line">    <span class="keyword">for</span> <span class="variable">row</span> <span class="keyword">in</span> CODE_TABLE &#123;</span><br><span class="line">        <span class="built_in">assert!</span>(seen.<span class="title function_ invoke__">insert</span>(row.code), <span class="string">&quot;duplicated error code &#123;&#125;&quot;</span>, row.code);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>第二个测试防的是第 3 节提到的撞号事故。但它只能保证码不重复，保证不了码的语义不变——后者只能靠流程，见第 9 节。</p>
+<h2 id="panic-与-Result-的分界"><a href="#panic-与-Result-的分界" class="headerlink" title="panic 与 Result 的分界"></a>panic 与 Result 的分界</h2><p>错误码体系只对“会被外部看见的错误”有意义，所以必须回答另一个问题：什么情况下根本不该走 <code>Result</code>。</p>
+<p>Rust 里 <code>panic!</code> 的语义是程序自身的假设被打破：它终止执行、回溯到线程边界或进程，不参与调用方的分支判断，因此天然无法承载契约。判据不是“严重不严重”，而是“<strong>它是否可能由外部世界引起</strong>”。</p>
+<p>可能由外部引起的一律 <code>Result</code>：网络与磁盘读写、用户输入与外部数据反序列化、上游返回、配置缺失、依赖下线。无论多么“离谱”，都是运维现实的一部分。</p>
+<p>只有程序内部不可能态，才允许 <code>panic</code>：</p>
+<figure class="highlight rust"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">impl</span> <span class="title class_">OrderState</span> &#123;</span><br><span class="line">    <span class="comment">/// 状态机迁移表之外的情形属于实现缺陷</span></span><br><span class="line">    <span class="keyword">pub</span> <span class="keyword">fn</span> <span class="title function_">advance</span>(<span class="keyword">self</span>, event: Event) <span class="punctuation">-&gt;</span> <span class="type">Result</span>&lt;<span class="keyword">Self</span>, DomainError&gt; &#123;</span><br><span class="line">        <span class="keyword">match</span> (<span class="keyword">self</span>, event) &#123;</span><br><span class="line">            (<span class="keyword">Self</span>::Created, Event::Paid) =&gt; <span class="title function_ invoke__">Ok</span>(<span class="keyword">Self</span>::Paid),</span><br><span class="line">            (<span class="keyword">Self</span>::Paid, Event::Shipped) =&gt; <span class="title function_ invoke__">Ok</span>(<span class="keyword">Self</span>::Shipped),</span><br><span class="line">            (s, e) <span class="keyword">if</span> s.<span class="title function_ invoke__">is_final</span>() =&gt; <span class="title function_ invoke__">Err</span>(DomainError::StateNotAllowed &#123;</span><br><span class="line">                from: s.<span class="title function_ invoke__">name</span>(),</span><br><span class="line">                to: e.<span class="title function_ invoke__">target_name</span>(),</span><br><span class="line">            &#125;),</span><br><span class="line">            <span class="comment">// 到这里说明迁移表写漏了：不是业务问题，是代码问题</span></span><br><span class="line">            (s, e) =&gt; <span class="built_in">unreachable!</span>(<span class="string">&quot;state machine gap: &#123;&#125; &#123;:?&#125;&quot;</span>, s.<span class="title function_ invoke__">name</span>(), e),</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>注意同一函数里两条路径的分工：<strong>外部可解释的失败给 <code>Err</code>，实现不完整的失败给 <code>unreachable!</code></strong>。若为了保险把后者也返回 <code>Err</code>，缺陷就伪装成业务错误进了码表，客户端收到语义正确、根因错误的提示。</p>
+<p>配套的几条纪律：</p>
+<table>
+<thead>
+<tr>
+<th>情形</th>
+<th>处置</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>解析用户输入失败</td>
+<td><code>Result</code>，码 1xxx</td>
+<td>外部可解释</td>
+</tr>
+<tr>
+<td>上游 5xx</td>
+<td><code>Result</code>，码 2xxx</td>
+<td>外部可解释</td>
+</tr>
+<tr>
+<td>配置缺失</td>
+<td><code>Result</code>，启动即失败</td>
+<td>不该拖到请求路径</td>
+</tr>
+<tr>
+<td>穷尽 <code>match</code> 的漏分支</td>
+<td><code>unreachable!</code></td>
+<td>实现缺陷</td>
+</tr>
+<tr>
+<td>数学与状态机不变量</td>
+<td><code>debug_assert!</code>、<code>assert!</code></td>
+<td>违反即 bug</td>
+</tr>
+<tr>
+<td>全局单例初始化</td>
+<td>允许 <code>expect</code>，仅启动阶段</td>
+<td>失败无重试意义</td>
+</tr>
+</tbody></table>
+<p><code>expect</code> 只出现在 <code>main</code> 与初始化路径，是这套体系里少数合理的直接终止：启动阶段失败的信息由运维系统承载，而不是由错误码承载。</p>
+<p>还有一个必须提前定下的部署约束。若编译为 <code>panic = &quot;abort&quot;</code>，栈展开被禁用，在请求边界捕获 panic 的兜底写法无法生效。这个选择改变了 9xxx 段的含义：<code>unwind</code> 下是“捕获到的内部缺陷”，<code>abort</code> 下是“进程重启”。</p>
+<p>锁中毒、异步任务 panic 后 <code>JoinHandle</code> 返回错误这类回收手段属于并发范畴，本文不展开；只强调一点：这些回收点必须显式生成一个 9xxx 码并打日志，否则可观测性上会出现空洞。</p>
+<h2 id="日志级别与错误码的对应关系"><a href="#日志级别与错误码的对应关系" class="headerlink" title="日志级别与错误码的对应关系"></a>日志级别与错误码的对应关系</h2><p>日志这一环只有一条中心原则：<strong>级别由码决定，不由来源决定</strong>。按来源分配会让告警淹没在正常业务失败里；按码段分配，级别就成了码表的一个属性，可以集中评审。</p>
+<p>把第 5 节提到的静态码表补全成这样：<code>to_wire</code> 的 <code>match</code> 只负责产出码本身，状态码、重试提示、日志级别、是否告警都从表里查。</p>
+<figure class="highlight rust"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">use</span> tracing::Level;</span><br><span class="line"></span><br><span class="line"><span class="keyword">pub</span> <span class="keyword">struct</span> <span class="title class_">CodeMeta</span> &#123;</span><br><span class="line">    <span class="keyword">pub</span> code: &amp;<span class="symbol">&#x27;static</span> <span class="type">str</span>,</span><br><span class="line">    <span class="keyword">pub</span> status: <span class="type">u16</span>,</span><br><span class="line">    <span class="keyword">pub</span> retryable: <span class="type">bool</span>,</span><br><span class="line">    <span class="keyword">pub</span> level: Level,</span><br><span class="line">    <span class="keyword">pub</span> alert: <span class="type">bool</span>,</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">static</span> CODE_TABLE: &amp;[CodeMeta] = &amp;[</span><br><span class="line">    CodeMeta &#123; code: <span class="string">&quot;ORD-INV-1003&quot;</span>,  status: <span class="number">422</span>, retryable: <span class="literal">false</span>, level: Level::INFO,  alert: <span class="literal">false</span> &#125;,</span><br><span class="line">    CodeMeta &#123; code: <span class="string">&quot;ORD-INV-5001&quot;</span>,  status: <span class="number">409</span>, retryable: <span class="literal">false</span>, level: Level::INFO,  alert: <span class="literal">false</span> &#125;,</span><br><span class="line">    CodeMeta &#123; code: <span class="string">&quot;ORD-AUTH-4001&quot;</span>, status: <span class="number">403</span>, retryable: <span class="literal">false</span>, level: Level::WARN,  alert: <span class="literal">false</span> &#125;,</span><br><span class="line">    CodeMeta &#123; code: <span class="string">&quot;ORD-UP-2004&quot;</span>,   status: <span class="number">504</span>, retryable: <span class="literal">true</span>,  level: Level::WARN,  alert: <span class="literal">false</span> &#125;,</span><br><span class="line">    CodeMeta &#123; code: <span class="string">&quot;ORD-ST-3007&quot;</span>,   status: <span class="number">503</span>, retryable: <span class="literal">true</span>,  level: Level::WARN,  alert: <span class="literal">true</span>  &#125;,</span><br><span class="line">    CodeMeta &#123; code: <span class="string">&quot;ORD-RS-7001&quot;</span>,   status: <span class="number">429</span>, retryable: <span class="literal">true</span>,  level: Level::INFO,  alert: <span class="literal">false</span> &#125;,</span><br><span class="line">    CodeMeta &#123; code: <span class="string">&quot;ORD-INT-9001&quot;</span>,  status: <span class="number">500</span>, retryable: <span class="literal">false</span>, level: Level::ERROR, alert: <span class="literal">true</span>  &#125;,</span><br><span class="line">];</span><br></pre></td></tr></table></figure>
+
+<p>收益是消除双份真相。若 <code>match</code> 与这张表各自维护状态码和文案，改一处忘另一处是必然的；现在只有码由 <code>match</code> 决定，第 9 节的灰度也只需动这张表。</p>
+<p>级别与告警的建议对应如下。</p>
+<table>
+<thead>
+<tr>
+<th>码段</th>
+<th>默认级别</th>
+<th>告警</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1xxx 参数与校验</td>
+<td>info</td>
+<td>否</td>
+<td>调用方写错，非我方故障</td>
+</tr>
+<tr>
+<td>4xxx 权限</td>
+<td>warn</td>
+<td>否，走安全审计</td>
+<td>需留存，不该叫醒值班</td>
+</tr>
+<tr>
+<td>5xxx 领域规则</td>
+<td>info</td>
+<td>否</td>
+<td>业务正常结果，只进分析</td>
+</tr>
+<tr>
+<td>2xxx 上游依赖</td>
+<td>warn</td>
+<td>突增才告警</td>
+<td>单点超时是常态</td>
+</tr>
+<tr>
+<td>3xxx 存储与基础设施</td>
+<td>warn</td>
+<td>是</td>
+<td>影响面通常全局</td>
+</tr>
+<tr>
+<td>7xxx 限流与配额</td>
+<td>info</td>
+<td>否，看趋势</td>
+<td>由容量策略决定</td>
+</tr>
+<tr>
+<td>9xxx 内部缺陷</td>
+<td>error</td>
+<td>是，出现即告警</td>
+<td>每次都是 bug</td>
+</tr>
+</tbody></table>
+<p>第二条纪律是<strong>只在折叠点打一次日志</strong>。异常语言里常见每层 <code>catch</code> 都打印的习惯，Rust 里不要照搬：<code>?</code> 传播本身不产生日志，否则一个错误经过四层就复现四行，还会让按码计数虚高。中间层要补的是上下文，写进字段，或者干脆不打。</p>
+<figure class="highlight rust"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/// 只在请求边界调用一次</span></span><br><span class="line"><span class="keyword">pub</span> <span class="keyword">fn</span> <span class="title function_">emit</span>(err: &amp;AppError, trace_id: &amp;<span class="type">str</span>) &#123;</span><br><span class="line">    <span class="keyword">let</span> <span class="variable">code</span> = <span class="title function_ invoke__">to_wire</span>(err, <span class="literal">None</span>).code;</span><br><span class="line">    <span class="keyword">let</span> <span class="variable">meta</span> = <span class="title function_ invoke__">lookup</span>(code).<span class="title function_ invoke__">expect</span>(<span class="string">&quot;code must exist in CODE_TABLE&quot;</span>);</span><br><span class="line">    tracing::event!(</span><br><span class="line">        target: <span class="string">&quot;wire&quot;</span>,</span><br><span class="line">        meta.level,               <span class="comment">// 级别由码表给出</span></span><br><span class="line">        code = meta.code,</span><br><span class="line">        trace_id,</span><br><span class="line">        cause = %<span class="title function_ invoke__">describe</span>(err),   <span class="comment">// 一行因果链，不用多行堆栈</span></span><br><span class="line">        <span class="string">&quot;request failed&quot;</span>,</span><br><span class="line">    );</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>%</code> 打印 <code>Display</code>、<code>?</code> 打印 <code>Debug</code>，<code>tracing</code> 0.1 两个都支持。这里刻意不做 <code>Debug</code> 全展开，因为它会把原因链变成多行文本；把 <code>cause</code> 压成一行比保留美观更重要。</p>
+<h2 id="错误码分布与可观测性"><a href="#错误码分布与可观测性" class="headerlink" title="错误码分布与可观测性"></a>错误码分布与可观测性</h2><p>有了按码的日志，第二步是把它变成可告警的指标。核心是一个按码与状态打标签的计数器：码表是有限集合，基数可控，这正是相对日志文本的又一次胜利。</p>
+<figure class="highlight rust"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">use</span> prometheus::&#123;opts, register_int_counter_vec, IntCounterVec&#125;;</span><br><span class="line"><span class="keyword">use</span> std::sync::OnceLock;</span><br><span class="line"></span><br><span class="line"><span class="keyword">static</span> ERR_COUNTER: OnceLock&lt;IntCounterVec&gt; = OnceLock::<span class="title function_ invoke__">new</span>();</span><br><span class="line"></span><br><span class="line"><span class="keyword">fn</span> <span class="title function_">counter</span>() <span class="punctuation">-&gt;</span> &amp;<span class="symbol">&#x27;static</span> IntCounterVec &#123;</span><br><span class="line">    ERR_COUNTER.<span class="title function_ invoke__">get_or_init</span>(|| &#123;</span><br><span class="line">        register_int_counter_vec!(opts!(<span class="string">&quot;app_error_total&quot;</span>, <span class="string">&quot;对外错误码计数&quot;</span>), &amp;[<span class="string">&quot;code&quot;</span>, <span class="string">&quot;status&quot;</span>])</span><br><span class="line">            .<span class="title function_ invoke__">expect</span>(<span class="string">&quot;metrics must init at startup&quot;</span>)   <span class="comment">// 初始化路径才允许 expect</span></span><br><span class="line">    &#125;)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">pub</span> <span class="keyword">fn</span> <span class="title function_">observe</span>(wire: &amp;WireError) &#123;</span><br><span class="line">    <span class="title function_ invoke__">counter</span>()</span><br><span class="line">        .<span class="title function_ invoke__">with_label_values</span>(&amp;[wire.code, &amp;wire.status.<span class="title function_ invoke__">to_string</span>()])</span><br><span class="line">        .<span class="title function_ invoke__">inc</span>();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>告警规则建议三条，它们覆盖的正是错误码体系自身会失效的三种方式。</p>
+<p>第一条，9xxx 段出现任何一次即告警。这类码的语义是“内部缺陷”，量级不重要，出现本身就是信号。</p>
+<p>第二条，某个码的占比突破阈值。以分钟窗口统计各码占比，它比绝对数量更适合当值班触发条件——绝对量随流量涨跌，占比不会。</p>
+<p>第三条，“无码失败”计数。请求既没产生成功响应也没产生任何码，说明映射漏了：可能 panic 未被捕获，也可能新增变体走了兜底臂。这是体系的自检，缺了它，码表失真只会由客户先发现。</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 示意规则，阈值按业务基线定</span></span><br><span class="line"><span class="bullet">-</span> <span class="attr">alert:</span> <span class="string">InternalErrorSeen</span></span><br><span class="line">  <span class="attr">expr:</span> <span class="string">increase(app_error_total&#123;code=~&quot;ORD-INT-.*&quot;&#125;[5m])</span> <span class="string">&gt;</span> <span class="number">0</span></span><br><span class="line">  <span class="attr">for:</span> <span class="string">0m</span></span><br><span class="line"><span class="bullet">-</span> <span class="attr">alert:</span> <span class="string">ErrorCodeRatioSpike</span></span><br><span class="line">  <span class="attr">expr:</span> <span class="string">sum</span> <span class="string">by</span> <span class="string">(code)</span> <span class="string">(rate(app_error_total[5m]))</span> <span class="string">/</span> <span class="string">sum(rate(app_error_total[5m]))</span> <span class="string">&gt;</span> <span class="number">0.02</span></span><br><span class="line">  <span class="attr">for:</span> <span class="string">10m</span></span><br></pre></td></tr></table></figure>
+
+<p>还有 SLO 的一条口径：<strong>错误预算按对外协议层统计，不按领域错误统计</strong>。库存不足、状态不允许是使用服务的正常结果，把它们算进失败率，任何一次促销都会耗尽预算。只有 3xxx、9xxx 这类“我们没履行契约”的码进预算；2xxx 取决于对外承诺有没有包含依赖可用性。</p>
+<p>排障动线至此闭环：告警给出码，码在表里查得级别与责任段，trace id 串起一次请求，<code>cause</code> 那一行给出完整因果链。四步里没有一步需要读消息文本。</p>
+<h2 id="变更、灰度与客户端兼容"><a href="#变更、灰度与客户端兼容" class="headerlink" title="变更、灰度与客户端兼容"></a>变更、灰度与客户端兼容</h2><p>错误码会演进，体系的价值取决于演进时是否不破坏调用方。三种变更要分开处理。</p>
+<table>
+<thead>
+<tr>
+<th>变更类型</th>
+<th>兼容性</th>
+<th>做法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>新增码</td>
+<td>兼容</td>
+<td>正常发布，同步文档与 SDK 常量</td>
+</tr>
+<tr>
+<td>废弃码</td>
+<td>条件兼容</td>
+<td>双码并行至少两个发布周期，旧码继续发</td>
+</tr>
+<tr>
+<td>改语义或删码</td>
+<td>破坏性</td>
+<td>发新码，旧码保持原语义；只允许在大版本移除</td>
+</tr>
+</tbody></table>
+<p>“双码并行”是最实用的一招。假设要把笼统的 <code>ORD-INV-5001</code> 细分成缺货与冻结两种，而客户端 SDK 版本参差，直接改语义会让旧 SDK 给出错误提示。做法是新增 <code>ORD-INV-5006</code> 表示冻结、<code>5001</code> 保持原语义继续发一段时间，等监控显示旧码比例降到阈值以下再收口。</p>
+<p>灰度要用码分布当回滚依据。新映射按租户或流量百分比放量时，观察两套规则下各码的占比曲线：如果 <code>ORD-INT-9001</code> 或“无码失败”计数在灰度侧抬头，说明新规则漏了情形进兜底，回滚这张表即可，不必回滚业务代码。</p>
+<p>最后是客户端如何处理未知错误码。这几乎必然发生：客户端早于服务端发布，或者服务端新增了码。规则四条，缺一不可。</p>
+<figure class="highlight rust"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/// SDK 侧：未知码必须有归宿，且不能被视为成功</span></span><br><span class="line"><span class="meta">#[non_exhaustive]</span></span><br><span class="line"><span class="keyword">pub</span> <span class="keyword">enum</span> <span class="title class_">ClientError</span> &#123;</span><br><span class="line">    InsufficientStock,</span><br><span class="line">    UpstreamUnavailable,</span><br><span class="line">    RateLimited,</span><br><span class="line">    Unknown &#123; code: <span class="type">String</span>, status: <span class="type">u16</span> &#125;,</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">impl</span> <span class="title class_">ClientError</span> &#123;</span><br><span class="line">    <span class="keyword">pub</span> <span class="keyword">fn</span> <span class="title function_">from_wire</span>(code: &amp;<span class="type">str</span>, status: <span class="type">u16</span>) <span class="punctuation">-&gt;</span> <span class="keyword">Self</span> &#123;</span><br><span class="line">        <span class="keyword">match</span> code &#123;</span><br><span class="line">            <span class="string">&quot;ORD-INV-5001&quot;</span> | <span class="string">&quot;ORD-INV-5006&quot;</span> =&gt; <span class="keyword">Self</span>::InsufficientStock,</span><br><span class="line">            <span class="string">&quot;ORD-UP-2004&quot;</span> | <span class="string">&quot;ORD-UP-2005&quot;</span> | <span class="string">&quot;ORD-ST-3007&quot;</span> =&gt; <span class="keyword">Self</span>::UpstreamUnavailable,</span><br><span class="line">            <span class="string">&quot;ORD-RS-7001&quot;</span> =&gt; <span class="keyword">Self</span>::RateLimited,</span><br><span class="line">            other =&gt; <span class="keyword">Self</span>::Unknown &#123; code: other.<span class="title function_ invoke__">to_string</span>(), status &#125;,</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">pub</span> <span class="keyword">fn</span> <span class="title function_">retryable</span>(&amp;<span class="keyword">self</span>) <span class="punctuation">-&gt;</span> <span class="type">bool</span> &#123;</span><br><span class="line">        <span class="comment">// 未知码不重试：语义未知的重试可能带来重复副作用</span></span><br><span class="line">        matches!(<span class="keyword">self</span>, <span class="keyword">Self</span>::UpstreamUnavailable | <span class="keyword">Self</span>::RateLimited)</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>第一，必须有显式的未知分支，<code>#[non_exhaustive]</code> 能防止 SDK 作者漏写。第二，未知码按“语义未知的失败”处理：不重试、保留原始码上报、展示兜底文案。第三，绝不因为无法识别就把响应当成成功。第四，未知码要计数上报服务端，它是发现文档与实现不一致的通道。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>本文把 Rust 服务里的错误拆成四层：领域、应用、基础设施、对外协议，切分依据是“这一层的错误给谁看”。每层信息的分工是——消息给人读，码给程序分支，<code>source</code> 给排障，重试标志给策略，trace id 给跨系统对齐。码以稳定为第一属性，用命名空间分段，只把评审过的子集对外；与状态码的关系是多码对一状态可以、一码对多禁止。代码层面用 <code>thiserror</code> 与 newtype 保证库内错误可匹配、外部错误可收敛。</p>
+<p>三条最容易失守的地方：不要在 <code>match</code> 里随手写 <code>_ =&gt; 500</code>，把穷尽性留给编译器；只在折叠点打一次日志；把状态码、级别、告警都做成码表的属性，避免两份真相各自漂移。体系的成熟度不在文档多细，而在客户端遇到没见过的码时，行为是否依然可预期。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://doc.rust-lang.org/std/error/index.html">Rust std::error 模块文档</a></li>
+<li><a href="https://github.com/dtolnay/thiserror">thiserror 项目主页</a></li>
+<li><a href="https://github.com/dtolnay/anyhow">anyhow 项目主页</a></li>
+<li><a href="https://docs.rs/tracing">tracing 文档站</a></li>
+<li><a href="https://datatracker.ietf.org/doc/html/rfc7807">RFC 7807: Problem Details for HTTP APIs</a></li>
+<li><a href="https://github.com/grpc/grpc/blob/master/doc/statuscodes.md">gRPC 状态码定义</a></li>
+<li><a href="https://prometheus.io/docs/practices/naming/">Prometheus 指标命名实践</a></li>
+<li><a href="https://blog.rust-lang.org/2023/07/13/Rust-1.71.0.html">Rust 1.71.0 发布公告</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Rust 项目中的错误码体系</p><p><a href="https://987763485.github.io/2023/08/01/Rust项目中的错误码体系/">https://987763485.github.io/2023/08/01/Rust项目中的错误码体系/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2023-08-01</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-19</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/rust/">rust</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2023/08/03/Rust%E5%B8%B8%E8%A7%81%E7%BC%96%E8%AF%91%E9%94%99%E8%AF%AF%E8%A7%A3%E6%9E%90/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Rust 常见编译错误解析</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2023/07/25/%E5%90%91%E9%87%8F%E6%95%B0%E6%8D%AE%E5%BA%93%E9%80%89%E5%9E%8B%E5%AF%B9%E6%AF%94/"><span class="level-item">向量数据库选型对比</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

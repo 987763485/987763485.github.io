@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>CommonJS 规范与 require 机制 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="一次 require 拿到 undefined 的事故"><meta property="og:type" content="blog"><meta property="og:title" content="CommonJS 规范与 require 机制"><meta property="og:url" content="https://987763485.github.io/2016/06/30/CommonJS%E8%A7%84%E8%8C%83%E4%B8%8Erequire%E6%9C%BA%E5%88%B6/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="一次 require 拿到 undefined 的事故"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2016-06-30T04:31:15.000Z"><meta property="article:modified_time" content="2026-10-18T07:17:07.966Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="javascript"><meta property="article:tag" content="后端开发"><meta property="article:tag" content="nodejs"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2016/06/30/CommonJS%E8%A7%84%E8%8C%83%E4%B8%8Erequire%E6%9C%BA%E5%88%B6/"},"headline":"CommonJS 规范与 require 机制","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2016-06-30T04:31:15.000Z","dateModified":"2026-10-18T07:17:07.966Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"一次 require 拿到 undefined 的事故"}</script><link rel="canonical" href="https://987763485.github.io/2016/06/30/CommonJS%E8%A7%84%E8%8C%83%E4%B8%8Erequire%E6%9C%BA%E5%88%B6/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2016-06-30T04:31:15.000Z" title="6/30/2016, 12:31:15 PM">2016-06-30</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></span><span class="level-item">26 分钟读完 (大约3967个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">CommonJS 规范与 require 机制</h1><div class="content"><h2 id="一次-require-拿到-undefined-的事故"><a href="#一次-require-拿到-undefined-的事故" class="headerlink" title="一次 require 拿到 undefined 的事故"></a>一次 require 拿到 undefined 的事故</h2><p>六月最后一个礼拜,组里那个内部排期工具包 taskq 惹出一场骚动。写的时候只想着给页面用,同事在 2016 年这个 6 月里用 webpack 把它打进页面,跑得很顺,谁也没多想。第二天另一个同事要在 Node 脚本里复用它,<code>var taskq = require(&#39;taskq&#39;)</code> 之后第一行就打挂,报错是 <code>TypeError: Cannot read property &#39;create&#39; of undefined</code>。扒开看源码,毛病在最外面那圈 UMD 包装:导出分支和浏览器分支的活儿搅在一块,工厂函数只在检测到浏览器全局的那条路上 return,Node 里 <code>self</code> 不存在,<code>module.exports</code> 就接到了 undefined,页面里正常恰恰因为浏览器有这个全局。组里当天就吵起来,吵的不是这一行代码,是”我们写的包到底该按哪套规矩发布”。</p>
+<p>先把边界划清,免得跟已有笔记重复。Node 怎么把文件找出来、<code>module.paths</code> 怎么上溯、缓存与循环依赖怎么回事,那部分我写在另一篇里,这里一行不再讲。ES6 模块语法本身、构建工具怎么接、tree shaking 的原理也早讲过一遍,我不重做那三种写法的对比。这篇只留两样我自己的东西:规范条文与各家实现之间的差额,以及新写一个包该按哪套发的判断。</p>
+<h2 id="CommonJS-是一摞规范-不是一个"><a href="#CommonJS-是一摞规范-不是一个" class="headerlink" title="CommonJS 是一摞规范,不是一个"></a>CommonJS 是一摞规范,不是一个</h2><p>CommonJS 这个名字容易让人以为它是一条规矩,实际是好几条规范摞在一起的总称,各自演进,互不管辖。跟我们发包相关的是两条:Modules 和 Packages。Modules 约定几个名字的形状——<code>module</code> 上的 <code>id</code>、<code>exports</code>、<code>filename</code>、<code>loaded</code>,<code>module.paths</code> 给谁看,以及 <code>require</code> 这个函数该返回什么、同样的标识符该不该命中同一份导出。它写的是名字的含义和职责,不是文件怎么找出来。Packages 约定的是一个目录怎么才算一个包:有没有 <code>package.json</code>,<code>main</code> 字段指向哪儿,没写 <code>main</code> 时 <code>index.js</code> 的地位,还有 <code>bin</code>、<code>tests</code> 这些习惯位置。规范另外还有 Async、System 之类的部分,当期基本没碰。条款编号我记不准,也不在这儿抄错,下面全按内容讲,不写第几条。</p>
+<p>分层看清了,坑也就明白:我们照着 Node 的行为写代码,以为那就是 CommonJS,其实手上这套”行为”是规范、Node 实现、打包器私货三层混合的结果,规范只覆盖最里面一小块。</p>
+<h2 id="规范写的、Node-实现的、打包器自加的"><a href="#规范写的、Node-实现的、打包器自加的" class="headerlink" title="规范写的、Node 实现的、打包器自加的"></a>规范写的、Node 实现的、打包器自加的</h2><p>这篇最想留下的是这张差额表。我原本把 <code>require</code> 的每个行为都归到”规范里应该有”,扒开看一遍才清楚,很多东西是实现自己加的,被工具链当成默认规矩传下来,打包器又摞了一层私货。同一台机器上粗略观察:换个工具就得重新对一遍表。</p>
+<table>
+<thead>
+<tr>
+<th>行为或字段</th>
+<th>规范写了</th>
+<th>Node 实现加了</th>
+<th>打包器自加的</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>不以文件分隔符开头的标识符按模块名解析</td>
+<td>写了这个约定</td>
+<td>落地成具体算法</td>
+<td>沿用 Node</td>
+</tr>
+<tr>
+<td><code>.js</code>&#x2F;<code>.json</code>&#x2F;<code>.node</code> 后缀补全</td>
+<td>没规定这几种后缀</td>
+<td>Node 自己定的三类</td>
+<td>跟着 Node,再加自己的后缀表</td>
+</tr>
+<tr>
+<td><code>node_modules</code> 逐级上溯</td>
+<td>只提了查找路径这个概念</td>
+<td>Node 的具体目录策略</td>
+<td>基本照抄</td>
+</tr>
+<tr>
+<td><code>package.json</code> 的 <code>main</code></td>
+<td>Packages 部分写了</td>
+<td>实现了,含缺 <code>index.js</code> 报错</td>
+<td>认,优先级各写各的</td>
+</tr>
+<tr>
+<td>顶层 <code>this</code> 等于 <code>module.exports</code></td>
+<td>未规定</td>
+<td>Node 包装函数造成的</td>
+<td>不适用,没有全局</td>
+</tr>
+<tr>
+<td><code>require.cache</code> 与重复 <code>require</code> 命中同一份</td>
+<td>要求同标识符同导出</td>
+<td>Node 用缓存实现</td>
+<td>自己一套模块表</td>
+</tr>
+<tr>
+<td><code>bin</code> 目录与全局安装时的软链</td>
+<td>Packages 只提目录习惯</td>
+<td>npm 做的事,不是 <code>require</code></td>
+<td>不参与</td>
+</tr>
+<tr>
+<td><code>browser</code> 字段</td>
+<td>从来没这条</td>
+<td>Node 直接忽略</td>
+<td>2016 年打包器自加的约定</td>
+</tr>
+<tr>
+<td><code>jsnext:main</code></td>
+<td>从来没这条</td>
+<td>Node 直接忽略</td>
+<td>工具为区分 ES6 源文件自己加的</td>
+</tr>
+</tbody></table>
+<p>最后两行是重点。<code>browser</code> 和 <code>jsnext:main</code> 既不是规范也不是 Node 的行为,纯粹是工具链叠在实现之上的约定,可我们写 <code>package.json</code> 时觉得它们本来就是模块系统的一部分。心里没底时我只信一条标准:这行为换一家实现还认不认。认,大概率是规范;不认,就是私货。</p>
+<h2 id="UMD-一份代码喂几个环境"><a href="#UMD-一份代码喂几个环境" class="headerlink" title="UMD:一份代码喂几个环境"></a>UMD:一份代码喂几个环境</h2><p>回到那行报错。UMD 的思路朴素:把模块包进一个立即执行函数,开头用几个 <code>typeof</code> 探测环境,探测到哪条路就走哪条,浏览器兜底挂全局。下面是重写后的版本,逐行看:</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">(<span class="keyword">function</span> (<span class="params">root, factory</span>) &#123;</span><br><span class="line">  <span class="keyword">if</span> (<span class="keyword">typeof</span> define === <span class="string">&#x27;function&#x27;</span> &amp;&amp; define.<span class="property">amd</span>) &#123;</span><br><span class="line">    <span class="title function_">define</span>([], factory);</span><br><span class="line">  &#125; <span class="keyword">else</span> <span class="keyword">if</span> (<span class="keyword">typeof</span> <span class="variable language_">module</span> === <span class="string">&#x27;object&#x27;</span> &amp;&amp; <span class="variable language_">module</span>.<span class="property">exports</span>) &#123;</span><br><span class="line">    <span class="variable language_">module</span>.<span class="property">exports</span> = <span class="title function_">factory</span>();</span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    root.<span class="property">taskq</span> = <span class="title function_">factory</span>();</span><br><span class="line">  &#125;</span><br><span class="line">&#125;)(<span class="keyword">typeof</span> <span class="variable language_">self</span> !== <span class="string">&#x27;undefined&#x27;</span> ? <span class="variable language_">self</span> : <span class="variable language_">this</span>, <span class="keyword">function</span> (<span class="params"></span>) &#123;</span><br><span class="line">  <span class="string">&#x27;use strict&#x27;</span>;</span><br><span class="line">  <span class="keyword">function</span> <span class="title function_">create</span>(<span class="params">name</span>) &#123; <span class="keyword">return</span> &#123; <span class="attr">name</span>: name, <span class="attr">tasks</span>: [] &#125;; &#125;</span><br><span class="line">  <span class="keyword">return</span> &#123; <span class="attr">create</span>: create, <span class="attr">version</span>: <span class="string">&#x27;0.2.1&#x27;</span> &#125;;</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>第一个分支检测 AMD。要同时验 <code>define</code> 是函数和 <code>define.amd</code> 存在,只验前者会误伤别的库里的同名变量;命中就把工厂交给 <code>define</code>。第二个分支是 CommonJS 的路,条件写成 <code>typeof module === &#39;object&#39; &amp;&amp; module.exports</code> 而不是只查 <code>exports</code>,因为真正要替换的是 <code>module.exports</code>,带上它是为了排掉只给了 <code>exports</code> 空壳的环境。第三个分支兜底,<code>root</code> 在浏览器是 <code>self</code>,别处是 <code>this</code>,挂上去给 <code>&lt;script&gt;</code> 用。三个分支互斥,顺序不能换,AMD 必须在 CommonJS 前面。</p>
+<p>出事的写法是把浏览器挂载当成返回值的前提,工厂内部大致长这样:</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> (<span class="params"></span>) &#123;</span><br><span class="line">  <span class="keyword">var</span> api = &#123; <span class="attr">create</span>: create &#125;;</span><br><span class="line">  <span class="keyword">if</span> (<span class="keyword">typeof</span> <span class="variable language_">self</span> !== <span class="string">&#x27;undefined&#x27;</span>) &#123;</span><br><span class="line">    <span class="variable language_">self</span>.<span class="property">taskq</span> = api;</span><br><span class="line">    <span class="keyword">return</span> api;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>Node 里 <code>self</code> 不存在,函数走到末尾没有 <code>return</code>,<code>module.exports = factory()</code> 赋值的就是 undefined。<code>require</code> 本身不报错,undefined 一路传下去,到调用方法那行才炸。浏览器有 <code>self</code>,本地跑十遍都发现不了。教训很直白:导出分支只管往哪儿挂,返回值必须无条件给出来,别把两件事写在同一个 <code>if</code> 里。</p>
+<h2 id="AMD-与-CommonJS-差在什么时候要依赖"><a href="#AMD-与-CommonJS-差在什么时候要依赖" class="headerlink" title="AMD 与 CommonJS:差在什么时候要依赖"></a>AMD 与 CommonJS:差在什么时候要依赖</h2><p>两套规矩最实在的差别是加载时机,不是写法。CommonJS 是同步取,执行到那一行才要依赖,拿不到当场挂掉。AMD 把依赖写在门口先声明,加载器提前把文件拉完、回调里再执行。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> taskq = <span class="built_in">require</span>(<span class="string">&#x27;taskq&#x27;</span>);</span><br><span class="line">taskq.<span class="title function_">create</span>(<span class="string">&#x27;发布&#x27;</span>);</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="title function_">define</span>([<span class="string">&#x27;taskq&#x27;</span>], <span class="keyword">function</span> (<span class="params">taskq</span>) &#123;</span><br><span class="line">  <span class="keyword">return</span> &#123; <span class="attr">create</span>: <span class="keyword">function</span> (<span class="params">name</span>) &#123; <span class="keyword">return</span> taskq.<span class="title function_">create</span>(name); &#125; &#125;;</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>Node 里同步无所谓,文件就在本地磁盘上。浏览器不是这么回事,2016 年我们在页面上仍然是一个接一个的 <code>&lt;script&gt;</code> 标签,同步 <code>require</code> 网络路径上的模块等于把渲染打挂。所以 AMD 那套依赖前置声明在浏览器里是真有用的机制,不是花架子。RequireJS 的配置与 shim 专文讲过了,这里只留结论:同一个包要同时发给 Node 和老式页面,同步和异步语义没法共存,只能靠 UMD 的分枝交给两边。</p>
+<h2 id="2016-年年中-ES6-模块的真实处境"><a href="#2016-年年中-ES6-模块的真实处境" class="headerlink" title="2016 年年中,ES6 模块的真实处境"></a>2016 年年中,ES6 模块的真实处境</h2><p>先把话说死:ES6 模块语法是 2015 年 6 月定稿的 ECMAScript 2015 的一部分,标准在手,引擎没有。这个时间点找台浏览器试 <code>&lt;script type=&quot;module&quot;&gt;</code>,答案是不认;Node 这边也一样,<code>package.json</code> 里写任何字段都变不出运行时能力。所以线上跑的所谓”ES6 模块”,全是 Babel 6 转成 CommonJS 之后的产物,是转译产物而不是运行时能力。</p>
+<p>我们的构建脚本里是这么配的,先装 <code>babel-core</code> 和 <code>babel-preset-es2015</code>,然后:</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;presets&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span><span class="string">&quot;es2015&quot;</span><span class="punctuation">]</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;comments&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">false</span></span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>源码写成 ES6:</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">function</span> <span class="title function_">create</span>(<span class="params">name</span>) &#123; <span class="keyword">return</span> &#123; <span class="attr">name</span>: name, <span class="attr">tasks</span>: [] &#125;; &#125;</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">default</span> &#123; <span class="attr">create</span>: create, <span class="attr">version</span>: <span class="string">&#x27;0.2.1&#x27;</span> &#125;;</span><br></pre></td></tr></table></figure>
+
+<p><code>.babelrc</code> 跑一遍之后,磁盘上真正被 <code>require</code> 的东西大致是:</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="title class_">Object</span>.<span class="title function_">defineProperty</span>(<span class="built_in">exports</span>, <span class="string">&quot;__esModule&quot;</span>, &#123; <span class="attr">value</span>: <span class="literal">true</span> &#125;);</span><br><span class="line"><span class="built_in">exports</span>.<span class="property">create</span> = create;</span><br><span class="line"><span class="built_in">exports</span>.<span class="property">default</span> = &#123; <span class="attr">create</span>: create, <span class="attr">version</span>: <span class="string">&#x27;0.2.1&#x27;</span> &#125;;</span><br><span class="line"><span class="keyword">function</span> <span class="title function_">create</span>(<span class="params">name</span>) &#123; <span class="keyword">return</span> &#123; <span class="attr">name</span>: name, <span class="attr">tasks</span>: [] &#125;; &#125;</span><br></pre></td></tr></table></figure>
+
+<p>看明白这段就少踩一半坑:导出变成对 <code>exports</code> 属性赋值,文件被打上 <code>__esModule</code> 标记,<code>import</code> 变成 <code>require</code> 加属性访问。模块系统本身还是 CommonJS 那一套,语法只是层皮。所以 <code>main</code> 指向哪儿答案很硬:指向转译后的 CommonJS 产物,指源码的话 Node 侧的同事直接抓瞎。至于引擎以后会不会原生支持,2016 年年中我不知道,也不打算在这儿猜。</p>
+<h2 id="default-导出与那个多出来的-default"><a href="#default-导出与那个多出来的-default" class="headerlink" title="default 导出与那个多出来的 .default"></a>default 导出与那个多出来的 .default</h2><p>转译是转译,消费是消费,两边一碰就有错位。最小复现很简短,源文件只有一个默认导出:</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">default</span> <span class="keyword">function</span> <span class="title function_">create</span>(<span class="params">name</span>) &#123; <span class="keyword">return</span> &#123; <span class="attr">name</span>: name, <span class="attr">tasks</span>: [] &#125;; &#125;</span><br></pre></td></tr></table></figure>
+
+<p>Babel 6 转完之后,<code>exports</code> 上躺着的是 <code>default</code> 这个属性和 <code>__esModule</code> 标记。手写 CommonJS 的同事照老习惯去 <code>require</code>,打印出来是这样:</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> taskq = <span class="built_in">require</span>(<span class="string">&#x27;./taskq&#x27;</span>);</span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="keyword">typeof</span> taskq);          <span class="comment">// &#x27;object&#x27;</span></span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="keyword">typeof</span> taskq.<span class="property">create</span>);   <span class="comment">// &#x27;undefined&#x27;</span></span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="keyword">typeof</span> taskq.<span class="property">default</span>);  <span class="comment">// &#x27;function&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p><code>require()</code> 拿到的是带 <code>default</code> 的对象,不是函数本身。如果调用方也是 Babel 转译的,<code>import taskq from &#39;./taskq&#39;</code> 编译出来会经 interop helper 去访问 <code>.default</code>,它读 <code>__esModule</code> 决定要不要补这一下,跑得通;手写那边不知道有这个约定,把 <code>taskq</code> 当函数调,报的是 <code>TypeError: taskq is not a function</code>。两边都没写错,错在那层标记只有一边认。后来的规矩:包内部一律具名导出,<code>default</code> 只留给明确给 ES6 源码用的入口,<code>main</code> 给出的东西必须能被 <code>require</code> 直接使。</p>
+<h2 id="main、browser、jsnext-main-三个入口并存"><a href="#main、browser、jsnext-main-三个入口并存" class="headerlink" title="main、browser、jsnext:main 三个入口并存"></a>main、browser、jsnext:main 三个入口并存</h2><p><code>package.json</code> 写全了是三个字段并存,各自伺候不同工具:</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;name&quot;</span><span class="punctuation">:</span> <span class="string">&quot;taskq&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;version&quot;</span><span class="punctuation">:</span> <span class="string">&quot;0.2.1&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;main&quot;</span><span class="punctuation">:</span> <span class="string">&quot;dist/taskq.cjs.js&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;browser&quot;</span><span class="punctuation">:</span> <span class="string">&quot;dist/taskq.umd.js&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;jsnext:main&quot;</span><span class="punctuation">:</span> <span class="string">&quot;src/taskq.es6.js&quot;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>CommonJS 规范和 Node 只认 <code>main</code>,另外两个字段 Node 见到就当没有。2016 年的前端打包器里,有的优先读 <code>browser</code>,有的读 <code>jsnext:main</code> 想拿 ES6 源码去做静态分析,也有的干脆全不理。后果很具体:同一次发布,页面上打出来的包比预想少了一截——<code>browser</code> 指的那个 UMD 产物砍掉了 Node 专用分支,而另一条链子上工具回头去读 <code>main</code>,把 Node 专用实现原样带进浏览器;摇树没生效那次更憋气,<code>jsnext:main</code> 指的文件里还残留 <code>require</code>,谁也没法静态分析,可字段看着一切正常。当期规避土得很:要么把浏览器版单独发一个包,两个 <code>name</code> 互不干扰;要么约定 <code>pkg.dir</code> 这种自己的目录规矩,把三个入口都塞进 <code>dist</code> 由构建脚本生成,人不手写。字段能不能被认,我不再指望规范,只查那一个工具的文档。</p>
+<h2 id="模块作用域的三个细节坑"><a href="#模块作用域的三个细节坑" class="headerlink" title="模块作用域的三个细节坑"></a>模块作用域的三个细节坑</h2><p><code>exports</code> 与 <code>module.exports</code> 的关系、文件怎么被找出来,那部分我在另一篇里写完了,不重复。这里只补三个当年仍让我判断失误的性质。</p>
+<p>一是模块文件顶层的 <code>this</code> 不等于全局对象,它等于 <code>module.exports</code>。顶层写 <code>this.foo = 1</code> 就是往导出对象上挂属性;同一份代码放进 UMD 的立即执行函数里,<code>this</code> 是什么全看外面传了什么,这就是页面里正常、Node 里行为两样的来源。二是别给 <code>exports</code> 整体赋值,它只是实现为方便给的局部变量,你把它指向新对象,原先那条链接就断了,<code>require</code> 拿到的还是老东西:</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">exports</span> = &#123; <span class="attr">create</span>: create &#125;;   <span class="comment">// 不生效</span></span><br><span class="line"><span class="variable language_">module</span>.<span class="property">exports</span> = &#123; <span class="attr">create</span>: create &#125;;  <span class="comment">// 生效</span></span><br></pre></td></tr></table></figure>
+
+<p>三是 <code>require</code> 不是全局变量,是函数参数。模块文件被包进形如 <code>function (exports, require, module, __filename, __dirname)</code> 的函数里执行,<code>require</code> 是这条参数的局部量,机制一句带过。用处在于:严格模式下、或者在 <code>eval</code> 与回调里以为能摸到 <code>require</code>,答案是不能,得让它待在这个包装函数的作用域里。规范只说模块可以通过 <code>require</code> 取依赖,从没承诺它在词法上是全局的,这条又是 Node 的实现形状。</p>
+<h2 id="四条选型判据"><a href="#四条选型判据" class="headerlink" title="四条选型判据"></a>四条选型判据</h2><p>吵完那一架,我们把判断压成四条,每条都带上当期我们站哪边。一是目标运行时:包得在 Node 脚本里被 <code>require</code>,出口就必须是 CommonJS 产物,这条没商量;只在页面里跑、页面还是一个接一个 <code>&lt;script&gt;</code> 标签的,用 UMD 或 AMD。二是要不要被打包器做静态分析:要,就留一份全静态语法的 ES6 源文件给 <code>jsnext:main</code> 指,同时承认这字段只有部分工具认,别当能力承诺。三是要不要发 npm 给外部用:发外部就只留一个入口、行为可预期,花哨字段收进构建脚本;内部包可以并存三个字段,工具链我们能一把抓。四是团队对 ES6 语法的接受度:2016 年年中组里一半人还在写 ES5,构建链也没全过一遍,所以源码可以写 ES6,发布产物必须是转译后的 ES5 CommonJS,谁 <code>require</code> 都不需要额外前提。四条判完基本就唯一确定,剩下的分歧全是口味。</p>
+<h2 id="一张横向对照"><a href="#一张横向对照" class="headerlink" title="一张横向对照"></a>一张横向对照</h2><table>
+<thead>
+<tr>
+<th>维度</th>
+<th>CommonJS</th>
+<th>AMD</th>
+<th>UMD</th>
+<th>ES6 模块</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>语法形态</td>
+<td><code>require</code> 加 <code>module.exports</code></td>
+<td><code>define</code> 加依赖数组与回调</td>
+<td>外面一圈探测分支,内层任选一套</td>
+<td><code>import</code> 与 <code>export</code>,静态结构</td>
+</tr>
+<tr>
+<td>加载时机</td>
+<td>执行到那行同步取</td>
+<td>依赖前置,加载器先拉完再执行</td>
+<td>看命中哪个分支,两套时机都有</td>
+<td>标准里是提前解析,引擎跟上才算</td>
+</tr>
+<tr>
+<td>2016 年年中的运行时支持</td>
+<td>Node 原生,浏览器要工具</td>
+<td>RequireJS 这类加载器可用</td>
+<td>两边都能吃,靠包装</td>
+<td>浏览器不支持,Node 也不支持</td>
+</tr>
+<tr>
+<td>能否静态分析</td>
+<td>难,<code>require</code> 可以写在条件里</td>
+<td>更难,依赖是运行期的字符串数组</td>
+<td>谈不上,分支本身就是动态的</td>
+<td>语法上能,但当期只有工具认它</td>
+</tr>
+<tr>
+<td>我们当时的用法</td>
+<td>Node 侧与发布产物的默认形态</td>
+<td>老页面的 <code>define</code> 入口</td>
+<td>同时发 Node 和浏览器的包</td>
+<td>只写在源码里,产物一律转成前者</td>
+</tr>
+</tbody></table>
+<p>表里第四行措辞我特意收着:”语法上能静态分析”是标准文本的性质,2016 年年中真吃到这份好处的只有少数工具,靠的是转译和自建字段,不是运行时。</p>
+<h2 id="新写一个包该按哪套发布"><a href="#新写一个包该按哪套发布" class="headerlink" title="新写一个包该按哪套发布"></a>新写一个包该按哪套发布</h2><table>
+<thead>
+<tr>
+<th>情形</th>
+<th>发布形态</th>
+<th>一句话理由</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>只给 Node 脚本用</td>
+<td>纯 CommonJS,<code>main</code> 指产物</td>
+<td>没有第二个消费者,别加私有字段</td>
+</tr>
+<tr>
+<td>要给老页面 <code>&lt;script&gt;</code> 直接引</td>
+<td>UMD,只挂一个全局名</td>
+<td>检测分支照抄可靠模板,工厂无条件 <code>return</code></td>
+</tr>
+<tr>
+<td>同时给 Node 和浏览器</td>
+<td>UMD 打底,<code>browser</code> 指浏览器版</td>
+<td>两套语义靠分支分头交给两边</td>
+</tr>
+<tr>
+<td>内部工具且要参与静态分析</td>
+<td>额外留 ES6 源文件给 <code>jsnext:main</code></td>
+<td>字段只有一部分工具认,不能当承诺</td>
+</tr>
+<tr>
+<td>发 npm 给外部</td>
+<td>单入口 CommonJS 产物,不裸发源码</td>
+<td>外人只该有一个能预期的行为</td>
+</tr>
+<tr>
+<td>页面全是 AMD 加载</td>
+<td>干脆只发 AMD</td>
+<td>没有 Node 消费者就不必兜底</td>
+</tr>
+</tbody></table>
+<p>这半年我最大的收获不是记住了哪套语法,而是把”规范写的”和”实现做的”分成两栏存放。分不开的时候,报错只会出现在别人机器上,而且一定出现在你跑过十遍的那条路上。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>CommonJS 规范与 require 机制</p><p><a href="https://987763485.github.io/2016/06/30/CommonJS规范与require机制/">https://987763485.github.io/2016/06/30/CommonJS规范与require机制/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2016-06-30</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/javascript/">javascript</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a><a class="link-muted mr-2" rel="tag" href="/tags/nodejs/">nodejs</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2016/07/02/%E6%BB%9A%E5%8A%A8%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E4%B8%8Epassive%E4%BA%8B%E4%BB%B6/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">滚动性能优化与 passive 事件</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2016/06/28/Nodejshttp%E6%A8%A1%E5%9D%97%E6%90%AD%E5%BB%BA%E6%9C%8D%E5%8A%A1%E5%99%A8/"><span class="level-item">Node.js http 模块搭建服务器</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

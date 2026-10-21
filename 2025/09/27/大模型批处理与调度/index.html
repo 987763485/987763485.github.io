@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>大模型批处理与调度 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="大模型推理服务的调度不是“多并发少并发”的问题，而是显存水位与单步时间片怎么分配的问题。本文从连续批处理的调度循环出发，讲清分块预填充、长度分桶、优先级与老化、抢占策略、离线混部、异步批任务接口与数据侧索引重建，并给出调度指标口径、调参验证流程和手段代价对照表，适合被长尾与利用率困扰的推理服务工程师。"><meta property="og:type" content="blog"><meta property="og:title" content="大模型批处理与调度"><meta property="og:url" content="https://987763485.github.io/2025/09/27/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E6%89%B9%E5%A4%84%E7%90%86%E4%B8%8E%E8%B0%83%E5%BA%A6/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="大模型推理服务的调度不是“多并发少并发”的问题，而是显存水位与单步时间片怎么分配的问题。本文从连续批处理的调度循环出发，讲清分块预填充、长度分桶、优先级与老化、抢占策略、离线混部、异步批任务接口与数据侧索引重建，并给出调度指标口径、调参验证流程和手段代价对照表，适合被长尾与利用率困扰的推理服务工程师。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2025-09-26T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-20T14:36:10.176Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="大模型"><meta property="article:tag" content="python"><meta property="article:tag" content="typescript"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2025/09/27/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E6%89%B9%E5%A4%84%E7%90%86%E4%B8%8E%E8%B0%83%E5%BA%A6/"},"headline":"大模型批处理与调度","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2025-09-26T16:00:00.000Z","dateModified":"2026-10-20T14:36:10.176Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"大模型推理服务的调度不是“多并发少并发”的问题，而是显存水位与单步时间片怎么分配的问题。本文从连续批处理的调度循环出发，讲清分块预填充、长度分桶、优先级与老化、抢占策略、离线混部、异步批任务接口与数据侧索引重建，并给出调度指标口径、调参验证流程和手段代价对照表，适合被长尾与利用率困扰的推理服务工程师。"}</script><link rel="canonical" href="https://987763485.github.io/2025/09/27/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E6%89%B9%E5%A4%84%E7%90%86%E4%B8%8E%E8%B0%83%E5%BA%A6/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2025-09-26T16:00:00.000Z" title="9/27/2025, 12:00:00 AM">2025-09-27</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></span><span class="level-item">1 小时读完 (大约11216个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">大模型批处理与调度</h1><div class="content"><p>大模型推理服务的调度不是“多并发少并发”的问题，而是显存水位与单步时间片怎么分配的问题。本文从连续批处理的调度循环出发，讲清分块预填充、长度分桶、优先级与老化、抢占策略、离线混部、异步批任务接口与数据侧索引重建，并给出调度指标口径、调参验证流程和手段代价对照表，适合被长尾与利用率困扰的推理服务工程师。</p>
+<h2 id="调度对象是显存与时间片"><a href="#调度对象是显存与时间片" class="headerlink" title="调度对象是显存与时间片"></a>调度对象是显存与时间片</h2><p>传统在线请求服务的调度单位就是请求本身：连接数、每秒请求数、线程池大小、副本数几乎是一比一对应关系，容量规划因此可以建立在“请求数”这个稳定的换算基准上。</p>
+<p>大模型推理服务把这个对应关系打断了。一条请求消耗的资源不再是常数，而是随两个变量漂移：输入长度决定预填充（Prefill）阶段的一次性计算量，输出长度决定解码（Decode）阶段的逐步计算量，以及这批中间状态在显存中驻留多久。关于后者占多少显存、怎么分页管理，本文同期的《大模型推理优化：KV Cache 与 PagedAttention》已经把机制和公式讲透了，本文不重复，只把它当作调度器必须回答的一个约束条件来用。</p>
+<p>关键直觉是：同一个入口进来的两条请求，一条输出很短、一条输出很长，资源足迹能差一个数量级；而在第一个 token 产出之前，调度器并不知道站在面前的是哪一种。这就是把“当前并发数”当容量读几乎不含信息的原因——它既没说这些请求各已生成多长，也没说剩余预算还能容纳多少长度。</p>
+<p>第二个打断对应关系的是时间片粒度。解码是自回归的：一次前向只多产出 1 个 token，所有在跑请求共享同一次前向组成一个 batch，于是一步一步成了天然的调度节拍。batch 并非越大越好：显存水位限制它能装多少条，尾延迟限制一步能跑多久——一步超时就意味着批内所有请求同时超时，这是请求级调度里不存在的耦合。</p>
+<p>把这两点合起来看，可以得出本文的核心论断：<strong>调度器真正分配的对象是显存水位与单步时间片，请求数只是这两种资源被消耗之后的记账结果</strong>。由此推出三条实践后果。</p>
+<p>第一，把并发上限当容量是错的。容量应表述为“在给定长度分布下可同时驻留多少 token 长度、可容忍多长的单步时间”，再反推请求数；这个反推值随负载形状剧烈变化，是需要重新标定的区间而非常数。</p>
+<p>第二，伸缩信号不能只用请求数或 QPS。本文只到这里为止，伸缩信号选型与排水（Drain）流程由同期的《推理服务的弹性伸缩》负责，本文只在“队列深度等指标可以复用给伸缩决策”这一处与它衔接。</p>
+<p>第三，排队发生在两个不同地方：网关侧的准入队列（还没进引擎，成本只是等待），以及引擎内部的等待队列（已分配部分状态或占住一块显存预算，成本还含被抢占风险）。这两段队列的观测口径、超时语义和回压（Backpressure）策略必须分开设计，把它们混成一个“排队数”指标是很多调度事故的起点。</p>
+<h2 id="连续批处理的调度循环"><a href="#连续批处理的调度循环" class="headerlink" title="连续批处理的调度循环"></a>连续批处理的调度循环</h2><p>连续批处理（Continuous Batching，也常被称作 in-flight batching 或 step batching）是现代推理引擎的默认形态。它的循环可以压缩成四句话：每步重挑一次参与者；有请求结束就立刻腾槽位；新请求可在任意步边界进入正在解码的 batch；进入与否取决于剩余显存预算与这一步的时间预算。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">每一步的循环（引擎内部）：</span><br><span class="line">  1. 收集运行集：所有未结束且已分配状态的请求</span><br><span class="line">  2. 预算检查：估算下一步新增的 KV 空间需求</span><br><span class="line">  3. 组批：在预算内挑选参与者，预填充任务与解码任务按策略混合</span><br><span class="line">  4. 一次前向，产出本步 token</span><br><span class="line">  5. 结算：完成/停止的请求退出并释放，被抢占的请求退出运行集</span><br><span class="line">  6. 补位：从准入队列拉入新请求，直到预算再次吃紧</span><br></pre></td></tr></table></figure>
+
+<pre class="mermaid">flowchart TD
+  A[请求到达] --> B{准入检查}
+  B -->|长度或配额不合法| Z[快速失败]
+  B -->|通过| C[排队等待预算]
+  C --> D[组入 batch]
+  D --> E[单步解码]
+  E --> F{本步结果}
+  F -->|正常产出| E
+  F -->|完成或停止| G[释放槽位并补位]
+  F -->|预算不足| H[抢占：重算或换出]
+  H --> C
+  G --> I[观测上报]
+  I --> C</pre>
+
+<p>它带来的最大变化，是把“利用率”从请求维度搬到块水位维度。固定 batch 形态下，一批要等最长请求结束才能整批释放，短请求白占槽位；连续批处理消除了这种等待，代价是调度器必须持续回答：下一次分配要多少块、还剩多少块、还能不能塞进一条新请求。于是显存分页机制（机制归同期 KV Cache 那篇）与调度循环咬合成反馈系统，运营侧的核心信号也从“并发数”变成块水位（Block Watermark）——空闲块比例、碎片化程度、单次分配失败率。</p>
+<p>块水位管理有三个需要写进策略文档的细节。</p>
+<p>第一，水位阈值要分层，不能只有一条警戒线。可以粗略地分成“可正常准入”“只准入短请求”“只允许已在运行的请求走完”“触发抢占”四档，每一档的动作要事先约定，不能留给调度器临场判断——它临场判断的结果通常是抖动。</p>
+<p>第二，新请求进入正在解码的 batch 时，它的预填充是一笔集中开销。如果不做任何保护，一条长 prompt 的预填充会让这一步显著变慢，把整个 batch 的每 token 间隔一起拖坏。这正是分块预填充要解决的问题，下一节展开。</p>
+<p>第三，补位与抢占是同一个循环的两半，必须成对设计。只实现“完成即补位”而不定义“预算不足时谁退出”，系统在高水位附近表现为随机卡顿；反之定义了抢占却没有快速补位，腾出的预算会被排队时间浪费掉。</p>
+<p>连续批处理让“一步”成了最小可观测单位。把步时间、步内 batch 大小、步内预填充占比三条曲线叠在一起，长尾来源基本能分辨：是步变慢了，是 batch 变小了，还是预算不足导致运行集收缩——三者的修法完全不同。</p>
+<h2 id="分块预填充"><a href="#分块预填充" class="headerlink" title="分块预填充"></a>分块预填充</h2><p>预填充阶段要为整段提示词一次性建立中间状态，它的计算量随输入长度近似线性甚至更陡地增长，而且算力密集；解码阶段每步只处理 1 个 token，访存密集。这两种性质完全不同的工作在同一个单步循环里相遇，就产生了连续批处理最典型的病灶：一条长提示词的请求进来，它的预填充会把这一步拉得很长，同批所有正在解码的请求都要等它，每 token 间隔（Time Per Output Token，TPOT）曲线出现规律性的尖峰，用户侧表现为流式输出忽然卡顿一下。</p>
+<p>分块预填充（Chunked Prefill，也常叫 prefill 切块或预填充穿插）的做法是把这条请求的预填充切成若干块，每块的规模由“这一步还允许花多少时间”这个预算决定，块与块之间穿插进正常的解码步里。这样单步时长被约束在预算附近，解码请求的间隔不再被外来长提示词支配。</p>
+<p>它的代价需要如实记账，共三项。</p>
+<p>第一项是计算被打散。总浮点运算量不变，但同样多的计算分散进更多步里执行，每步的有效规模变小，访存与算力的混合利用率不如一次性大预填充那样干净；分次写入中间状态也有额外开销。工程上常见的现象是：分块之后每 token 间隔的尖峰被削平，但整体吞吐略有回落。回落多少取决于块大小与负载形状，只能用本文后面的实验方法自己量。</p>
+<p>第二项是进度可观测性变差。没有分块时，“首 token 到达”几乎等价于“预填充完成”，是个干净的里程碑；分块后预填充可能处于半完成并被挂起，观测上必须新增字段：已消费的提示词块数、剩余块数、当前预填充阶段。准入排队时长与首 token 等待时长（Time To First Token，TTFT）也不再是同一件事——前者只反映等待，后者掺入了被切碎的预填充耗时。仪表盘上把两者叠在一张图，就能看出卡顿来自等待还是预填充。</p>
+<p>第三项是实现复杂度。调度器要为每个请求维护部分完成的预填充游标，抢占语义要能区分“预填充中途被踢出”与“解码中途被踢出”（前者游标可能整段作废需重算，后者可保留已生成部分），块对齐与命中率统计也要跟着改。</p>
+<p>什么负载值得开？判断依据是输入长度分布与尾延迟敏感度的组合。输入分布重尾明显时——检索增强生成（Retrieval-Augmented Generation，RAG）把大量文档片段拼进提示词、代码库问答携带整文件上下文——分块收益通常大于损失；输入短、输出长、并发高时，一次性预填充本来就很快，强行切块只增加步数与调度分支，收益接近零甚至为负。中间地带可用“步时间预算”做自适应：预填充估算耗时超过某个步时间阈值的若干倍才切块，阈值是团队约定示例，须由自己的步时间分布标定。</p>
+<h2 id="长度分布与调度"><a href="#长度分布与调度" class="headerlink" title="长度分布与调度"></a>长度分布与调度</h2><p>调度器拿不到未来，只能拿到两个不可信的承诺：实际输入长度（这个是可靠的）和客户端声明的输出上限 <code>max_tokens</code>（这个经常不可靠）。围绕这两点，长度分布就成了策略设计的主轴。</p>
+<p>第一件武器是按长度分桶（Length Bucketing）。把提示词长度与输出长度预估都相近的请求归入同一批，好处落在两端：批内形状对齐，计算与显存分配的可预估性提高，填充浪费与碎片下降；步时间方差变小，块水位可以贴着上限运行而不必留一大片保险余量，等待时间也随之下降。代价是攒批本身要等：同质批次需要时间凑齐，攒批窗口与尾延迟必须显式权衡，窗口取值是团队约定示例，由到达率与长度分布的实测分位决定。</p>
+<p>第二件事是防饿死。长短混排时，“预算够就先放最短的进来”这条贪心规则会让长请求永远排不到：每次预算检查总有短请求能塞进去，长请求要的预算始终凑不齐，表现为个别请求的排队时长达到其他请求的几个数量级。解法有三类：为长请求保留专用预算池、给等待时长设上限并超限强制准入、以及下一节的老化提升（Aging）。至少要选一类，并且单独盯“最长排队请求的等待时长”而不是排队时长分位——分位会被短请求稀释，恰好看不见饿死。</p>
+<p>第三件事是把长度校验做进入口，而不是做进失败路径。输入长度超过模型上下文上限或本实例组可受理上限时，应在准入阶段直接返回明确错误，不要排队（排队也不会成功，还占住队列位与观测名额）。输出侧则要把“预估长度”变成调度输入：用同类请求的历史分位或客户端自带的用途标签预估，结果参与预算检查与分桶。</p>
+<p>再说预留浪费。很多实现按 <code>max_tokens</code> 预留预算，理由是避免中途爆预算，但客户端普遍把上限写成一个大而安全的数字（声明几千、实际只用一小部分是常见形态，倍数请自己统计）。按声明值预留等于让虚高承诺吃掉真实容量，吞吐随客户端保守程度无谓下滑。两条修正路径：按预估分位预留、运行中逐步扩展，把硬约束留给抢占；或干脆不预留、靠抢占兜底。前者抢占少但需要预估器，后者实现简单但抢占率与重算成本上升。选哪条取决于负载里“声明与实际的差距”——又一个先测量后决策的例子。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 预留策略的两种实现骨架（示意，不含真实阈值）</span></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">admit_reserve</span>(<span class="params">estimate_tokens: <span class="built_in">int</span>, declared_max: <span class="built_in">int</span>, mode: <span class="built_in">str</span></span>) -&gt; <span class="built_in">int</span>:</span><br><span class="line">    <span class="keyword">if</span> mode == <span class="string">&quot;quantile&quot;</span>:      <span class="comment"># 按预估分位预留，运行期可扩展</span></span><br><span class="line">        <span class="keyword">return</span> estimate_tokens</span><br><span class="line">    <span class="keyword">if</span> mode == <span class="string">&quot;declared&quot;</span>:      <span class="comment"># 按声明值预留，抢占更少但容量被吃掉</span></span><br><span class="line">        <span class="keyword">return</span> declared_max</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>                    <span class="comment"># 不预留，完全依赖抢占兜底</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="优先级与公平性"><a href="#优先级与公平性" class="headerlink" title="优先级与公平性"></a>优先级与公平性</h2><p>优先级能作用的环节有三个，把它们混成“一个优先级字段”是常见错误。</p>
+<p>一是准入排队：预算不足时谁先获得准入，副作用最小，只改顺序而不动在跑的东西。二是组批与步内份额：同一步里所有在跑请求并行产出，优先级不能让某个请求“多生成一个 token”，它改变的是新预填充穿插的先后，也就是“谁下一步被允许开始”。三是抢占，决定谁被踢出，副作用最大，下一节单独讨论。</p>
+<p>老化提升（Aging）是优先级机制的标配。纯优先级加贪心准入会让低优先级流量在高峰期彻底停摆，而停摆不是慢，是无限期无响应，在服务等级目标（Service Level Objective，SLO）里比高延迟更难解释。做法是给等待时间设阶梯：跨过阈值后逐步提升有效优先级，保证每个请求都能在有限等待后准入。阈值与阶数是团队约定示例，应由你能接受的最长等待时间反推。</p>
+<p>多租户公平性有几种可组合的策略族，本文只描述形态不给具体权重。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">配额型：每个租户在单位时间内有独立预算上限，超限只排队不越权——可预测性强，容量利用率偏低</span><br><span class="line">加权型：按租户等级分配权重，预算按权重比例摊——需要权重来源说明，否则容易被业务侧质疑</span><br><span class="line">轮询型：在预算可用时按环形顺序逐个服务各租户的队首——实现简单，天然防单租户刷屏</span><br><span class="line">赤字型：记录每个租户本轮&quot;少拿了多少&quot;，下一轮优先补齐——长期公平最好，短期可预测性最差</span><br><span class="line">保底型：为关键租户预留一块不可被抢占的预算——代价是把共享池变小，其余流量承担波动</span><br></pre></td></tr></table></figure>
+
+<p>真实系统往往是“保底 + 配额 + 老化”的组合：保底护住必须交付的流量，共享池用配额限突发，老化防长请求饿死。要警惕策略叠加后无人能解释“这条请求为什么等了这么久”，所以每条策略都要留准入判定记录。</p>
+<p>再说高优先级抢占低优的连锁问题。被踢出的请求要回来继续，得重新排队甚至重新预填充；如果回来时正碰上下一波高优流量，它会再次被踢。于是低优流量的完成时间不是线性劣化，而是随高优到达率呈阶梯式跳升，再叠加客户端超时重试，形成放大回路。缓解手段有三类：给被抢占请求一段冷却期、把反复被抢占的请求迁进保底预算池、限制单请求被抢占次数并在超限后给出明确终态。最关键的是最后一条：任何抢占都必须收敛到终态，否则客户端只能死等。</p>
+<h2 id="抢占的两种代价与选择"><a href="#抢占的两种代价与选择" class="headerlink" title="抢占的两种代价与选择"></a>抢占的两种代价与选择</h2><p>抢占就是把已经在消耗资源的请求从运行集里移出去。它有两种实现路线，机制细节归同期的《大模型推理优化：KV Cache 与 PagedAttention》，本文只讲怎么选。</p>
+<p>重算（Recompute）路线丢弃该请求的中间状态，等它重新获得预算时从提示词开始重新计算。代价是算力与一段不短的恢复时间，恢复时间随输入长度增长；好处是不需要额外的数据搬运通道，也不占用主存，实现上只要把请求退回队列即可。换出（Swap，把状态搬到主存等低层介质）路线保留状态，代价是一次双向带宽传输与一块需要预留的主存空间；好处是回来时几乎不用重算，恢复时间主要由传输量决定，与输入长度关系相对弱。</p>
+<p>选择依据压缩成四个问题。已生成多少？已生成很多且输入很长时重算浪费最大，倾向换出。输入多长？重算成本随它上升、换出成本随驻留状态上升，两者交叉点就是你的分界线（自己实测，别套别人的倍数）。压力是分钟级还是小时级？短时抖动换出划算，长期紧张时主存会被占满、重算更稳。有没有终态保证？重算可能反复从头开始，缺次数上限时更容易制造死等请求。</p>
+<p>更要紧的问题是：什么时候宁可让请求等，也不要抢占。四种信号提示应该等。一是预算压力只来自一小段突发，排空后自然缓解，抢占只会把突发变成重复计算。二是候选者剩余输出预估很短，等它跑完释放槽位更便宜。三是候选者处在长提示词、已生成不多的状态，重算代价极高。四是抢占次数持续上升——这说明问题不在调度顺序而在容量或准入，正确动作是收紧准入或回压；用抢占掩盖容量不足，只会让所有请求一起变慢，看似“系统在忙”而在做重复功。</p>
+<p>反过来，必须抢占的场景也很明确：高优先级请求到达而可用预算确实装不下；块水位逼近硬上限，继续分配有触发内存保护（Out Of Memory，OOM）导致实例重启的风险；带截止期限的在线请求即将超时。这里的取舍本质是“牺牲一个低价值请求的进度，换取一个高价值请求的确定性”，如果所有请求都声明自己是高优先级，抢占机制就等于没设计，退化成一个随机抖动源。</p>
+<h2 id="离线批与在线混部"><a href="#离线批与在线混部" class="headerlink" title="离线批与在线混部"></a>离线批与在线混部</h2><p>混部的动机很直接：在线流量的利用率曲线有波谷，离线任务曲线很平，把离线填进波谷就能抬起日均利用率。但它不是“再加一种低优先级请求”这么简单，三个硬前提不满足就会成为事故源。</p>
+<p>第一个前提是可中断：每次调用都要能在步边界被抢占且不留副作用，写入必须是“完成后一次性提交”，不能有半写状态。第二个前提是可断点续跑：进度以条目为粒度落在外部状态里，实例重启或被抢占后能从条目边界继续，而不是从头重跑整批——否则重跑再次制造预算压力，形成自我强化的挤占。第三个前提是明确截止期限与可放弃性：必须知道这批最晚何时要交、哪部分可以放弃；没有截止期限的离线任务是无限期的资源索取者，调度器无法在它和在线请求之间做正确权衡。</p>
+<p>污染路径有三条。第一条是显存：离线任务通常提示词长、输出长，一旦准入就长时间占住预算，在线准入等待随之上升；对策是给离线单独设一条不可越过的预算水位线，而不只给它低优先级。第二条是时间片：离线的长预填充拉长步时间，直接抬升在线的每 token 间隔；对策是对离线流量强制启用分块预填充与更小的步内份额。第三条最容易被忽略，是下游检索服务：离线批量重建或跑大批嵌入会顺带把向量库与嵌入模型吃满，在线请求卡在检索阶段而不是推理阶段，此时推理指标看起来一切正常；对策是把下游调用也纳入离线配额，用同一条令牌桶约束。</p>
+<p>隔离有两种形态，运维成本完全不同。独立实例池最干净，离线打满也只影响离线，代价是池子空转时并不能给在线让路，除非配合伸缩——伸缩信号与排水归同期的《推理服务的弹性伸缩》，本文只指出“独立池 + 可回收”才是完整形态。同池不同优先级把容量收益吃到极限，代价是策略复杂度与故障半径变大：一次调度器缺陷同时冲击两类负载。粗略建议是在线服务等级目标很紧时用独立池加潮汐回收，负载形状互补且调度指标齐全时才过渡到同池。</p>
+<h2 id="批处理-API-形态"><a href="#批处理-API-形态" class="headerlink" title="批处理 API 形态"></a>批处理 API 形态</h2><p>除了在线流式接口，多数团队还会提供一层“提交一批、异步取结果”的批处理接口（Batch API）：客户端把成千上万条请求打包提交，系统择机在低峰期跑完，客户端轮询或回调取结果。它的调度含义是把准入时机交回给平台，从而让填谷从“机会主义”变成“可计划”。</p>
+<p>任务表设计上有六个必做要点。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 批任务表的最小骨架（示意字段，不含真实容量数值）</span></span><br><span class="line"><span class="keyword">CREATE TABLE</span> batch_job (</span><br><span class="line">  id              <span class="type">BIGINT</span> <span class="keyword">PRIMARY KEY</span>,</span><br><span class="line">  external_id     <span class="type">VARCHAR</span>(<span class="number">128</span>) <span class="keyword">UNIQUE</span>,   <span class="comment">-- 客户端幂等键，同键重复提交返回同一任务</span></span><br><span class="line">  status          <span class="type">VARCHAR</span>(<span class="number">32</span>) <span class="keyword">NOT NULL</span>,  <span class="comment">-- queued/running/completing/succeeded/failed/cancelled</span></span><br><span class="line">  deadline_at     <span class="type">TIMESTAMP</span>,             <span class="comment">-- 最晚交付时间，调度据此决定是否放弃</span></span><br><span class="line">  total_count     <span class="type">INT</span> <span class="keyword">NOT NULL</span>,</span><br><span class="line">  done_count      <span class="type">INT</span> <span class="keyword">NOT NULL</span> <span class="keyword">DEFAULT</span> <span class="number">0</span>,</span><br><span class="line">  failed_count    <span class="type">INT</span> <span class="keyword">NOT NULL</span> <span class="keyword">DEFAULT</span> <span class="number">0</span>,</span><br><span class="line">  created_at      <span class="type">TIMESTAMP</span> <span class="keyword">NOT NULL</span>,</span><br><span class="line">  finished_at     <span class="type">TIMESTAMP</span>              <span class="comment">-- 进入终态时间，过期清理据此计算</span></span><br><span class="line">);</span><br></pre></td></tr></table></figure>
+
+<p>一是幂等与去重：提交接口接受客户端幂等键，同一份输入重复提交返回同一任务，条目层面也要有去重键。二是终态。任务表必须有明确终态集合，任何路径最终都要落到其中之一；“不要给客户端一个没有终态的任务”是这一节的头号原则——没有终态时客户端只能永远轮询，超时、计费、告警逻辑全部失效。三是结果落地。逐条结果写入对象存储或表，任务上暴露可读位置与格式，并保留失败原因分类。四是重跑的最小单元。整批重跑简单，但一条坏数据会毁掉全部已完成工作；可用中间形态：条目独立记账，重跑只提交未成功集合。五是过期清理。结果与中间文件要有保留期与归档策略，清理本身要可重入。六是进度可观测。至少给出完成数、失败数与按当前速率外推的预计剩余，且这些字段来自条目级记账而非估算，否则“预计剩余”会在任务后段剧烈跳动。</p>
+<p>调度侧还需要两个约定。一是准入时机与截止期限耦合：只有 <code>deadline_at</code> 允许时才把任务推迟到波谷，快到期的要么提级要么明确失败，不能默默吞掉。二是抢占粒度落在条目边界：批任务内部条目之间无依赖，调度器可随时停止取新条目，这比中断正在解码的在线请求便宜得多，应设为默认行为。</p>
+<h2 id="数据侧调度：嵌入重建与索引换代"><a href="#数据侧调度：嵌入重建与索引换代" class="headerlink" title="数据侧调度：嵌入重建与索引换代"></a>数据侧调度：嵌入重建与索引换代</h2><p>调度不只发生在推理入口，也发生在数据侧。知识库规模上去后，最典型的两类批任务是大批量嵌入重建与模型换代的索引迁移，编排要求几乎全是幂等与断点续跑。</p>
+<p>重建的编排骨架是这样。先把语料按稳定主键切片——哈希分桶或主键范围都行，要点是规则确定、可复现，且分片粒度足够小，否则一片里塞了长文档就形成拖尾分片，任务被最后一小撮分片卡住。每个分片在状态表里独立记账，调度器按可用预算取分片，取到即跑、跑完即置状态。失败分三类：可重试（上游超时、被抢占）、不可重试（长度超限、内容被拒）、需人工看（未知错误）；只有第一类自动重试，带退避与次数上限，超限进死信。</p>
+<p>幂等是这里的硬约束，因为它决定“重跑会不会毁数据”。写入向量库必须以可去重的键做覆盖写，键里包含模型版本或配置指纹：同一条文档、同一版本重放，结果应当是唯一一份；版本变了，新旧条目是两批可区分的记录。反过来，追加式写入会让任何一次重试都制造重复向量，检索时同一文档片段占满前排，是很难靠脚本挽回的脏数据。顺序要求也别忘了：删除与写入必须有确定语义，跨分片的全局清理要等所有分片完成后再做。</p>
+<p>模型换代不要原地重建，用影子索引（Shadow Index）加双写：新模型产出写进一个暂不承接读取的索引，增量同时双写两份，追平后按租户或流量比例切读，保留可回滚窗口，确认无误再停旧索引写入。切读期的调度要点是新索引冷、旧索引热，检索侧容量要按两份服务规划，别让推理指标正常而检索先塌。检索质量与召回评估属于同期《知识库与混合检索》的范畴，本文只保留调度视角：双写窗口与切读节奏必须受截止期限约束，否则“过渡态”会长成永久状态。</p>
+<h2 id="调度指标口径"><a href="#调度指标口径" class="headerlink" title="调度指标口径"></a>调度指标口径</h2><p>指标体系的整体分层归同期的《大模型监控指标体系》，本节只讲调度专属的几族：怎么定义、误报从哪来、阈值怎么定。以下阈值都是团队约定示例，须由各自负载标定。</p>
+<table>
+<thead>
+<tr>
+<th>指标族</th>
+<th>怎么定义</th>
+<th>误报主要来自哪里</th>
+<th>阈值约定示例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>准入排队时长分位</td>
+<td>从入口接受到进入运行集的时间，按分位统计</td>
+<td>快速失败的请求没有排队时间，会把低分位拉得很“漂亮”</td>
+<td>高分位持续超一个等待上界即告警</td>
+</tr>
+<tr>
+<td>首 token 等待</td>
+<td>从请求到达到第一个 token 产出</td>
+<td>客户端网络缓冲与网关流式转发会虚增或虚减</td>
+<td>按负载形状分档，短负载严、长负载松</td>
+</tr>
+<tr>
+<td>每 token 间隔</td>
+<td>相邻输出 token 的时间差，取分位而非均值</td>
+<td>流式聚合与批量刷写会把间隔抹平成尖峰</td>
+<td>高分位超间隔上限连续若干分钟告警</td>
+</tr>
+<tr>
+<td>批内步时间</td>
+<td>引擎内一次前向的时长，及步内 batch 大小</td>
+<td>步数统计口径不一（含预处理&#x2F;后处理的步不能比）</td>
+<td>与自身基线的偏移超约定倍数即查</td>
+</tr>
+<tr>
+<td>块水位与抢占次数</td>
+<td>空闲块比例分档，抢占事件按原因分类计数</td>
+<td>抢占计数未按原因拆分，看不出是容量还是顺序问题</td>
+<td>水位进警戒档、或抢占数上升即预警</td>
+</tr>
+<tr>
+<td>被抢占后完成时间劣化</td>
+<td>同一长度桶内“被抢占请求完成时长 &#x2F; 未被抢占请求完成时长”</td>
+<td>长请求本来就更容易被抢占，直接比会夸大</td>
+<td>劣化比超约定倍数则重新审视抢占策略</td>
+</tr>
+<tr>
+<td>离线任务被中断次数</td>
+<td>每批任务条目在条目边界被停止的次数</td>
+<td>任务重跑覆盖旧计数，看不出真实抖动</td>
+<td>单任务超过重试上限时人工介入</td>
+</tr>
+<tr>
+<td>租户公平性度量</td>
+<td>各租户实际用量 &#x2F; 约定配额，及最长等待租户</td>
+<td>短任务多的租户天然占优，只看用量会误判</td>
+<td>偏离配额带或某租户长期垫底告警</td>
+</tr>
+</tbody></table>
+<p>还有两个口径值得单列。一是“最长排队请求的等待时长”（不是分位数），它是饿死的直接探测器；二是“步内预填充占比”，它探测分块预填充是否真在起作用：长期为零说明开关没生效，长期接近上限说明在线解码在被挤。</p>
+<h2 id="观测实现要点"><a href="#观测实现要点" class="headerlink" title="观测实现要点"></a>观测实现要点</h2><p>采样位置决定指标能回答什么，三层都要有。引擎内是唯一能拿到步级事实的地方——步时间、步内 batch 大小、块水位、抢占事件、准入判定结果，约束是不能在解码热路径上做重活，只能在步边界聚合、按固定窗口导出。网关侧拿到用户视角：端到端首 token 等待、相邻 token 间隔、流式中断率，它看不到等待原因，但能证明用户是否真受影响。旁路采集器拿硬件事实，用来验证水位高是不是真的物理吃紧，不能替代前两层。三层的事件计数必须互相对账，长期不一致就是口径漂移信号。</p>
+<p>低基数（Low Cardinality）是调度指标的第一纪律。标签只允许枚举维度：模型、实例组、租户、优先级档、长度桶、失败原因、抢占类型；请求标识、用户标识与原始文本一律不能进标签，请求级细节放进可查询的日志与链路并按采样率保留。</p>
+<p>脱敏与最小必要要写成硬性规则而不是提醒。指标标签与日志里不出现用户提问原文，也不出现任何个人身份信息字段；提示词只以长度、语言、必要时的不可逆哈希桶形式存在；采样保留的调试请求需单独授权并设定保留期，到期删除。堆快照（Heap Snapshot）、内核转储与权重文件属最高敏感级：它们可能同时含模型参数与在途请求内容，因此默认不外发，不进共享存储、不进第三方自动上传的诊断包，取证只在受控环境内做。</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 调度指标清单（带语言标签，阈值为团队约定示例）</span></span><br><span class="line"><span class="bullet">-</span> <span class="attr">metric:</span> <span class="string">scheduler_admission_queue_seconds</span></span><br><span class="line">  <span class="attr">labels:</span> [<span class="string">model</span>, <span class="string">instance_group</span>, <span class="string">tenant</span>, <span class="string">priority_tier</span>]</span><br><span class="line">  <span class="attr">type:</span> <span class="string">histogram</span></span><br><span class="line">  <span class="attr">note:</span> <span class="string">准入排队时长，必须看分位</span></span><br><span class="line"><span class="bullet">-</span> <span class="attr">metric:</span> <span class="string">scheduler_longest_waiting_seconds</span></span><br><span class="line">  <span class="attr">labels:</span> [<span class="string">model</span>, <span class="string">instance_group</span>]</span><br><span class="line">  <span class="attr">type:</span> <span class="string">gauge</span></span><br><span class="line">  <span class="attr">note:</span> <span class="string">当前排队最久请求的等待时长，饿死探测器</span></span><br><span class="line"><span class="bullet">-</span> <span class="attr">metric:</span> <span class="string">scheduler_step_seconds</span></span><br><span class="line">  <span class="attr">labels:</span> [<span class="string">model</span>, <span class="string">instance_group</span>]</span><br><span class="line">  <span class="attr">type:</span> <span class="string">histogram</span></span><br><span class="line">  <span class="attr">note:</span> <span class="string">单步前向时长</span></span><br><span class="line"><span class="bullet">-</span> <span class="attr">metric:</span> <span class="string">scheduler_batch_running_requests</span></span><br><span class="line">  <span class="attr">labels:</span> [<span class="string">model</span>, <span class="string">instance_group</span>]</span><br><span class="line">  <span class="attr">type:</span> <span class="string">gauge</span></span><br><span class="line">  <span class="attr">note:</span> <span class="string">运行集大小，只用于解释步时间变化</span></span><br><span class="line"><span class="bullet">-</span> <span class="attr">metric:</span> <span class="string">scheduler_kv_block_free_ratio</span></span><br><span class="line">  <span class="attr">labels:</span> [<span class="string">model</span>, <span class="string">instance_group</span>, <span class="string">watermark_tier</span>]</span><br><span class="line">  <span class="attr">type:</span> <span class="string">gauge</span></span><br><span class="line">  <span class="attr">note:</span> <span class="string">空闲块比例，分档水位</span></span><br><span class="line"><span class="bullet">-</span> <span class="attr">metric:</span> <span class="string">scheduler_preemption_total</span></span><br><span class="line">  <span class="attr">labels:</span> [<span class="string">model</span>, <span class="string">instance_group</span>, <span class="string">reason</span>, <span class="string">method</span>]</span><br><span class="line">  <span class="attr">type:</span> <span class="string">counter</span></span><br><span class="line">  <span class="attr">note:</span> <span class="string">抢占次数，reason</span> <span class="string">与</span> <span class="string">method（重算或换出）必须拆</span></span><br><span class="line"><span class="bullet">-</span> <span class="attr">metric:</span> <span class="string">scheduler_chunked_prefill_ratio</span></span><br><span class="line">  <span class="attr">labels:</span> [<span class="string">model</span>, <span class="string">instance_group</span>]</span><br><span class="line">  <span class="attr">type:</span> <span class="string">gauge</span></span><br><span class="line">  <span class="attr">note:</span> <span class="string">步内预填充占比</span></span><br><span class="line"><span class="bullet">-</span> <span class="attr">metric:</span> <span class="string">scheduler_tenant_fairness_gap</span></span><br><span class="line">  <span class="attr">labels:</span> [<span class="string">model</span>, <span class="string">tenant</span>]</span><br><span class="line">  <span class="attr">type:</span> <span class="string">gauge</span></span><br><span class="line">  <span class="attr">note:</span> <span class="string">实际用量与约定配额的偏离度</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="一次调参的验证方案"><a href="#一次调参的验证方案" class="headerlink" title="一次调参的验证方案"></a>一次调参的验证方案</h2><p>调度改动最大的风险不是改错，而是“改了之后看不出有没有用”。前提是承认调度指标噪声很大：到达率、长度分布、抢占历史任一变化，都足以伪造一次“成功调参”。所以流程必须固定。</p>
+<p>第一，固定负载形状。把到达率、输入长度分布、输出长度分布写进实验描述，并用同一份可重放的流量脚本压测；流量要么来自录制回放，要么来自能说明白的合成分布。第二，一次只改一轴。同时改块大小和优先级权重，差异无法归因。第三，看分布不看均值：一条被饿死的请求可以被一千条快请求摊平，主判据是高分位与最差若干样本。第四，留对照组。同容量并行的两个实例组各跑一套参数最干净；做不到并行就用时间片对照，且对照期与实验期等长。第五，把长尾单独看。被抢占、超长输入、长等待三个子集各自出图，它们才是策略的直接作用对象。</p>
+<p>必须写进规程的一条纪律：<strong>禁止跨负载对比下结论</strong>。低峰期数据不能证明参数变好，流量结构变化后的对比也不成立；结论只能在同一负载形状、同一时间窗口的对照实验里得出，不满足就记为“未验证”而不是“有效”。</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="section"># 调度调参实验记录（模板）</span></span><br><span class="line"><span class="bullet">-</span> 实验编号 / 日期 / 负责人：</span><br><span class="line"><span class="bullet">-</span> 假设（一句话，可被证伪）：</span><br><span class="line"><span class="bullet">-</span> 改动轴（只能填一项）：块大小 / 攒批窗口 / 水位分档 / 老化阈值 / 预留策略</span><br><span class="line"><span class="bullet">-</span> 对照组配置：</span><br><span class="line"><span class="bullet">-</span> 负载形状：到达率 = <span class="strong">____</span>；输入长度分布 = <span class="strong">____</span>；输出长度分布 = <span class="strong">____</span></span><br><span class="line"><span class="bullet">-</span> 运行窗口：起止时间、是否覆盖完整流量周期：</span><br><span class="line"><span class="bullet">-</span> 主判据：TTFT 高分位 / TPOT 高分位 / 准入排队高分位 / 最长等待 / 抢占次数</span><br><span class="line"><span class="bullet">-</span> 子集观察：被抢占请求、超长输入请求、长等待请求</span><br><span class="line"><span class="bullet">-</span> 干扰记录：实例变更、上游发布、流量异常、缓存重建</span><br><span class="line"><span class="bullet">-</span> 结论：有效 / 无效 / 未验证（噪声不足）</span><br><span class="line"><span class="bullet">-</span> 下一步（若要继续，仍需一次只改一轴）：</span><br></pre></td></tr></table></figure>
+
+<h2 id="常见错误清单"><a href="#常见错误清单" class="headerlink" title="常见错误清单"></a>常见错误清单</h2><p>以下七条是按事故频率挑的，每条都给出可机检的信号。</p>
+<p>其一，把并发上限当容量。上限是保护值不是容量，配小误伤限流、配大高水位抢占频发；信号是块水位与并发数走势长期背离。其二，用请求数做伸缩信号——并发不变而长度分布变长时负载就翻倍；信号是扩容后水位仍不降。其三，抢占没有终态，被抢占请求反复回炉却不给结论；信号是存在既未完成也未失败且已产生抢占事件的请求。其四，离线任务不可中断；信号是低峰期水位仍高、在线排队时长全天平坦地恶化。其五，没有租户级隔离，单租户突发挤占全部预算；信号是公平性偏离度持续出带。其六，指标只有均值，掩盖饿死与长尾；信号是仪表盘上找不到分位或最大值字段。其七，准入不做长度校验，超限请求进队列后才失败，白占队列位；信号是准入后立刻失败的比例偏高。</p>
+<h2 id="手段与代价对照"><a href="#手段与代价对照" class="headerlink" title="手段与代价对照"></a>手段与代价对照</h2><table>
+<thead>
+<tr>
+<th>调度手段</th>
+<th>解决什么</th>
+<th>代价</th>
+<th>适合负载</th>
+<th>必须盯的指标</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>连续批处理</td>
+<td>固定批的等待浪费，槽位空转</td>
+<td>调度循环复杂，预算必须持续核算</td>
+<td>几乎所有在线生成负载</td>
+<td>步时间、运行集大小、块水位</td>
+</tr>
+<tr>
+<td>分块预填充</td>
+<td>长预填充把解码步堵成长尾尖峰</td>
+<td>计算被打散、吞吐回落、进度难观测</td>
+<td>输入重尾、尾延迟敏感</td>
+<td>每 token 间隔高分位、步内预填充占比</td>
+</tr>
+<tr>
+<td>长度分桶</td>
+<td>批内形状不齐带来的浪费与碎片</td>
+<td>攒批等待，桶边界需要维护</td>
+<td>长度分布多峰、批量任务</td>
+<td>准入排队分位、最长等待、碎片率</td>
+</tr>
+<tr>
+<td>优先级加老化</td>
+<td>关键流量被普通流量淹没</td>
+<td>解释成本高，低优可能长期停滞</td>
+<td>多租户与混合重要性负载</td>
+<td>分优先级排队时长、公平性偏离</td>
+</tr>
+<tr>
+<td>抢占重算</td>
+<td>预算紧张时快速腾出资源</td>
+<td>重复计算，恢复时间随输入增长</td>
+<td>输入短、状态小、抖动短时</td>
+<td>抢占次数按原因、重算 token 量</td>
+</tr>
+<tr>
+<td>抢占换出</td>
+<td>保住已完成的大部分工作</td>
+<td>带宽与主存占用，实现依赖引擎</td>
+<td>输入长、已生成多的在线请求</td>
+<td>换出时长、主存水位、恢复后完成时间</td>
+</tr>
+<tr>
+<td>离线混部</td>
+<td>抬升波谷期利用率</td>
+<td>与在线互相污染，故障半径变大</td>
+<td>有截止期限且可中断的批任务</td>
+<td>在线高分位、离线被中断次数</td>
+</tr>
+<tr>
+<td>异步批任务</td>
+<td>把准入时机交回平台，可计划填谷</td>
+<td>需要任务表、幂等、终态与清理机制</td>
+<td>无需即时响应的海量处理</td>
+<td>完成数与失败数、到期未完成率</td>
+</tr>
+</tbody></table>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>本文的立足点是一句话：推理调度分配的是显存水位与单步时间片，请求数只是记账结果。承认这一点，很多设计会变简单：准入按预算而非并发数，观测按步而非按请求，抢占按代价函数而非按谁最倒霉。</p>
+<p>连续批处理把利用率问题转化为块水位管理，分块预填充把长提示词的集中开销摊平，长度分桶把不确定性关进同质的桶里，优先级与老化解决顺序与公平，重算与换出是抢占的两条代价曲线。它们不是互斥选项，而是同一个循环里针对不同故障模式的旋钮；每个旋钮都要有指标族证明它真的在起作用，否则调参只是给噪声换了个形状。</p>
+<p>最后是三条纪律：任何抢占都必须收敛到终态；任何预留承诺都要怀疑客户端虚报；任何结论只能在同负载形状的对照实验里得出，禁止跨负载对比。把这三条写进规程，比把参数调到“看起来很好”更有价值。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li>vLLM 项目仓库根：<a href="https://github.com/vllm-project/vllm">https://github.com/vllm-project/vllm</a></li>
+<li>SGLang 项目仓库根：<a href="https://github.com/sgl-project/sglang">https://github.com/sgl-project/sglang</a></li>
+<li>AIBrix 项目仓库根（大模型推理控制面，2025 年 2 月开源）：<a href="https://github.com/vllm-project/aibrix">https://github.com/vllm-project/aibrix</a></li>
+<li>Text Generation Inference 项目仓库根：<a href="https://github.com/huggingface/text-generation-inference">https://github.com/huggingface/text-generation-inference</a></li>
+<li>TensorRT-LLM 项目仓库根：<a href="https://github.com/NVIDIA/TensorRT-LLM">https://github.com/NVIDIA/TensorRT-LLM</a></li>
+<li>论文主题：高效显存分页管理与连续批处理的 LLM 服务调度（PagedAttention，SOSP 2023）</li>
+<li>论文主题：请求级批处理与迭代级调度（Orca，OSDI 2022）</li>
+<li>论文主题：分块预填充与解码穿插的服务调度（Sarathi 与 Sarathi-Serve 系列工作）</li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>大模型批处理与调度</p><p><a href="https://987763485.github.io/2025/09/27/大模型批处理与调度/">https://987763485.github.io/2025/09/27/大模型批处理与调度/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2025-09-27</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-20</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="link-muted mr-2" rel="tag" href="/tags/python/">python</a><a class="link-muted mr-2" rel="tag" href="/tags/typescript/">typescript</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2025/10/04/%E5%90%91%E9%87%8F%E7%B4%A2%E5%BC%95%E7%AE%97%E6%B3%95HNSW%E4%B8%8EIVF/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">向量索引算法：HNSW 与 IVF</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2025/09/20/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E6%8E%A8%E7%90%86%E6%9C%8D%E5%8A%A1%E5%8C%96%E5%AE%9E%E8%B7%B5/"><span class="level-item">大模型推理服务化实践</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

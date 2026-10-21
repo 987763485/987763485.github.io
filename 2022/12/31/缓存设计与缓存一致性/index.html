@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>缓存设计与缓存一致性 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="缓存是后端系统里性价比最高的性能手段，也是最容易留下隐患的地方。加一个 Redis 只需要半天，但要让它在流量高峰、发布回滚、主从延迟和机房故障下都不出问题，需要一套完整的设计。本文不讨论某个命令怎么用，而是把缓存设计拆成四个必须回答的问题：缓存放在哪、缓存什么、何时失效、失效之后怎么办。沿着这条主线，我们会依次看读写模式、一致性方案的失败窗口、穿透与雪崩的应对、热点与容量治理，最后用商品详情页做"><meta property="og:type" content="blog"><meta property="og:title" content="缓存设计与缓存一致性"><meta property="og:url" content="https://987763485.github.io/2022/12/31/%E7%BC%93%E5%AD%98%E8%AE%BE%E8%AE%A1%E4%B8%8E%E7%BC%93%E5%AD%98%E4%B8%80%E8%87%B4%E6%80%A7/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="缓存是后端系统里性价比最高的性能手段，也是最容易留下隐患的地方。加一个 Redis 只需要半天，但要让它在流量高峰、发布回滚、主从延迟和机房故障下都不出问题，需要一套完整的设计。本文不讨论某个命令怎么用，而是把缓存设计拆成四个必须回答的问题：缓存放在哪、缓存什么、何时失效、失效之后怎么办。沿着这条主线，我们会依次看读写模式、一致性方案的失败窗口、穿透与雪崩的应对、热点与容量治理，最后用商品详情页做"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2022-12-30T23:11:45.000Z"><meta property="article:modified_time" content="2026-10-19T02:02:48.553Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="后端开发"><meta property="article:tag" content="架构设计"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2022/12/31/%E7%BC%93%E5%AD%98%E8%AE%BE%E8%AE%A1%E4%B8%8E%E7%BC%93%E5%AD%98%E4%B8%80%E8%87%B4%E6%80%A7/"},"headline":"缓存设计与缓存一致性","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2022-12-30T23:11:45.000Z","dateModified":"2026-10-19T02:02:48.553Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"缓存是后端系统里性价比最高的性能手段，也是最容易留下隐患的地方。加一个 Redis 只需要半天，但要让它在流量高峰、发布回滚、主从延迟和机房故障下都不出问题，需要一套完整的设计。本文不讨论某个命令怎么用，而是把缓存设计拆成四个必须回答的问题：缓存放在哪、缓存什么、何时失效、失效之后怎么办。沿着这条主线，我们会依次看读写模式、一致性方案的失败窗口、穿透与雪崩的应对、热点与容量治理，最后用商品详情页做"}</script><link rel="canonical" href="https://987763485.github.io/2022/12/31/%E7%BC%93%E5%AD%98%E8%AE%BE%E8%AE%A1%E4%B8%8E%E7%BC%93%E5%AD%98%E4%B8%80%E8%87%B4%E6%80%A7/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-12-30T23:11:45.000Z" title="12/31/2022, 7:11:45 AM">2022-12-31</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></span><span class="level-item">1 小时读完 (大约7716个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">缓存设计与缓存一致性</h1><div class="content"><p>缓存是后端系统里性价比最高的性能手段，也是最容易留下隐患的地方。加一个 Redis 只需要半天，但要让它在流量高峰、发布回滚、主从延迟和机房故障下都不出问题，需要一套完整的设计。本文不讨论某个命令怎么用，而是把缓存设计拆成四个必须回答的问题：缓存放在哪、缓存什么、何时失效、失效之后怎么办。沿着这条主线，我们会依次看读写模式、一致性方案的失败窗口、穿透与雪崩的应对、热点与容量治理，最后用商品详情页做一次完整推演，并给出一份可落地的取舍清单。本文适合已经用过 Redis、准备把缓存做成基础设施的后端工程师阅读。</p>
+<h2 id="先把缓存看成一条链路"><a href="#先把缓存看成一条链路" class="headerlink" title="先把缓存看成一条链路"></a>先把缓存看成一条链路</h2><p>很多团队对缓存的理解停留在“查之前先读 Redis”。这只是链路中的一环。一个真实的读请求，可能依次经过浏览器缓存、CDN、API 网关的本地缓存、服务进程内的本地缓存、Redis 集群，最后才落到数据库。每一层都在回答同样四个问题，只是答案的粒度不同：CDN 缓存整张图片，网关缓存聚合后的响应，服务缓存领域对象，Redis 缓存行记录。</p>
+<p>这条链路的第一个收益是延迟：进程内命中在微秒以下，同机房 Redis 在几百微秒，数据库查询在毫秒级。第二个收益是保护下游：数据库的连接数和 IOPS 有限，缓存挡住绝大多数读请求，数据库才有余力处理写入和少量回源。</p>
+<p>但缓存也引入了新的不变量：同一份数据存在多个副本，就存在多个可能过期的时刻。设计缓存，本质上是在“延迟、吞吐、一致性、成本”四个维度上做取舍，并且明确每个取舍的失败窗口有多大、窗口内业务能否接受。下面这张图是本文讨论的典型链路，后文的所有方案都可以放回这张图里定位。</p>
+<pre class="mermaid">flowchart TD
+    A[浏览器或客户端] --> B[CDN]
+    B --> C[API 网关本地缓存]
+    C --> D[服务进程本地缓存]
+    D --> E[Redis 集群]
+    E --> F[数据库]
+    F -.回源回填.-> E
+    E -.回源回填.-> D</pre>
+
+<p>四层缓存并不是越多越好。每增加一层，命中率收益都要和一致性维护、内存成本、排障复杂度一起算；只有某一层的回源量仍足以打垮下游时，才值得在它前面再加一层。</p>
+<h2 id="缓存放在哪：进程内、集中式与二级结构"><a href="#缓存放在哪：进程内、集中式与二级结构" class="headerlink" title="缓存放在哪：进程内、集中式与二级结构"></a>缓存放在哪：进程内、集中式与二级结构</h2><h3 id="进程内缓存"><a href="#进程内缓存" class="headerlink" title="进程内缓存"></a>进程内缓存</h3><p>进程内缓存是距离请求最近的一层。它就是一个带过期和淘汰的哈希表，命中时没有网络往返，也没有序列化开销，延迟可以做到微秒以下。适合放进去的东西有几类：变更频率低但读取极频繁的字典数据，例如城市列表、类目树、费率表；单实例内可以接受短暂不一致的配置；以及被大量请求反复读取的极热点对象。</p>
+<p>它的代价同样明确。第一，每个实例各存一份，集群扩缩容后副本数量变化，内存总量随之变化，容量规划不能只看单机。第二，失效没有天然办法通知所有实例，只能靠短 TTL 或额外的广播通道，而广播可能丢失、可能乱序。第三，数据放在堆上，大对象会推高 GC 压力，Go 服务尤其要关注这一点。第四，发布重启意味着缓存清空，冷启动时回源压力会集中出现。</p>
+<p>在 Go 里可以从带读写锁和过期时间的 map 起步，也可以选用 bigcache、ristretto 这类实现，重点看淘汰是否可控、过期键是否后台清理、并发写入的长尾延迟，而不只是峰值 QPS。</p>
+<h3 id="集中式缓存"><a href="#集中式缓存" class="headerlink" title="集中式缓存"></a>集中式缓存</h3><p>集中式缓存以 Redis 为代表。Redis 7.0 在 2022 年 4 月发布，命令执行仍是单线程，网络 IO 可多线程化，集群按哈希槽分片。它提供全局一致的视图：所有实例看到同一份数据，容量可到几百 GB，运维和监控也有成熟工具。</p>
+<p>代价是每次访问都要付一次网络往返：同机房几百微秒，跨可用区到毫秒级。另一个成本是连接数：每个实例都要连每个分片，很快就要靠连接池复用。还要说清楚：Redis 的持久化是备份手段，不是事务保障，把它当唯一数据源，等于接受一次故障丢一批数据。</p>
+<h3 id="本地缓存加分布式缓存的二级结构"><a href="#本地缓存加分布式缓存的二级结构" class="headerlink" title="本地缓存加分布式缓存的二级结构"></a>本地缓存加分布式缓存的二级结构</h3><p>多数高并发系统最终会落到二级结构：L1 是进程内缓存，TTL 设在秒级；L2 是 Redis，TTL 设在分钟到小时级。读请求先查 L1，未命中再查 L2，仍未命中才回源。L1 承担极热点，L2 承担全局视图，数据库只处理真正的冷数据。</p>
+<p>这个结构的难点全部在失效上。写请求完成数据库更新后，要删 L2，同时通知所有实例删 L1。通知可以走 Redis 发布订阅或独立广播通道，但广播不可靠：订阅者重连会丢消息，网络分区时顺序也可能不一致。因此 L1 的 TTL 必须短，它是广播失败时的兜底，经验上取一秒到五秒，取决于业务能容忍多长的旧值窗口。</p>
+<p>Redis 6 引入的客户端缓存用 RESP3 的 tracking 机制做类似的事：服务端记录客户端读过哪些键，变化时推送失效消息。思路与自建广播一致，但各语言客户端支持程度不一，落地前要确认版本和连接模式。</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>进程内缓存</th>
+<th>集中式缓存</th>
+<th>二级结构</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>命中延迟</td>
+<td>微秒以下</td>
+<td>几百微秒</td>
+<td>微秒到几百微秒</td>
+</tr>
+<tr>
+<td>容量上限</td>
+<td>受堆内存限制</td>
+<td>可达数百 GB</td>
+<td>两者之和</td>
+</tr>
+<tr>
+<td>一致性</td>
+<td>多实例各自为政</td>
+<td>全局一致</td>
+<td>依赖广播与短 TTL</td>
+</tr>
+<tr>
+<td>运维复杂度</td>
+<td>低</td>
+<td>中</td>
+<td>高</td>
+</tr>
+<tr>
+<td>适用场景</td>
+<td>字典、配置、极热点</td>
+<td>通用读缓存</td>
+<td>超高并发读</td>
+</tr>
+</tbody></table>
+<h2 id="缓存什么：对象、粒度与键"><a href="#缓存什么：对象、粒度与键" class="headerlink" title="缓存什么：对象、粒度与键"></a>缓存什么：对象、粒度与键</h2><p>缓存的第一条判断标准不是“这个数据读得多”，而是“这份数据旧几秒钟，业务能不能接受”。商品详情、用户资料、评论列表、类目树都适合缓存；账户余额、库存可售数、权限判定这类数据，要么不缓存，要么必须在读取时做版本校验，不能只靠 TTL 兜底。</p>
+<p>第二条标准是回源代价。一次回源要查五张表、调用两个下游服务的数据，缓存收益远大于一条主键查询。反过来，如果回源本身就是一次内存查询，缓存的复杂度可能超过它节省的时间。</p>
+<p>粒度是设计里最容易被忽略的维度。缓存一个聚合对象，例如整个商品详情，命中率高、一次网络往返就能拿到全部字段，但只要价格或库存变化，就得让整个对象失效，短期内命中率会明显下降。缓存字段级数据，失效精准，但一次页面渲染要发十几次读取，网络和代码复杂度都上去了。折中的做法是以聚合根为缓存单位，把变更频率相近的字段放在一起，把变化频繁的字段拆出去。判断依据是字段的变更频率和一致性要求，而不是数据库表结构。</p>
+<p>键的设计要兼顾可读性、可排查性和集群分布。推荐“业务域:对象:标识:版本”的形式，例如 item:detail:88231:v3，冒号分层便于按前缀统计命中和批量清理。键里不要直接拼未转义的用户输入，否则可能产生超长键或冲突。Redis 集群模式下，只有落在同一个哈希槽的键才能参与多键操作，需要时可以用花括号指定哈希标签，例如 cart:{42}:items，但要清楚这会把这些键固定到同一个分片，热点也随之一起来。</p>
+<p>值的大小需要设上限。单个值建议控制在几十 KB 以内，超过一百 KB 就要考虑拆分或压缩。大键的危害不止是占内存：读取会占用带宽和客户端缓冲区，删除会阻塞事件循环，迁移时也会拖慢槽迁移。序列化格式上，JSON 可读、跨语言、演进方便，是默认选择；对体积敏感的场景可以用 protobuf 或 MessagePack，但要保留版本字段，方便改结构。</p>
+<p>TTL 的设定应当来自数据的变更规律和业务容忍度，而不是统一拍一个三十分钟。变化极少的字典可以设小时级并配合主动刷新；用户资料可以设分钟级；价格库存这类数据要么不缓存，要么把 TTL 压到秒级并配合变更通知。TTL 的作用是兜底，它保证“最坏情况下旧值也会在一个可预期的时间内消失”，但不能替代主动失效。</p>
+<h2 id="读写模式：谁负责回源，写路径怎么走"><a href="#读写模式：谁负责回源，写路径怎么走" class="headerlink" title="读写模式：谁负责回源，写路径怎么走"></a>读写模式：谁负责回源，写路径怎么走</h2><p>四种常见模式的差别可以归结为两个问题：回源由业务代码负责，还是由缓存层负责；写操作是同步落到数据库，还是先落缓存。答案不同，失败时的责任方和补偿手段也不同。</p>
+<h3 id="cache-aside"><a href="#cache-aside" class="headerlink" title="cache-aside"></a>cache-aside</h3><p>业务代码自己读缓存、回源、回填，写时先更新数据库再删除缓存。它是最通用的模式，缓存只承担被动 KV 的角色，业务完全控制回源逻辑，也方便做批量、降级和绕过。缺点是回源代码散落在各处，并发未命中时容易放大，双写之间有一致性窗口。</p>
+<pre class="mermaid">sequenceDiagram
+    participant C as 客户端
+    participant S as 服务
+    participant R as Redis
+    participant D as 数据库
+    C->>S: 读取商品详情
+    S->>R: GET item:detail:1:v3
+    alt 命中
+        R-->>S: 返回缓存值
+    else 未命中
+        S->>D: SELECT 商品
+        D-->>S: 返回行数据
+        S->>R: SET 值 EX 300
+    end
+    S-->>C: 返回结果</pre>
+
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(r *Repo)</span></span> GetItem(ctx context.Context, id <span class="type">int64</span>) (*Item, <span class="type">error</span>) &#123;</span><br><span class="line">    key := fmt.Sprintf(<span class="string">&quot;item:detail:%d:v3&quot;</span>, id)</span><br><span class="line">    <span class="keyword">if</span> raw, err := r.rdb.Get(ctx, key).Bytes(); err == <span class="literal">nil</span> &#123;</span><br><span class="line">        <span class="keyword">var</span> it Item</span><br><span class="line">        <span class="keyword">if</span> err := json.Unmarshal(raw, &amp;it); err == <span class="literal">nil</span> &#123;</span><br><span class="line">            <span class="keyword">return</span> &amp;it, <span class="literal">nil</span> <span class="comment">// 命中直接返回</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    it, err := r.db.QueryItem(ctx, id) <span class="comment">// 未命中回源</span></span><br><span class="line">    <span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">nil</span>, err</span><br><span class="line">    &#125;</span><br><span class="line">    b, _ := json.Marshal(it)</span><br><span class="line">    r.rdb.Set(ctx, key, b, <span class="number">5</span>*time.Minute) <span class="comment">// TTL 兜底</span></span><br><span class="line">    <span class="keyword">return</span> it, <span class="literal">nil</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这段代码省略了错误分支，实际实现里要区分 redis.Nil 和真正的连接错误：前者是未命中，后者应当熔断或降级，而不是当成未命中继续打数据库。回填必须带 TTL，空结果也要用单独的标记缓存，否则不存在的键会每次都穿透。</p>
+<h3 id="read-through"><a href="#read-through" class="headerlink" title="read-through"></a>read-through</h3><p>把回源动作收进缓存层，业务只调用读取接口，未命中时由缓存组件加载并回填。Guava 的 LoadingCache、Caffeine 的 CacheLoader 都是这个思路；Redis 本身不提供 read-through，需要客户端库封装。它的优点是业务代码干净、回源逻辑集中；缺点是缓存层必须知道数据源和查询方式，复杂查询、批量读取、事务内读取都不适合。</p>
+<h3 id="write-through"><a href="#write-through" class="headerlink" title="write-through"></a>write-through</h3><p>写请求同步写缓存和数据库，通常由缓存层保证先后顺序。缓存里几乎不会出现旧值，读路径因此很简单。代价是写延迟变成两者之和，而且缓存和数据库很难放进同一个事务，第二步失败仍然需要补偿。它适合写少读多、对读一致性要求较高的配置类数据。</p>
+<h3 id="write-behind"><a href="#write-behind" class="headerlink" title="write-behind"></a>write-behind</h3><p>先写缓存，异步批量落库。写吞吐最高，还能把随机写合并成顺序写。代价是进程崩溃会丢掉最近一段写入，落库失败需要重放，多个写之间的顺序也可能错乱。它只适合可容忍丢失、可重放的数据，例如计数、埋点、点赞数。订单、库存、余额这类数据不要使用。</p>
+<p>实际系统往往是混用：主体数据走 cache-aside，计数走 write-behind，配置走 write-through。要按数据类型分别选择，而不是全站套用一种模式。</p>
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>回源方</th>
+<th>写延迟</th>
+<th>一致性</th>
+<th>主要风险</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>cache-aside</td>
+<td>业务代码</td>
+<td>低</td>
+<td>最终一致</td>
+<td>并发回填、删除失败</td>
+</tr>
+<tr>
+<td>read-through</td>
+<td>缓存层</td>
+<td>低</td>
+<td>最终一致</td>
+<td>回源逻辑耦合、异常被隐藏</td>
+</tr>
+<tr>
+<td>write-through</td>
+<td>缓存层</td>
+<td>高</td>
+<td>较强</td>
+<td>双写第二步失败</td>
+</tr>
+<tr>
+<td>write-behind</td>
+<td>缓存层异步</td>
+<td>最低</td>
+<td>弱</td>
+<td>丢数据、乱序</td>
+</tr>
+</tbody></table>
+<h2 id="何时失效：四种做法与它们的失败窗口"><a href="#何时失效：四种做法与它们的失败窗口" class="headerlink" title="何时失效：四种做法与它们的失败窗口"></a>何时失效：四种做法与它们的失败窗口</h2><p>讨论一致性要先接受一个前提：除非付出分布式事务的代价，缓存和数据库之间只能是最终一致。设计的目标不是消灭窗口，而是把窗口量化到业务可以接受，并为窗口内的错误准备补偿。</p>
+<h3 id="先更新数据库，再删除缓存"><a href="#先更新数据库，再删除缓存" class="headerlink" title="先更新数据库，再删除缓存"></a>先更新数据库，再删除缓存</h3><p>为什么是删除而不是更新缓存？更新缓存有两个问题。其一，并发写时后到的更新可能基于更旧的计算结果，把新值覆盖；其二，缓存值常常是聚合计算的结果，写路径重新算一遍既慢又容易漏字段。删除是幂等的，下一次读自然回填最新值。</p>
+<p>顺序为什么是先库后缓存？如果先删缓存再更新库，删除和更新之间到来的读请求会回源读到旧值并回填，这个旧值会一直留到 TTL 过期。先更新库再删缓存，窗口缩小到删除动作本身，但仍有几种失败：删除命令执行失败、删除时网络超时、主从延迟导致回填读到旧库。补偿手段是删除失败进重试队列、按指数退避，再用 binlog 订阅兜底，TTL 是最后一道保险。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(r *Repo)</span></span> UpdateItem(ctx context.Context, it *Item) <span class="type">error</span> &#123;</span><br><span class="line">    <span class="keyword">if</span> err := r.db.UpdateItem(ctx, it); err != <span class="literal">nil</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> err</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 删除而不是更新；失败必须留痕，不能吞掉</span></span><br><span class="line">    <span class="keyword">if</span> err := r.rdb.Del(ctx, itemKey(it.ID)).Err(); err != <span class="literal">nil</span> &#123;</span><br><span class="line">        r.invalidateQueue.Push(it.ID) <span class="comment">// 交给重试队列</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">nil</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="延迟双删"><a href="#延迟双删" class="headerlink" title="延迟双删"></a>延迟双删</h3><p>做法是更新数据库前后各删一次，第二次延迟几百毫秒到一秒，目的是清掉“更新期间读请求回填的旧值”。效果依赖延迟值，而它取决于主从复制延迟、查询耗时和调度抖动，很难精确：太短清不掉，太长只是把窗口往后移。本文的建议是把它当作缓解手段，用在读多写少、主从延迟稳定的场景，并配合 TTL，不要当成强一致方案。</p>
+<h3 id="订阅-binlog"><a href="#订阅-binlog" class="headerlink" title="订阅 binlog"></a>订阅 binlog</h3><p>用 canal、go-mysql 这类工具解析 MySQL 的 row 格式 binlog，把变更事件投递到消息队列，由消费者删除对应缓存。优点是失效逻辑移出业务代码，所有写入口都能覆盖，包括后台脚本和其他服务；缺点是多一套组件运维，事件通常有百毫秒级延迟，大事务和 DDL 会产生大量事件，消费者还必须按主键保序。它适合作为兜底，而不是唯一手段。</p>
+<h3 id="版本号"><a href="#版本号" class="headerlink" title="版本号"></a>版本号</h3><p>在缓存值里带一个版本号，可以是数据库行的更新时间或递增版本。回填前比较版本，低于缓存中已有版本就放弃写入，这能解决“旧值回填覆盖新值”的竞态，代价是写路径要维护版本，比较与写入要用 Lua 保证原子。版本号也可以用在本地缓存：请求携带版本，本地版本落后就跳过。</p>
+<h3 id="把窗口摆到桌面上"><a href="#把窗口摆到桌面上" class="headerlink" title="把窗口摆到桌面上"></a>把窗口摆到桌面上</h3><table>
+<thead>
+<tr>
+<th>方案</th>
+<th>典型窗口</th>
+<th>补偿</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>先更库再删缓存</td>
+<td>删除失败到重试成功，最长到 TTL</td>
+<td>重试队列、binlog、TTL</td>
+<td>通用</td>
+</tr>
+<tr>
+<td>延迟双删</td>
+<td>延迟值估计误差</td>
+<td>TTL</td>
+<td>主从延迟稳定</td>
+</tr>
+<tr>
+<td>binlog 订阅</td>
+<td>百毫秒级</td>
+<td>消费重试、幂等</td>
+<td>多写入口</td>
+</tr>
+<tr>
+<td>版本号</td>
+<td>读请求仍可能短暂读到旧值</td>
+<td>无需额外补偿</td>
+<td>写少、冲突敏感</td>
+</tr>
+</tbody></table>
+<p>先算出业务能容忍的窗口，再选方案。把“删缓存失败”当成必然会发生的事件来设计，而不是异常分支。</p>
+<h2 id="失效之后：穿透、击穿与雪崩的统一视角"><a href="#失效之后：穿透、击穿与雪崩的统一视角" class="headerlink" title="失效之后：穿透、击穿与雪崩的统一视角"></a>失效之后：穿透、击穿与雪崩的统一视角</h2><p>这三个问题常被分开讲，但设计上是同一件事的三种触发方式：缓存未命中导致回源量瞬时放大。放大倍数等于请求量乘以未命中率，而数据库能承受的回源量有硬上限。防护手段的选择，取决于未命中是“键本来就不存在”“单个键集中失效”，还是“大面积同时失效或整层不可用”。</p>
+<h3 id="穿透：查一个根本不存在的数据"><a href="#穿透：查一个根本不存在的数据" class="headerlink" title="穿透：查一个根本不存在的数据"></a>穿透：查一个根本不存在的数据</h3><p>攻击者用随机 ID 反复查询，缓存永远不命中，请求全部落到数据库。两种主流防护各有边界。布隆过滤器把可能存在的键压进一个位数组，查询前先判断，不存在就直接返回。它的问题是误判率随容量增长，且标准布隆过滤器不支持删除，数据删除后只能靠重建或改用计数布隆。工程上要明确过滤器放在哪：放在本地可省一次往返，但多实例要同步；放在 Redis 则每次多一次往返。新增数据必须同步写入，否则会被误杀，通常用 binlog 或写路径双写保证。</p>
+<p>空值缓存更简单：查不到也写入一个特殊标记，TTL 设短一些，例如三十秒到两分钟。它能挡住重复查询同一个不存在键的流量，但挡不住每次换 ID 的扫描，而且要注意标记值不要和真实空值混淆，内存占用也要计入容量。两者常常一起用：布隆过滤器挡随机 ID，空值缓存挡重复访问。</p>
+<h3 id="击穿：一个热点键过期"><a href="#击穿：一个热点键过期" class="headerlink" title="击穿：一个热点键过期"></a>击穿：一个热点键过期</h3><p>某个键的 QPS 极高，过期瞬间所有请求同时回源。互斥重建让一个请求去加载，其余请求等待或快速失败，Go 里可以用 singleflight 把同键的并发调用合并，跨进程则用 Redis 的 SET NX 加过期时间。要处理锁持有者崩溃、加载超时和 double check，否则锁本身会成为新的故障点。逻辑过期是另一条路：值里带一个过期时间，物理上不设 TTL，读到逻辑过期时先返回旧值，同时异步刷新。它保证了延迟稳定，代价是刷新期间读到旧数据，刷新任务失败时旧值会一直存在，必须有监控和兜底。</p>
+<h3 id="雪崩：大面积失效或整层不可用"><a href="#雪崩：大面积失效或整层不可用" class="headerlink" title="雪崩：大面积失效或整层不可用"></a>雪崩：大面积失效或整层不可用</h3><p>大量键在同一时刻过期，或者 Redis 集群整体故障，回源量会瞬间超过数据库上限。TTL 打散是最低成本的措施：在基础 TTL 上加一个随机偏移，把过期时间摊开。但它只解决“同时过期”，解决不了整层故障。多级缓存让 L1 在 L2 不可用时仍能挡住一部分读；降级策略直接返回默认值、静态页或稍旧的快照；限流和熔断保护数据库不被压垮。Redis 自身的高可用，例如主从加哨兵、多副本、多可用区，是基础设施层面的必备项，不能等出事再补。</p>
+<p>设计顺序应当是倒过来的：先估算数据库每秒能承受多少回源，再决定需要把未命中率压到多少，最后选择防护组合。三种问题都只能降低概率，不能消除，所以每一条路径上都要有“最坏情况下返回什么”的答案。</p>
+<h2 id="热点与容量：命中率背后的账"><a href="#热点与容量：命中率背后的账" class="headerlink" title="热点与容量：命中率背后的账"></a>热点与容量：命中率背后的账</h2><p>热点的处理手段在别处已经讲过，这里只放回框架。本地缓存吸收单实例内的极热点，代价是一致性；键拆分把读写分散到多个分片，代价是写放大与扩容迁移；多副本分担读流量，代价是主从延迟。三者可以叠加，但每叠加一层，失效路径就多一个出错环节。先用读放大和写放大的比例判断热点类型，再决定用缓存、拆分还是合并。</p>
+<p>容量规划要区分“全量数据”和“工作集”。缓存不该装下所有数据，而应装下被频繁访问的那部分。假设总数据一百 GB，每天真正被访问的只有二十 GB，那么按三十 GB 配置内存并留出余量，比按一百 GB 配置更经济。内存水位建议控制在百分之七十到八十，给碎片、复制缓冲和突发写入留空间。Redis 的淘汰策略要选对：allkeys-lru 适合访问分布相对均匀的通用缓存，allkeys-lfu 适合热点长期稳定的场景，volatile-lru 只淘汰设了过期时间的键，noeviction 在内存满时直接报错，不能用于缓存集群。需要注意 Redis 的 LRU 是采样近似，maxmemory-samples 越大越接近真实 LRU，但 CPU 开销也越高。</p>
+<p>过期键采用惰性删除加定期抽样，大量键在同一秒过期会集中消耗 CPU，这也是 TTL 必须打散的原因之一。</p>
+<p>命中率与回源放大的关系值得算一遍。假设线上二十万 QPS、命中率百分之九十九，回源是两千；命中率掉到百分之九十五，回源就是一万，放大五倍。命中率从九十九提升到九十九点九，回源则从两千降到两百。这解释了为什么缓存优化要盯着尾部：最后几个百分点对应的是最热的数据，也是故障时最先崩的部分。反过来，如果数据库只能承受三千回源，那么命中率必须稳定在百分之九十八点五以上，这就是容量与降级策略的输入。</p>
+<h2 id="观测：让失效风暴提前可见"><a href="#观测：让失效风暴提前可见" class="headerlink" title="观测：让失效风暴提前可见"></a>观测：让失效风暴提前可见</h2><p>观测要覆盖三段：读路径的命中情况、失效路径的执行情况、下游实际承受的回源压力。只盯 Redis 的内存和 CPU 会误判，很多事故里 Redis 指标一切正常，数据库却已经被回源打满。</p>
+<p>命中率要分维度看。Redis 的 INFO 里 keyspace_hits 和 keyspace_misses 是累计值，实例重启会清零，跨实例也不能简单相加，应当采集增量并按 key 前缀埋点。客户端库统一记录“前缀 + 是否命中 + 回源耗时”，用于定位业务域。回源 QPS 要和数据库 QPS、连接池等待时间对齐看：缓存指标正常而数据库 QPS 上涨，往往意味着请求绕过了缓存。</p>
+<p>失效路径的指标包括删除重试队列的长度、binlog 消费延迟、广播订阅者的重连次数，以及单位时间内的删除命令数量。最后一项是失效风暴的先行指标：正常情况下删除速率跟随写入速率，如果短时间出现大量删除，紧接着往往就是回源尖峰。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 命中与淘汰的累计值，需隔一段时间取差值</span></span><br><span class="line">redis-cli info stats | grep -E <span class="string">&#x27;keyspace_hits|keyspace_misses|evicted_keys|expired_keys&#x27;</span></span><br><span class="line"><span class="comment"># 依赖 LFU 策略时，可抽样查看热点键</span></span><br><span class="line">redis-cli --hotkeys</span><br></pre></td></tr></table></figure>
+
+<p>热点探测本文不展开，只提醒两点：MONITOR 会显著拖慢实例；–hotkeys 依赖 LFU，LRU 实例上结果无意义。</p>
+<p>最后是把演练做成常态：定期摘掉 Redis，看数据库是否扛得住、降级是否生效；构造一批键同时过期，验证 TTL 打散；观察发布后 L1 冷启动的回源曲线。演练暴露的问题比静态评审更真实。</p>
+<h2 id="案例：商品详情页的缓存取舍"><a href="#案例：商品详情页的缓存取舍" class="headerlink" title="案例：商品详情页的缓存取舍"></a>案例：商品详情页的缓存取舍</h2><p>商品详情页是读多写少的典型：读取量可能是写入的几百倍，标题和图片偶有变更，页面允许短时间展示旧值，但下单必须用实时价格。这个画像决定了下面几个选择。</p>
+<p>其一，缓存聚合对象而不是字段。标题、图片、类目、店铺、规格放在一个 JSON 里，一次网络往返拿到整页数据；价格和库存拆出去走实时接口，避免高频变更把整页缓存冲掉。</p>
+<p>其二，写路径先更新数据库再删缓存，删除失败进重试队列，再用 binlog 订阅兜底，覆盖运营后台等本服务之外的写入口。TTL 设十分钟作为最后保险。详情页能接受十分钟的旧标题，不能接受旧价格，所以价格根本不进这个对象。</p>
+<p>其三，大促商品加一层本地缓存，TTL 两秒，变更时广播删除，广播丢失最多让旧值多活两秒。已下架商品写入短 TTL 的空标记，挡住按 ID 扫描的爬虫。</p>
+<p>这个案例的要点不是具体参数，而是先把“哪些字段允许旧、旧多久、谁兜底”写成约定，再让缓存结构去匹配它。</p>
+<h2 id="取舍清单"><a href="#取舍清单" class="headerlink" title="取舍清单"></a>取舍清单</h2><p>把前面的内容压缩成五条判断。第一，按数据分类选模式：详情类走 cache-aside，计数类可以考虑 write-behind，配置类适合 write-through。第二，先定一致性窗口，再选失效方案：能接受分钟级旧值就用 TTL 加删除重试，不能接受就上版本号或 binlog。第三，删除失败必须有重试，TTL 是最后一道防线，不是唯一防线。第四，容量按工作集估算并留出余量，淘汰策略与访问分布匹配。第五，穿透、击穿、雪崩各有一层防护，且都要能在 Redis 不可用时退化为“限流加默认值”。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>缓存设计不是选一个 Redis 实例，而是回答四个问题：数据放在哪一层、缓存什么粒度、何时让它失效、失效后如何防止回源放大。读写模式决定了责任边界，一致性方案决定了最坏窗口，三大防护决定了故障时的下限，容量与观测决定了这套系统能不能长期稳定。所有方案都是取舍，没有免费的强一致。落地时先量化业务能容忍的旧值窗口和数据库能承受的回源上限，再反过来选择缓存层级、失效手段与降级策略，比先选技术再找场景可靠得多。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://redis.io/docs/">Redis 官方文档</a></li>
+<li><a href="https://redis.io/docs/manual/eviction/">Redis 键过期与内存淘汰</a></li>
+<li><a href="https://redis.io/docs/manual/client-side-caching/">Redis 客户端缓存</a></li>
+<li><a href="https://docs.aws.amazon.com/whitepapers/latest/database-caching-strategies-using-redis/caching-patterns.html">AWS 数据库缓存策略：缓存模式</a></li>
+<li><a href="https://www.usenix.org/conference/nsdi13/technical-sessions/presentation/nishtala">Scaling Memcache at Facebook（NSDI 2013）</a></li>
+<li><a href="https://dl.acm.org/doi/10.1145/362686.362692">Space&#x2F;Time Trade-offs in Hash Coding with Allowable Errors（Bloom Filter 原始论文）</a></li>
+<li><a href="https://pkg.go.dev/golang.org/x/sync/singleflight">Go singleflight 包文档</a></li>
+<li><a href="https://dev.mysql.com/doc/refman/8.0/en/binary-log.html">MySQL 二进制日志文档</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>缓存设计与缓存一致性</p><p><a href="https://987763485.github.io/2022/12/31/缓存设计与缓存一致性/">https://987763485.github.io/2022/12/31/缓存设计与缓存一致性/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2022-12-31</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-19</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a><a class="link-muted mr-2" rel="tag" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/">架构设计</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2023/01/07/vLLM%E6%8E%A8%E7%90%86%E5%8A%A0%E9%80%9F%E5%AE%9E%E8%B7%B5/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">vLLM 推理加速实践</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2022/12/29/%E5%95%86%E7%94%A8%E5%AF%86%E7%A0%81%E5%BA%94%E7%94%A8%E5%AE%89%E5%85%A8%E6%80%A7%E8%AF%84%E4%BC%B0%E8%A6%81%E7%82%B9/"><span class="level-item">商用密码应用安全性评估要点</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

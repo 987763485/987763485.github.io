@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Agent 工作流编排对比 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="Agent 的能力上限由模型决定，但能不能上生产，往往由模型外面那层执行外壳决定。本文把常见的编排做法归成三种范式：代码式链、声明式图、状态机加事件，只在机制层面比较差别。对比给的是维度与自家 PoC 里的验证动作，不给排名结论。"><meta property="og:type" content="blog"><meta property="og:title" content="Agent 工作流编排对比"><meta property="og:url" content="https://987763485.github.io/2026/06/29/Agent%E5%B7%A5%E4%BD%9C%E6%B5%81%E7%BC%96%E6%8E%92%E5%AF%B9%E6%AF%94/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="Agent 的能力上限由模型决定，但能不能上生产，往往由模型外面那层执行外壳决定。本文把常见的编排做法归成三种范式：代码式链、声明式图、状态机加事件，只在机制层面比较差别。对比给的是维度与自家 PoC 里的验证动作，不给排名结论。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2026-06-28T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-20T17:19:07.905Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="大模型"><meta property="article:tag" content="python"><meta property="article:tag" content="agent"><meta property="article:tag" content="typescript"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2026/06/29/Agent%E5%B7%A5%E4%BD%9C%E6%B5%81%E7%BC%96%E6%8E%92%E5%AF%B9%E6%AF%94/"},"headline":"Agent 工作流编排对比","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2026-06-28T16:00:00.000Z","dateModified":"2026-10-20T17:19:07.905Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"Agent 的能力上限由模型决定，但能不能上生产，往往由模型外面那层执行外壳决定。本文把常见的编排做法归成三种范式：代码式链、声明式图、状态机加事件，只在机制层面比较差别。对比给的是维度与自家 PoC 里的验证动作，不给排名结论。"}</script><link rel="canonical" href="https://987763485.github.io/2026/06/29/Agent%E5%B7%A5%E4%BD%9C%E6%B5%81%E7%BC%96%E6%8E%92%E5%AF%B9%E6%AF%94/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2026-06-28T16:00:00.000Z" title="6/29/2026, 12:00:00 AM">2026-06-29</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></span><span class="level-item">27 分钟读完 (大约4072个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Agent 工作流编排对比</h1><nav class="series-nav" aria-label="系列文章导航"><div class="series-nav-meta"><i class="fas fa-book-open" aria-hidden="true"></i><span>本文属于《<a class="series-nav-title" href="/series/agent/">Agent 智能体开发</a>》第 17/55 篇</span></div><div class="series-nav-links"><a class="series-nav-link series-nav-prev" href="/2026/04/29/PiAgent%E6%A1%86%E6%9E%B6%E8%A7%A3%E6%9E%90/"><i class="fas fa-chevron-left" aria-hidden="true"></i><span>上一篇</span></a><a class="series-nav-link series-nav-index" href="/series/agent/">系列目录</a><a class="series-nav-link series-nav-next" href="/2026/07/18/Agent%E5%B7%A5%E5%85%B7%E5%8D%8F%E8%AE%AE%E6%A0%87%E5%87%86%E5%8C%96/"><span>下一篇</span><i class="fas fa-chevron-right" aria-hidden="true"></i></a></div></nav><div class="content"><p>Agent 的能力上限由模型决定，但能不能上生产，往往由模型外面那层执行外壳决定。本文把常见的编排做法归成三种范式：代码式链、声明式图、状态机加事件，只在机制层面比较差别。对比给的是维度与自家 PoC 里的验证动作，不给排名结论。</p>
+<h2 id="编排为什么值得单独谈"><a href="#编排为什么值得单独谈" class="headerlink" title="编排为什么值得单独谈"></a>编排为什么值得单独谈</h2><p>一次 Agent 调用看似只有一问一答，真实轨迹里却混着模型推理、工具调用、外部写入和人工等待。模型再强，它只在某一次请求里“活着”，请求一结束就什么都不剩。要持久化、能重放、可审计，靠的都是外面那层执行外壳：把每一步的输入输出落盘，能在进程被杀之后从中间状态接着跑。</p>
+<p>这也是编排值得和框架选型分开谈的原因。选型那条线在《Agent 框架对比与选型》里已经展开，本文不重复它的流程与维度清单。编排关心的是另一件事：控制流放在哪里，状态由谁持有，副作用由谁去重。</p>
+<p>划界口径：编排的最小闭环由 951 负责，LangGraph 的状态机写法由 771 负责，LangChain 链式用法由 839 与 862 负责，CrewAI 与 Eino 的用法由 994 和 943 负责；本文只谈范式的机制差别，不复述 API 与用法教程，也不给编排层的性能数字——吞吐、延迟、开销都高度依赖自家工具链。时间口径：本文写于 2026 年 6 月末，LangChain 与 LangGraph 都已在 1.x 当期版本线，OpenAI Agents SDK 仍是 0.x，CrewAI 与 AutoGen 偏多智能体协作的表达方式，Eino 更贴近 Go 服务端把编排做成组件管道的思路。</p>
+<p>外壳要跑在别人的运行时上：Node.js 26 还是 Current 线、尚未进入 LTS，24 才是 Active LTS；Go 侧当期是 1.26；PyTorch 2.12 可作为当期主线，但本文不把结论绑到它的某个特性上；再往下是 Kubernetes 1.36 的口径。</p>
+<h2 id="范式一：代码式链"><a href="#范式一：代码式链" class="headerlink" title="范式一：代码式链"></a>范式一：代码式链</h2><p>最朴素也最常见：整条流程就是一段宿主语言代码。Python 或 TypeScript 里写一个异步函数，循环调用模型，用条件判断走分支，用迭代消费工具结果，状态就是函数栈上的局部变量。</p>
+<p>优点全在工程熟悉度上。断点可以打在流程中间，异常用普通的捕获语句处理，类型检查器能在编辑期发现“上一步返回字符串、下一步当列表用”这类错误；子函数能在别的业务里复用，单元测试拿 mock 就能跑，任何后端工程师都能读，不需要先学一套图语法。</p>
+<p>缺点都集中在“以后才疼”。第一，状态活在内存里：进程一重启，跑了四十分钟的批处理就归零，要续跑得自己把中间变量序列化到外部存储，再自己判断哪些副作用已经做过。第二，可视化弱：给人看的流程图和运行时真正走的路径是两套东西。第三，非作者读不懂：链的形状藏在分支与闭包捕获里，接手的人要通读一遍才知道有几条路径。第四，人工介入要自己搭：停在某点等审批，等于把等待态外置到存储和队列里，本质是在手写一个状态机。</p>
+<p>代码式链在当期生态里活得很好：不少 1.x 的链式入口仍是宿主语言的组合子，把函数换成框架提供的可调用对象，检查点与并行的语义就一起继承下来。问题不在代码本身，而在于谁来替你持有状态。</p>
+<h2 id="范式二：声明式图与-DAG"><a href="#范式二：声明式图与-DAG" class="headerlink" title="范式二：声明式图与 DAG"></a>范式二：声明式图与 DAG</h2><p>第二种做法把节点和边显式写出来：节点是一件可命名的事，边是谁完成后谁才能开始，分支用条件边表达，汇聚用显式的 join 表达。流程的形状不再藏在控制流里，而是一份机器可读的定义。</p>
+<p>优点有三条。可检查：图定义能静态校验，孤立节点、不可达分支、意外的环、汇聚点上游不齐，都能在上线前报错。可并行：无依赖的分支可以并发调度，调度器看得到依赖，才谈得上把等待时间重叠起来。拓扑清晰：图本身就是文档，评审时讨论的是这条边该不该存在，而不是这段代码会走到哪一行。</p>
+<p>缺点也三条，容易在扩需求时才暴露。循环与动态分支别扭：迭代到满足验收条件为止这种需求，要么把环画进图里，要么在外层反复调用整张图，两者都在削弱“这是一张 DAG”的直觉；分支数量由运行期数据决定时，静态图无从下笔。图爆炸：路径数按组合增长，十几个节点的图还看得完，几十条真实路径就没人能看全。错误语义常被忽略：一个节点抛错时，同时在跑的其他分支是取消还是跑完、部分结果要不要保留，多数图定义里没写清楚。</p>
+<h2 id="范式三：状态机加事件"><a href="#范式三：状态机加事件" class="headerlink" title="范式三：状态机加事件"></a>范式三：状态机加事件</h2><p>第三种做法用两套词汇描述流程：一个有限的状态集合，加上一张“什么事件把哪个状态推到哪个状态”的迁移表，副作用只挂在迁移上，而不是挂在状态里。</p>
+<p>优点正好落在前两种范式的短处上。长时任务语义天然清楚：要等外部回调就停在等待态，进程可以随时退出，因为“现在在哪一步”是一行可落盘的数据，不是内存里的调用栈。人工介入有地方放：暂停态是一等公民，审批人的决定是事件。恢复语义也清楚：重启后读当前状态即可。</p>
+<p>暂停-审批-继续这条最常见的路径，用状态机表达是这样的：</p>
+<pre class="mermaid">stateDiagram-v2
+    [*] --> Running
+    Running --> Paused: 命中审批门
+    Paused --> Reviewing: 审批人领取
+    Reviewing --> Running: 通过并注入决定
+    Reviewing --> Blocked: 驳回
+    Blocked --> Running: 修正输入后重进
+    Running --> Done: 全部步骤完成
+    Done --> [*]</pre>
+
+<p>代价有两条。建模成本高：要把业务讲成状态和事件两套词汇，前期费时，状态划分一粗，迁移表就很难看。事件顺序与幂等要自己保证：消息重复投递、乱序到达，都得在迁移表里写明当前状态与事件不匹配就丢弃并记账，框架不会替你想这件事。</p>
+<h2 id="三种范式的三维对照"><a href="#三种范式的三维对照" class="headerlink" title="三种范式的三维对照"></a>三种范式的三维对照</h2><table>
+<thead>
+<tr>
+<th>对照维度</th>
+<th>代码式链</th>
+<th>声明式图与 DAG</th>
+<th>状态机加事件</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>控制流住在哪</td>
+<td>宿主语言的分支与循环</td>
+<td>一份图定义</td>
+<td>一张迁移表</td>
+</tr>
+<tr>
+<td>状态由谁持有</td>
+<td>进程内存里的局部变量</td>
+<td>运行时持有的共享状态对象</td>
+<td>外部存储中的当前状态行</td>
+</tr>
+<tr>
+<td>分支与汇聚</td>
+<td>自己写并发原语</td>
+<td>由依赖关系推导，join 需显式声明</td>
+<td>事件到达触发迁移，汇聚靠状态判断</td>
+</tr>
+<tr>
+<td>人工介入落点</td>
+<td>自己搭等待态</td>
+<td>由运行时提供的中断原语承担</td>
+<td>暂停本身就是一个状态</td>
+</tr>
+<tr>
+<td>停机后接着跑</td>
+<td>全部自己实现</td>
+<td>取决于运行时是否把每步落盘</td>
+<td>读状态行即可继续</td>
+</tr>
+</tbody></table>
+<p>这张表只描述机制归谁负责，不含优劣判断。真正的取舍要看下面五个维度，以及在自家 PoC 里能不能验出你要的行为。</p>
+<h2 id="五个对比维度与验证动作"><a href="#五个对比维度与验证动作" class="headerlink" title="五个对比维度与验证动作"></a>五个对比维度与验证动作</h2><p>第一个维度是检查点与恢复：能不能从中间状态续跑，恢复后副作用会不会重复。代码式链里检查点是一份额外的手工活；图范式里它是运行时的一项能力，能不能到节点粒度各家不同；状态机范式里它几乎等同于状态行，恢复最便宜，前提是状态划得够细。幂等键由编排层生成并随状态一起恢复，比业务代码自己拼键名可靠。验证动作：跑一条含三次外部写入的流程，在第二次写入后强杀进程再拉起，数写入总次数。</p>
+<p>第二个维度是并行与汇聚：分支能不能真并发、汇聚点语义是什么、部分失败怎么处理。代码式链自己搭并发，语义完全由你定义；图范式把依赖交给调度器，代价是汇聚规则常常写不清楚；状态机范式没有传统意义的汇聚，只有满足条件才迁移。验证动作：两条并行分支，一条快速失败，另一条按团队约定示例慢十秒，看外壳对慢的那条做了什么——保留、丢弃，还是整体失败，写成可重复的断言。</p>
+<p>第三个维度是人工介入：落点在哪一层，决定等待期间要不要占用计算资源。代码式链最省事的做法是阻塞等，代价是进程不能退出；图范式靠运行时的显式中断能力，等待态可以落盘；状态机范式里暂停是状态、审批结果是事件、审批门是迁移的前置条件，表达直白，但每条审批路径都要预先建模。验证动作：让一个审批请求排队一天，中间把服务重启两次，看通过后流程能否自动走下去。</p>
+<p>第四个维度是重放与可观测：同输入能不能复现，取决于你记了什么。要记渲染后发给模型的完整提示、工具调用的入参与返回、采样参数与随机性设置、每个分支决策依据的值。不一致分两层：模型调用本身有随机性，两次结果不同可以容忍；分支选择、工具入参、写入次数变了，说明编排层漏了记录。验证动作：留一份轨迹，隔一周用同一输入连跑两遍，逐步骤比对模型调用之外的记录。</p>
+<p>第五个维度是取消与超时：取消是不是一条真信号，能不能传播到工具和子任务。代码式链里取消依赖语言自身的机制，能否穿透到工具实现全看运气；图范式要在节点级声明取消与超时的传播规则，否则父流程已退出、远端作业还在跑；状态机范式可以把取消建模成事件，让每个状态回答收到它该去哪个状态。验证动作：给一个会提交远端异步作业的工具发取消，看远端是被撤销还是继续推进，再看归属标识能否穿过重启被找回来；字段名本文自拟，叫它 owner_step。</p>
+<p>五个维度都不必参考外部评测，全部能在自家 PoC 里跑出来；一套编排在任意一点上说不清自己的行为，功能清单再长也不必细看。</p>
+<h2 id="迁移成本与锁定"><a href="#迁移成本与锁定" class="headerlink" title="迁移成本与锁定"></a>迁移成本与锁定</h2><p>锁定不是一句“换框架很麻烦”，而是三样东西各自有多难搬。图定义最不锁定：它描述形状，语言中性，搬出去通常只是换一种表达格式；但分支条件一旦写成某运行时的表达式，或者宿主函数被直接嵌进节点，形状就跟着私有语义走了。状态 schema 最难搬：它带的远超形状，还有检查点的编码方式、历史是覆盖还是累积、并发写入怎么合并，这些语义在文档里常常只有一句话，落到实现里全是细节。工具绑定居中：接口这层被 MCP 标准化了不少，当前可用口径是 2025-11-25 修订；官方已给出下一轮修订的 RC，方向包括把异步任务归入扩展、增加发现类方法、简化会话与初始化握手、强化授权服务器校验、以元数据文档取代动态注册、把旧的 HTTP+SSE 传输与部分能力列入废弃并给出约 12 个月的移除窗口。这是草案，可能变动，本文不把它当作已生效结论，也不写端点拼写与字段名；再往后那一轮修订在本文日期尚未生效，不能当已发布引用。智能体边界另有 A2A v1.0.0 与 v1.0.1 两条已发布规格，能力包这层有 2025-10-16 的 Agent Skills，治理归属写在 2025-12-09 的公告里。</p>
+<p>把退出成本当成选型维度，做法是一次反向 PoC：让最小流程把图定义、状态 schema 与工具绑定导出成纯文本，再用另一套宿主代码读回来、跑同一条轨迹并比对结果。导不出来或读回来跑不通的那部分，就是锁定的确切位置。</p>
+<h2 id="判定表：任务形态与范式"><a href="#判定表：任务形态与范式" class="headerlink" title="判定表：任务形态与范式"></a>判定表：任务形态与范式</h2><p>下表只做形态与范式的对应，判断依据是前面五个维度里你愿不愿意自己实现，不出现任何产品名做推荐结论。</p>
+<table>
+<thead>
+<tr>
+<th>任务形态</th>
+<th>更合适的范式</th>
+<th>关键判断点</th>
+<th>还要补的东西</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>对话式单工具</td>
+<td>代码式链</td>
+<td>一次会话内完成，不需跨进程续跑</td>
+<td>调用轨迹落盘</td>
+</tr>
+<tr>
+<td>长时批处理</td>
+<td>状态机加事件</td>
+<td>中间状态要扛得住重启与排队</td>
+<td>事件幂等与乱序处理</td>
+</tr>
+<tr>
+<td>审批密集流程</td>
+<td>状态机加事件</td>
+<td>等待以天计，不该占用计算资源</td>
+<td>审批人与状态的对应关系</td>
+</tr>
+<tr>
+<td>探索式规划</td>
+<td>代码式链打底，外层套图</td>
+<td>分支由运行期数据决定，形状事先写不出</td>
+<td>分支决策依据的记录</td>
+</tr>
+<tr>
+<td>多智能体协作</td>
+<td>声明式图做骨架，节点内允许代码式</td>
+<td>交接点多，固定拓扑比自由调用好审</td>
+<td>节点级错误与汇聚语义</td>
+</tr>
+</tbody></table>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>三种范式的差别，本质是责任归属的差别：状态归谁持有、并行由谁调度、暂停落在哪一层、取消由谁传播。任务形态决定你更愿意自己扛哪一层责任，这跟用哪个库没有关系。想看外壳的隔离与评测视角，可以读 Anthropic 工程栏目的 how we contain Claude、managed agents 与 agent evals 三篇，本文只给标题与栏目。本文只给维度与验证动作，不给排名：任何一条维度，都能在自家 PoC 里用半天验出来。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Agent 工作流编排对比</p><p><a href="https://987763485.github.io/2026/06/29/Agent工作流编排对比/">https://987763485.github.io/2026/06/29/Agent工作流编排对比/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2026-06-29</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-21</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="link-muted mr-2" rel="tag" href="/tags/python/">python</a><a class="link-muted mr-2" rel="tag" href="/tags/agent/">agent</a><a class="link-muted mr-2" rel="tag" href="/tags/typescript/">typescript</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2026/07/04/%E7%AB%AF%E4%BE%A7Agent%E4%B8%8E%E6%9C%AC%E5%9C%B0%E6%8E%A8%E7%90%86/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">端侧 Agent 与本地推理</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2026/06/24/Agent%E8%AF%84%E6%B5%8B%E4%B8%8E%E5%9F%BA%E5%87%86%E6%B5%8B%E8%AF%95/"><span class="level-item">Agent 评测与基准测试</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>PostgreSQL 主从与备份 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="“主从复制”和“备份”经常被当成同一件事，但前者只能在一台机器故障时顶上，后者才决定误删数据之后还能不能回来。本文从 WAL 讲起，依次拆解逻辑备份、物理备份、流复制、同步复制与 PITR 的原理和命令，并给出一套可以落地的备份策略与演练清单。文中示例基于 PostgreSQL 12，配置与命令都可以直接照抄到测试环境验证。"><meta property="og:type" content="blog"><meta property="og:title" content="PostgreSQL 主从与备份"><meta property="og:url" content="https://987763485.github.io/2020/09/23/PostgreSQL%E4%B8%BB%E4%BB%8E%E4%B8%8E%E5%A4%87%E4%BB%BD/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="“主从复制”和“备份”经常被当成同一件事，但前者只能在一台机器故障时顶上，后者才决定误删数据之后还能不能回来。本文从 WAL 讲起，依次拆解逻辑备份、物理备份、流复制、同步复制与 PITR 的原理和命令，并给出一套可以落地的备份策略与演练清单。文中示例基于 PostgreSQL 12，配置与命令都可以直接照抄到测试环境验证。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2020-09-23T10:23:56.000Z"><meta property="article:modified_time" content="2026-10-18T15:04:25.902Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="后端开发"><meta property="article:tag" content="数据库"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2020/09/23/PostgreSQL%E4%B8%BB%E4%BB%8E%E4%B8%8E%E5%A4%87%E4%BB%BD/"},"headline":"PostgreSQL 主从与备份","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2020-09-23T10:23:56.000Z","dateModified":"2026-10-18T15:04:25.902Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"“主从复制”和“备份”经常被当成同一件事，但前者只能在一台机器故障时顶上，后者才决定误删数据之后还能不能回来。本文从 WAL 讲起，依次拆解逻辑备份、物理备份、流复制、同步复制与 PITR 的原理和命令，并给出一套可以落地的备份策略与演练清单。文中示例基于 PostgreSQL 12，配置与命令都可以直接照抄到测试环境验证。"}</script><link rel="canonical" href="https://987763485.github.io/2020/09/23/PostgreSQL%E4%B8%BB%E4%BB%8E%E4%B8%8E%E5%A4%87%E4%BB%BD/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2020-09-23T10:23:56.000Z" title="9/23/2020, 6:23:56 PM">2020-09-23</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></span><span class="level-item">1 小时读完 (大约8706个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">PostgreSQL 主从与备份</h1><div class="content"><p>“主从复制”和“备份”经常被当成同一件事，但前者只能在一台机器故障时顶上，后者才决定误删数据之后还能不能回来。本文从 WAL 讲起，依次拆解逻辑备份、物理备份、流复制、同步复制与 PITR 的原理和命令，并给出一套可以落地的备份策略与演练清单。文中示例基于 PostgreSQL 12，配置与命令都可以直接照抄到测试环境验证。</p>
+<h2 id="备份与复制：两件常被混淆的事"><a href="#备份与复制：两件常被混淆的事" class="headerlink" title="备份与复制：两件常被混淆的事"></a>备份与复制：两件常被混淆的事</h2><h3 id="复制保证可用性"><a href="#复制保证可用性" class="headerlink" title="复制保证可用性"></a>复制保证可用性</h3><p>流复制的本质，是主库把产生的 WAL 记录持续发送给备库，备库按顺序重放。它解决的问题是“主库所在的那台机器挂了，服务还能不能继续”：备库随时处于可以接管的接近最新状态，切换之后业务只丢失很少的数据。很多团队还会让备库承担只读查询、报表和备份源，从而分担主库压力。</p>
+<p>但复制是“忠实”的：主库上一条没有条件的 <code>DELETE</code>、一次错误的表结构变更，都会作为 WAL 原样传到备库并被重放。复制会把逻辑错误一起复制过去，保护不了数据本身。</p>
+<h3 id="备份保证可回溯"><a href="#备份保证可回溯" class="headerlink" title="备份保证可回溯"></a>备份保证可回溯</h3><p>备份是某一时刻的数据副本，配合归档 WAL，可以回到过去任意时间点。误删表、批量更新写错条件、程序写入脏数据，只能靠备份加 PITR 解决；机房断电、阵列损坏，同样需要一份放在别处的副本。</p>
+<p>两者保护的目标不同，可用下表概括。表中 RPO（允许丢失的数据窗口）与 RTO（恢复耗时）都是设计目标，须由业务方确认并通过演练验证。</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>流复制</th>
+<th>备份 + WAL 归档</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>保护对象</td>
+<td>主机、实例级故障</td>
+<td>逻辑错误、误操作、灾难</td>
+</tr>
+<tr>
+<td>数据回退</td>
+<td>不能回退，只能向前重放</td>
+<td>可以回到任意时间点</td>
+</tr>
+<tr>
+<td>RPO 目标</td>
+<td>同步模式下接近零</td>
+<td>取决于归档与基础备份周期</td>
+</tr>
+<tr>
+<td>RTO 目标</td>
+<td>分钟级，取决于切换流程</td>
+<td>小时级，取决于数据量与演练</td>
+</tr>
+<tr>
+<td>典型用途</td>
+<td>高可用、读写分离</td>
+<td>合规、误操作恢复、迁移</td>
+</tr>
+</tbody></table>
+<h3 id="一套典型拓扑"><a href="#一套典型拓扑" class="headerlink" title="一套典型拓扑"></a>一套典型拓扑</h3><p>下图是一个常见的小型生产拓扑：一主两从，其中一台同步、一台异步，WAL 持续归档到独立存储，基础备份也落在独立主机上。本文后续的配置都围绕这张图展开。</p>
+<pre class="mermaid">flowchart LR
+  C[应用客户端] --> P[primary 主库]
+  P -->|流复制 WAL| S1[standby 1 同步]
+  P -->|流复制 WAL| S2[standby 2 异步]
+  P -->|archive_command| A[WAL 归档存储]
+  P -->|pg_basebackup| B[备份主机]
+  A --> B</pre>
+
+<p>需要强调的是，备库不能放在与主库同一台物理机、同一个存储卷上。否则主机宕机时主备一起消失，这套拓扑就退化成了“只有复制、没有冗余”。</p>
+<h2 id="WAL：复制与备份共同的底座"><a href="#WAL：复制与备份共同的底座" class="headerlink" title="WAL：复制与备份共同的底座"></a>WAL：复制与备份共同的底座</h2><h3 id="预写日志的基本原理"><a href="#预写日志的基本原理" class="headerlink" title="预写日志的基本原理"></a>预写日志的基本原理</h3><p>PostgreSQL 修改数据时，并不会立刻把数据页写回磁盘，而是先把“改了什么”追加到 WAL（Write-Ahead Log）中，等事务提交时确保 WAL 已经落盘，数据页则可以延迟到检查点时再刷写。这样做有两个好处：提交只需要顺序写日志，性能远好于随机写数据页；崩溃之后可以用 WAL 把没来得及刷盘的数据页重放出来，保证已提交事务不丢。</p>
+<p>这条规则被称为“先写日志、再写数据”，也是复制与 PITR 的基础：拿到完整的 WAL 序列，就能在另一台机器重建出一致的数据状态。WAL 在磁盘上被切分成固定大小的段文件，默认每个 16 MB，放在数据目录的 <code>pg_wal</code> 子目录中（PostgreSQL 10 之前叫 <code>pg_xlog</code>）。每条 WAL 记录都有一个 LSN（Log Sequence Number），可以理解为“日志中的字节偏移”，它是判断复制进度、指定恢复目标的通用坐标。</p>
+<h3 id="wal-level：决定-WAL-里有多少信息"><a href="#wal-level：决定-WAL-里有多少信息" class="headerlink" title="wal_level：决定 WAL 里有多少信息"></a>wal_level：决定 WAL 里有多少信息</h3><p><code>wal_level</code> 控制 WAL 记录的信息量，直接决定了这个实例能做什么：</p>
+<ul>
+<li><code>minimal</code>：只记录崩溃恢复必需的信息，无法用于归档恢复，也无法支撑复制。</li>
+<li><code>replica</code>：默认值，额外记录足够让备库重放的信息，流复制、<code>pg_basebackup</code>、WAL 归档都需要至少这一级别。</li>
+<li><code>logical</code>：在 <code>replica</code> 基础上增加逻辑解码所需的信息，供逻辑复制或变更捕获使用，WAL 体积也最大。</li>
+</ul>
+<p>换句话说，只要打算做主从或者 PITR，就不能停留在 <code>minimal</code>。修改 <code>wal_level</code> 需要重启实例；而 <code>max_wal_senders</code>、<code>wal_keep_segments</code> 这类参数虽然可以动态调整，也建议在配置文件中固化下来。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"># postgresql.conf 中与 WAL 相关的最小配置</span><br><span class="line">wal_level = replica</span><br><span class="line">max_wal_senders = 10</span><br><span class="line">wal_keep_segments = 512</span><br><span class="line">archive_mode = on</span><br><span class="line">archive_command = &#x27;test ! -f /data/wal_archive/%f &amp;&amp; cp %p /data/wal_archive/%f&#x27;</span><br></pre></td></tr></table></figure>
+
+<h3 id="归档：把-WAL-从“临时文件”变成“历史”"><a href="#归档：把-WAL-从“临时文件”变成“历史”" class="headerlink" title="归档：把 WAL 从“临时文件”变成“历史”"></a>归档：把 WAL 从“临时文件”变成“历史”</h3><p>WAL 段在正常情况下会被循环复用，旧段一旦不再需要就会被删除。如果不做归档，那么基础备份之后产生的 WAL 迟早会被覆盖，PITR 就成了空谈。<code>archive_mode = on</code> 让 PostgreSQL 在切换 WAL 段时调用 <code>archive_command</code>，把完成的段文件复制到归档目录；<code>restore_command</code> 则在恢复时从归档目录把需要的段取回来。</p>
+<p><code>archive_command</code> 的约定很简单：把 <code>%p</code> 指定的文件放到目标位置，成功返回 0，失败返回非 0。返回非 0 时 PostgreSQL 会不断重试，并保留该段不删除，直到归档成功。上面那条命令用 <code>test ! -f</code> 做了幂等保护，避免重复拷贝同一个文件时报错。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"># 恢复时从归档目录取 WAL，%f 是文件名，%p 是目标路径</span><br><span class="line">restore_command = &#x27;cp /data/wal_archive/%f %p&#x27;</span><br></pre></td></tr></table></figure>
+
+<p>归档必须被监控，原因在于它是“静默失败”的典型：<code>archive_command</code> 失败不会让主库停止写入，业务毫无感知，但归档目录里已经出现空洞。等真正需要恢复时才发现缺了某一段 WAL，恢复只能停在那里。因此 <code>pg_stat_archiver</code> 中的失败计数、最后一次成功归档的文件名与时间，应当纳入日常巡检；归档目录所在磁盘的剩余空间也要设置告警。</p>
+<p>还有一个容易被忘记的细节：归档只在 WAL 段写满并切换时触发。业务写入很少的库，一个 16 MB 的段可能几小时都写不满，归档也就迟迟不推进，RPO 被悄悄拉长。此时应设置 <code>archive_timeout</code>，比如 300 秒，强制周期性切换，代价是会归档一些只写了一半的段文件。</p>
+<h2 id="两种备份路线：逻辑与物理"><a href="#两种备份路线：逻辑与物理" class="headerlink" title="两种备份路线：逻辑与物理"></a>两种备份路线：逻辑与物理</h2><p>PostgreSQL 提供两条完全不同的备份路线，理解它们的差别，比记住命令更重要。逻辑备份导出的是“数据与结构的描述”，物理备份复制的是“数据目录的字节”。前者像导出一份 SQL 脚本，后者像给整个实例拍一张快照。</p>
+<h3 id="逻辑备份：pg-dump-与-pg-dumpall"><a href="#逻辑备份：pg-dump-与-pg-dumpall" class="headerlink" title="逻辑备份：pg_dump 与 pg_dumpall"></a>逻辑备份：pg_dump 与 pg_dumpall</h3><p><code>pg_dump</code> 针对单个数据库工作。它在一个事务里取到一致性快照（可重复读级别），因此即使备份期间业务仍在写入，导出的数据也对应同一个时间点，不会出现“订单表是十点的、明细表是十点零五的”这种撕裂。备份过程只持有 <code>ACCESS SHARE</code> 锁，普通的增删改不会被阻塞，但 <code>ALTER TABLE</code>、<code>DROP TABLE</code> 这类需要排他锁的 DDL 会被挡住，所以大库导出应避开变更窗口。</p>
+<p>它的输出格式值得仔细选择：</p>
+<ul>
+<li><code>-Fp</code>（plain）：纯 SQL 文本，可以用 <code>psql</code> 直接灌入，便于人工查看和局部修改，但不支持并行恢复。</li>
+<li><code>-Fc</code>（custom）：自定义归档，压缩、支持 <code>pg_restore</code> 选择性恢复，是单库备份的常用选择。</li>
+<li><code>-Fd</code>（directory）：目录格式，每个表一个文件，配合 <code>-j</code> 可以并行导出与并行恢复，大库首选。</li>
+<li><code>-Ft</code>（tar）：打包成 tar，便于传输，但灵活性不如目录格式。</li>
+</ul>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 目录格式导出，4 个并行 worker</span></span><br><span class="line">pg_dump -h 10.0.0.11 -U postgres -Fd -j 4 \</span><br><span class="line">  -f /backup/appdb_20200923 appdb</span><br><span class="line"></span><br><span class="line"><span class="comment"># 恢复：目录格式才支持 -j 并行；--no-owner 便于恢复到不同属主的环境</span></span><br><span class="line">pg_restore -h 10.0.0.21 -U postgres -d appdb -j 4 --no-owner \</span><br><span class="line">  /backup/appdb_20200923</span><br><span class="line"></span><br><span class="line"><span class="comment"># 只恢复某张表：先 -l 列出目录，再用 -L 指定</span></span><br><span class="line">pg_restore -l /backup/appdb_20200923 &gt; /tmp/toc.list</span><br></pre></td></tr></table></figure>
+
+<p><code>pg_dump</code> 不负责全局对象：角色、表空间这些跨数据库的对象由 <code>pg_dumpall</code> 导出。<code>pg_dumpall</code> 本质上是对每个库轮流调用 <code>pg_dump</code>，再加上全局对象的导出，因此它不能并行，库多时很慢。实践中通常用 <code>--globals-only</code> 单独备份角色与表空间定义，再对各库分别做目录格式导出。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 全局对象单独备份，恢复时先于各库执行</span></span><br><span class="line">pg_dumpall -h 10.0.0.11 -U postgres --globals-only -f /backup/globals.sql</span><br></pre></td></tr></table></figure>
+
+<p>逻辑备份的局限也很明确：数据量大时导出与恢复都以小时计，恢复要重建索引与约束，耗时是导出的数倍；它只能回到导出那一刻，无法做时间点恢复；导出期间若有长事务，快照被拖住，WAL 也无法回收。因此它适合作为第二道防线与迁移手段，而非唯一手段。</p>
+<h3 id="物理基础备份：pg-basebackup"><a href="#物理基础备份：pg-basebackup" class="headerlink" title="物理基础备份：pg_basebackup"></a>物理基础备份：pg_basebackup</h3><p>物理备份复制整个数据目录，外加备份期间产生的 WAL，得到一个“解压即可启动”的实例副本。<code>pg_basebackup</code> 是最常用的工具，它通过复制协议连接主库，不需要登录主机拷文件。</p>
+<p>使用它有几个前提：主库 <code>wal_level</code> 至少为 <code>replica</code>，<code>max_wal_senders</code> 大于零，连接账号具备 <code>REPLICATION</code> 权限（或为超级用户），并且 <code>pg_hba.conf</code> 中放行了 <code>replication</code> 类型的连接。少了任何一条，备份都会在第一步失败。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 在主库上创建专用的复制角色与物理复制槽</span></span><br><span class="line"><span class="keyword">CREATE</span> ROLE repl <span class="keyword">WITH</span> REPLICATION LOGIN PASSWORD <span class="string">&#x27;change-me&#x27;</span>;</span><br><span class="line"><span class="keyword">SELECT</span> pg_create_physical_replication_slot(<span class="string">&#x27;backup_slot&#x27;</span>);</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 备份主机上执行：tar + gzip，流式传输 WAL，显示进度</span></span><br><span class="line">pg_basebackup -h 10.0.0.11 -U repl -D /backup/base_20200923 \</span><br><span class="line">  -Ft -z -P --checkpoint=fast --wal-method=stream -S backup_slot</span><br></pre></td></tr></table></figure>
+
+<p>这里每个参数都有理由。<code>-Ft -z</code> 输出 <code>base.tar.gz</code> 与 <code>pg_wal.tar.gz</code>，便于归档和校验；<code>-P</code> 打印进度，长备份没有进度会让人怀疑是不是卡死了；<code>--checkpoint=fast</code> 立即触发检查点，而不是等待下一个周期，能显著缩短备份窗口；<code>--wal-method=stream</code> 在备份同时另开一条连接流式接收 WAL，保证备份期间产生的日志不缺失；<code>-S</code> 指定复制槽，让主库在备份期间保留所需 WAL。最后一点尤其关键：一次几百 GB 的备份可能跑上一小时，如果没有复制槽，主库在此期间切换掉的 WAL 段可能已被删除，备份就会在结束时失败。</p>
+<p>物理备份的恢复很简单：解包到数据目录，修正属主与权限，启动实例。目录权限必须严格，数据目录通常为 <code>0700</code>，属主为运行 PostgreSQL 的系统用户，否则实例会拒绝启动。这也是备份文件需要加密的原因之一：<code>base.tar.gz</code> 里就是全部数据，谁拿到谁就能读。</p>
+<h3 id="两条路线怎么配合"><a href="#两条路线怎么配合" class="headerlink" title="两条路线怎么配合"></a>两条路线怎么配合</h3><p>逻辑备份解决“拿回一张表、迁到另一个版本”，物理备份解决“整个实例快速回来、配合 WAL 做 PITR”。成熟做法是两者都用：日常以物理基础备份加 WAL 归档为主，周期性补一份逻辑导出，用于对抗物理文件损坏与误删表。只做逻辑备份，TB 级数据库的恢复时间不可接受；只做物理备份，找回一张表也要恢复整个实例。</p>
+<h2 id="搭建流复制"><a href="#搭建流复制" class="headerlink" title="搭建流复制"></a>搭建流复制</h2><p>流复制的搭建可以拆成四步：主库准备、备库取基础备份、备库写恢复配置、启动并验证。PostgreSQL 12 在这里有一个必须注意的变化：<code>recovery.conf</code> 已被移除，备库身份由数据目录中的 <code>standby.signal</code> 文件表示，恢复相关参数直接写进 <code>postgresql.conf</code> 或 <code>postgresql.auto.conf</code>。照着 11 及更早版本的教程操作，会在启动时报“<code>recovery.conf</code> 不被支持”之类的错误。</p>
+<h3 id="主库准备"><a href="#主库准备" class="headerlink" title="主库准备"></a>主库准备</h3><p>主库需要满足前面提到的复制前提，并在 <code>pg_hba.conf</code> 中为备库网段放行复制连接：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"># postgresql.conf</span><br><span class="line">wal_level = replica</span><br><span class="line">max_wal_senders = 10</span><br><span class="line">wal_keep_segments = 512</span><br><span class="line">hot_standby = on</span><br><span class="line"></span><br><span class="line"># pg_hba.conf</span><br><span class="line">host    replication    repl    10.0.0.0/24    md5</span><br></pre></td></tr></table></figure>
+
+<p><code>wal_keep_segments</code> 是保险：即便不用复制槽，主库也保留这么多段 WAL 供备库追赶。固定段数覆盖不了长时间断连，但能避免网络抖动导致备库重做基础备份。</p>
+<h3 id="备库初始化与配置"><a href="#备库初始化与配置" class="headerlink" title="备库初始化与配置"></a>备库初始化与配置</h3><p>在备库主机上用 <code>pg_basebackup</code> 拉取一份基础备份，<code>-R</code> 会自动生成 <code>standby.signal</code> 并把连接信息写入 <code>postgresql.auto.conf</code>：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 备库数据目录必须为空</span></span><br><span class="line">pg_basebackup -h 10.0.0.11 -U repl -D /var/lib/postgresql/12/main \</span><br><span class="line">  -P --checkpoint=fast --wal-method=stream \</span><br><span class="line">  -S standby1_slot -R</span><br></pre></td></tr></table></figure>
+
+<p>如果使用复制槽，需要先在主库创建同名物理槽。<code>-R</code> 写入的内容大致等价于下面两行，理解它们比依赖自动生成更重要：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"># postgresql.conf（或 postgresql.auto.conf）</span><br><span class="line">primary_conninfo = &#x27;host=10.0.0.11 port=5432 user=repl password=change-me application_name=standby1&#x27;</span><br><span class="line">primary_slot_name = &#x27;standby1_slot&#x27;</span><br><span class="line">hot_standby = on</span><br></pre></td></tr></table></figure>
+
+<p><code>primary_conninfo</code> 中的 <code>application_name</code> 会显示在主库的 <code>pg_stat_replication</code> 里，多台备库时一定要区分开，否则排障时根本不知道哪台延迟了。<code>hot_standby = on</code> 允许备库接受只读查询，这也是读写分离的基础。</p>
+<h3 id="启动与验证"><a href="#启动与验证" class="headerlink" title="启动与验证"></a>启动与验证</h3><p>启动备库后，它会进入恢复模式，不断接收并重放 WAL。验证分两头看：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 主库：每个备库的状态，state 为 streaming 才算正常</span></span><br><span class="line"><span class="keyword">SELECT</span> application_name, state, sync_state,</span><br><span class="line">       sent_lsn, write_lsn, flush_lsn, replay_lsn</span><br><span class="line"><span class="keyword">FROM</span> pg_stat_replication;</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 备库：接收端状态与已接收位置</span></span><br><span class="line"><span class="keyword">SELECT</span> status, sender_host, slot_name, received_lsn</span><br><span class="line"><span class="keyword">FROM</span> pg_stat_wal_receiver;</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 备库只读验证</span></span><br><span class="line"><span class="keyword">SELECT</span> pg_is_in_recovery();  <span class="comment">-- 应返回 t</span></span><br></pre></td></tr></table></figure>
+
+<p><code>state</code> 为 <code>streaming</code> 表示 WAL 正在持续传输；<code>catchup</code> 说明备库还在追赶历史日志，属正常过渡；为空则连接未建立，应检查 <code>pg_hba.conf</code>、密码文件与网络。<code>pg_is_in_recovery()</code> 返回 <code>t</code> 是备库标志，提升后变成 <code>f</code>，在脚本里判断角色很方便。</p>
+<h2 id="同步复制与它的代价"><a href="#同步复制与它的代价" class="headerlink" title="同步复制与它的代价"></a>同步复制与它的代价</h2><p>默认的流复制是异步的：主库把 WAL 写进本地日志就向客户端返回提交成功，至于备库有没有收到，主库并不等待。这样做性能最好，但主库突然断电时，那些“已提交但还没传到备库”的事务就丢了。同步复制要解决的正是这个窗口。</p>
+<h3 id="两个参数的分工"><a href="#两个参数的分工" class="headerlink" title="两个参数的分工"></a>两个参数的分工</h3><p>配置同步复制只涉及两个参数，但它们的作用点不同：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"># 主库：声明哪些备库算同步备库</span><br><span class="line">synchronous_standby_names = &#x27;ANY 1 (standby1, standby2)&#x27;</span><br><span class="line"></span><br><span class="line"># 主库：声明提交要等到哪一步才算完成</span><br><span class="line">synchronous_commit = on</span><br></pre></td></tr></table></figure>
+
+<p><code>synchronous_standby_names</code> 决定“等谁”，<code>synchronous_commit</code> 决定“等到什么程度”。备库是否同步，是按 <code>application_name</code> 匹配的，名字写错是最常见的配置失效原因——主库会安静地退回异步，<code>pg_stat_replication</code> 里 <code>sync_state</code> 显示 <code>async</code>，一切看起来都正常。</p>
+<p><code>sync_state</code> 有几个取值：<code>sync</code> 表示当前同步备库，<code>potential</code> 表示在候选列表中但尚未成为同步备库，<code>quorum</code> 表示按法定人数计入，<code>async</code> 表示完全不参与同步。用 <code>ANY 1 (standby1, standby2)</code> 时，两台都会显示 <code>quorum</code>，任意一台确认即可。</p>
+<h3 id="synchronous-commit-的五个级别"><a href="#synchronous-commit-的五个级别" class="headerlink" title="synchronous_commit 的五个级别"></a>synchronous_commit 的五个级别</h3><p>这个参数控制提交返回前必须完成的工作，级别越高越安全，延迟也越大：</p>
+<table>
+<thead>
+<tr>
+<th>取值</th>
+<th>提交返回前保证</th>
+<th>典型场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>off</code></td>
+<td>只写入本地 WAL 缓冲区，不等落盘</td>
+<td>批量导入、可重跑的任务</td>
+</tr>
+<tr>
+<td><code>local</code></td>
+<td>本地 WAL 已落盘</td>
+<td>只保证本地持久化</td>
+</tr>
+<tr>
+<td><code>remote_write</code></td>
+<td>备库已写入其操作系统缓存</td>
+<td>折中方案，备库崩溃仍可能丢</td>
+</tr>
+<tr>
+<td><code>on</code></td>
+<td>备库已把 WAL 刷到磁盘</td>
+<td>默认值，多数同步复制场景</td>
+</tr>
+<tr>
+<td><code>remote_apply</code></td>
+<td>备库已重放，只读查询可见</td>
+<td>要求读己之写的一致性场景</td>
+</tr>
+</tbody></table>
+<p><code>on</code> 是默认值，但只有配置了同步备库才真正产生等待效果；没有同步备库时它与 <code>local</code> 等价。<code>remote_apply</code> 还要等备库重放完成，遇到长查询时延迟明显上升。</p>
+<h3 id="为什么同步复制会拖住主库"><a href="#为什么同步复制会拖住主库" class="headerlink" title="为什么同步复制会拖住主库"></a>为什么同步复制会拖住主库</h3><p>同步复制的本质是把“提交”的完成条件外包给了另一台机器。如果 <code>synchronous_standby_names = &#39;standby1&#39;</code>，而 <code>standby1</code> 恰好宕机、网络中断或者重放卡住，主库上所有写事务都会停在提交点等待，连接池很快被占满，业务表现为“数据库没挂，但什么都写不进去”。这不是 bug，而是同步复制用可用性换一致性的必然结果。</p>
+<p>缓解手段有三条。第一，配置两个同步候选并用 <code>ANY 1</code>，只要一台健康就能提交，相当于“法定人数”模式。第二，为等待设置上限，用 <code>statement_timeout</code> 或应用侧超时尽早暴露问题，并准备好把 <code>synchronous_standby_names</code> 置空、降级为异步的预案——这是明确的取舍，须由业务方拍板。第三，监控 <code>sync_state</code> 与延迟，备库掉线立即告警。</p>
+<p>还要澄清一个常见误解：同步复制不等于绝对不丢数据。它保证的是“至少一台备库确认”，如果主备同时故障、备库磁盘缓存撒谎，或者运维在故障时误操作，数据仍可能丢失。它把窗口缩到很小，但不能替代备份。</p>
+<h2 id="PITR：把数据库倒回某个时刻"><a href="#PITR：把数据库倒回某个时刻" class="headerlink" title="PITR：把数据库倒回某个时刻"></a>PITR：把数据库倒回某个时刻</h2><p>PITR（Point-In-Time Recovery，时间点恢复）是备份体系的皇冠：以基础备份为起点，用归档 WAL 一路重放，可在任意时刻停下。它对付的不是硬件故障，而是“数据被改坏、实例还活着”这类事故。</p>
+<h3 id="原理与前提"><a href="#原理与前提" class="headerlink" title="原理与前提"></a>原理与前提</h3><p>恢复过程可以分成两段：先把基础备份解包，得到一个“备份结束那一刻”的实例；然后从归档中依次取 WAL 段重放，直到达到指定的目标。目标可以是一个时间点、一个 LSN、一个事务 ID，或者一个命名还原点。</p>
+<pre class="mermaid">flowchart LR
+  B[基础备份 T0] --> R[重放归档 WAL]
+  R --> T1[目标时刻 T1]
+  T1 --> P[提升为主库]
+  E[误操作时刻 T2] -.->|不回放| X[丢弃]</pre>
+
+<p>这套机制成立有三个硬前提：基础备份必须早于目标时刻；从备份结束到目标时刻之间的 WAL 必须完整归档、没有缺口；恢复使用的程序版本与系统架构要和备份时一致。缺任何一条，恢复都会停在半路。</p>
+<h3 id="一次完整的恢复演练"><a href="#一次完整的恢复演练" class="headerlink" title="一次完整的恢复演练"></a>一次完整的恢复演练</h3><p>假设 9 月 23 日 14:05，有人误执行了一条没有条件的删除，13:00 之前的数据是好的。基础备份是当天凌晨 2 点做的，WAL 一直正常归档。恢复步骤如下。</p>
+<p>第一步，停库并保护现场。不要直接删除旧数据目录，把它改名保留，万一恢复目标选错还有退路。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">pg_ctl -D /var/lib/postgresql/12/main stop -m fast</span><br><span class="line"><span class="built_in">mv</span> /var/lib/postgresql/12/main /var/lib/postgresql/12/main.broken</span><br><span class="line"></span><br><span class="line"><span class="built_in">mkdir</span> -p /var/lib/postgresql/12/main</span><br><span class="line">tar -xzf /backup/base_20200923/base.tar.gz -C /var/lib/postgresql/12/main</span><br><span class="line">tar -xzf /backup/base_20200923/pg_wal.tar.gz -C /var/lib/postgresql/12/main/pg_wal</span><br><span class="line"><span class="built_in">chown</span> -R postgres:postgres /var/lib/postgresql/12/main</span><br><span class="line"><span class="built_in">chmod</span> 700 /var/lib/postgresql/12/main</span><br></pre></td></tr></table></figure>
+
+<p>第二步，配置恢复参数并放置 <code>recovery.signal</code>。这个信号文件告诉实例“启动时进入归档恢复”，与备库使用的 <code>standby.signal</code> 是两回事，两者不能同时存在。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"># postgresql.conf</span><br><span class="line">restore_command = &#x27;cp /data/wal_archive/%f %p&#x27;</span><br><span class="line">recovery_target_time = &#x27;2020-09-23 14:00:00+08&#x27;</span><br><span class="line">recovery_target_action = &#x27;promote&#x27;</span><br><span class="line">timezone = &#x27;Asia/Shanghai&#x27;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">touch</span> /var/lib/postgresql/12/main/recovery.signal</span><br></pre></td></tr></table></figure>
+
+<p>第三步，启动并观察日志。恢复期间会看到大量 <code>restored log file</code> 与 <code>redo done</code> 之类的输出，最后出现 <code>recovery stopping before commit of transaction ...</code> 或 <code>recovery stopping at ...</code>，说明已经到达目标。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">pg_ctl -D /var/lib/postgresql/12/main start</span><br><span class="line"><span class="built_in">tail</span> -f /var/log/postgresql/postgresql-12-main.log</span><br></pre></td></tr></table></figure>
+
+<p>第四步，验证。检查 <code>pg_is_in_recovery()</code> 是否为 <code>f</code>（<code>promote</code> 模式会自动提升），核对关键表的行数、最大时间戳，确认误删的数据还在、后续的脏数据没有进来。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> pg_is_in_recovery();</span><br><span class="line"><span class="keyword">SELECT</span> <span class="built_in">count</span>(<span class="operator">*</span>), <span class="built_in">max</span>(created_at) <span class="keyword">FROM</span> orders;</span><br></pre></td></tr></table></figure>
+
+<h3 id="目标参数与两个易错点"><a href="#目标参数与两个易错点" class="headerlink" title="目标参数与两个易错点"></a>目标参数与两个易错点</h3><p><code>recovery_target_time</code> 最直观，但它是按服务器 <code>TimeZone</code> 解释的。如果主机时区、配置文件时区、运维人员心里的时区三者不一致，目标就会整体偏移几个小时，恢复出来的数据“看起来对，其实不对”。因此务必在配置里显式写死 <code>timezone</code>，并在工单里记录带时区偏移的时间字符串。</p>
+<p>第二个易错点是 <code>recovery_target_action</code>。它有三个取值：<code>pause</code>（到达目标后暂停，默认）、<code>promote</code>（自动提升）、<code>shutdown</code>（停止实例）。<code>pause</code> 最适合不确信目标是否正确的场景：实例停在目标点，可以连上去查数据，确认无误后再执行 <code>pg_promote()</code> 或 <code>SELECT pg_wal_replay_resume()</code>。若目标时刻之后还有可用 WAL，暂停状态也可以继续往前重放。</p>
+<p>除时间外，还可用 <code>recovery_target_lsn</code> 精确到字节、<code>recovery_target_xid</code> 指定事务，或用 <code>recovery_target_name</code> 配合 <code>pg_create_restore_point()</code> 埋点。计划内变更先建还原点，出问题按名字恢复，比推算时间可靠。</p>
+<p>最后要接受一个现实：PITR 只能恢复到归档 WAL 存在的地方。如果归档在 13:40 断了，目标定在 14:00 也没用，恢复会在 13:40 处停下并报错。这正是前文强调“归档必须被监控”的原因——它决定了你的恢复上限。</p>
+<h2 id="切换、脑裂与旧主回归"><a href="#切换、脑裂与旧主回归" class="headerlink" title="切换、脑裂与旧主回归"></a>切换、脑裂与旧主回归</h2><p>复制搭起来只是开始，真正考验运维的是“什么时候可以把备库提上来”以及“提上来之后旧主怎么办”。这两个问题处理不好，复制反而会制造更大的事故。</p>
+<h3 id="计划内切换"><a href="#计划内切换" class="headerlink" title="计划内切换"></a>计划内切换</h3><p>计划内切换（switchover）是有准备的角色互换，目标是不丢数据、尽量少中断。流程可以固定为五步。</p>
+<p>第一，确认备库已经追平。在主库上取当前 WAL 位置，在备库上取回放位置，两者相等才说明没有延迟：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 主库</span></span><br><span class="line"><span class="keyword">SELECT</span> pg_current_wal_lsn();</span><br><span class="line"><span class="comment">-- 备库</span></span><br><span class="line"><span class="keyword">SELECT</span> pg_last_wal_replay_lsn(), pg_is_in_recovery();</span><br></pre></td></tr></table></figure>
+
+<p>第二，停止写入。把应用连接摘走、收回虚拟 IP，或者把数据库设为只读，确保不会再有新事务。第三，再比对一次 LSN，确认在停止写入的瞬间备库已经追平。第四，提升备库：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 通用方式</span></span><br><span class="line">pg_ctl -D /var/lib/postgresql/12/main promote</span><br><span class="line"><span class="comment"># Debian/Ubuntu 的包装命令</span></span><br><span class="line">pg_ctlcluster 12 main promote</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 也可以在备库的 SQL 会话里直接提升（12 起提供）</span></span><br><span class="line"><span class="keyword">SELECT</span> pg_promote();</span><br></pre></td></tr></table></figure>
+
+<p>第五，把客户端指向新主库，并修改其余备库的 <code>primary_conninfo</code>，让它们改从新主库复制。切换至此完成，旧主则需决定报废、重建还是重新加入。</p>
+<h3 id="故障转移与-fencing"><a href="#故障转移与-fencing" class="headerlink" title="故障转移与 fencing"></a>故障转移与 fencing</h3><p>非计划故障转移（failover）没有准备时间，最大风险是脑裂：旧主还活着，只是监控误判或网络分区，新主提升后两边同时接受写入，产生两条分叉的时间线。网络恢复后两份数据无法合并，只能弃其一。</p>
+<p>因此提升之前必须先 fencing，也就是确保旧主不会再接受任何写入。手段包括通过带外管理断电、交换机端口关闭、存储卷摘除、收回虚拟 IP 并在防火墙上封掉数据库端口。只有确认旧主“确实死了或确实写不了”，才执行提升。这条规则听起来保守，但它是唯一能从根本上避免双主写入的办法。</p>
+<p>提升之后，新主库的时间线 ID 会加一，WAL 归档目录里会多出 <code>.history</code> 文件，记录时间线分叉的历史。旧主即使恢复，也不能直接改成备库跟随——它的 WAL 已经和新主分叉。此时 <code>pg_rewind</code> 可以把旧主的数据目录“倒回”分叉点，再作为备库接入：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 在旧主上执行，以新主为源同步差异</span></span><br><span class="line">pg_rewind -D /var/lib/postgresql/12/main \</span><br><span class="line">  --source-server=<span class="string">&quot;host=10.0.0.12 port=5432 user=repl dbname=postgres&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 重新标记为备库并配置连接</span></span><br><span class="line"><span class="built_in">touch</span> /var/lib/postgresql/12/main/standby.signal</span><br></pre></td></tr></table></figure>
+
+<p><code>pg_rewind</code> 有一个前提：旧主必须开启了 <code>wal_log_hints</code>，或者在初始化时启用了数据校验和，否则它无法定位差异块，只能重做基础备份。这个参数最好在部署时就打开，事后补开需要重启，而很多团队恰恰是在事故当天才发现没开。</p>
+<h3 id="自动化工具的位置"><a href="#自动化工具的位置" class="headerlink" title="自动化工具的位置"></a>自动化工具的位置</h3><p>手工切换可以写成 runbook，但“该不该切”和“旧主是否已隔离”很难靠人保证。Patroni、repmgr 这类工具把选主、fencing、配置改写与 VIP 漂移串成自动流程，Patroni 依赖 etcd、Consul 或 ZooKeeper 做一致性仲裁。它们能缩短 RTO，却不会替你决定 RPO 取舍；引入前先把手工流程跑通、监控补齐。</p>
+<h2 id="监控、备份策略与常见坑"><a href="#监控、备份策略与常见坑" class="headerlink" title="监控、备份策略与常见坑"></a>监控、备份策略与常见坑</h2><p>复制和备份都属于“平时感觉不到、出事时决定生死”的基础设施。它们最大的敌人不是技术难点，而是长期无人验证的假设。</p>
+<h3 id="复制与归档监控"><a href="#复制与归档监控" class="headerlink" title="复制与归档监控"></a>复制与归档监控</h3><p>复制延迟有两个视角：字节差与时间差。字节差用 LSN 相减，直观且不依赖时钟；时间差看 <code>replay_lag</code>，更贴近业务感受，但要求备库处于活跃状态，且受主备时钟偏差影响。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 主库：发送、落盘、回放三个位置，以及时间延迟</span></span><br><span class="line"><span class="keyword">SELECT</span> application_name, state, sync_state,</span><br><span class="line">       pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) <span class="keyword">AS</span> replay_bytes,</span><br><span class="line">       replay_lag</span><br><span class="line"><span class="keyword">FROM</span> pg_stat_replication;</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 备库：已接收但尚未回放的字节数</span></span><br><span class="line"><span class="keyword">SELECT</span> pg_last_wal_receive_lsn() <span class="operator">-</span> pg_last_wal_replay_lsn() <span class="keyword">AS</span> apply_lag_bytes;</span><br></pre></td></tr></table></figure>
+
+<p>归档健康度看 <code>pg_stat_archiver</code>：重点不是成功次数，而是 <code>failed_count</code> 是否增长、<code>last_archived_time</code> 是否停滞。若当前时间减去最后成功归档时间超过 <code>archive_timeout</code> 的两倍，就应告警。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> archived_count, failed_count,</span><br><span class="line">       last_archived_wal, last_archived_time,</span><br><span class="line">       last_failed_wal, last_failed_time</span><br><span class="line"><span class="keyword">FROM</span> pg_stat_archiver;</span><br></pre></td></tr></table></figure>
+
+<p>磁盘方面要盯三个位置：数据目录、<code>pg_wal</code>、归档目录。<code>pg_wal</code> 异常膨胀通常有两个原因——归档卡住导致旧段无法删除，或者复制槽持有 <code>restart_lsn</code> 不放。后者可以用下面的查询定位：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> slot_name, active, restart_lsn,</span><br><span class="line">       pg_size_pretty(</span><br><span class="line">         pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)</span><br><span class="line">       ) <span class="keyword">AS</span> retained_wal</span><br><span class="line"><span class="keyword">FROM</span> pg_replication_slots;</span><br></pre></td></tr></table></figure>
+
+<p>一个长期不活跃的复制槽，能让 <code>pg_wal</code> 涨到磁盘写满，而磁盘写满会让主库直接停止工作。复制槽是“防丢 WAL”的利器，也是“吃光磁盘”的隐患，必须成对地配置监控。</p>
+<h3 id="一套可执行的备份策略"><a href="#一套可执行的备份策略" class="headerlink" title="一套可执行的备份策略"></a>一套可执行的备份策略</h3><p>下面这套策略适合中小规模的生产库，参数是示例目标，不是行业标准，实施时应按数据量、变更频率和合规要求调整。</p>
+<table>
+<thead>
+<tr>
+<th>项目</th>
+<th>频率</th>
+<th>保留</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>物理基础备份</td>
+<td>每日一次</td>
+<td>14 天</td>
+<td><code>pg_basebackup</code> 到独立备份主机</td>
+</tr>
+<tr>
+<td>WAL 归档</td>
+<td>持续</td>
+<td>覆盖最老基础备份再留余量</td>
+<td>支撑 PITR 到任意时刻</td>
+</tr>
+<tr>
+<td>逻辑导出</td>
+<td>每周一次</td>
+<td>4 周</td>
+<td>目录格式，含全局对象</td>
+</tr>
+<tr>
+<td>异地副本</td>
+<td>每日同步</td>
+<td>与本地一致</td>
+<td>对象存储或异地机房</td>
+</tr>
+<tr>
+<td>恢复演练</td>
+<td>每月一次</td>
+<td>留存报告</td>
+<td>记录耗时与校验结果</td>
+</tr>
+</tbody></table>
+<p>落地细节决定成败：备份文件离开主机前算校验和、传输后对比，避免“成功但损坏”；归档与备份应加密，物理备份等同于全部数据；备份账号只给复制权限；备份目录记录起始 LSN 与时间，恢复前确认归档覆盖该区间。</p>
+<p>演练是整套策略里最容易被跳过、也最不能跳过的一环。演练要覆盖三种场景：从最近的基础备份完整恢复、按时间点恢复到误操作之前、以及模拟主库丢失后从备份重建备库。每次记录实际耗时，与 RTO 目标对比；记录恢复后的校验方式，比如关键表行数、金额汇总、抽样比对。没有演练过的备份，只能算“可能可用”。</p>
+<h3 id="常见坑清单"><a href="#常见坑清单" class="headerlink" title="常见坑清单"></a>常见坑清单</h3><ul>
+<li>只做主从、不做 WAL 归档。复制再健康也无法回到过去，一次误删就是终局。</li>
+<li>复制槽建了不监控。备库长期离线，槽位保留的 WAL 会把磁盘吃满。</li>
+<li>备份文件放在主库同一台机器、同一个存储卷。主机或阵列故障时主备与备份一起消失。</li>
+<li>从未验证恢复。备份命令退出码为 0，不代表文件可解包、可启动、数据完整。</li>
+<li>PITR 时区混乱。目标时间按服务器时区解释，配置里不写死时区就可能偏移数小时。</li>
+<li>未 fencing 就提升。旧主仍在写，形成双主，后续只能弃数据。</li>
+<li>只备份数据库、不备份角色与表空间。恢复后权限全丢，应用连不上。</li>
+<li>归档命令使用会覆盖目标的写法，或目录权限不足，失败后静默重试，没人发现。</li>
+<li>长期不检查 <code>pg_wal</code> 与归档目录容量，磁盘写满导致主库停机。</li>
+<li>把备库当备份，在备库上执行 <code>DROP</code> 之后才想起没有归档。</li>
+</ul>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>复制与备份保护的是两类完全不同的风险：前者用冗余换可用性，后者用历史副本换可回溯性，任何一方都不能替代另一方。WAL 是二者的共同底座，<code>wal_level</code>、<code>archive_mode</code>、<code>archive_command</code> 决定了你能否做复制与 PITR，也决定了事故当天的恢复上限。日常最值得投入的三件事是：让归档持续且被监控、让复制延迟可见、让恢复演练成为固定日程。配置层面记住 PostgreSQL 12 的变化——<code>recovery.conf</code> 已消失，备库用 <code>standby.signal</code>，归档恢复用 <code>recovery.signal</code>。最后，所有 RPO 与 RTO 都应以演练实测为准，而不是写在文档里的愿望。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://www.postgresql.org/docs/12/wal-intro.html">PostgreSQL 12 Documentation: Write-Ahead Logging (WAL)</a></li>
+<li><a href="https://www.postgresql.org/docs/12/runtime-config-wal.html">PostgreSQL 12 Documentation: Write-Ahead Logging Configuration</a></li>
+<li><a href="https://www.postgresql.org/docs/12/continuous-archiving.html">PostgreSQL 12 Documentation: Continuous Archiving and Point-in-Time Recovery</a></li>
+<li><a href="https://www.postgresql.org/docs/12/warm-standby.html">PostgreSQL 12 Documentation: Log-Shipping Standby Servers</a></li>
+<li><a href="https://www.postgresql.org/docs/12/warm-standby-failover.html">PostgreSQL 12 Documentation: Failover, Load Balancing and Replication</a></li>
+<li><a href="https://www.postgresql.org/docs/12/app-pgdump.html">PostgreSQL 12 Documentation: pg_dump</a></li>
+<li><a href="https://www.postgresql.org/docs/12/app-pg-dumpall.html">PostgreSQL 12 Documentation: pg_dumpall</a></li>
+<li><a href="https://www.postgresql.org/docs/12/app-pgrestore.html">PostgreSQL 12 Documentation: pg_restore</a></li>
+<li><a href="https://www.postgresql.org/docs/12/app-pgbasebackup.html">PostgreSQL 12 Documentation: pg_basebackup</a></li>
+<li><a href="https://www.postgresql.org/docs/12/app-pgrewind.html">PostgreSQL 12 Documentation: pg_rewind</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>PostgreSQL 主从与备份</p><p><a href="https://987763485.github.io/2020/09/23/PostgreSQL主从与备份/">https://987763485.github.io/2020/09/23/PostgreSQL主从与备份/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2020-09-23</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a><a class="link-muted mr-2" rel="tag" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/">数据库</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2020/09/28/Elasticsearch%E5%9F%BA%E7%A1%80%E4%B8%8E%E6%9F%A5%E8%AF%A2/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Elasticsearch 基础与查询</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2020/09/16/ELK%E6%97%A5%E5%BF%97%E5%B9%B3%E5%8F%B0%E6%90%AD%E5%BB%BA%E5%AE%9E%E8%B7%B5/"><span class="level-item">ELK 日志平台搭建实践</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

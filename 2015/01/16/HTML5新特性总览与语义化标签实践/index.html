@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>HTML5 新特性总览与语义化标签实践 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="写页面时最常被问的一句话是”这个 HTML5 特性能不能用”。2015 年初的真实答案是：有的立刻能用，有的要补一层兜底，有的只有一家内核实现，还有一堆只是草案。本文做两件事，一是给一张”特性 × 内核”的判断地图，让读者自己也会查；二是把语义化标签里旧文没写透的几个（main、time、figure、header&amp;#x2F;footer 的作用域）写成能直接照做的规范。适合刚入行、写页面时纠结”"><meta property="og:type" content="blog"><meta property="og:title" content="HTML5 新特性总览与语义化标签实践"><meta property="og:url" content="https://987763485.github.io/2015/01/16/HTML5%E6%96%B0%E7%89%B9%E6%80%A7%E6%80%BB%E8%A7%88%E4%B8%8E%E8%AF%AD%E4%B9%89%E5%8C%96%E6%A0%87%E7%AD%BE%E5%AE%9E%E8%B7%B5/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="写页面时最常被问的一句话是”这个 HTML5 特性能不能用”。2015 年初的真实答案是：有的立刻能用，有的要补一层兜底，有的只有一家内核实现，还有一堆只是草案。本文做两件事，一是给一张”特性 × 内核”的判断地图，让读者自己也会查；二是把语义化标签里旧文没写透的几个（main、time、figure、header&amp;#x2F;footer 的作用域）写成能直接照做的规范。适合刚入行、写页面时纠结”"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2015-01-16T05:28:09.000Z"><meta property="article:modified_time" content="2026-10-17T17:54:34.338Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="web前端"><meta property="article:tag" content="浏览器"><meta property="article:tag" content="html5"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2015/01/16/HTML5%E6%96%B0%E7%89%B9%E6%80%A7%E6%80%BB%E8%A7%88%E4%B8%8E%E8%AF%AD%E4%B9%89%E5%8C%96%E6%A0%87%E7%AD%BE%E5%AE%9E%E8%B7%B5/"},"headline":"HTML5 新特性总览与语义化标签实践","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2015-01-16T05:28:09.000Z","dateModified":"2026-10-17T17:54:34.338Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"写页面时最常被问的一句话是”这个 HTML5 特性能不能用”。2015 年初的真实答案是：有的立刻能用，有的要补一层兜底，有的只有一家内核实现，还有一堆只是草案。本文做两件事，一是给一张”特性 × 内核”的判断地图，让读者自己也会查；二是把语义化标签里旧文没写透的几个（main、time、figure、header&#x2F;footer 的作用域）写成能直接照做的规范。适合刚入行、写页面时纠结”"}</script><link rel="canonical" href="https://987763485.github.io/2015/01/16/HTML5%E6%96%B0%E7%89%B9%E6%80%A7%E6%80%BB%E8%A7%88%E4%B8%8E%E8%AF%AD%E4%B9%89%E5%8C%96%E6%A0%87%E7%AD%BE%E5%AE%9E%E8%B7%B5/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2015-01-16T05:28:09.000Z" title="1/16/2015, 1:28:09 PM">2015-01-16</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/">前端开发</a></span><span class="level-item">32 分钟读完 (大约4762个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">HTML5 新特性总览与语义化标签实践</h1><nav class="series-nav" aria-label="系列文章导航"><div class="series-nav-meta"><i class="fas fa-book-open" aria-hidden="true"></i><span>本文属于《<a class="series-nav-title" href="/series/html-css/">HTML 与 CSS</a>》第 1/62 篇</span></div><div class="series-nav-links"><span class="series-nav-link series-nav-prev is-disabled" aria-disabled="true"><i class="fas fa-chevron-left" aria-hidden="true"></i><span>上一篇</span></span><a class="series-nav-link series-nav-index" href="/series/html-css/">系列目录</a><a class="series-nav-link series-nav-next" href="/2013/05/30/%E4%BB%8EHTML4%E8%BF%81%E7%A7%BB%E5%88%B0HTML5%E7%9A%84checklist/"><span>下一篇</span><i class="fas fa-chevron-right" aria-hidden="true"></i></a></div></nav><div class="content"><p>写页面时最常被问的一句话是”这个 HTML5 特性能不能用”。2015 年初的真实答案是：有的立刻能用，有的要补一层兜底，有的只有一家内核实现，还有一堆只是草案。本文做两件事，一是给一张”特性 × 内核”的判断地图，让读者自己也会查；二是把语义化标签里旧文没写透的几个（<code>main</code>、<code>time</code>、<code>figure</code>、<code>header</code>&#x2F;<code>footer</code> 的作用域）写成能直接照做的规范。适合刚入行、写页面时纠结”这标签浏览器认不认”的同学。</p>
+<h2 id="先把”H5”这个词收窄：本文只谈规范"><a href="#先把”H5”这个词收窄：本文只谈规范" class="headerlink" title="先把”H5”这个词收窄：本文只谈规范"></a>先把”H5”这个词收窄：本文只谈规范</h2><p>“H5”在中文前端圈已经被用坏了，它至少同时指三样东西：HTML5 这份规范本身；移动端里那种带翻页、CSS3 动效、摇一摇的推广页；泛指一切”比较新的网页效果”，连 Flexbox 也算进去。三层含义混在一起，谈可用性就变成鸡同鸭讲——有人说”H5 视频早就没问题了”，指自家移动端页面能放；有人回”IE 不支持 H5”，说的是某几个新标签。</p>
+<p>本文只谈第一层：规范给标记语言新增了哪些元素与属性，各家内核实现到什么程度。之所以先划这条线，是因为规范里的东西有明确的实现状态可查，而”H5 页面”是营销词，没有状态可查。</p>
+<p>另外，从 HTML4 迁过来的那些事（doctype、<code>&lt;meta charset&gt;</code> 的位置、废弃标签、属性布尔化）《从 HTML4 迁移到 HTML5 的 checklist》已经列过，本文只引用结论；<code>section</code>、<code>article</code>、<code>nav</code>、<code>aside</code> 的定义与判别依据也在《section、article、nav、aside 语义化标签的合理使用》里讲透了，本文只在示范里直接使用，不重复判据。</p>
+<h2 id="判断可用性的唯一标准"><a href="#判断可用性的唯一标准" class="headerlink" title="判断可用性的唯一标准"></a>判断可用性的唯一标准</h2><p>一条纪律先立住：<strong>一个特性能不能用，唯一标准是你的目标浏览器集合里那个内核是否实现</strong>。不是”规范定稿了没有”，不是”文档写着支持”，更不是”我本机 Chrome 里能跑”。</p>
+<p>由此有三条推论，都是当下踩过的坑。第一，规范状态与实现状态是两条独立的线：W3C 那份 HTML5 快照 2014 年 10 月才进入候选推荐阶段，同期 WHATWG 的生活标准还在改，<code>hgroup</code> 就是一边还留着、一边已经在删。第二，本机可用不等于目标可用：按我们站点 2014 年 12 月的流量日志，IE 9 到 11 仍有可观占比，Android 2.3 与 4.x 自带浏览器没清干净。第三，”可用”要再拆三层：能不能解析出节点、能不能被 CSS 命中、能不能被辅助技术和爬虫读到；<code>main</code> 就是三层不一致的典型，较新内核能解析，但部分内核把它当未知元素、不给默认块级样式，读屏软件当时也未必报成地标。</p>
+<p>判断流程可以固定成一张图：</p>
+<pre class="mermaid">flowchart TD
+  A[想用某个特性] --> B{查目标内核实现情况}
+  B -->|全部实现| C[直接用]
+  B -->|部分实现| D{不支持的用户看到什么}
+  D -->|静默忽略且内容仍完整| E[用并补兜底样式]
+  D -->|功能缺失| F[写降级方案或不用]
+  B -->|只有草案| G[只用 polyfill 并标注状态]</pre>
+
+<p>下表按 2015 年 1 月的版本情况整理常问特性。每格只填四档之一：可用、需前缀、不可用、草案；”需兜底”指内核认得节点但必须自己补 CSS。口径保守，以各家稳定版为准，不含 beta 与带开关的实验特性。</p>
+<table>
+<thead>
+<tr>
+<th>特性</th>
+<th>Chrome 桌面</th>
+<th>Firefox 桌面</th>
+<th>IE 9 &#x2F; 10 &#x2F; 11</th>
+<th>Safari 7-8</th>
+<th>Android 2.3 &#x2F; 4.4</th>
+<th>iOS 7-8</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>header</code>&#x2F;<code>footer</code>&#x2F;<code>nav</code>&#x2F;<code>section</code>&#x2F;<code>article</code></td>
+<td>可用</td>
+<td>可用</td>
+<td>9 需 shiv，10-11 需兜底</td>
+<td>可用</td>
+<td>2.3 需兜底，4.4 可用</td>
+<td>可用</td>
+</tr>
+<tr>
+<td><code>main</code></td>
+<td>可用</td>
+<td>可用</td>
+<td>需兜底</td>
+<td>可用</td>
+<td>2.3 不可用，4.4 可用</td>
+<td>可用</td>
+</tr>
+<tr>
+<td><code>time</code>&#x2F;<code>address</code>&#x2F;<code>abbr</code>&#x2F;<code>figure</code></td>
+<td>可用</td>
+<td>可用</td>
+<td>可用，8 以下需 shiv</td>
+<td>可用</td>
+<td>可用</td>
+<td>可用</td>
+</tr>
+<tr>
+<td><code>hgroup</code></td>
+<td>可用</td>
+<td>可用</td>
+<td>可用</td>
+<td>可用</td>
+<td>可用</td>
+<td>不鼓励</td>
+</tr>
+<tr>
+<td><code>ruby</code></td>
+<td>需前缀</td>
+<td>不可用</td>
+<td>受限</td>
+<td>可用</td>
+<td>需前缀</td>
+<td>可用</td>
+</tr>
+<tr>
+<td><code>details</code>&#x2F;<code>summary</code></td>
+<td>可用</td>
+<td>不可用</td>
+<td>不可用</td>
+<td>可用</td>
+<td>可用</td>
+<td>可用</td>
+</tr>
+<tr>
+<td>表单新类型与原生校验</td>
+<td>可用</td>
+<td>可用</td>
+<td>9 不可用，10-11 部分</td>
+<td>部分</td>
+<td>2.3 不可用，4.4 部分</td>
+<td>部分</td>
+</tr>
+<tr>
+<td><code>datalist</code></td>
+<td>可用</td>
+<td>可用</td>
+<td>11 可用，9-10 不可用</td>
+<td>不可用</td>
+<td>4.4 可用</td>
+<td>不可用</td>
+</tr>
+<tr>
+<td><code>audio</code>&#x2F;<code>video</code></td>
+<td>可用，编码各异</td>
+<td>可用，编码各异</td>
+<td>可用，仅 H.264</td>
+<td>可用</td>
+<td>2.3 受限，4.4 可用</td>
+<td>可用</td>
+</tr>
+<tr>
+<td><code>canvas</code> 2D</td>
+<td>可用</td>
+<td>可用</td>
+<td>可用</td>
+<td>可用</td>
+<td>可用</td>
+<td>可用</td>
+</tr>
+<tr>
+<td>WebGL</td>
+<td>可用</td>
+<td>可用</td>
+<td>11 可用，9-10 不可用</td>
+<td>可用</td>
+<td>4.4 部分</td>
+<td>8 起可用</td>
+</tr>
+<tr>
+<td><code>localStorage</code>&#x2F;<code>sessionStorage</code></td>
+<td>可用</td>
+<td>可用</td>
+<td>可用，私密模式有坑</td>
+<td>可用</td>
+<td>可用</td>
+<td>可用</td>
+</tr>
+<tr>
+<td>IndexedDB</td>
+<td>可用</td>
+<td>可用</td>
+<td>10-11 可用</td>
+<td>7.1 起可用</td>
+<td>2.3 不可用，4.4 可用</td>
+<td>8 起可用</td>
+</tr>
+<tr>
+<td>Geolocation</td>
+<td>可用</td>
+<td>可用</td>
+<td>可用</td>
+<td>可用</td>
+<td>可用</td>
+<td>可用</td>
+</tr>
+<tr>
+<td>DeviceOrientation</td>
+<td>可用</td>
+<td>可用</td>
+<td>10-11 可用</td>
+<td>可用</td>
+<td>4.4 可用</td>
+<td>口径不一</td>
+</tr>
+<tr>
+<td><code>img srcset</code></td>
+<td>可用，非标准</td>
+<td>不可用</td>
+<td>不可用</td>
+<td>7.1 可用，非标准</td>
+<td>不可用</td>
+<td>可用，非标准</td>
+</tr>
+<tr>
+<td><code>template</code></td>
+<td>可用</td>
+<td>不可用</td>
+<td>11 可用，9-10 不可用</td>
+<td>7.1 可用</td>
+<td>4.4 可用</td>
+<td>可用</td>
+</tr>
+<tr>
+<td><code>dialog</code></td>
+<td>可用</td>
+<td>不可用</td>
+<td>不可用</td>
+<td>不可用</td>
+<td>不可用</td>
+<td>不可用</td>
+</tr>
+<tr>
+<td><code>picture</code></td>
+<td>草案</td>
+<td>草案</td>
+<td>草案</td>
+<td>草案</td>
+<td>草案</td>
+<td>草案</td>
+</tr>
+<tr>
+<td>自定义元素 &#x2F; Shadow DOM</td>
+<td>草案，部分实现</td>
+<td>不可用</td>
+<td>不可用</td>
+<td>不可用</td>
+<td>不可用</td>
+<td>不可用</td>
+</tr>
+</tbody></table>
+<h2 id="特性地图：五块内容各给三档"><a href="#特性地图：五块内容各给三档" class="headerlink" title="特性地图：五块内容各给三档"></a>特性地图：五块内容各给三档</h2><p>下面按五块给出”能立刻用 &#x2F; 谨慎用 &#x2F; 别用”的档位与一句理由，理由都落回同一件事：不支持的用户看到什么。</p>
+<h3 id="语义与结构标签"><a href="#语义与结构标签" class="headerlink" title="语义与结构标签"></a>语义与结构标签</h3><p>能立刻用：<code>header</code>、<code>footer</code>、<code>nav</code>、<code>section</code>、<code>article</code>、<code>aside</code>、<code>time</code>、<code>address</code>、<code>abbr</code>、<code>figure</code>、<code>figcaption</code>、<code>mark</code>。老内核最多不认得节点，补一层 shiv 和块级样式就能收平，内容不受影响，成本可算。谨慎用：<code>main</code>，IE 全系与 Android 2.3 当时仍按未知元素处理，写它就得补 <code>display: block</code> 并保留 <code>role=&quot;main&quot;</code>；<code>ruby</code> 只有 WebKit 系完整支持，Firefox 要等当年的春季版本，别为它设计依赖排版；<code>hgroup</code> 各家能渲染，但标准一侧已经不鼓励，它只解决主副标题的字号问题。别用：把 <code>dialog</code> 当业务弹窗。</p>
+<h3 id="表单增强"><a href="#表单增强" class="headerlink" title="表单增强"></a>表单增强</h3><p><code>input</code> 新类型（<code>email</code>、<code>url</code>、<code>tel</code>、<code>number</code>、<code>date</code>、<code>range</code>、<code>search</code>）、<code>placeholder</code>、<code>required</code>、<code>pattern</code>、<code>autocomplete</code> 能立刻用，不支持的内核会退化成 <code>type=&quot;text&quot;</code>，用户照样能填；但原生校验气泡的样式与文案各家不一致，Android 2.3 干脆全不认。<code>date</code> 系列在 iOS 上弹原生选择器、在部分安卓自带浏览器里是裸文本框，这个反差必须实测。<code>datalist</code> 谨慎用：Firefox、Chrome、IE 11 可用，iOS Safari 完全不支持。新类型怎么兼容、校验怎么降级、日期控件要不要拉一份 JS 库，下一篇（1 月 18 日）专讲，这里不展开。</p>
+<h3 id="多媒体与图形"><a href="#多媒体与图形" class="headerlink" title="多媒体与图形"></a>多媒体与图形</h3><p><code>audio</code>&#x2F;<code>video</code> 一句：标签各家都认，难的是编码与移动端自动播放限制，坑在《HTML5 多媒体标签 audio 与 video 的坑》里讲过，别把”能用标签”当”能上线”。<code>canvas</code> 一句：2D 上下文在 IE 9 以上、Android 4.x、iOS 都稳，IE 8 只有 excanvas 那种覆盖面很窄的兼容层。WebGL 一句：桌面三家可用，IE 要到 11 才进，移动端只有较新系统能跑。</p>
+<h3 id="存储与离线"><a href="#存储与离线" class="headerlink" title="存储与离线"></a>存储与离线</h3><p><code>localStorage</code>&#x2F;<code>sessionStorage</code> 各内核都可用，但 Safari 私密模式写入会抛异常，见《localStorage 与 sessionStorage 本地存储实战》；IndexedDB 按上表，别把它当唯一存储；ApplicationCache 坑太多，结论见《Application Cache 离线缓存机制与陷阱》，移动端口径见《移动端离线存储与缓存》。这三块一句带过，不重讲。</p>
+<h3 id="设备与通信"><a href="#设备与通信" class="headerlink" title="设备与通信"></a>设备与通信</h3><p>Geolocation 能立刻用，各内核都实现，要处理的是用户拒绝授权与 <code>watchPosition</code> 的回调频率、耗电。DeviceOrientation 谨慎用，各内核坐标系和”是否要用户先动一下”的口径不一致。<code>postMessage</code> 一句：IE 8 的实现只能传字符串且有缺陷，IE 9 以上才可用，origin 校验照《postMessage 实现跨窗口安全通信》写。补一句网络口径：当下仍是 <code>XMLHttpRequest</code> 的天下，更简洁的 fetch 类接口在主流内核里还没落地，别按它设计架构。</p>
+<h2 id="草案区：看着眼熟但别上线"><a href="#草案区：看着眼熟但别上线" class="headerlink" title="草案区：看着眼熟但别上线"></a>草案区：看着眼熟但别上线</h2><p>这四样热度很高，但状态必须写清楚，否则会被当成既有能力排进项目。</p>
+<p><code>&lt;dialog&gt;</code>：只有 Chrome 一家实现，IE 全系与 Firefox 都没有，样式还是 WebKit 那套。要弹窗就用 div 加遮罩；即使要用，也必须写完整的降级。</p>
+<p><code>&lt;template&gt;</code>：Chrome 与 IE 11 可用，Safari 7.1 起可用，Firefox 不支持。它把一段不渲染的标记留在文档里供脚本克隆，价值是真的，但在 Firefox 的占比面前不能裸用；先用 <code>script type=&quot;text/x-template&quot;</code> 那种老办法存内容，两边都能跑。</p>
+<p><code>srcset</code> 与 <code>&lt;picture&gt;</code>：前者 Chrome 34、Safari 7.1 已支持，但 2015 年 1 月还不是标准、语法仍在改，各家实现互不覆盖；<code>&lt;picture&gt;</code> 只是草案，只有 polyfill 可用，而 polyfill 会带来重复下载与首屏时间问题。响应式图片当下仍要靠服务端裁剪加 CSS 背景图。</p>
+<p>自定义元素、Shadow DOM 与 Web Components：概念在铺开，Chrome 有部分实验实现，其余内核为零，封装规范仍在吵。这一批只能算前瞻，写进技术规划可以，写进需求排期是事故。</p>
+<h2 id="语义化实践：六条能直接照做的规范"><a href="#语义化实践：六条能直接照做的规范" class="headerlink" title="语义化实践：六条能直接照做的规范"></a>语义化实践：六条能直接照做的规范</h2><p>下面讲写法，只讲旧文没细讲的标签与几个普遍误解。</p>
+<h3 id="标题层级：先纠一个错"><a href="#标题层级：先纠一个错" class="headerlink" title="标题层级：先纠一个错"></a>标题层级：先纠一个错</h3><p>纪律是 <code>h1</code> 到 <code>h6</code> 按内容层级顺序写、不跳级、一个页面主标题只有一个。要纠的错是”用了 HTML5 就能靠 <code>section</code> 嵌套自动决定标题级别”——那个大纲算法没有任何浏览器实现，到 2015 年初规范一侧也已经不推荐它，<code>section</code> 里的 <code>h1</code> 不会自动降级。所以层级由标题标签名手工排干净，<code>section</code> 只承担分组职责、且要写得出标题。算法来龙去脉见《HTML5 文档大纲与标题层级的正确用法》。</p>
+<h3 id="main：一个页面一个，配样式兜底"><a href="#main：一个页面一个，配样式兜底" class="headerlink" title="main：一个页面一个，配样式兜底"></a><code>main</code>：一个页面一个，配样式兜底</h3><p><code>main</code> 标页面唯一的主体内容，即去掉页头、页脚、主导航与侧栏之后剩下的那块。三条约束：一个页面只有一个；它不能是 <code>header</code>、<code>footer</code>、<code>nav</code>、<code>aside</code> 的后代；里面不放全站重复的内容。老内核要补块级样式，IE 9 以下还要 shiv 才能命中，同时保留 ARIA 地标：</p>
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* main 在部分内核里仍是未知元素，无默认块级样式 */</span></span><br><span class="line"><span class="selector-tag">main</span> &#123;</span><br><span class="line">  <span class="attribute">display</span>: block;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">main</span> <span class="attr">role</span>=<span class="string">&quot;main&quot;</span> <span class="attr">class</span>=<span class="string">&quot;page-main&quot;</span>&gt;</span></span><br><span class="line">  <span class="comment">&lt;!-- 页面唯一的主体内容 --&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">main</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>如果团队还没打算引入 <code>main</code>，<code>&lt;div role=&quot;main&quot;&gt;</code> 在 2015 年仍是正当写法，语义由 role 兑现，不必为了用新标签改全站。</p>
+<h3 id="header-footer-的作用域"><a href="#header-footer-的作用域" class="headerlink" title="header&#x2F;footer 的作用域"></a><code>header</code>&#x2F;<code>footer</code> 的作用域</h3><p>这两个标签不创建大纲节点，含义随所在区块变化：写在页面顶层是站点页头页脚，写在 <code>article</code> 内部就是这篇文章的头与尾。发布时间、来源、免责这类元信息不该平铺在正文里，该收进 <code>article</code> 级的 <code>header</code> 与 <code>footer</code>。下面这份新闻列表页可直接照抄结构，用到了 <code>time</code>、<code>address</code>、<code>abbr</code>、<code>figure</code> 与 <code>figcaption</code>：</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&lt;!DOCTYPE <span class="keyword">html</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">html</span> <span class="attr">lang</span>=<span class="string">&quot;zh-CN&quot;</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">head</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">meta</span> <span class="attr">charset</span>=<span class="string">&quot;utf-8&quot;</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">title</span>&gt;</span>科技频道 - 某某资讯<span class="tag">&lt;/<span class="name">title</span>&gt;</span></span><br><span class="line">  <span class="comment">&lt;!--[if lt IE 9]&gt;</span></span><br><span class="line"><span class="comment">    &lt;script src=&quot;/js/html5shiv-3.7.2.min.js&quot;&gt;&lt;/script&gt;</span></span><br><span class="line"><span class="comment">  &lt;![endif]--&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">head</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">body</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">header</span> <span class="attr">class</span>=<span class="string">&quot;site-head&quot;</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">p</span> <span class="attr">class</span>=<span class="string">&quot;logo&quot;</span>&gt;</span>某某资讯<span class="tag">&lt;/<span class="name">p</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">nav</span> <span class="attr">role</span>=<span class="string">&quot;navigation&quot;</span> <span class="attr">aria-label</span>=<span class="string">&quot;主导航&quot;</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">ul</span>&gt;</span><span class="tag">&lt;<span class="name">li</span>&gt;</span><span class="tag">&lt;<span class="name">a</span> <span class="attr">href</span>=<span class="string">&quot;/&quot;</span>&gt;</span>首页<span class="tag">&lt;/<span class="name">a</span>&gt;</span><span class="tag">&lt;/<span class="name">li</span>&gt;</span><span class="tag">&lt;<span class="name">li</span>&gt;</span><span class="tag">&lt;<span class="name">a</span> <span class="attr">href</span>=<span class="string">&quot;/tech/&quot;</span>&gt;</span>科技<span class="tag">&lt;/<span class="name">a</span>&gt;</span><span class="tag">&lt;/<span class="name">li</span>&gt;</span><span class="tag">&lt;/<span class="name">ul</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;/<span class="name">nav</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;/<span class="name">header</span>&gt;</span></span><br><span class="line"></span><br><span class="line">  <span class="tag">&lt;<span class="name">main</span> <span class="attr">role</span>=<span class="string">&quot;main&quot;</span> <span class="attr">class</span>=<span class="string">&quot;channel&quot;</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">h1</span>&gt;</span>科技频道<span class="tag">&lt;/<span class="name">h1</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">p</span> <span class="attr">class</span>=<span class="string">&quot;upd&quot;</span>&gt;</span>更新于 <span class="tag">&lt;<span class="name">time</span> <span class="attr">datetime</span>=<span class="string">&quot;2015-01-16 09:00&quot;</span>&gt;</span>1 月 16 日 09:00<span class="tag">&lt;/<span class="name">time</span>&gt;</span>，来源 <span class="tag">&lt;<span class="name">abbr</span> <span class="attr">title</span>=<span class="string">&quot;某某通讯社&quot;</span>&gt;</span>某社<span class="tag">&lt;/<span class="name">abbr</span>&gt;</span><span class="tag">&lt;/<span class="name">p</span>&gt;</span></span><br><span class="line"></span><br><span class="line">    <span class="tag">&lt;<span class="name">article</span> <span class="attr">class</span>=<span class="string">&quot;news-item&quot;</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">header</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">h2</span>&gt;</span><span class="tag">&lt;<span class="name">a</span> <span class="attr">href</span>=<span class="string">&quot;/news/1024.html&quot;</span>&gt;</span>某公司发布新一代处理器<span class="tag">&lt;/<span class="name">a</span>&gt;</span><span class="tag">&lt;/<span class="name">h2</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">p</span> <span class="attr">class</span>=<span class="string">&quot;meta&quot;</span>&gt;</span></span><br><span class="line">          <span class="tag">&lt;<span class="name">time</span> <span class="attr">datetime</span>=<span class="string">&quot;2015-01-15&quot;</span>&gt;</span>1 月 15 日<span class="tag">&lt;/<span class="name">time</span>&gt;</span></span><br><span class="line">          <span class="tag">&lt;<span class="name">address</span> <span class="attr">class</span>=<span class="string">&quot;source&quot;</span>&gt;</span>本报科技组<span class="tag">&lt;/<span class="name">address</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;/<span class="name">p</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;/<span class="name">header</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">figure</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">img</span> <span class="attr">src</span>=<span class="string">&quot;/img/1024-220.jpg&quot;</span> <span class="attr">width</span>=<span class="string">&quot;220&quot;</span> <span class="attr">height</span>=<span class="string">&quot;140&quot;</span> <span class="attr">alt</span>=<span class="string">&quot;处理器封装外观&quot;</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">figcaption</span>&gt;</span>新一代处理器的封装外观（图片来源：某社）<span class="tag">&lt;/<span class="name">figcaption</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;/<span class="name">figure</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">p</span>&gt;</span>正文摘要……<span class="tag">&lt;/<span class="name">p</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">footer</span> <span class="attr">class</span>=<span class="string">&quot;item-foot&quot;</span>&gt;</span><span class="tag">&lt;<span class="name">p</span>&gt;</span><span class="tag">&lt;<span class="name">small</span>&gt;</span>未经许可不得转载<span class="tag">&lt;/<span class="name">small</span>&gt;</span><span class="tag">&lt;/<span class="name">p</span>&gt;</span><span class="tag">&lt;/<span class="name">footer</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;/<span class="name">article</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;/<span class="name">main</span>&gt;</span></span><br><span class="line"></span><br><span class="line">  <span class="tag">&lt;<span class="name">aside</span> <span class="attr">role</span>=<span class="string">&quot;complementary&quot;</span> <span class="attr">class</span>=<span class="string">&quot;side&quot;</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">h2</span>&gt;</span>热门排行<span class="tag">&lt;/<span class="name">h2</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">ol</span>&gt;</span><span class="tag">&lt;<span class="name">li</span>&gt;</span><span class="tag">&lt;<span class="name">a</span> <span class="attr">href</span>=<span class="string">&quot;/news/1001.html&quot;</span>&gt;</span>……<span class="tag">&lt;/<span class="name">a</span>&gt;</span><span class="tag">&lt;/<span class="name">li</span>&gt;</span><span class="tag">&lt;/<span class="name">ol</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;/<span class="name">aside</span>&gt;</span></span><br><span class="line"></span><br><span class="line">  <span class="tag">&lt;<span class="name">footer</span> <span class="attr">class</span>=<span class="string">&quot;site-foot&quot;</span> <span class="attr">role</span>=<span class="string">&quot;contentinfo&quot;</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">p</span>&gt;</span><span class="tag">&lt;<span class="name">small</span>&gt;</span>版权所有 <span class="symbol">&amp;copy;</span> 2015 某某资讯<span class="tag">&lt;/<span class="name">small</span>&gt;</span><span class="tag">&lt;/<span class="name">p</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;/<span class="name">footer</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">body</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">html</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>配套兜底样式一条都不能省：</p>
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="selector-tag">article</span>, <span class="selector-tag">aside</span>, <span class="selector-tag">figcaption</span>, <span class="selector-tag">figure</span>, <span class="selector-tag">footer</span>, <span class="selector-tag">header</span>, <span class="selector-tag">main</span>, <span class="selector-tag">nav</span>, <span class="selector-tag">section</span> &#123;</span><br><span class="line">  <span class="attribute">display</span>: block;</span><br><span class="line">&#125;</span><br><span class="line"><span class="selector-tag">figure</span> &#123;</span><br><span class="line">  <span class="attribute">margin</span>: <span class="number">0</span> <span class="number">0</span> <span class="number">1em</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="selector-tag">address</span> &#123;</span><br><span class="line">  <span class="attribute">display</span>: inline;      <span class="comment">/* 默认斜体，列表元信息里压回正体 */</span></span><br><span class="line">  <span class="attribute">font-style</span>: normal;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="time：把机器时间藏进-datetime"><a href="#time：把机器时间藏进-datetime" class="headerlink" title="time：把机器时间藏进 datetime"></a><code>time</code>：把机器时间藏进 <code>datetime</code></h3><p>人读的文本与机器读的时间要分开写。<code>datetime</code> 按需要的精度取值：</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">time</span> <span class="attr">datetime</span>=<span class="string">&quot;2015-01-16&quot;</span>&gt;</span>2015 年 1 月 16 日<span class="tag">&lt;/<span class="name">time</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">time</span> <span class="attr">datetime</span>=<span class="string">&quot;13:28&quot;</span>&gt;</span>下午 1 点 28 分<span class="tag">&lt;/<span class="name">time</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">time</span> <span class="attr">datetime</span>=<span class="string">&quot;2015-01-16 13:28&quot;</span>&gt;</span>1 月 16 日 13:28<span class="tag">&lt;/<span class="name">time</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">time</span> <span class="attr">datetime</span>=<span class="string">&quot;2015-01-16T13:28+08:00&quot;</span>&gt;</span>1 月 16 日 13:28<span class="tag">&lt;/<span class="name">time</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>日期用 <code>-</code> 分隔，日期与时间之间可用 <code>T</code> 或空格，时区偏移写 <code>+08:00</code> 或 <code>Z</code>。为什么不把那串直接写进文本？读者看不懂；界面语言会切换，同一篇可能显示”16 Jan 2015”；还有时区——面向多时区时展示文本按访问者本地时区渲染，而 <code>datetime</code> 里的偏移量是绝对时刻，爬虫与结构化数据抽取要的是后者。文本随便换，机器时间不动，这才是 <code>time</code> 的价值。列表页只精确到日就写日期，别硬凑一个零点。顺带说 <code>&lt;data&gt;</code>：语义是”机器可读的值”，但内核对它没有任何特殊行为，写它只能算自我安慰，要挂数据用 <code>span</code> 加 <code>data-*</code> 更实际。</p>
+<h3 id="未知元素兼容层：shiv-与块级兜底"><a href="#未知元素兼容层：shiv-与块级兜底" class="headerlink" title="未知元素兼容层：shiv 与块级兜底"></a>未知元素兼容层：shiv 与块级兜底</h3><p>IE 9 以下把没登记过的标签当未知元素处理，后果是节点建不起来、CSS 选不中。当时的真实做法是 html5shiv（也叫 html5shim）3.7.x，它在解析阶段用 <code>createElement</code> 把那些名字注册进去，IE 才会建节点：</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">&lt;!--[if lt IE 9]&gt;</span></span><br><span class="line"><span class="comment">  &lt;script src=&quot;/js/html5shiv-3.7.2.min.js&quot;&gt;&lt;/script&gt;</span></span><br><span class="line"><span class="comment">&lt;![endif]--&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>三条注意：脚本必须放在 <code>&lt;head&gt;</code> 里、在 IE 解析到 body 之前执行；条件注释只在 IE 9 以下生效，IE 10 起会忽略，现代浏览器不多下一个字节；shiv 只解决”认识节点”，<code>display: block</code> 仍要自己写，两者是一套。还有 <code>innerShiv</code>，给 <code>innerHTML</code> 打补丁，只在动态塞片段的项目里需要。原理与逐标签清单见《HTML5 语义化标签的兼容性处理》，这里只留当下要补的两点：<code>main</code> 也要进兜底列表，<code>ruby</code> 不在这套兜底能救的范围内。</p>
+<h3 id="无障碍：role-该补就补"><a href="#无障碍：role-该补就补" class="headerlink" title="无障碍：role 该补就补"></a>无障碍：role 该补就补</h3><p><code>role=&quot;main&quot;</code>、<code>role=&quot;navigation&quot;</code>、<code>role=&quot;contentinfo&quot;</code>、<code>role=&quot;complementary&quot;</code> 这几个地标角色在 2015 年初支持还不完整，JAWS 与 NVDA 行为不一，旧版读屏对 HTML5 标签的隐式角色还没学会。补显式 role 的代价只是几个属性，收益是把契约写给还没认识新标签的朗读器，建议保留；地标数量要控制，别为每个小卡片补一个。</p>
+<h2 id="常见误用与纠偏"><a href="#常见误用与纠偏" class="headerlink" title="常见误用与纠偏"></a>常见误用与纠偏</h2><p>复盘视角看几条高频错误。</p>
+<p>为了”语义”把导航写成结构废墟。导航本质是链接列表，<code>nav &gt; ul &gt; li &gt; a</code> 就是最正确的结构，有人为了”看起来语义化”在中间塞几层 div 加类名，反而把列表语义切断了。反过来把没有主题的东西包成 <code>section</code> 是同一类错误：写不出标题的分组就是布局容器，诚实写 <code>div</code> 加 class。</p>
+<p><code>&lt;br&gt;</code> 与 <code>&lt;p&gt;</code> 混用。段落用 <code>p</code>，只在诗文、地址、表单说明这种”必须换行但不是新段落”处用 <code>br</code>；用 <code>br</code> 模拟段落间距等于放弃段落语义，爬虫读不出段落边界。</p>
+<p><code>&lt;hr&gt;</code> 当视觉分割线。它的语义是主题转换处的分割，话题换了才写；纯装饰的线该用 CSS 边框，列表项之间每条插 <code>hr</code> 属于误用。</p>
+<p><code>&lt;small&gt;</code> 的两种误传。一种说它只能写版权，另一种说它不语义别用。HTML5 里 <code>small</code> 的定义是附属信息、免责与法律条款那类小字，版权声明正好落在定义内，这么用是对的；错的是把它当字号工具，或反过来把正文小注塞进 <code>p class=&quot;small&quot;</code>。字号交给 CSS。</p>
+<p><code>&lt;b&gt;</code> 与 <code>&lt;i&gt;</code> 不是”不语义”。HTML5 重新定义过它们：<code>b</code> 是视觉上突出但不承担额外重要性的片段（关键词、产品名、手写批注），<code>i</code> 是一段不同语气或语域的文本（学名、外来语、思想活动）。与 <code>strong</code>&#x2F;<code>em</code> 的分工在于是否加重语义强度，真正该避免的是把它们当 <code>span</code> 的别名挂样式。</p>
+<p>最后一个认知误区：因为某内核不认就认定这标签不能用。未知元素的代价只是节点与样式，shiv 加块级声明就能收平；反过来因为 Chrome 能用就直接上 <code>dialog</code>，代价是功能缺失。前者可控，后者不可控，两类要分开评估。</p>
+<h2 id="小结：取舍清单与一条纪律"><a href="#小结：取舍清单与一条纪律" class="headerlink" title="小结：取舍清单与一条纪律"></a>小结：取舍清单与一条纪律</h2><p>新增语义标签值不值得用，笔者给一份四问清单：这块内容通不通得过旧文那套语义测试？老内核不认时补 shiv 与块级样式能不能收平？辅助技术和爬虫能不能因此读到结构？团队里其他人能不能一致按这条规则写？四问都过就值得用；第三、四问过不了，<code>div</code> 加语义化 class 反而更好——一个一致的 <code>.news-item</code> 比十个理解各异的 <code>section</code> 有用。<code>dialog</code>、<code>picture</code>、<code>srcset</code>、Web Components 这一批，正确处置是写进观察清单而不是排期。</p>
+<p>一条纪律收束全文：<strong>先看目标内核的支持情况，再谈语义和优雅</strong>。语义是内容与工具之间的契约，另一端没上线，签得再漂亮也不生效；另一端已经能读时，也别用 div 假装没有更诚实的写法。想用一个新特性先花五分钟查表、翻一次自家流量日志，这一步做了，关于”要不要用 HTML5”的争论会自己消解。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>HTML5 新特性总览与语义化标签实践</p><p><a href="https://987763485.github.io/2015/01/16/HTML5新特性总览与语义化标签实践/">https://987763485.github.io/2015/01/16/HTML5新特性总览与语义化标签实践/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2015-01-16</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/web%E5%89%8D%E7%AB%AF/">web前端</a><a class="link-muted mr-2" rel="tag" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/">浏览器</a><a class="link-muted mr-2" rel="tag" href="/tags/html5/">html5</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2015/01/18/HTML5%E8%A1%A8%E5%8D%95%E6%96%B0%E5%A2%9Einput%E7%B1%BB%E5%9E%8B%E4%B8%8E%E6%A0%A1%E9%AA%8C%E5%B1%9E%E6%80%A7%E8%AF%A6%E8%A7%A3/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">HTML5 表单新增 input 类型与校验属性详解</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2015/01/11/jQueryUI%E7%BB%84%E4%BB%B6%E4%BD%BF%E7%94%A8%E5%AE%9E%E8%B7%B5/"><span class="level-item">jQuery UI 组件使用实践</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

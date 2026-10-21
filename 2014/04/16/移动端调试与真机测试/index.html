@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>移动端调试与真机测试 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="上一篇《移动端调试工具与实践》讲的是每个工具怎么用，前提是已经决定用哪个工具。但项目里真正反复争论的往往是前面两步：机型和内核这么多，到底要备哪几台才算安全；预算和排期有限，几种调试方案里哪条路对我们项目划算。本文就谈这两个选型问题，不再重复工具的操作步骤。适合刚开始负责移动 Web 项目测试方案的同学，读完能直接抄走一张最小覆盖矩阵和一份提测自查清单。"><meta property="og:type" content="blog"><meta property="og:title" content="移动端调试与真机测试"><meta property="og:url" content="https://987763485.github.io/2014/04/16/%E7%A7%BB%E5%8A%A8%E7%AB%AF%E8%B0%83%E8%AF%95%E4%B8%8E%E7%9C%9F%E6%9C%BA%E6%B5%8B%E8%AF%95/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="上一篇《移动端调试工具与实践》讲的是每个工具怎么用，前提是已经决定用哪个工具。但项目里真正反复争论的往往是前面两步：机型和内核这么多，到底要备哪几台才算安全；预算和排期有限，几种调试方案里哪条路对我们项目划算。本文就谈这两个选型问题，不再重复工具的操作步骤。适合刚开始负责移动 Web 项目测试方案的同学，读完能直接抄走一张最小覆盖矩阵和一份提测自查清单。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2014-04-16T10:20:36.000Z"><meta property="article:modified_time" content="2026-10-17T12:46:58.192Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="web前端"><meta property="article:tag" content="html5"><meta property="article:tag" content="移动端"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2014/04/16/%E7%A7%BB%E5%8A%A8%E7%AB%AF%E8%B0%83%E8%AF%95%E4%B8%8E%E7%9C%9F%E6%9C%BA%E6%B5%8B%E8%AF%95/"},"headline":"移动端调试与真机测试","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2014-04-16T10:20:36.000Z","dateModified":"2026-10-17T12:46:58.192Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"上一篇《移动端调试工具与实践》讲的是每个工具怎么用，前提是已经决定用哪个工具。但项目里真正反复争论的往往是前面两步：机型和内核这么多，到底要备哪几台才算安全；预算和排期有限，几种调试方案里哪条路对我们项目划算。本文就谈这两个选型问题，不再重复工具的操作步骤。适合刚开始负责移动 Web 项目测试方案的同学，读完能直接抄走一张最小覆盖矩阵和一份提测自查清单。"}</script><link rel="canonical" href="https://987763485.github.io/2014/04/16/%E7%A7%BB%E5%8A%A8%E7%AB%AF%E8%B0%83%E8%AF%95%E4%B8%8E%E7%9C%9F%E6%9C%BA%E6%B5%8B%E8%AF%95/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2014-04-16T10:20:36.000Z" title="4/16/2014, 6:20:36 PM">2014-04-16</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/">移动端</a></span><span class="level-item">28 分钟读完 (大约4213个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">移动端调试与真机测试</h1><div class="content"><p>上一篇《移动端调试工具与实践》讲的是每个工具怎么用，前提是已经决定用哪个工具。但项目里真正反复争论的往往是前面两步：机型和内核这么多，到底要备哪几台才算安全；预算和排期有限，几种调试方案里哪条路对我们项目划算。本文就谈这两个选型问题，不再重复工具的操作步骤。适合刚开始负责移动 Web 项目测试方案的同学，读完能直接抄走一张最小覆盖矩阵和一份提测自查清单。</p>
+<h2 id="2014-年移动-Web-的碎片化现实"><a href="#2014-年移动-Web-的碎片化现实" class="headerlink" title="2014 年移动 Web 的碎片化现实"></a>2014 年移动 Web 的碎片化现实</h2><p>先说 iOS。很多人以为 iPhone 用户不用操心兼容，这是错觉。iOS 5 还占着不少份额，它和 iOS 7 之间隔了两代内核：iOS 5 对应 Safari 5.1 时代的 WebKit，CSS 前缀和一些 API 的行为明显更老；iOS 6 补上了远程调试能力；iOS 7 改版后状态栏透明、默认表单控件全部重绘，页头顶部的 fixed 元素会被状态栏压住 20 像素，老页面升级当天就出问题的案例一大把。同一个 Safari 名字下面藏着三代行为，这就是 iOS 的现状。</p>
+<p>Android 这边更碎。关键节点是去年底发布的 Android 4.4：WebView 终于换成了 Chromium 30 内核，而且作为独立组件随应用商店升级；在此之前，从 2.3 到 4.3 用的都是老 WebKit 血统，4.0 到 4.3 基本停在 Chrome 18 的代码基线上。粗对照如下：</p>
+<table>
+<thead>
+<tr>
+<th>系统版本</th>
+<th>WebView 内核</th>
+<th>大约相当于桌面端</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Android 2.3</td>
+<td>老 WebKit 533 系</td>
+<td>Safari 4&#x2F;5 时代</td>
+</tr>
+<tr>
+<td>Android 4.0 至 4.3</td>
+<td>Android WebKit 534（Chrome 18 基线）</td>
+<td>Chrome 18</td>
+</tr>
+<tr>
+<td>Android 4.4</td>
+<td>Chromium 30（537.36）</td>
+<td>Chrome 30，可独立升级</td>
+</tr>
+<tr>
+<td>iOS 5 &#x2F; 6 &#x2F; 7</td>
+<td>WebKit 三代分支</td>
+<td>各自对应 Safari 5.1&#x2F;6&#x2F;7</td>
+</tr>
+</tbody></table>
+<p>再往上还叠了两层魔改。一层是厂商 ROM：华为、三星、小米的自带浏览器都是拿 AOSP 源码自己改的，视频被劫持进系统播放器、UA 里塞自家标识、个别 CSS 属性处理不一致都是常事。另一层是第三方浏览器：UC 的 U3 内核、QQ 浏览器、百度浏览器各有各的加速代理，图片预压缩、请求合并，页面跑在里面时已经不完全按标准 WebView 的规则出牌了。所以”我在自己手机上测过了”这句话，严格讲只是宣告”矩阵里这一格没炸”。一台开发机测不完，不是抱怨，是事实。</p>
+<h2 id="调试方案横向对比"><a href="#调试方案横向对比" class="headerlink" title="调试方案横向对比"></a>调试方案横向对比</h2><p>桌面端习惯了 DevTools 打开就有一切，移动端选型的目标其实是”每个排查场景至少有一条信息通道”。几种方案的能看与不能看，摊开对比：</p>
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>能看到</th>
+<th>看不到</th>
+<th>需要的设备与环境</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>weinre</td>
+<td>DOM 树、样式、控制台执行 JS</td>
+<td>断点、Network 面板、布局渲染信息；所有指令要经服务器中转，有网络往返</td>
+<td>一台起服务的开发机，任何能打开页面的手机</td>
+</tr>
+<tr>
+<td>iOS 真机加 Safari Web Inspector</td>
+<td>DOM、样式、console、资源与时间线</td>
+<td>调试不了 App 内嵌的 WebView，只有 Safari 页面可查</td>
+<td>iPhone 加一台 Mac，数据线，系统 iOS 6 以上</td>
+</tr>
+<tr>
+<td>Chrome 远程调试 Android WebView</td>
+<td>DOM、断点、Network、Timeline，信息量最全</td>
+<td>4.0 以下没有通道；4.0 至 4.3 只能调试可调试包，4.4 才顺畅</td>
+<td>对应 Android 真机，PC 装 Chrome 32 以上</td>
+</tr>
+<tr>
+<td>WP8 模拟器</td>
+<td>屏幕画面、布局冒烟</td>
+<td>触摸手感、真实性能、JS 调试通道很弱，基本靠注入日志</td>
+<td>一台 Windows 8 的 PC，不需要手机</td>
+</tr>
+<tr>
+<td>自建日志回传</td>
+<td>JS 报错、自定义埋点、真实 UA</td>
+<td>DOM、样式、网络瀑布什么都看不见，报错之外全靠你埋了什么</td>
+<td>任意手机，加服务端一个收日志的接口</td>
+</tr>
+</tbody></table>
+<p>前四行的用法在上一篇都写过，这里只比选型。我的结论是分三档：能用系统级远程调试就用它，iOS 靠 Safari Web Inspector，Android 4.4 靠 Chrome 远程调试，信息量最大、零代码侵入；跨平台兜底靠 weinre，代价是看不到的东西比看得到的多；最后的保底是日志回传，它不挑内核、不挑浏览器，UC、QQ 里照样能把错传回来，缺点是只能看你自己打印过的东西。实际项目里三档通常都要，只是比重不同。日志回传贴一段当年在用的最小实现：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 报错回传：不挑内核，老 WebView 也能跑</span></span><br><span class="line">(<span class="keyword">function</span> (<span class="params"></span>) &#123;</span><br><span class="line">    <span class="variable language_">window</span>.<span class="property">onerror</span> = <span class="keyword">function</span> (<span class="params">msg, file, line</span>) &#123;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            <span class="keyword">var</span> data = <span class="title class_">JSON</span>.<span class="title function_">stringify</span>(&#123;</span><br><span class="line">                <span class="attr">ua</span>: navigator.<span class="property">userAgent</span>,</span><br><span class="line">                <span class="attr">msg</span>: msg,</span><br><span class="line">                <span class="attr">file</span>: file,</span><br><span class="line">                <span class="attr">line</span>: line</span><br><span class="line">            &#125;);</span><br><span class="line">            <span class="keyword">var</span> xhr = <span class="keyword">new</span> <span class="title class_">XMLHttpRequest</span>();</span><br><span class="line">            xhr.<span class="title function_">open</span>(<span class="string">&quot;POST&quot;</span>, <span class="string">&quot;/api/log/jserror&quot;</span>, <span class="literal">true</span>); <span class="comment">// 同源接口，绕开跨域</span></span><br><span class="line">            xhr.<span class="title function_">setRequestHeader</span>(<span class="string">&quot;Content-Type&quot;</span>, <span class="string">&quot;application/json&quot;</span>);</span><br><span class="line">            xhr.<span class="title function_">send</span>(data);</span><br><span class="line">        &#125; <span class="keyword">catch</span> (e) &#123;</span><br><span class="line">            <span class="comment">// 回传本身出错就静默，绝不能影响业务</span></span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">    &#125;;</span><br><span class="line">&#125;)();</span><br></pre></td></tr></table></figure>
+
+<h2 id="拿不到真机时怎么办"><a href="#拿不到真机时怎么办" class="headerlink" title="拿不到真机时怎么办"></a>拿不到真机时怎么办</h2><p>项目早期或者出差在外，手边只有一台电脑是常态。这时候要先想清楚哪些结论”模拟出来不算数”。</p>
+<h3 id="UA-伪装与-navigator-检测不可靠"><a href="#UA-伪装与-navigator-检测不可靠" class="headerlink" title="UA 伪装与 navigator 检测不可靠"></a>UA 伪装与 navigator 检测不可靠</h3><p>测试报告里写”用户是 Chrome”没有任何意义，因为 UA 会说谎。国产浏览器为了不被网站挡在门外，UA 尾巴上挂着 <code>AppleWebKit</code> 和 <code>Safari</code> 是标配，个别 UC 与 QQ 浏览器的版本还直接自称 Chrome 18，把站点骗得团团转——它内核明明还是老 WebKit。伪装史在《navigator 与浏览器检测的取舍》里讲得很细，本文只取测试角度的结论：验证结果必须以”机型、系统、浏览器”三元组记录，不接受”这台手机 UA 显示 Chrome 所以等于 Chrome”这种推论；代码里靠 UA 分支的补丁逻辑，本身就是要重点测的风险点。</p>
+<h3 id="桌面模拟能给什么、给不了什么"><a href="#桌面模拟能给什么、给不了什么" class="headerlink" title="桌面模拟能给什么、给不了什么"></a>桌面模拟能给什么、给不了什么</h3><p>Chrome 和 Safari 都有拖视口加模拟 touch 的设备模式，快速过布局、验证媒体查询完全够用，改一行 CSS 刷新十秒搞定，这是它划算的地方。但它模拟不了三样东西：内核行为差异（桌面 Chrome 再快也是 Chrome 30 级别的解析器，替 2.3 上的老 WebKit 说话没有效力）、真实的触摸手感（惯性滚动、双击缩放的时序都是另一套）、以及硬件资源上限。所以桌面模拟适合”改样式时提效”，不适合”出测试结论”。</p>
+<h3 id="只能真机复现的坑"><a href="#只能真机复现的坑" class="headerlink" title="只能真机复现的坑"></a>只能真机复现的坑</h3><p>下面这些，模拟环境测不出来，谁模拟谁上当：</p>
+<ul>
+<li>300ms 点击延迟：双击缩放判断发生在原生层，桌面拖视口永远等不出这一拍；</li>
+<li>软键盘顶起页面：键盘弹出时视口怎么变、<code>window.innerHeight</code> 变不变，各家行为不同，必须真机敲一遍表单；</li>
+<li><code>position: fixed</code> 抖动：iOS 上滚动时 fixed 元素跟着晃甚至跳位，纯渲染层问题；</li>
+<li>video 自动播放：iOS Safari 要求用户手势才起播，且一播就被系统全屏播放器接管，桌面模拟里设置 autoplay 就会播，完全两回事；</li>
+<li>图片内存上限：低端 iPhone 上解码面积超限直接白图甚至整页重载，桌面内存管够，测不出来；</li>
+<li>iOS 截图与滚动条：系统截图只截当前视口，长页效果要肉眼翻页验收；滚动条只在滚动瞬间出现，”内容还能不能滚”这类判断模拟环境里做不了。</li>
+</ul>
+<h2 id="真机从哪来"><a href="#真机从哪来" class="headerlink" title="真机从哪来"></a>真机从哪来</h2><p>选型选到最后都是采购和制度问题。三条路各有适用面。</p>
+<h3 id="自建机型池"><a href="#自建机型池" class="headerlink" title="自建机型池"></a>自建机型池</h3><p>小团队预算有限，买机标准我建议按”份额乘以内核差异再除以价格”来排优先级：份额决定问题暴露量，内核差异决定它代表不代表一族机型，价格决定你能铺多宽。当年我们花三千多块凑了第一批：一台 iPhone 4S 守 iOS 6 老内核加低端内存，一台 iPhone 5 跑 iOS 7 主流，一台 HTC 老机器留着 2.3 的坑，一台三星 Galaxy S3 代表 4.1 加厂商定制浏览器，一台红米代表 MIUI 用户群。Nexus 5 是后来补的，专门看 Chromium 30 新内核的行为。每加一台新机，先问它覆盖了矩阵里哪一格空白，问不出来的不买。</p>
+<h3 id="轮流借用制度"><a href="#轮流借用制度" class="headerlink" title="轮流借用制度"></a>轮流借用制度</h3><p>自建池解决”常驻机型”，长尾机型靠制度。我们的做法是设一个共享设备架，同事手里的旧手机登记后统一贴标（型号、系统、可借周期），版本测试期由测试同学按清单签出，用完归位。成本几乎为零，两年里从同事手里”众筹”出了七八台不在矩阵主格但偶发问题集中的机型。</p>
+<h3 id="云真机与众测平台"><a href="#云真机与众测平台" class="headerlink" title="云真机与众测平台"></a>云真机与众测平台</h3><p>2014 年 Testin、百度云测这类第三方云测试服务已经做起来了，平台上挂着几百款真机可以远程点选。要划清它们的适用边界：跑批量兼容性截图、装机与崩溃收集非常合适，版本发布前拉一份几百机型的兼容报告给产品和测试看，性价比高；但深度调试不行——没有稳定的调试通道，操作排队延迟大，弱网、键盘这些场景基本碰不到。Appium 这类开源自动化方案 2011 年就有了，今年 3 月刚发布 1.0，可以拿来做批量冒烟脚本，但别指望它替你判断”这个动画卡不卡”。一句话：云真机管广度，自有真机管深度。</p>
+<h2 id="测试矩阵与优先级"><a href="#测试矩阵与优先级" class="headerlink" title="测试矩阵与优先级"></a>测试矩阵与优先级</h2><p>把前面的东西收拢成一张最小覆盖矩阵，按我们项目当时的用户份额（百度统计看系统版本分布，友盟和 GA 交叉验证机型集中度）填出是这样：</p>
+<table>
+<thead>
+<tr>
+<th>档位</th>
+<th>机型与系统</th>
+<th>浏览器 &#x2F; WebView</th>
+<th>网络</th>
+<th>优先级</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>iOS 主流</td>
+<td>iPhone 5，iOS 7</td>
+<td>Safari，微信内 WebView</td>
+<td>WiFi</td>
+<td>P0</td>
+</tr>
+<tr>
+<td>iOS 低端</td>
+<td>iPhone 4S，iOS 6</td>
+<td>Safari</td>
+<td>3G 限速</td>
+<td>P0</td>
+</tr>
+<tr>
+<td>Android 老内核</td>
+<td>HTC 2.3 自带机</td>
+<td>自带浏览器，UC</td>
+<td>2G &#x2F; 3G</td>
+<td>P0</td>
+</tr>
+<tr>
+<td>Android 主流</td>
+<td>Galaxy S3（4.1），红米（4.2）</td>
+<td>厂商自带浏览器，QQ，百度</td>
+<td>3G 限速</td>
+<td>P0</td>
+</tr>
+<tr>
+<td>Android 新内核</td>
+<td>Nexus 5，4.4</td>
+<td>系统 WebView，Chrome</td>
+<td>WiFi</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>Windows Phone</td>
+<td>Lumia 520，WP8</td>
+<td>IE10</td>
+<td>WiFi</td>
+<td>P2，按份额决定投不投</td>
+</tr>
+</tbody></table>
+<p>份额数据每季度刷新一次，矩阵里哪个格子盖住的真实用户掉到 3% 以下，P0 就降 P1，有新机型冲进前列就补格子。网络维度别偷懒：手机挂上 Charles 代理，用 Throttle 的 3G 预设再手动把延迟调高，首屏真实秒数立刻现形，这一步在有真机通道的方案里成本最低、收益最大，建议直接固化进每次提测。</p>
+<h2 id="常见兼容问题的分类定位套路"><a href="#常见兼容问题的分类定位套路" class="headerlink" title="常见兼容问题的分类定位套路"></a>常见兼容问题的分类定位套路</h2><p>把历史 bug 按类归档之后，每类都能总结出一条最短定位路径。</p>
+<h3 id="布局类"><a href="#布局类" class="headerlink" title="布局类"></a>布局类</h3><p>案例：iOS 7 升级当天，首页搜索条整体下移了 20 像素——系统状态栏变透明，页面默认顶到屏幕最上沿。定位路径：先确认问题只在 iOS 7 出现，再拿 Safari Web Inspector 看视口高度，发现 fixed 定位基准变了。补一条 <code>meta</code> 与顶部占位的分支逻辑解决。布局类的套路是：先分内核代际，再分视口基准，最后才怀疑具体 CSS。</p>
+<h3 id="事件类"><a href="#事件类" class="headerlink" title="事件类"></a>事件类</h3><p>案例：页面在 WP8 的 IE10 里按钮全部点不动。原因很简单，只绑了 <code>touchstart</code>，而 IE10 走 Pointer Events 那一系。定位路径：拿日志回传确认事件根本没进处理函数，再在点击入口统一走 click 加库兜住延迟，不再裸绑 touch。事件类的套路是：先判断”事件到底有没有派发”，再谈处理逻辑，别一上来就怀疑业务代码。</p>
+<h3 id="媒体类"><a href="#媒体类" class="headerlink" title="媒体类"></a>媒体类</h3><p>案例：视频页在三星自带浏览器里一播放就被弹进全屏系统播放器，自制的进度条和封面全失效。定位路径：同一 URL 在 Chrome 和自带浏览器各放一遍，确认是厂商 ROM 劫持而非代码问题，最后按浏览器家族分别降级——劫持不可控的机型退回静态封面加跳转链接。媒体类基本是厂商定制的重灾区，套路是”同机型换浏览器对照”，两分钟就能把内核问题和 ROM 问题分开。</p>
+<h3 id="性能类"><a href="#性能类" class="headerlink" title="性能类"></a>性能类</h3><p>案例：Android 4.1 的老机器上列表滚动严重掉帧。定位路径：4.4 上先用 Chrome 远程调试的 Timeline 确认是每帧重绘面积太大，回头把 <code>box-shadow</code> 加大圆角的组合从滚动容器里拆出去。老内核拿不到 Timeline，就在滚动循环里打时间戳回传。性能套路的核心是先定瓶颈层——网络、脚本还是绘制——再优化，跨机型对比时间戳往往比盯着单机看更有信息量。</p>
+<h3 id="输入法类"><a href="#输入法类" class="headerlink" title="输入法类"></a>输入法类</h3><p>案例：中文输入法下昵称字数校验疯狂误报超限。原因是部分 Android 浏览器在候选拼音阶段就开始连续触发 <code>input</code>，字数按拼音字母算了一遍。定位路径：真机上分别用系统英文键盘和中文键盘各录一遍事件序列，差异立刻暴露；处理上输入法组合期间的值不参与校验。这类坑模拟环境根本不存在，也再次说明为什么必须有一台装着中文输入法的真机常驻。</p>
+<h2 id="提测前自查清单"><a href="#提测前自查清单" class="headerlink" title="提测前自查清单"></a>提测前自查清单</h2><p>下面这份是我们组贴在工位上的版本，可以直接抄走改成自己项目的：</p>
+<ul>
+<li><input disabled="" type="checkbox"> <code>viewport</code> 声明正确，页面在三个宽度档（320&#x2F;375&#x2F;480 逻辑像素）下无横向滚动；</li>
+<li><input disabled="" type="checkbox"> 代码里没有靠 UA 猜内核的分支，特性判断全部改为能力检测；</li>
+<li><input disabled="" type="checkbox"> Android 2.3 与 4.0 系自带浏览器各跑一遍主流程，UC 单独再跑一遍；</li>
+<li><input disabled="" type="checkbox"> iOS 6 与 iOS 7 各过一遍带 fixed 顶底栏的页面；</li>
+<li><input disabled="" type="checkbox"> UC、QQ、百度三款第三方浏览器覆盖核心路径；</li>
+<li><input disabled="" type="checkbox"> 全表单页真实弹出软键盘，验证遮挡与页面回弹；</li>
+<li><input disabled="" type="checkbox"> Charles 限速到 3G 预设，记录首屏完成时间；</li>
+<li><input disabled="" type="checkbox"> 最大尺寸图片检查白图与整页重载，页面解码面积合计有数；</li>
+<li><input disabled="" type="checkbox"> video、audio 在各机型确认手势起播与全屏行为符合产品预期；</li>
+<li><input disabled="" type="checkbox"> 高频点击操作验证 300ms 感知，必要时接入 fastclick 并回归双击场景；</li>
+<li><input disabled="" type="checkbox"> <code>window.onerror</code> 回传已开启，提测包里能看到自己的日志落库；</li>
+<li><input disabled="" type="checkbox"> 横竖屏切换、iOS 7 后退缓存页各试一次。</li>
+</ul>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>移动端的测试问题本质上是覆盖问题：碎片化的内核与 ROM 决定了不可能一台机测完，能做的是把”测哪几台、怎么调、信哪些结论”变成显式决策。调试方案按信息量分档，系统级远程调试优先，weinre 兜底，日志回传保底；桌面模拟只用于提效，涉及触摸、键盘、内存、媒体劫持的结论必须出自真机。机型来源上，自建池管常驻主力格，借用制度补长尾，云真机跑批量兼容性报告。矩阵按季度用真实份额刷新优先级，弱网限速固化进流程。最后，把自查清单贴在每次提测的入口，让同类坑只踩一次。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>移动端调试与真机测试</p><p><a href="https://987763485.github.io/2014/04/16/移动端调试与真机测试/">https://987763485.github.io/2014/04/16/移动端调试与真机测试/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2014-04-16</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-17</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/web%E5%89%8D%E7%AB%AF/">web前端</a><a class="link-muted mr-2" rel="tag" href="/tags/html5/">html5</a><a class="link-muted mr-2" rel="tag" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/">移动端</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2014/04/21/CSS%E5%AE%9E%E7%8E%B0%E5%B8%B8%E8%A7%81UI%E7%BB%84%E4%BB%B6/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">CSS 实现常见 UI 组件</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2014/04/09/%E6%AD%A3%E5%88%99%E8%A1%A8%E8%BE%BE%E5%BC%8F%E8%BF%9B%E9%98%B6%E5%9B%9E%E6%BA%AF%E4%B8%8E%E6%80%A7%E8%83%BD/"><span class="level-item">正则表达式进阶：回溯与性能</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

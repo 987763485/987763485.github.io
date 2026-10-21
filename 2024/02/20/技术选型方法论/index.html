@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>技术选型方法论 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="技术选型每个团队都会反复做，但多数讨论停在”要看场景”这句话上，没有把场景展开成结论的过程。本文把它拆成约束收集、候选池、评分维度、证据采集、决策记录与复评退出六个环节，每一环给出可直接套用的清单、判定表或模板，适合即将引入新框架、新语言运行时的同学，以及需要在评审会上解释”为什么是它”的负责人。文中时限、人数与阈值一律是团队约定示例，不代表任何厂商或社区统计。"><meta property="og:type" content="blog"><meta property="og:title" content="技术选型方法论"><meta property="og:url" content="https://987763485.github.io/2024/02/20/%E6%8A%80%E6%9C%AF%E9%80%89%E5%9E%8B%E6%96%B9%E6%B3%95%E8%AE%BA/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="技术选型每个团队都会反复做，但多数讨论停在”要看场景”这句话上，没有把场景展开成结论的过程。本文把它拆成约束收集、候选池、评分维度、证据采集、决策记录与复评退出六个环节，每一环给出可直接套用的清单、判定表或模板，适合即将引入新框架、新语言运行时的同学，以及需要在评审会上解释”为什么是它”的负责人。文中时限、人数与阈值一律是团队约定示例，不代表任何厂商或社区统计。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2024-02-19T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-19T07:05:04.375Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="java"><meta property="article:tag" content="kotlin"><meta property="article:tag" content="flutter"><meta property="article:tag" content="csharp"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2024/02/20/%E6%8A%80%E6%9C%AF%E9%80%89%E5%9E%8B%E6%96%B9%E6%B3%95%E8%AE%BA/"},"headline":"技术选型方法论","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2024-02-19T16:00:00.000Z","dateModified":"2026-10-19T07:05:04.375Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"技术选型每个团队都会反复做，但多数讨论停在”要看场景”这句话上，没有把场景展开成结论的过程。本文把它拆成约束收集、候选池、评分维度、证据采集、决策记录与复评退出六个环节，每一环给出可直接套用的清单、判定表或模板，适合即将引入新框架、新语言运行时的同学，以及需要在评审会上解释”为什么是它”的负责人。文中时限、人数与阈值一律是团队约定示例，不代表任何厂商或社区统计。"}</script><link rel="canonical" href="https://987763485.github.io/2024/02/20/%E6%8A%80%E6%9C%AF%E9%80%89%E5%9E%8B%E6%96%B9%E6%B3%95%E8%AE%BA/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2024-02-19T16:00:00.000Z" title="2/20/2024, 12:00:00 AM">2024-02-20</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/">全栈开发</a></span><span class="level-item">1 小时读完 (大约10617个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">技术选型方法论</h1><div class="content"><p>技术选型每个团队都会反复做，但多数讨论停在”要看场景”这句话上，没有把场景展开成结论的过程。本文把它拆成约束收集、候选池、评分维度、证据采集、决策记录与复评退出六个环节，每一环给出可直接套用的清单、判定表或模板，适合即将引入新框架、新语言运行时的同学，以及需要在评审会上解释”为什么是它”的负责人。文中时限、人数与阈值一律是团队约定示例，不代表任何厂商或社区统计。</p>
+<h2 id="选型的三种失败形态"><a href="#选型的三种失败形态" class="headerlink" title="选型的三种失败形态"></a>选型的三种失败形态</h2><p>要设计流程，先要看清失败长什么样。选型事故几乎都能归入三类，成因不同，预防手段也不同；把它们混成同一种”选错了”，开出的药方就只能是一句”下次多调研”。</p>
+<h3 id="形态一：选完就后悔"><a href="#形态一：选完就后悔" class="headerlink" title="形态一：选完就后悔"></a>形态一：选完就后悔</h3><p>典型说法是”早知道就不换它了”。技术本身往往没有明显缺陷，缺的是决策时没把约束写成文字：输入信号只有”最近讨论得多””维护者很有名””演示跑得很顺”，而没人回答”招不招到会它的人””出问题时谁半夜排查””现有构建脚本要不要重写”。半年后炸出来的问题，通常在决策那天已经确定。</p>
+<p>更深的成因是把候选池当成结论：方案排第一，只说明它在评估者构造的维度上得分最高，不意味着它与团队的组织现实相容。</p>
+<h3 id="形态二：半年后迁移"><a href="#形态二：半年后迁移" class="headerlink" title="形态二：半年后迁移"></a>形态二：半年后迁移</h3><p>这类失败是选完之后走了一半又退回来，或者干脆换掉。成因有三个：评估只覆盖”能不能写出第一个接口”，没覆盖演进，一个只做增删改查的验证项目能跑，不代表它两年后撑得住多租户、灰度发布与合规审计；PoC 代码被直接当成生产骨架，早期妥协变成长期债务，迁移成本最后都记在”这个技术不行”的账上；决策时没写复评触发条件，注意力要等线上事故才回到选型问题上。</p>
+<p>它多发生在多端项目里：服务端语言与跨端界面方案由两个小组分别评估，各看各的文档，最后发现可观测口径接不上——链路标识无法贯穿，构建产物版本对不上，只能重做一端。接界处没人负责，就是典型的单点都对、整体不可用。</p>
+<h3 id="形态三：只有跑分没有结论"><a href="#形态三：只有跑分没有结论" class="headerlink" title="形态三：只有跑分没有结论"></a>形态三：只有跑分没有结论</h3><p>第三类最隐蔽：材料里全是数字，却没有决策。有人跑了一轮微基准，得出两个方案在某细分操作上相差若干倍，会议室于是陷入两种极端——要么”数据都在这，还用讨论吗”，要么”这数据不说明问题”，然后什么都没定。</p>
+<p>成因是跑分与决策之间缺两层转换。一是负载形态：微基准测单个操作的极限，端到端关心真实请求里 IO、序列化、连接池与调度共同决定的分位延迟与稳定性，两者结论可以相反。二是表述形式：基准结论必须以区间加条件的形式给出，条件要写清硬件、并发档位、预热方式与配置水平，否则它没法参与权衡。</p>
+<p>三类失败合起来指向同一句话：选型的产物不是赢家，而是一份把约束、证据、决定与代价绑在一起的记录。后面几个环节都是为了产出这份记录。</p>
+<h2 id="先定约束再找候选"><a href="#先定约束再找候选" class="headerlink" title="先定约束再找候选"></a>先定约束再找候选</h2><h3 id="流程总览"><a href="#流程总览" class="headerlink" title="流程总览"></a>流程总览</h3><p>选型可以画成一条带门禁的流水线，关键在三处：候选池在硬约束之后，PoC 在评分之后，复评条件与决定写在同一份文档里。</p>
+<pre class="mermaid">flowchart TD
+    A[收集约束条件] --> B{硬约束门禁}
+    B -->|不满足| C[直接淘汰并记录原因]
+    B -->|满足| D[候选池收敛到 3-5 个]
+    D --> E[按维度评分]
+    E --> F{分数接近}
+    F -->|是| G[做 PoC 与证据采集]
+    F -->|否| H[写出 ADR 决策记录]
+    G --> H
+    H --> I[设定复评触发条件]
+    I --> J[到期或触发时重评]
+    J --> A</pre>
+
+<p>两处门禁最容易被省略，也最省时间：硬约束淘汰能在一小时内清掉半个池子，复评触发条件则决定你会不会跌进形态二。</p>
+<h3 id="六类约束"><a href="#六类约束" class="headerlink" title="六类约束"></a>六类约束</h3><p>约束要写成可判定真假的句子，不能是”性能要好””生态要活跃”这类无法核对的愿望。下面这份清单把最容易漏的六类约束落成问句，评审时逐条回答并写下出处；答案要由团队自己填，本文不代填。</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">## 约束问句清单（团队约定示例）</span></span><br><span class="line">交付时间：本次改造允许占用几个迭代？最晚上线日期？有无不可移动的对外承诺？</span><br><span class="line">  → 若答案是&quot;下版本就要上&quot;，需要重写构建脚本或更换部署形态的候选事实上已出局。</span><br><span class="line">团队现有技能：谁会、谁愿意学、谁能成为可被咨询的对象、谁承担布道与评审？</span><br><span class="line">  → 判据示例：至少两名成员能独立完成一次带测试与监控的模块改造。达不到这条线，</span><br><span class="line"><span class="code">    所谓学习曲线平缓只是文档给外人看的印象。</span></span><br><span class="line"><span class="code">运维与招聘：排查工具是否熟悉？日志与指标能否接进现有平台？告警规则由谁维护？</span></span><br><span class="line"><span class="code">  → 这项成本不体现在代码里，而体现在凌晨的故障处理与一次次招聘结果上。</span></span><br><span class="line"><span class="code">合规与数据出境：是否涉及个人信息与重要数据？是否需境内存储与处理？需通过哪些测评？</span></span><br><span class="line"><span class="code">  → 第三方与托管组件是否满足。《个人信息保护法》与《数据安全法》自 2021 年施行后，</span></span><br><span class="line"><span class="code">    这在国内项目里是常规项而非可选项。</span></span><br><span class="line"><span class="code">许可证与商用限制：宽松型还是传染性？可否闭源分发？有无专利与商标条款？</span></span><br><span class="line"><span class="code">  → 双许可下是否存在必须购买商业授权的边界？整棵依赖树（不只顶层项目）是否扫描过？</span></span><br><span class="line"><span class="code">退出成本：两年后要迁走，哪些必须重做？接口契约与数据能否保留？技能能否迁移？</span></span><br><span class="line"><span class="code">  → 需要长期承担的资产是领域模型与接口契约；退出成本低说明这两层隔离得好。</span></span><br></pre></td></tr></table></figure>
+
+<p>清单里最常被跳过的是运维与招聘、退出成本两类，因为它们不表现为技术缺陷，而表现为团队持续付出额外时间；合规与许可证两类相反，跳过的代价集中爆发，通常是临近上线时整个方案作废。本文不做状态管理库、向量数据库这类具体候选的逐项对比，那是专篇内容。</p>
+<h3 id="落成一份文件"><a href="#落成一份文件" class="headerlink" title="落成一份文件"></a>落成一份文件</h3><p>把六类约束写成仓库里的一个文件，评审时逐条签字，模板可以直接抄：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># constraints.yaml —— 字段与取值均为团队约定示例</span></span><br><span class="line"><span class="attr">delivery:</span></span><br><span class="line">  <span class="attr">must_online_before:</span> <span class="string">&quot;2024-06-30&quot;</span>   <span class="comment"># 本迭代硬约束</span></span><br><span class="line">  <span class="attr">poc_budget_person_days:</span> <span class="number">4</span>          <span class="comment"># 单人 PoC 上限</span></span><br><span class="line"><span class="attr">team_skill:</span></span><br><span class="line">  <span class="attr">min_independent_contributors:</span> <span class="number">2</span>    <span class="comment"># 能独立完成带测试改造的人数</span></span><br><span class="line"><span class="attr">ops_and_hiring:</span></span><br><span class="line">  <span class="attr">observability_required:</span> [<span class="string">logs</span>, <span class="string">metrics</span>, <span class="string">traces</span>]</span><br><span class="line">  <span class="attr">deploy_target:</span> <span class="string">&quot;现有容器平台，不自建新的运维体系&quot;</span></span><br><span class="line"><span class="attr">compliance:</span></span><br><span class="line">  <span class="attr">data_residency:</span> <span class="string">&quot;境内存储，不出境&quot;</span></span><br><span class="line">  <span class="attr">third_party_hosting:</span> <span class="string">&quot;不依赖不可控的外部托管服务&quot;</span></span><br><span class="line"><span class="attr">license:</span></span><br><span class="line">  <span class="attr">allow:</span> [<span class="string">&quot;Apache-2.0&quot;</span>, <span class="string">&quot;MIT&quot;</span>, <span class="string">&quot;BSD-3-Clause&quot;</span>]</span><br><span class="line">  <span class="attr">deny:</span> [<span class="string">&quot;AGPL 类强传染条款用于对外分发的核心模块&quot;</span>]</span><br><span class="line"><span class="attr">exit_cost:</span></span><br><span class="line">  <span class="attr">must_preserve:</span> [<span class="string">&quot;HTTP 契约&quot;</span>, <span class="string">&quot;数据库表结构&quot;</span>, <span class="string">&quot;领域层代码&quot;</span>]</span><br></pre></td></tr></table></figure>
+
+<p>它的作用不是形式合规，而是让淘汰可解释：有人问”为什么不考虑那个方案”，答案可以是”不满足 data_residency 这一条”，而不是一句”感觉不合适”。它还有个副作用——迫使团队承认某些决定来自组织约束而非技术判断，而技术讨论恶化的起点，正是把组织偏好论证成技术优越性。</p>
+<h3 id="约束之间会冲突"><a href="#约束之间会冲突" class="headerlink" title="约束之间会冲突"></a>约束之间会冲突</h3><p>六类约束经常互相矛盾，交付时间一紧，团队技能与退出成本就会被挤压。可操作的办法只有一个：在文件顶部写一行显式排序，例如”合规 &gt; 交付时间 &gt; 运维与招聘 &gt; 团队技能 &gt; 退出成本 &gt; 许可证细节”，并记录理由。有了排序，冲突发生时不必重新争吵；没有排序，同一个冲突每周都会以新形式出现一次。</p>
+<p>排序之后把约束分成两档：硬门禁不满足直接淘汰并记录，软约束进入评分维度按权重体现。分档本身要是一次显式决定，而不是评审现场的即兴判断；至于协作规范如何落到日常流程，属于团队协作类文章的范围。</p>
+<h2 id="候选池的构建与收敛"><a href="#候选池的构建与收敛" class="headerlink" title="候选池的构建与收敛"></a>候选池的构建与收敛</h2><h3 id="来源要刻意分散"><a href="#来源要刻意分散" class="headerlink" title="来源要刻意分散"></a>来源要刻意分散</h3><p>池子最常见的毛病是来源单一：某位成员在读一个项目，于是一半候选是它的变体。渠道应当互相独立，至少四类：自家存量，翻依赖清单与构建脚本，看哪些方案已在某个角落跑着且没人抱怨，它的运维经验与排查手册都在手里；官方生态位，框架给出的受支持集成清单与兼容性矩阵，例如 Spring 的项目列表、Kotlin 的官方库索引、Flutter 的插件市场与 .NET 的包目录；包仓库的客观记录，包括发布历史、支持声明与许可证字段；外部实践描述，只用来发现候选，因为它天然带幸存者偏差。</p>
+<h3 id="先排除，再加权"><a href="#先排除，再加权" class="headerlink" title="先排除，再加权"></a>先排除，再加权</h3><p>第一步不是打分而是排除。拿约束清单逐条核对，四类情况应当在评分之前出局：硬约束不满足；目标平台或运行时不受支持，或只在预览状态下支持；许可证与商用条款同产品形态冲突；没有可核对的维护信号，例如长期没有发布、没有安全响应渠道、官方已声明进入维护或废弃状态。</p>
+<p>排除要留一行记录，写清因哪条约束出局。它的价值在半年后：有人重提这个方案时，一句”已因合规约束排除，原因见约束清单第 4 条”就能避免整场讨论重来一遍。</p>
+<h3 id="为什么是-3-5-个"><a href="#为什么是-3-5-个" class="headerlink" title="为什么是 3-5 个"></a>为什么是 3-5 个</h3><p>池子要压到三到五个，这不是审美，而是两种失效之间的平衡点。只有两个候选时，评审几乎必然退化成立场之争：新证据只被用来攻击对方，否决一个之后团队失去选项，只能退回重做。三到五个提供了中间地带——可以得出”两个都不合适，用第三个”，也可以把两个候选合并成同一个决定，例如服务端沿用现有语言、只在客户端引入新方案，而合并往往就是最优解。超过五个则成本失控：评分表要有人独立填写，PoC 预算按候选数线性增长，且第五个之后往往是某个方案的另一个变体，差异不足以支撑决策。</p>
+<p>压缩的做法是按实现路径分组，同组只保留一个代表，判断标准是替代它们所需付出的工程动作是否相同：若两个候选要求相同的部署形态、技能栈与运维接入方式，它们在决策上就是同一个选项。示例：后端候选里若若干项都属于”沿用 JVM 生态、只是语言不同”，例如在 Java 17 与 21 这两个 LTS 版本之上用 Kotlin 1.9.x 编写服务层，那就是一组；”更换运行时并更换构建与镜像产物”的候选自成一组。分组只解决评审成本，不构成优劣判断。</p>
+<h3 id="把”不引入”放进池子"><a href="#把”不引入”放进池子" class="headerlink" title="把”不引入”放进池子"></a>把”不引入”放进池子</h3><p>最后一步容易漏：把”不做改动、在现有栈内解决”作为正式候选列入并给完整评分。这是防追新的机制，也是防个别人偏好决定的机制：很多选型的真实需求只是”某个模块难维护”，而现有栈里的重构、拆分或升级同样能满足它；这个选项不在表上，决策就变成”引入什么”的单选题。</p>
+<h2 id="评分维度设计"><a href="#评分维度设计" class="headerlink" title="评分维度设计"></a>评分维度设计</h2><h3 id="维度要能被独立填写"><a href="#维度要能被独立填写" class="headerlink" title="维度要能被独立填写"></a>维度要能被独立填写</h3><p>评分维度的设计标准只有一条：一个没有参与讨论的成员，看完维度定义和证据来源后，能填出一个和别人可比较的分。”生态好””性能强””社区活跃”没有判据，做不到这一点，最终只能变成嗓门大小的比拼。每个维度写清三件事：问什么、看什么证据、怎么给分，其中分档优于连续分值，后者会制造假精确。</p>
+<h3 id="六个常用维度"><a href="#六个常用维度" class="headerlink" title="六个常用维度"></a>六个常用维度</h3><p>其中四个维度可以按下面的检查单直接填写，问句、证据与误判都固定下来：</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">## 评分维度检查单（每一格都要写证据出处，空证据不计分）</span></span><br><span class="line">功能匹配度</span><br><span class="line">  问句：本季度需求拆成十条关键能力后，几条直接支持、几条要自建、几条不支持？</span><br><span class="line">  证据：官方能力清单，加上自己写过的最小样例，而不是别人的对比文章。</span><br><span class="line">  误判：把远期可能的需求算进权重，用三年后的想象为今天的决定投票。</span><br><span class="line">生态与长期演进</span><br><span class="line">  问句：两年后我还能不能拿到升级路径？</span><br><span class="line">  证据：官方发布节奏、兼容性声明、大版本迁移指南，以及它依赖的构建与运行时是否</span><br><span class="line"><span class="code">    仍在受支持状态。</span></span><br><span class="line"><span class="code">  误判：用热度替代可核对的记录。</span></span><br><span class="line"><span class="code">学习曲线</span></span><br><span class="line"><span class="code">  问句：一位新人限时完成含测试与配置的小模块，实际花了多久、卡在哪里？</span></span><br><span class="line"><span class="code">  证据：一次受控实验的耗时与卡点记录，它同时构成 PoC 的一部分。</span></span><br><span class="line"><span class="code">  误判：把&quot;文档友好&quot;当成上手容易，忽略深入之后要理解运行时内部。</span></span><br><span class="line"><span class="code">构建与部署一致性</span></span><br><span class="line"><span class="code">  问句：现有构建与发布流水线能否产出可复现产物？</span></span><br><span class="line"><span class="code">  证据：CI 构建与发布记录、依赖锁定与版本回放结果。</span></span><br><span class="line"><span class="code">  误判：用开发机上的表现替代流水线里的表现。</span></span><br></pre></td></tr></table></figure>
+
+<p>另外两个维度值得单独说，因为它们最容易被评错。</p>
+<p>性能是否够用。关键在”够用”而不是”最优”。先写下目标：某类接口在预期峰值并发下的分位延迟上限、单实例承载流量下限、内存预算、启动时间要求，再判断候选落在”满足并留有余量””处在边界需专门优化””无法满足”哪一档。多数候选都在第一档，此时这个维度对决策没有贡献，应当把权重让出去；落到第三档则是硬问题，不能靠”以后优化”含糊。完整的负载对比属于性能类文章。</p>
+<p>可观测性与排障难度。这是最被低估的维度。问三句：日志、指标、链路能否接进现有平台；出问题时能否用现有工具看到内部状态；是否有可用的追踪与剖析集成。判据建议写成”不加新组件就能定位一次人为构造的超时故障”。它决定凌晨值班的体验，却几乎不出现在对比材料里，因为跑分不需要值班。</p>
+<p>回到版本口径：以 2024 年 2 月为时点，可核对的基线是 JVM 侧 Java 17 与 21 这两个 LTS 版本配合 Spring Boot 3.2，.NET 侧是 .NET 8，跨端方案取当时的稳定通道版本，Kotlin 服务层按 1.9.x 口径评估，前端工具链按 Node.js 20 LTS 口径，Go 侧则是刚发布不足一个月的 1.22。依据不是热度，而是各自的升级路径能否被官方文档验证。</p>
+<h3 id="先分档，再打分"><a href="#先分档，再打分" class="headerlink" title="先分档，再打分"></a>先分档，再打分</h3><p>维度定好后先做一遍不打分只分档的判定表，比直接打分更快。内容全部是团队约定示例，不构成推荐：</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>判据</th>
+<th>证据形式</th>
+<th>结论档</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>功能匹配度</td>
+<td>十条关键能力中需要自建几条</td>
+<td>官方能力清单与最小样例</td>
+<td>直接 &#x2F; 绕行 &#x2F; 不支持</td>
+</tr>
+<tr>
+<td>性能是否够用</td>
+<td>是否满足延迟与内存预算</td>
+<td>端到端观察口径</td>
+<td>满足 &#x2F; 边界 &#x2F; 不足</td>
+</tr>
+<tr>
+<td>可观测性</td>
+<td>能否接进现有三类信号</td>
+<td>故障演练记录</td>
+<td>接得上 &#x2F; 需自建 &#x2F; 接不上</td>
+</tr>
+<tr>
+<td>构建一致性</td>
+<td>现有流水线能否稳定产出</td>
+<td>CI 构建记录</td>
+<td>兼容 &#x2F; 需改造 &#x2F; 冲突</td>
+</tr>
+</tbody></table>
+<p>这张表通常已经能淘汰一批候选，剩下的才值得进入加权环节。</p>
+<h2 id="加权打分与一票否决"><a href="#加权打分与一票否决" class="headerlink" title="加权打分与一票否决"></a>加权打分与一票否决</h2><h3 id="打分表模板"><a href="#打分表模板" class="headerlink" title="打分表模板"></a>打分表模板</h3><p>打分表要能被复制使用，字段先固定下来。下面这份建议放进仓库文档目录，评审时每人独立填一份再合并：</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="section"># 选型打分表（团队约定示例，权重需自行确认）</span></span><br><span class="line">候选：A / B / C / D（其中必须包含&quot;不引入&quot;）</span><br><span class="line">维度与权重（由约束优先级映射得到）：</span><br><span class="line">  功能匹配度        权重 __   A _ B _ C _ D _</span><br><span class="line">  性能是否够用      权重 __   A _ B _ C _ D _</span><br><span class="line">  生态与长期演进    权重 __   A _ B _ C _ D _</span><br><span class="line">  可观测性与排障    权重 __   A _ B _ C _ D _</span><br><span class="line">  学习曲线          权重 __   A _ B _ C _ D _</span><br><span class="line">  构建与部署一致性  权重 __   A _ B _ C _ D _</span><br><span class="line">计分规则：1-4 档，4 为最好；每个分必须在证据列写出可核对出处，空证据不计分。</span><br><span class="line">加权总分 = Σ(档位 × 权重)，保留一位小数。</span><br><span class="line">一票否决检查：见否决门禁，任一项为&quot;是&quot;则不进入计分。</span><br><span class="line">分歧记录：任一维度最大分差 ≥ 2 档时，双方各写一句理由附在表后。</span><br><span class="line">接近判定：最高分与次高分差值不足总分 10% 时视为接近，转入 PoC。</span><br></pre></td></tr></table></figure>
+
+<h3 id="权重从约束排序里来"><a href="#权重从约束排序里来" class="headerlink" title="权重从约束排序里来"></a>权重从约束排序里来</h3><p>权重的合法性来自上一节的约束优先级，而不是评审现场的兴趣。做法很机械：把约束清单里的排序直接映射成维度权重，排在前面的约束对应的维度拿高分值，归一化之后把映射结果写进表头。这样当有人质疑”为什么可观测性权重这么高”，答案指向约束文件而不是某个人的偏好。反过来，如果换一组合理权重就翻转结论，这本身就是重要信息：说明决策由权重而非证据决定，应当回到约束层确认优先级。</p>
+<h3 id="加权法的四个失效场景"><a href="#加权法的四个失效场景" class="headerlink" title="加权法的四个失效场景"></a>加权法的四个失效场景</h3><p>第一种是分数接近。此时打分已经失去区分能力，该看的是可逆性与执行侧条件：哪个方案改错了能退回、哪套产物能复用现有流水线、谁愿意承担内部负责人角色、值班时谁能看懂告警。这几项塞不进加权表，却常常是真正的决定因素。</p>
+<p>第二种是权重被结果反推，先在心里定了赢家再回去调权重。防法有三条：权重在任何分数填写之前锁定并写入文件；填分与算分由不参与讨论的人执行；调整权重必须提交变更说明，同 ADR 一起存档。</p>
+<p>第三种是维度重复计权。功能匹配度与生态演进、性能够用与构建一致性明显正相关，同时给高权重等于把同一个判断算两遍，会把某方向的优势放大成决定性优势。检查方法是问：这个候选的高分，是否完全由另一维带来？</p>
+<p>第四种是打分掩盖否决项。加权表天生倾向于”总分高就赢”，而许可证、托管依赖这类问题不能被别的维度补回来，所以否决检查必须在计分之前执行；顺序错了，表再漂亮也没有意义。</p>
+<h3 id="一票否决门禁"><a href="#一票否决门禁" class="headerlink" title="一票否决门禁"></a>一票否决门禁</h3><p>否决项要少而明确，每项都得有可核对的判据，否则会退化成情绪化否决。建议固定这五条，作为打分表之前的第一道门禁，在计分之前逐条勾选：</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">## 一票否决门禁（任一为&quot;是&quot;则出局，记入淘汰清单）</span></span><br><span class="line">[ ] 许可证与分发形态冲突：产品要求闭源分发或对外服务，而候选含关键传递依赖的条款</span><br><span class="line"><span class="code">    与之直接冲突。易误伤：把只在开发工具链出现的强条款依赖当成运行时依赖。</span></span><br><span class="line"><span class="code">[ ] 无可核对的维护信号：长期没有发布、没有安全问题处理渠道、官方已声明进入维护期</span></span><br><span class="line"><span class="code">    或废弃、主干仓库与文档站指向不一致。判据是仓库自身记录，不是讨论区热度。</span></span><br><span class="line"><span class="code">[ ] 无可用稳定版本：所需能力只存在于预览、实验或内部分支，或稳定版本不支持目标</span></span><br><span class="line"><span class="code">    平台与运行时。按&quot;目标平台&quot;判定，不按&quot;最新版本&quot;判定。</span></span><br><span class="line"><span class="code">[ ] 接不进现有可观测体系：日志无法结构化、指标拿不到、链路无法贯穿，或必须额外</span></span><br><span class="line"><span class="code">    自建一整套组件才能看到内部状态。判据：一次人为构造的超时故障能否定位。</span></span><br><span class="line"><span class="code">[ ] 需要不可控的托管服务：核心能力只在外部托管服务上可用，无法部署在可控环境内。</span></span><br><span class="line"><span class="code">    有开源实现但官方推荐路径依赖托管服务的，按推荐路径判定。</span></span><br></pre></td></tr></table></figure>
+
+<p>五条之外不再加。每多一条否决项，就多一次把技术分歧转成规则解释的机会，而否决门禁的价值恰恰来自它短。</p>
+<h2 id="证据采集：社区健康度、PoC-与基准"><a href="#证据采集：社区健康度、PoC-与基准" class="headerlink" title="证据采集：社区健康度、PoC 与基准"></a>证据采集：社区健康度、PoC 与基准</h2><h3 id="社区健康度去哪看"><a href="#社区健康度去哪看" class="headerlink" title="社区健康度去哪看"></a>社区健康度去哪看</h3><p>判断一个项目靠不靠谱不用靠感觉，也不必引用来源不明的统计——证据全在仓库自己身上。下面五项按”看什么、去哪看”写成检查单，逐条核对后把原始事实填进评分表的证据列。</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">## 社区健康度检查单（只写观察到的事实，不写百分比）</span></span><br><span class="line">发布节奏：主干是否持续出版本？此前使用的版本线是否仍在收到补丁，还是已经停止维护？</span><br><span class="line">  → 补丁是否还发往旧分支，比新版本出了多少次更能说明维护意愿。看发布记录页。</span><br><span class="line">议题响应：开放与关闭的比例、缺陷类议题是否有人复现并分类、被确认的问题多久有回应、</span><br><span class="line">  同根问题是否反复被开。</span><br><span class="line">  → 判据是&quot;是否有人在处理&quot;，不是响应速度的绝对值。</span><br><span class="line">贡献者集中度：变更是否集中在一名维护者手上、是否有第二个人具备合并权限？</span><br><span class="line">  → 贡献者列表与提交分布都公开可查，不必自己造数；单人主导就是单点风险。</span><br><span class="line">文档质量：是否有版本切换、升级与迁移指南、示例是否指向当前可用 API、反复被问的</span><br><span class="line">  问题是否沉淀进文档。</span><br><span class="line">  → 只教&quot;如何开始&quot;而从不教&quot;如何升级&quot;的项目，演进成本一定高。</span><br><span class="line">破坏性变更历史：频率与幅度多大、是否遵循自己的兼容性声明、废弃是否有提前公告与</span><br><span class="line">  过渡期。</span><br><span class="line">  → 看变更记录与大版本升级指南；频繁且无公告的破坏性变更是长期成本的直接信号。</span><br></pre></td></tr></table></figure>
+
+<p>原始数据可以用几条命令落到本地，再由人判断，不要让脚本替你出结论：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 近若干次发布的时间与标签（仅采集，不做横向比较）</span></span><br><span class="line">gh api repos/&lt;owner&gt;/&lt;repo&gt;/releases --paginate -q <span class="string">&#x27;.[] | .tag_name + &quot; &quot; + .published_at&#x27;</span> | <span class="built_in">head</span> -20</span><br><span class="line"></span><br><span class="line"><span class="comment"># 提交者分布，用于判断贡献者集中度</span></span><br><span class="line">git shortlog --summary --numbered | <span class="built_in">head</span> -10</span><br><span class="line"></span><br><span class="line"><span class="comment"># 最近一次提交时间，用于判断维护信号</span></span><br><span class="line">git <span class="built_in">log</span> -1 --format=<span class="string">&#x27;%ad %s&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p>写进评分表的应当是你核对过的原始事实，例如”上一条发布在数月前””补丁仅发至某分支”，而不是百分比。本文不提供任何社区统计数字：这类数字必须来自你自己对仓库的观察，抄来的百分比无法参与决策。</p>
+<h3 id="PoC-怎么设计才不走过场"><a href="#PoC-怎么设计才不走过场" class="headerlink" title="PoC 怎么设计才不走过场"></a>PoC 怎么设计才不走过场</h3><p>PoC 是一次有预算的实验，不是一次演示，四件事要在开工前写进文档。第一是可证伪的假设，写成”若某能力在不自建组件的前提下能接进现有平台，则此候选可用”，并明确什么结果算它不成立；写不出失败条件的 PoC 只是给已有结论找证据。第二是人日预算，建议单人两到五日，团队约定示例可取四日为上限，超了就停——它是唯一能防住”再试一天就通了”这种膨胀的手段。第三是有代表性的负载，选真实场景里最麻烦的那条路径，至少包含一次带测试的业务改造、一次故障排查演练、一次完整构建与发布，跨端项目再加一次原生能力调用。第四是失败退出条件，写清”若未达成则本候选出局，代码删除或归档，不做二次利用”。</p>
+<p>一个真实感很强的反例：某团队让方案的最大推荐者独自做 PoC，题目由他自定，只演示成功路径，没有失败条件，时限从三天延到三周，最后把 PoC 代码整理两遍直接上线。这场 PoC 的唯一功能是证明推荐者是对的。破解只有三条：出题人、执行人、判分人分开；时限与失败条件写进文档；PoC 产物与生产代码隔离。</p>
+<h3 id="基准测试的正确姿势"><a href="#基准测试的正确姿势" class="headerlink" title="基准测试的正确姿势"></a>基准测试的正确姿势</h3><p>基准数据只服务于”性能够用”这一个维度，它不回答”该选谁”。要让它至少能参与权衡，四件事得依次做对，任何一件没做，结论就不该被引用：</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">## 基准测试操作要点（顺序不可颠倒）</span></span><br><span class="line">1 分清对象：微基准测单个操作的极限，容易被内联、缓存与测量开销影响；端到端测真实</span><br><span class="line">   请求的分位延迟与稳定性。选型判据来自端到端，微基准只用来解释差异从哪里来。</span><br><span class="line">2 固定环境：同一规格的机器或容器、同样的依赖版本与运行时参数、关闭其他负载，并把</span><br><span class="line">   配置写在结果旁边。环境不固定的两组数字，差异可能全部来自配置而非被测对象。</span><br><span class="line">3 预热与重复：带即时编译与垃圾回收的运行时要先预热再采集；单次结果不可用，多次运行</span><br><span class="line">   之后报告中位数与波动范围。</span><br><span class="line">4 表述条件：结论写成区间加条件，条件包含硬件、并发档位、预热轮数与被比较对象的配置</span><br><span class="line">   水平；脱离条件的区间不算结论，也不外推为跨场景的&quot;某某更快&quot;。</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">观察口径（示意值，需自行复测，不构成任何排名）：</span><br><span class="line">环境：__（机型 / 容器规格 / 核数 / 内存限额）；依赖与运行时参数：__；并发档位：__</span><br><span class="line">预热：__ 轮之后开始采集；重复：__ 次，取中位数并给出波动范围</span><br><span class="line">指标：__（如 P99 延迟 / 吞吐 / 常驻内存 / 启动时间）落在 __ 区间</span><br><span class="line">条件变化：把 __ 参数改为 __ 时，该区间向 __ 移动</span><br><span class="line">适用边界：仅适用于上述负载形态，不外推为&quot;某某更快&quot;</span><br></pre></td></tr></table></figure>
+
+<p>本文不给出任何跑分数字，示例里的阈值一律标注为团队约定示例或示意值；完整的负载设计与跨语言实测由性能对比类文章负责，本文只规定它在流程里承担哪一段职责。</p>
+<h2 id="决策记录与复评退出"><a href="#决策记录与复评退出" class="headerlink" title="决策记录与复评退出"></a>决策记录与复评退出</h2><h3 id="ADR-是选型的交付物"><a href="#ADR-是选型的交付物" class="headerlink" title="ADR 是选型的交付物"></a>ADR 是选型的交付物</h3><p>评审会结束时的口头共识不是选型的产物，能被后来的人读到、核对与推翻的记录才是。架构决策记录（ADR）把一次决定的背景、选项、结论与代价固化成带时间戳的文件，与代码同仓、编号递增，状态可以变更但内容不改写：新的认识用新记录表达，旧记录标为已被取代。三年后想知道当年为什么这么定，不需要找人问，也不需要靠猜。</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="section"># ADR-00X：&lt;决策的一句话标题&gt;</span></span><br><span class="line">状态：提议中 / 已接受 / 已废弃 / 已被 ADR-0YY 取代（必填）</span><br><span class="line">日期：YYYY-MM-DD     决策人：&lt;角色而非姓名&gt;     评审轮次：__</span><br><span class="line"><span class="section">## 背景</span></span><br><span class="line">业务与工程约束是什么，为什么此刻必须决定，不决定的代价是什么。</span><br><span class="line"><span class="section">## 选项</span></span><br><span class="line">候选池（必须含&quot;不引入&quot;），每项被排除或保留的一句话原因，否决门禁的勾选结果。</span><br><span class="line"><span class="section">## 决策</span></span><br><span class="line">选定什么、在哪个边界内选定、明确不适用的范围。</span><br><span class="line"><span class="section">## 后果</span></span><br><span class="line">正面：换来什么。负面：付出什么（新增运维面、技能缺口、迁移成本、锁定风险）。</span><br><span class="line">未解决：本次决策没有回答的问题，逐条列出。</span><br><span class="line"><span class="section">## 复评触发条件</span></span><br><span class="line">满足任一即重新评估：版本或平台跳代、团队负责人变更、流量或合规要求变化、</span><br><span class="line">连续若干次同类故障、约定到期日（团队约定示例：上线后 12 个月）。</span><br><span class="line"><span class="section">## 证据附录</span></span><br><span class="line">打分表、PoC 结论与失败条件、基准观察口径（标注示意值）、约束清单快照。</span><br></pre></td></tr></table></figure>
+
+<h3 id="示例：网关服务的语言边界怎么记"><a href="#示例：网关服务的语言边界怎么记" class="headerlink" title="示例：网关服务的语言边界怎么记"></a>示例：网关服务的语言边界怎么记</h3><p>以一个常见场景填一遍：一个已有 JVM 服务群的产品线，需要为新增的网关型服务决定实现边界，候选包括沿用现有栈与引入另一套运行时。这里用 Java 与 Go 举例，只演示记录方法，不比较优劣。</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="section"># ADR-014：新增网关型服务的实现语言</span></span><br><span class="line">状态：已接受   日期：2024-02-20   决策人：服务端架构评审组（轮值）</span><br><span class="line"><span class="section">## 背景</span></span><br><span class="line">现网服务群为 Java 17 LTS 加 Spring Boot 3.2，容器平台由同一组运维维护。新需求是</span><br><span class="line">高并发转发与协议适配：实例数少、连接数高、无复杂领域逻辑。团队约定示例：P99 延迟</span><br><span class="line">预算取自现有 SLO，内存预算按现有规格，上线不晚于本季度末。</span><br><span class="line"><span class="section">## 选项</span></span><br><span class="line">A 沿用现有栈（Java 17，或迁移到 21 这一 LTS，框架沿用 Spring Boot 3.2）</span><br><span class="line">B 新运行时（Go 1.21；1.22 刚发布不足一个月，本次不采用）</span><br><span class="line">C 不引入新服务，改造现有网关模块</span><br><span class="line">排除记录：三条候选均通过约束门禁，无一触发一票否决。</span><br><span class="line"><span class="section">## 决策</span></span><br><span class="line">选 B，边界限定为&quot;协议接入与转发层&quot;，业务规则仍留在现有服务内；接口契约、错误码与</span><br><span class="line">追踪标识沿用现有约定，日志字段按现有规范输出。改选 A 或 C 的触发条件：连接数增长</span><br><span class="line">超出预期且需要复用现有线程模型能力时。</span><br><span class="line"><span class="section">## 后果</span></span><br><span class="line">正面：接入层的部署产物与启动路径更简单（本地观察口径，非跑分结论）。</span><br><span class="line">负面：新增一条工具链与一套依赖；运维要补充内存与超时方面的排查经验；现有共享库无法</span><br><span class="line">直接复用，只能以契约方式对接；团队内可咨询人数当前为 1。</span><br><span class="line">未解决：与现有链路采样率策略的兼容细节；灰度与回滚的自动化程度。</span><br><span class="line"><span class="section">## 复评触发条件</span></span><br><span class="line">可咨询人数低于 2 持续两个月；同类故障一个季度出现 3 次（团队约定示例）；出现官方</span><br><span class="line">长期支持版本的迁移要求；网关侧开始承载业务规则（视为边界失守）。</span><br></pre></td></tr></table></figure>
+
+<p>这份记录的重点不在选项本身，而在于它把结论钉在场景里：标题写的是”新增网关型服务”，不是”服务端语言选择”；后果一栏明写负面代价与未解决问题；复评条件让决定可以在几个月后被合理推翻。一份填得完整的 ADR 不会给出”谁更好”这类跨场景结论。</p>
+<h3 id="什么时候必须重评"><a href="#什么时候必须重评" class="headerlink" title="什么时候必须重评"></a>什么时候必须重评</h3><p>复评不是仪式，触发条件要具体到能被非当事人核对。常见的有五类：依赖的版本或平台跳代，例如运行时从当前 LTS 迁移到下一代；团队结构变化，能承担内部负责人角色的人数低于阈值；外部约束变化，合规要求或分发形态调整；运维信号，同类故障重复出现或排查耗时上升；约定到期，即使没有异常也在上线后固定月份强制重看。第五条最重要，因为前四条都依赖有人愿意先承认问题。</p>
+<h3 id="降低沉没成本偏差"><a href="#降低沉没成本偏差" class="headerlink" title="降低沉没成本偏差"></a>降低沉没成本偏差</h3><p>选型一旦落地，团队就会不自觉地为它辩护。三个机制能缓解：决策人与执行人分离，评审组轮值，避免同一批人反复为自己的选择背书；PoC 与迁移的预算上限预先写死，超支要走正式追加审批；每季度做一次零基线重问——假设今天什么都没建，只看现在的需求与团队，是否还会选它。它的作用是把”要不要维持”与”当初要不要选”分开。</p>
+<h3 id="迁移路径预案"><a href="#迁移路径预案" class="headerlink" title="迁移路径预案"></a>迁移路径预案</h3><p>选型的代价不在决定那一刻，而在需要改变它的时候，所以预案属于决策记录的一部分。做法是优先选择可逆的接入方式：把新方案限制在一层适配代码里，让领域模型与接口契约不依赖它的具体类型；渐进替换而不是一次切换，先承接只读流量；保留双跑与影子流量，使回滚只需改一次路由配置。这些约束会让早期开发不够爽快，而正是这点不爽快，在事后省下整场重写。</p>
+<h3 id="三个反复出现的反模式"><a href="#三个反复出现的反模式" class="headerlink" title="三个反复出现的反模式"></a>三个反复出现的反模式</h3><p>追新：把”最近热门”当作证据，把”我们还在用旧版本”当作问题本身，破解是把”不引入”列入评分表并认真填一次证据列。由个别人偏好决定：候选池由某个方案的变体组成、维度按它的强项设计、PoC 由它的推荐者独自完成；这条最难自察，因为它看起来完全像专业判断，唯一可靠的检查是出题人、执行人、判分人是否分离。把选型当技术站队：反对方案等于否定人，于是要么用跑分压人，要么用”数据不说明问题”回避数据；一旦出现站队迹象，停止口头讨论，把分歧写成表里的分差与各自一句理由。</p>
+<h2 id="选型总表：维度、问题、证据与误判"><a href="#选型总表：维度、问题、证据与误判" class="headerlink" title="选型总表：维度、问题、证据与误判"></a>选型总表：维度、问题、证据与误判</h2><table>
+<thead>
+<tr>
+<th>维度</th>
+<th>该问的具体问题</th>
+<th>可用证据来源</th>
+<th>常见误判</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>约束与优先级</td>
+<td>哪几条是硬门禁，冲突时怎么让路</td>
+<td>约束文件、SLO、合规要求</td>
+<td>把组织偏好论证成技术优越</td>
+</tr>
+<tr>
+<td>候选池</td>
+<td>来源是否独立，是否含”不引入”</td>
+<td>存量依赖清单、官方集成列表</td>
+<td>一个来源生出半个池子</td>
+</tr>
+<tr>
+<td>功能匹配度</td>
+<td>十条关键能力里几条要自建</td>
+<td>官方能力清单、最小样例</td>
+<td>用三年后的想象投今天的票</td>
+</tr>
+<tr>
+<td>性能够用</td>
+<td>落在哪一档，判据是什么</td>
+<td>端到端观察口径（示意值）</td>
+<td>把”非最优”当成不可接受</td>
+</tr>
+<tr>
+<td>生态与演进</td>
+<td>两年后能否拿到升级路径</td>
+<td>发布记录、迁移指南、兼容声明</td>
+<td>用热度替代可核对的记录</td>
+</tr>
+<tr>
+<td>可观测性</td>
+<td>不加新组件能否定位构造故障</td>
+<td>演练记录、追踪与剖析接入</td>
+<td>只在看跑分时想到它</td>
+</tr>
+<tr>
+<td>学习曲线</td>
+<td>新人限时做完模块要多久</td>
+<td>受控实验的耗时与卡点</td>
+<td>把文档友好当成上手容易</td>
+</tr>
+<tr>
+<td>构建一致性</td>
+<td>流水线能否产出可复现产物</td>
+<td>CI 构建与发布记录</td>
+<td>用开发机表现替代流水线</td>
+</tr>
+<tr>
+<td>社区健康度</td>
+<td>发布、响应、集中度、文档、变更史</td>
+<td>仓库自身的公开记录</td>
+<td>引用来源不明的百分比</td>
+</tr>
+<tr>
+<td>PoC</td>
+<td>假设能否证伪，失败条件是什么</td>
+<td>预算内实验结论与归档</td>
+<td>让推荐者自己出题自己判</td>
+</tr>
+<tr>
+<td>基准测试</td>
+<td>结论能否写成区间加条件</td>
+<td>固定环境的多次运行</td>
+<td>把微基准当成决策依据</td>
+</tr>
+<tr>
+<td>决策记录</td>
+<td>后果与未解决问题是否写在纸上</td>
+<td>ADR 与打分表存档</td>
+<td>会议共识即视为已决策</td>
+</tr>
+<tr>
+<td>复评与退出</td>
+<td>什么条件触发重看，预案能否用</td>
+<td>ADR 触发条件、零基线记录</td>
+<td>等事故来替你做复评</td>
+</tr>
+</tbody></table>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>方法论的全部内容其实是一句话：把”我们觉得它行”变成”在写明的约束与条件下，证据支持这个决定，代价是这些，重看的条件在这里”。约束清单与否决门禁把池子变小，评分维度与检查单把差别说清楚，PoC 把印象换成观察，ADR 与复评条件让决定可以被诚实地推翻。权重和分数替代不了判断：一旦分差小到需要解释，起作用的就是可逆性、值班体验和谁愿意当内部负责人。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li>Architectural Decision Records，ADR 实践与模板索引：<a href="https://adr.github.io/">https://adr.github.io/</a></li>
+<li>Spring Boot Reference Documentation：<a href="https://docs.spring.io/spring-boot/docs/current/reference/htmlsingle/">https://docs.spring.io/spring-boot/docs/current/reference/htmlsingle/</a></li>
+<li>Kotlin 官方文档：<a href="https://kotlinlang.org/docs/home.html">https://kotlinlang.org/docs/home.html</a></li>
+<li>Flutter 官方文档：<a href="https://docs.flutter.dev/">https://docs.flutter.dev/</a></li>
+<li>.NET 官方文档：<a href="https://learn.microsoft.com/dotnet/">https://learn.microsoft.com/dotnet/</a></li>
+<li>Go 官方文档：<a href="https://go.dev/doc/">https://go.dev/doc/</a></li>
+<li>OpenTelemetry 文档：<a href="https://opentelemetry.io/docs/">https://opentelemetry.io/docs/</a></li>
+<li>Choose an Open Source License：<a href="https://choosealicense.com/">https://choosealicense.com/</a></li>
+<li>RFC 2119，要求级别用词：<a href="https://datatracker.ietf.org/doc/html/rfc2119">https://datatracker.ietf.org/doc/html/rfc2119</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>技术选型方法论</p><p><a href="https://987763485.github.io/2024/02/20/技术选型方法论/">https://987763485.github.io/2024/02/20/技术选型方法论/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2024-02-20</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-19</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/java/">java</a><a class="link-muted mr-2" rel="tag" href="/tags/kotlin/">kotlin</a><a class="link-muted mr-2" rel="tag" href="/tags/flutter/">flutter</a><a class="link-muted mr-2" rel="tag" href="/tags/csharp/">csharp</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2024/02/27/%E8%AE%BE%E8%AE%A1%E5%B7%A5%E7%A8%8B%E5%8D%8F%E4%BD%9C%E6%B5%81%E7%A8%8B/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">设计工程协作流程</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2024/02/18/RLHF%E5%AF%B9%E9%BD%90%E8%AE%AD%E7%BB%83%E5%85%A5%E9%97%A8/"><span class="level-item">RLHF 对齐训练入门</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

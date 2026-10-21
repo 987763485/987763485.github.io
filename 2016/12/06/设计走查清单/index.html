@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>设计走查清单 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="功能验收通过、视觉验收被打回，是上线前最常见的返工。本文把这件事拆成一份可执行的清单：什么时机查、谁来查、查哪些项、每一项怎么量、问题怎么记录，适合正在做页面还原的前端和需要参与走查的设计同学。"><meta property="og:type" content="blog"><meta property="og:title" content="设计走查清单"><meta property="og:url" content="https://987763485.github.io/2016/12/06/%E8%AE%BE%E8%AE%A1%E8%B5%B0%E6%9F%A5%E6%B8%85%E5%8D%95/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="功能验收通过、视觉验收被打回，是上线前最常见的返工。本文把这件事拆成一份可执行的清单：什么时机查、谁来查、查哪些项、每一项怎么量、问题怎么记录，适合正在做页面还原的前端和需要参与走查的设计同学。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2016-12-06T12:11:13.000Z"><meta property="article:modified_time" content="2026-10-18T10:33:06.524Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="web前端"><meta property="article:tag" content="前端工程化"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2016/12/06/%E8%AE%BE%E8%AE%A1%E8%B5%B0%E6%9F%A5%E6%B8%85%E5%8D%95/"},"headline":"设计走查清单","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2016-12-06T12:11:13.000Z","dateModified":"2026-10-18T10:33:06.524Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"功能验收通过、视觉验收被打回，是上线前最常见的返工。本文把这件事拆成一份可执行的清单：什么时机查、谁来查、查哪些项、每一项怎么量、问题怎么记录，适合正在做页面还原的前端和需要参与走查的设计同学。"}</script><link rel="canonical" href="https://987763485.github.io/2016/12/06/%E8%AE%BE%E8%AE%A1%E8%B5%B0%E6%9F%A5%E6%B8%85%E5%8D%95/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2016-12-06T12:11:13.000Z" title="12/6/2016, 8:11:13 PM">2016-12-06</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/">效率工具</a></span><span class="level-item">25 分钟读完 (大约3797个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">设计走查清单</h1><div class="content"><p>功能验收通过、视觉验收被打回，是上线前最常见的返工。本文把这件事拆成一份可执行的清单：什么时机查、谁来查、查哪些项、每一项怎么量、问题怎么记录，适合正在做页面还原的前端和需要参与走查的设计同学。</p>
+<h2 id="一次被打回的视觉验收"><a href="#一次被打回的视觉验收" class="headerlink" title="一次被打回的视觉验收"></a>一次被打回的视觉验收</h2><p>十二月初我们发一个后台改版。功能验收很顺利，测试同学把用例跑完，产品在会议室里点了两遍主流程，说可以发。第二天设计同学打开测试环境，半小时内提了十七条问题。</p>
+<p>问题集中在三处。第一处是间距：卡片内边距有的是 16px，有的是 20px，同一个列表里两种节奏混着用，肉眼说不出哪里不对，但整页看起来就是”松紧不一”。第二处是状态缺失：列表项的悬停态只在 Chrome 里有，IE 11 下鼠标移上去毫无反应；提交按钮的禁用态和可用态长得一模一样，用户点下去才知道没填完。第三处是断点：窗口拉到 1024 宽时，表格最后一列的操作按钮被挤成两行，右侧内容溢出到容器外面，出现了横向滚动条。</p>
+<p>这些问题没有一个能被功能用例覆盖，又分散在几十个页面、上千个元素上，靠人一屏屏截图对比既慢又容易漏。那次返工花了两天，比写页面还久。</p>
+<p>后来我们把走查沉淀成一份清单，按”环境、布局、断点、状态、字体、图形、交互、文案”分块，每块给出检查方法和常见问题。清单不解决设计规范该定成什么样，那是《设计系统与组件化思维入门》和《色彩与字号规范实践》的范围；它只解决一件事：页面写完了，怎么在半天内确认它和设计稿是一回事。</p>
+<h2 id="走查的时机与角色"><a href="#走查的时机与角色" class="headerlink" title="走查的时机与角色"></a>走查的时机与角色</h2><p>走查不是一次会议，而是三段连续的动作，顺序错了就会互相打架。</p>
+<p>开发自检放在提测之前。开发对着设计稿逐屏过一遍，重点是自己最清楚、别人最难发现的地方：元素是否对齐、间距是否用了同一个梯度、交互状态是否都写了、窗口拉宽拉窄会不会崩。自检不通过不提测，这是纪律，不是态度问题。自检时可以粗糙，但必须覆盖全部页面，宁可漏掉细节，不能漏掉整屏。</p>
+<p>设计走查放在提测之后的一到两天内。设计同学在测试环境里看，关注还原度：间距的节奏、字号层级、字重、图标比例、颜色是否符合规范。开发要陪同，因为很多问题当场就能判断是改代码还是改设计稿。这一步最忌讳的是设计同学提一句”这里感觉不对”就结束，必须落到具体元素和具体数值，否则开发只能猜。</p>
+<p>产品验收放在上线前。产品不看像素，看信息层级和操作路径：主按钮是不是在视线落点上，异常提示是不是说人话，空数据时用户知道下一步做什么。产品点头之后不应再改视觉，否则就要重新走一遍前两段。</p>
+<p>三段的产出物不同：自检产出”已修正的问题”，设计走查产出”带截图和数值的问题单”，产品验收产出”能不能发”的结论。三者混在一次会上，最常见的结局是产品说”先上吧”，设计的问题被压到下个版本，然后永远不再被提起。</p>
+<h2 id="环境准备"><a href="#环境准备" class="headerlink" title="环境准备"></a>环境准备</h2><p>走查结论吵架，多半是环境不一致：开发在自己机器上看是对的，设计在另一台显示器上看是错的。</p>
+<p>浏览器固定一到两个。主用 Chrome 54 或 55，辅助看 IE 11，涉及苹果设备再看 Safari 9 和 10。写具体版本，出了问题才知道去哪个环境复现。系统显示缩放统一为 100%，很多笔记本出厂是 125%，截图出来的像素全是虚的，量间距会差一两个像素。</p>
+<p>真机不能省。iOS 9 和 10 的 Safari、Android 4.4 的 WebView，以及微信内置的 X5 内核，字体渲染和视口表现都和桌面模拟器有差距。至少准备一台 iPhone 和一台千元安卓机，看首屏、看滚动、看输入框聚焦后页面是否被顶起。</p>
+<p>设计稿版本必须先对齐。Sketch 文件改过几轮之后，开发手里那份很可能已经过期。走查前在群里确认一次版本号和最后修改时间，用 Zeplin 或 Markman 导出的标注也标上日期。</p>
+<p>截图对比是主要手段。把浏览器窗口固定成设计稿的画布宽度，整屏截图，和设计稿半透明叠在一起看，错位一眼就能发现。叠图只看整体，具体数值仍要回元素面板读。</p>
+<h2 id="布局与栅格"><a href="#布局与栅格" class="headerlink" title="布局与栅格"></a>布局与栅格</h2><p>布局问题最隐蔽：单看每个元素都对，合起来就是不对劲。走查时按四层往下看。</p>
+<p>先看容器宽度。页面主容器是定宽 1200、定宽 960，还是百分比流式，设计稿上一定写得明白。常见错误是外层流式、内层定宽，窗口一宽，内容贴在左边，右边留出一条空白；或者反过来，窗口一窄，定宽容器直接撑出横向滚动条。</p>
+<p>再看栅格列。十二列、二十四列本身不重要，重要的是卡片是否都落在同一套列宽和沟槽上。判断方法很土：数一屏内卡片左边缘的位置，如果落在三四个不同的 x 坐标上，说明有的用 margin，有的用 padding，有的写死了宽度。</p>
+<p>然后看间距梯度。团队通常只允许 4、8、12、16、24、32 这几个值。走查时抽十个元素读一遍计算后的 margin 和 padding，出现 15、18、22 这类数字，基本就是从设计稿上目测抄来的。</p>
+<p>最后看对齐基线。同一行的文字、图标、按钮基线应一致，按钮高度应相同，图标与文字的间距应固定。最容易翻车的是图标加文字的组合，图标用了 vertical-align: middle，文字行高又不一样，结果图标总是偏高半个像素。</p>
+<p>快速测量有三招：DevTools 的盒模型面板直接读 margin 与 padding；给可疑元素临时加轮廓看层级；截图放进 Sketch 或 Photoshop 拉辅助线量距离。</p>
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* 走查专用：临时给所有元素加轮廓，提交前删除 */</span></span><br><span class="line">* &#123;</span><br><span class="line">  <span class="attribute">outline</span>: <span class="number">1px</span> solid <span class="built_in">rgba</span>(<span class="number">255</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0.2</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>轮廓法看结构可以，量间距不行，因为 outline 不占布局。要确认两个元素之间是 16 还是 20，还得读计算值，或临时加个背景色截图量像素。</p>
+<h2 id="断点"><a href="#断点" class="headerlink" title="断点"></a>断点</h2><p>断点为什么定在 768 和 1200，已有专文讨论，这里只说怎么过。原则是逐个宽度看。</p>
+<p>把窗口依次固定到几个值：1920、1440、1280、1200、1024、768、414、375、320。每到一处，先看有没有横向滚动条，再看内容有没有溢出容器，最后看布局切换是否符合设计稿的意图。</p>
+<p>重点看临界值。断点两侧各差一个像素的位置最容易出问题：1199 宽时是三列，1200 宽时变四列，中间那段卡片可能只剩一条缝；768 宽时侧边栏刚收起来，主内容还没来得及让出空间，于是出现重叠。把窗口卡在断点值减一的位置，问题会自己浮出来。</p>
+<p>内容溢出比布局错位更严重。长标题、长用户名、长数字在窄屏下会把容器顶开，表现为卡片被撑高、按钮被挤走、表格出现横向滚动。不必等真实数据，在控制台把文本改成超长字符串看会不会破版。表格和代码块是重灾区。</p>
+<p>移动端还有专属检查项：软键盘弹起后页面是否被顶起、固定底栏是否遮住输入框、横竖屏切换后布局是否成立。模拟器里点不出软键盘，只能用真机。</p>
+<h2 id="状态清单"><a href="#状态清单" class="headerlink" title="状态清单"></a>状态清单</h2><p>设计稿通常只画默认态，剩下七八种状态全靠开发自己补。走查时拿一张表逐个打勾，比凭印象点两下可靠得多。</p>
+<p>默认态看三件事：元素尺寸是否与标注一致，内容是否按预期换行，图标与文字是否垂直居中。悬停态和按下态要分别看，很多实现只写了 hover 忘了 active，点下去的瞬间没有任何反馈。焦点态最容易被忽略，键盘 Tab 走过时必须有可见焦点框，这也是无障碍的底线。</p>
+<p>禁用态要同时满足两点：视觉上可辨识，语义上不可操作。常见错误是只把透明度调到 0.5，看起来灰了，但按钮仍能点击，或者反过来加了 disabled 属性却没改样式，用户以为可以点。加载态看按钮是否防止了重复提交、骨架或转圈是否占住了原来的位置。空状态和错误状态各自需要一句说明和一个操作入口，不能只留一块白板。</p>
+<p>超长文本单独列一项。标题限两行还是单行省略，用户名最多几个字，数字要不要千分位，这些规则在真实数据里才会暴露。把每个字段都换成极端值试一遍：空字符串、一个字、两百个字、纯英文、纯数字。</p>
+<p>逐项打勾，没写的项就是待办。</p>
+<table>
+<thead>
+<tr>
+<th>状态</th>
+<th>检查方法</th>
+<th>常见问题</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>默认</td>
+<td>对照标注读尺寸</td>
+<td>行高被内容撑开</td>
+</tr>
+<tr>
+<td>悬停 &#x2F; 按下</td>
+<td>鼠标移入、按住不放</td>
+<td>只写了 hover，漏了 active</td>
+</tr>
+<tr>
+<td>焦点</td>
+<td>连续按 Tab 走一遍</td>
+<td>焦点框被 outline: none 干掉</td>
+</tr>
+<tr>
+<td>禁用</td>
+<td>看样式并尝试点击</td>
+<td>只改透明度，仍可提交</td>
+</tr>
+<tr>
+<td>加载</td>
+<td>慢网络下点击提交</td>
+<td>可重复点击，按钮塌陷</td>
+</tr>
+<tr>
+<td>空 &#x2F; 错误</td>
+<td>清空数据、断开接口</td>
+<td>只有白板，没有出口</td>
+</tr>
+</tbody></table>
+<h2 id="字体与颜色"><a href="#字体与颜色" class="headerlink" title="字体与颜色"></a>字体与颜色</h2><p>字号先看层级：正文、辅助文字、小标题各是几号，有没有出现 13、15 这种规范外的值。行高按字号的 1.5 倍核对，中文行高偏小会显得挤。字重要确认真有对应的字体文件，Windows 上用合成加粗的中文会发虚。</p>
+<p>颜色先搜硬编码。在样式文件里找十六进制色值，除了阴影和渐变，业务颜色都应该走变量。CSS 变量在 IE 11 下不生效，用了就必须有回退值。对比度用工具量一遍正文与背景，低于 4.5:1 的浅灰字在室外屏幕上基本读不出来。</p>
+<h2 id="图标与图片"><a href="#图标与图片" class="headerlink" title="图标与图片"></a>图标与图片</h2><p>图标看三样：尺寸是否统一、描边粗细是否一致、视觉重心是否对齐。同一排线性图标里混进一个 1px 一个 2px 的描边，放大后非常明显。走查只确认渲染清晰、颜色能跟随文字。</p>
+<p>图片看清晰度与兜底。高清屏要 2x 图，1x 图放大后发糊。用占位色块或写死宽高，避免加载完成后页面跳动；加载失败要有默认图，不能留一个破图标。背景图用 cover 裁切后，主体是否还在画面里，得在窄屏下单独看。</p>
+<h2 id="交互与动效"><a href="#交互与动效" class="headerlink" title="交互与动效"></a>交互与动效</h2><p>过渡时长控制在 150 到 300 毫秒，超过 500 毫秒就像卡住。连续触发时动效要能被打断，不能排队执行。低端安卓和旧浏览器上要能降级，动画关掉之后功能仍然完整。缓动曲线怎么选另有专文，走查只确认点得动、退得出、慢网络下不假死。</p>
+<h2 id="文案与本地化"><a href="#文案与本地化" class="headerlink" title="文案与本地化"></a>文案与本地化</h2><p>看截断与换行：单行省略还是两行截断，中文没有空格，word-break 设错会把词切成两半。中英文之间留一个空格，标点用全角。数字统一千分位，日期统一成一种格式。按钮文案长短最不齐，英文版通常更长，按三成余量预留宽度。</p>
+<h2 id="走查记录"><a href="#走查记录" class="headerlink" title="走查记录"></a>走查记录</h2><p>问题分三级：阻塞，不改不能上线；一般，本迭代内改完；建议，排到下个版本。每条记录写清页面地址、元素定位、截图、期望值与实际值，并标注提出人和责任人。改完由提出人回归，确认后才关闭。记录放在任务系统里，别散在聊天窗口。</p>
+<h2 id="附：走查项对照表"><a href="#附：走查项对照表" class="headerlink" title="附：走查项对照表"></a>附：走查项对照表</h2><table>
+<thead>
+<tr>
+<th>走查项</th>
+<th>检查方法</th>
+<th>常见问题</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>布局</td>
+<td>读盒模型，量边缘坐标</td>
+<td>间距值不在梯度上</td>
+</tr>
+<tr>
+<td>断点</td>
+<td>卡在断点值减一</td>
+<td>临界处溢出、重叠</td>
+</tr>
+<tr>
+<td>状态</td>
+<td>按清单逐项打勾</td>
+<td>漏焦点态、假禁用</td>
+</tr>
+<tr>
+<td>字体颜色</td>
+<td>搜硬编码色值</td>
+<td>对比度不足、合成加粗</td>
+</tr>
+<tr>
+<td>图标图片</td>
+<td>放大到 200% 看</td>
+<td>描边不齐、无失败兜底</td>
+</tr>
+<tr>
+<td>文案</td>
+<td>换成超长文本</td>
+<td>截断生硬、中英混排挤</td>
+</tr>
+</tbody></table>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>设计走查的本质是把”感觉不对”翻译成可核对的项目。固定环境、按层检查、逐项打勾、带证据记录，四件事做到，半天就能过完一个中等规模的版本。清单不必一次写全，每踩一个坑就补一行。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>设计走查清单</p><p><a href="https://987763485.github.io/2016/12/06/设计走查清单/">https://987763485.github.io/2016/12/06/设计走查清单/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2016-12-06</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/web%E5%89%8D%E7%AB%AF/">web前端</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/">前端工程化</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2016/12/08/Geolocation%E5%AE%9A%E4%BD%8DAPI%E5%AE%9E%E8%B7%B5/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Geolocation 定位 API 实践</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2016/11/29/Canvas%E4%B8%8ESVG%E7%9A%84%E5%8F%96%E8%88%8D/"><span class="level-item">Canvas 与 SVG 的取舍</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Rust 编译加速实践 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="本文面向被 Rust 编译时间拖慢节奏的后端开发者与基础库维护者，讨论的不是“某个开关一开就快多少”，而是一套可复用的归因方法：先把编译拆成可测量的阶段，再让每一类手段去对应它真正改善的阶段，最后用你自己的机器和仓库把收益量级测出来。读完你应该能回答三个问题：慢在哪一段、这段该用什么手段、换手段之后如何验证有效。"><meta property="og:type" content="blog"><meta property="og:title" content="Rust 编译加速实践"><meta property="og:url" content="https://987763485.github.io/2025/07/09/Rust%E7%BC%96%E8%AF%91%E5%8A%A0%E9%80%9F%E5%AE%9E%E8%B7%B5/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="本文面向被 Rust 编译时间拖慢节奏的后端开发者与基础库维护者，讨论的不是“某个开关一开就快多少”，而是一套可复用的归因方法：先把编译拆成可测量的阶段，再让每一类手段去对应它真正改善的阶段，最后用你自己的机器和仓库把收益量级测出来。读完你应该能回答三个问题：慢在哪一段、这段该用什么手段、换手段之后如何验证有效。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2025-07-08T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-20T13:05:08.425Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="rust"><meta property="article:tag" content="后端开发"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2025/07/09/Rust%E7%BC%96%E8%AF%91%E5%8A%A0%E9%80%9F%E5%AE%9E%E8%B7%B5/"},"headline":"Rust 编译加速实践","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2025-07-08T16:00:00.000Z","dateModified":"2026-10-20T13:05:08.425Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"本文面向被 Rust 编译时间拖慢节奏的后端开发者与基础库维护者，讨论的不是“某个开关一开就快多少”，而是一套可复用的归因方法：先把编译拆成可测量的阶段，再让每一类手段去对应它真正改善的阶段，最后用你自己的机器和仓库把收益量级测出来。读完你应该能回答三个问题：慢在哪一段、这段该用什么手段、换手段之后如何验证有效。"}</script><link rel="canonical" href="https://987763485.github.io/2025/07/09/Rust%E7%BC%96%E8%AF%91%E5%8A%A0%E9%80%9F%E5%AE%9E%E8%B7%B5/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2025-07-08T16:00:00.000Z" title="7/9/2025, 12:00:00 AM">2025-07-09</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></span><span class="level-item">2 小时读完 (大约14004个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Rust 编译加速实践</h1><nav class="series-nav" aria-label="系列文章导航"><div class="series-nav-meta"><i class="fas fa-book-open" aria-hidden="true"></i><span>本文属于《<a class="series-nav-title" href="/series/rust/">Rust 学习路线</a>》第 55/68 篇</span></div><div class="series-nav-links"><a class="series-nav-link series-nav-prev" href="/2025/09/04/Rustunsafe%E4%B8%8E%E8%A3%B8%E6%8C%87%E9%92%88%E5%AE%9E%E8%B7%B5/"><i class="fas fa-chevron-left" aria-hidden="true"></i><span>上一篇</span></a><a class="series-nav-link series-nav-index" href="/series/rust/">系列目录</a><a class="series-nav-link series-nav-next" href="/2025/06/14/Rust%E4%B8%8EeBPF%E7%BB%93%E5%90%88%E5%AE%9E%E8%B7%B5/"><span>下一篇</span><i class="fas fa-chevron-right" aria-hidden="true"></i></a></div></nav><div class="content"><p>本文面向被 Rust 编译时间拖慢节奏的后端开发者与基础库维护者，讨论的不是“某个开关一开就快多少”，而是一套可复用的归因方法：先把编译拆成可测量的阶段，再让每一类手段去对应它真正改善的阶段，最后用你自己的机器和仓库把收益量级测出来。读完你应该能回答三个问题：慢在哪一段、这段该用什么手段、换手段之后如何验证有效。</p>
+<h2 id="慢在哪一段：先把体感拆成可归因的四段"><a href="#慢在哪一段：先把体感拆成可归因的四段" class="headerlink" title="慢在哪一段：先把体感拆成可归因的四段"></a>慢在哪一段：先把体感拆成可归因的四段</h2><p>“编译慢”是一个体感，不是一个诊断。rustc（Rust 编译器）把一份源码变成可执行产物，中间经过几段性质完全不同的工作，每段慢的原因不同，能用的手段也不同。</p>
+<p>第一段是前端（frontend），负责把文本变成类型良好的中间表示。它包含解析（parsing）、宏展开（macro expansion）、类型检查与借用检查（type check 与 borrow check）。解析基本跟代码行数成正比，不容易成为问题；真正容易拖慢这一段的是宏——过程宏（proc macro）要在编译期运行一段 Rust 代码，声明宏的展开会成倍放大后续要处理的语法树；类型检查与借用检查的代价则与函数体复杂度、泛型约束的深浅、生命周期推理的数量相关，而不是简单的行数。凡是“改了一处却看到大量 crate 重新做类型检查”的现象，几乎都在这一段。</p>
+<p>第二段是中端（middle-end），主要工作是把泛型代码变成具体代码，也就是单态化（monomorphization），并做与目标机器无关的优化、把任务切成 codegen 单元（codegen unit）。单态化的机制是：同一个泛型函数会为每个实际用到的具体类型生成一份独立代码，调用点多、类型参数组合多时，这里的产物数量会明显膨胀。codegen 单元的划分方式决定了后端有多少可以并行的工作，也决定了单个单元有多大。</p>
+<p>第三段是后端（back-end），即 LLVM 的优化管线与机器码生成（machine code generation）。它的工作量与“要生成的函数体积与数量”成正比，对优化档位（opt-level）、调试信息档位（debug information level）、跨 crate 内联的可用性都敏感。这是典型的 CPU 与内存密集型阶段。</p>
+<p>第四段是链接与产物处理（linking 与 artifact handling）。链接要在一处汇集所有目标文件的符号表、做重定位、合并调试信息，往往是整个流程里并行度最低、内存占用最尖峰的一环；产物处理还包括二进制体积相关的工作与后续打包。</p>
+<p>除了这四段“纵切”，还有一条“横切”的维度值得单独讲：依赖图（crate graph）上的重复劳动。Cargo 按依赖拓扑顺序构建，上游 crate 没产出元数据（metadata）之前下游无法开始，因此端到端时间不等于总工作量，而更接近一条最长关键路径（critical path）。更麻烦的是重复劳动：每次某个上游 crate 的指纹（fingerprint）发生变化，所有依赖它的下游都要重新做前端检查、重新单态化、重新生成代码，哪怕你只改了上游一行注释以外的东西。一个内部大 crate 处在依赖图中游位置时，它的改动会把整片下游一起拖下水。这也是本文反复强调“看最慢的那条链，而不是看总耗时”的原因。</p>
+<p>把这条流水线与手段类别画在一起，就是全文的地图：</p>
+<pre class="mermaid">flowchart TD
+  A["源码与依赖图"] --> B["前端：解析、宏展开、类型检查与借用检查"]
+  B --> C["中端：单态化、优化、codegen 单元划分"]
+  C --> D["后端：LLVM 优化与机器码生成"]
+  D --> E["链接"]
+  E --> F["产物处理：调试信息与打包"]
+  B -.-> B2["手段：增量编译、crate 拆分、feature 收敛、宏与依赖瘦身、check 优先"]
+  C -.-> C2["手段：泛型改动态分发、收敛类型参数、feature 收敛"]
+  D -.-> D2["手段：优化档位与调试信息档位、并行度调整"]
+  E -.-> E2["手段：链接器与调试信息这类环境相关项"]
+  F -.-> F2["手段：构建缓存、CI 分层与按影响范围构建"]</pre>
+
+<p>下面这张映射表是全文的主线：后面每一节都会回到这张表，说明某个手段落在哪一行。</p>
+<table>
+<thead>
+<tr>
+<th>慢的那一段</th>
+<th>典型信号</th>
+<th>对应的手段类别</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>前端</td>
+<td>大量 crate 同时进入编译却要等很久才出“检查通过”；宏展开后代码量暴增</td>
+<td>crate 拆分、增量编译、feature 收敛、宏与泛型瘦身、check 优先</td>
+</tr>
+<tr>
+<td>中端</td>
+<td>少数几个 crate 长时间占满 CPU；泛型调用点极多</td>
+<td>泛型改动态分发、收敛类型参数、feature 收敛、crate 拆分</td>
+</tr>
+<tr>
+<td>后端</td>
+<td>CPU 与内存同时吃满；产物目录膨胀</td>
+<td>优化档位与调试信息档位、codegen 单元、并行度调整</td>
+</tr>
+<tr>
+<td>链接与产物</td>
+<td>每个 crate 都在跑，最后却卡在一个长尾任务</td>
+<td>链接器与调试信息这类环境相关项、产物拆分</td>
+</tr>
+<tr>
+<td>依赖图重复劳动</td>
+<td>改一行触发大范围重建；CI 每次都从零开始</td>
+<td>增量边界管理、依赖瘦身、构建缓存、CI 分层与按影响范围构建</td>
+</tr>
+</tbody></table>
+<h2 id="先测量：把“感觉慢”变成可比较的数据"><a href="#先测量：把“感觉慢”变成可比较的数据" class="headerlink" title="先测量：把“感觉慢”变成可比较的数据"></a>先测量：把“感觉慢”变成可比较的数据</h2><p>顺序很重要：先会测，再谈改。没有测量就调参，等于把编译器当黑盒抽奖。</p>
+<p>第一步拿分阶段与分 crate 的数据。构建工具侧最直观的是带计时与可视化的产物输出：把一次构建的时间按 crate 摊开，你就能看到“时间被少数几个 crate 吃掉”还是“被一条长链吃掉”；<code>cargo build --timings</code> 会生成一份 HTML 报告，横轴是时间、每行是一个 crate、依赖边标出谁在等谁（本文第 10 节再讲它的读法）。编译器侧还有分阶段计时（per-pass 或 per-phase 的计时输出）这类调试用途的选项，用来看单 crate 内部的时间落在前端、中端还是后端；这类选项的名称与可用性跟工具链渠道相关，本文不逐一罗列精确拼写，只提醒读者：这类输出是给自己看的诊断，不适合放进 CI 的门禁。</p>
+<p>第二步分场景计时。三种场景的答案互不通用：冷编译（clean 之后从零开始，反映 CI 与新人首次构建）、热增量（改一个文件后的重建，反映日常开发手感）、CI 全新（带缓存与并发的构建，反映流水线）。三个场景各设一个可重复的动作，例如“改一个内部实现文件”“改一个公共类型签名”“改一个宏”，分别记录三场景下的等待，你会得到一张按场景与按改动类型交叉的表，而不是一个笼统的均值。</p>
+<p>第三步控制变量。同一份代码（固定在某个提交上）、clean 后再测冷编译；同一块磁盘（网络盘与本地盘的差别足以掩盖所有优化）；同一并发档位；同一工具链版本；关掉编辑器后台检查再测终端构建，或者反过来。测量时至少跑两次取第二次，把第一次当作磁盘缓存与预热成本。</p>
+<p>第四步，也是多数人漏掉的一步：把“我改了什么”记下来。每次只改一个因素，否则你无法归因。建议用一张结构固定的表：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">record_id,date,scenario,toolchain_channel,change_type,jobs,cache_state,observed_wait_level,notes</span><br><span class="line">0001,2025-07-01,hot_incremental,stable,internal_impl_only,8,local_target_reused,低,单文件函数体改动</span><br><span class="line">0002,2025-07-01,hot_incremental,stable,public_type_signature,8,local_target_reused,高,改一个 pub struct 字段</span><br><span class="line">0003,2025-07-02,ci_cold,stable,none,16,shared_cache_miss,极高,全新 runner</span><br></pre></td></tr></table></figure>
+
+<p>表里的三行只是示意行，用来展示字段结构；<code>observed_wait_level</code> 故意写成“低&#x2F;高&#x2F;极高”这类相对量级而不是秒数：绝对耗时属于每台机器自己的秘密，本文通篇不给具体数字。真正要做的事，是在你自己仓库上把同一列换成实测值，并保证跨行比较时其他列不变。顺带划界：报错信息怎么读、怎么理解编译器诊断，往期文章已经展开；本篇只谈时间，不谈诊断。</p>
+<h2 id="增量编译的真实边界"><a href="#增量编译的真实边界" class="headerlink" title="增量编译的真实边界"></a>增量编译的真实边界</h2><p>增量编译（incremental compilation）是收益最直接的手段，也是最容易被误解的一个。它的前提是“构建产物能复用上一次的成果”，而复用与否由指纹决定，不由你改了多少行决定。</p>
+<p>先说哪些改动容易引发大范围重建。改动公共 API（public API）——尤其是那些被下游直接引用的条目——会让下游的元数据视图失效；改动一个被广泛使用的类型签名，包括结构体字段、trait 的方法签名、泛型参数或约束，会让所有用到它的 crate 重新做类型检查并重新生成代码，这是范围最大的一类；改动宏定义，下游要重新展开并重新检查展开结果，等于把前端工作重做一遍；改动 feature 组合则会让所有受影响 crate 的编译选项集合变化，指纹一起变，连产物内容都可能不同。此外还有几条“隐形失效”来源：构建脚本（build script）的输出变化、环境变量进入编译命令行、依赖版本被更新（哪怕是小版本）、以及路径变化——同一份仓库换个目录 checkout，缓存过的元数据里的路径就对不上。另一类一次性打散指纹的改动是批量语法迁移，例如把整个项目从旧 edition 迁到 2024 edition（该 edition 已随当时的稳定版工具链在 2025 年初进入稳定渠道）：它同时改动大量文件的语法与预设，几乎必然带来一次全量重建，因此应当安排在专门的窗口并提前告知团队，而不是随手合进某个功能分支。</p>
+<p>再说那个最常见的困惑：为什么我只改了一行，整个 workspace 都重编了。原因通常不在那一行，而在被改的那个 crate 的下游有多少、它是不是位于依赖图上游。Cargo 的复用单位是 crate，一个上游 crate 一旦要重新编译，它的所有下游都要重新读取新的元数据并重新走一遍检查与生成；如果你的公共类型恰好住在一个“人人依赖”的基础 crate 里，一行改动就等于全工程重做。另一个常见原因是 target 目录（构建产物目录）没被复用：不同的 target、不同的 feature 集合、不同的构建配置 profile 都会产出互不复用的结果。</p>
+<p>分支切换（branch switching）是这个问题的现实版本。切分支时上游 crate 的指纹变了（代码内容变了、依赖解析变了、feature 变了），你感受到的“切分支必全量重编”就是这么来的。可行的缓解方式按方向排序：把频繁切换的分支放在不同的 target 目录里复用（代价是磁盘占用翻倍）、把公共 API 的改动集中在少量“边界 crate”里让破坏范围可预测、把重构做成向后兼容的追加而不是原地修改签名。这里不承诺任何具体比例，只提示一个必做的验证：切换前后各测一次热增量，看你的改动是否真的收敛了。</p>
+<p>最后是 <code>cargo check</code>、<code>cargo build</code>、<code>cargo clippy</code> 三者的关系与代价方向。<code>cargo check</code> 只做到“类型检查与借用检查通过、元数据产出”这一层，不进入后端与链接，因此它的代价主要落在前端；它能让下游继续检查，但不能产出可运行产物，测试也跑不了。<code>cargo build</code> 是完整链路，四段都要走，代价最高也最接近 CI。<code>cargo clippy</code> 本质上是一次带 lint 引擎的检查工作，代价方向接近 <code>check</code> 但要多做一遍分析，且它自己的诊断有额外成本。三者产物的复用关系并不像想象的那样自由：不同工具与不同 profile 下的检查产物未必互相顶替，把它们混用来“省时间”常常换来的是反复重建。把方向记住就够：日常反馈优先用 <code>check</code>，需要跑测试时才 <code>build</code>，<code>clippy</code> 属于门禁与定时任务而不是每次保存都跑。</p>
+<h2 id="crate-拆分与依赖图：把关键路径切短"><a href="#crate-拆分与依赖图：把关键路径切短" class="headerlink" title="crate 拆分与依赖图：把关键路径切短"></a>crate 拆分与依赖图：把关键路径切短</h2><p>一个内部巨型 crate 是编译时间问题的常见根因：它自己很大（前端与后端都要做很多工作），又处在依赖图上游（一改就波及全工程），还阻塞并行（拆不开就只能串行等它）。把它拆成“接口薄、实现内”的小 crate 之所以能同时改善增量与并行，机制有三条。</p>
+<p>第一是元数据视图变小。下游只依赖薄接口 crate，编译器读到的类型与签名数量少了，类型检查与单态化的搜索空间随之收敛；实现 crate 内部怎么改，只要薄接口不变，下游就不必重建。第二是并行度变高。拆开的 crate 之间如果没有依赖边，构建调度可以把它们放在同一层并发跑，关键路径从“一个大块”变成“若干小块加一条薄链”。第三是破坏范围可预测。公共 API 的变更必须显式发生在薄接口 crate 上，你在 review 时就能看到“这次改动会波及哪些下游”，而不是等到 CI 全量重编才发现。</p>
+<p>拆得过碎同样有反作用，需要正视三件事。契约面变多：每个新 crate 边界都意味着一批 <code>pub</code> 条目、一套需要维护的错误类型与版本兼容承诺，接口设计的成本从“内部约定”升级为“跨 crate 承诺”。编译单元固定开销：每次进入编译都要读取上游元数据、建立 crate 上下文，边数与节点数上升后，这部分固定成本会累积，甚至抵消并行收益；依赖图碎成一串长链时，并行度反而下降，因为关键路径变长了。版本管理成本：workspace 内部 crate 可以用路径依赖统一管理，一旦有外部消费者，版本对齐与发布节奏就成了额外负担。</p>
+<p>要不要拆，建议按一份固定的问题序列过一遍，任何一问答“否”就先不要拆：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">1. 这块代码是否被两个以上&quot;消费方&quot;独立依赖？（否则拆了没有下游受益者）</span><br><span class="line">2. 它的公共接口能否稳定在远小于实现体量的规模？（薄接口的比例决定收益）</span><br><span class="line">3. 它是否处在依赖图上游、改动频率明显高于下游？（上游高频改动最值得拆）</span><br><span class="line">4. 是否存在只有部分使用方需要的重依赖或重 feature？（能隔离就值得拆）</span><br><span class="line">5. 拆出去后，是否有明确的责任人与版本节奏？（无人维护的边界会烂掉）</span><br><span class="line">6. 能否接受多出的编译单元固定开销与接口维护成本？（收益不足以覆盖就别拆）</span><br></pre></td></tr></table></figure>
+
+<p>依赖图分层是配合拆分的组织方式：把 workspace 内部 crate 按“基础类型层、能力层、业务组合层、可执行入口层”排成单向依赖，禁止反向边（下层不得依赖上层），外部第三方依赖尽量只在能力层以下出现。这样业务层的改动不会波及基础层，而外部依赖升级的影响被限制在少数边界 crate 内。</p>
+<figure class="highlight toml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 顶层 Cargo.toml：workspace 成员与共享配置集中声明</span></span><br><span class="line"><span class="section">[workspace]</span></span><br><span class="line"><span class="attr">members</span> = [<span class="string">&quot;crates/core-types&quot;</span>, <span class="string">&quot;crates/storage&quot;</span>, <span class="string">&quot;crates/service&quot;</span>, <span class="string">&quot;crates/app&quot;</span>]</span><br><span class="line"><span class="attr">resolver</span> = <span class="string">&quot;2&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="section">[workspace.dependencies]</span></span><br><span class="line"><span class="comment"># 内部 crate 的路径依赖，版本节奏由 workspace 统一管理</span></span><br><span class="line"><span class="attr">core-types</span> = &#123; path = <span class="string">&quot;crates/core-types&quot;</span> &#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="feature-与单态化：被组合放大与被复制放大的工作量"><a href="#feature-与单态化：被组合放大与被复制放大的工作量" class="headerlink" title="feature 与单态化：被组合放大与被复制放大的工作量"></a>feature 与单态化：被组合放大与被复制放大的工作量</h2><p>feature（Cargo 的条件编译开关）本身不慢，慢的是它的组合。每个 feature 集合都对应一份独立的编译结果与独立的指纹：本地开发常用一套组合，CI 矩阵里还要跑若干套，测试里又有“只在某 feature 下存在”的代码路径。矩阵里 feature 维度一加，CI 的任务数按乘积增长，而这些任务彼此还不能复用产物，等于把冷编译重复做了若干遍。治理方向不是“少测”，而是“只测真实支持的组合”：把没有消费者的组合从矩阵里删掉，把只在极端组合下才有的代码收敛进独立 crate 或独立测试作业，让组合数与真实承诺对齐。这一条会在第 9 节的 CI 裁剪里再落到操作层面。</p>
+<p>第二个放大器是优化档位（opt-level）与调试信息档位（debug 信息的详细程度）。它们的方向性关系值得记住：优化档位越高，后端要做的分析与变换越多，单位代码的编译代价越大；调试信息越多，前端与后端要为每个定义与行号维护额外元数据，产物体积与链接工作量同时上升，时间也随之上去。反之把调试信息降到较少甚至关闭，能省下体积与链接相关的工作，代价是线上问题难以定位。这两项没有“永远最优”的取值，只有“按场景选档”：日常热增量与检查用低成本档，需要跑性能验证或产出发布物时用高成本档，CI 里把两者分开而不是所有作业共用一个昂贵的 profile。</p>
+<p>第三个放大器是单态化，机制在第 1 节已经提过：泛型代码不为“抽象的 T”生成一次，而是为每个实际用到的具体类型各生成一份。于是一个被 40 种类型参数实例化的函数就会产生 40 份独立代码，中端要复制 40 遍、后端要生成 40 遍、链接要处理 40 份符号（这处份数是示意值，只用于说明乘积关系，不是任何实测结果）。放大效应的强度取决于调用点数量与类型参数个数的乘积，而不是泛型本身有多复杂。取舍也随之明确：当某个泛型接口只在少数几处被使用、却被塞进很多类型参数组合时，改成动态分发（用 trait 对象在运行时选择实现）可以让代码只生成一份，把编译期工作量换成一次运行时间接调用与一层装箱；收敛类型参数（把多个泛型参数合并成一个配置结构、把不必要的泛型改成具体类型）则往往更划算，因为它同时降低接口复杂度。这类取舍改变的是运行期成本与编译期成本的分配，本文只谈编译期一侧的收益，编译期计算能带来什么、抽象到底“零成本”在哪，本批另有两篇专门讨论，此处不重复。</p>
+<p>最后要把“依赖 feature 穿透”列为需要长期盯的项目：当一个依赖 crate 的 feature 被你间接打开（多个上游各自要求不同组合，或某个默认 feature 顺带拉进一大片代码），实际参与编译的代码量可能远超你的预期，而它在依赖树里并不显眼。判断方法是把“我声明的 feature”与“实际生效的 feature 全集”分开看，前者在 manifest 里，后者要通过依赖树工具去查（见第 6 节）。至于产物体积的裁剪手段，属于另一篇的主题，本文只关心体积背后的编译工作量。</p>
+<h2 id="依赖本身的成本：那些不属于你的代码也要编译"><a href="#依赖本身的成本：那些不属于你的代码也要编译" class="headerlink" title="依赖本身的成本：那些不属于你的代码也要编译"></a>依赖本身的成本：那些不属于你的代码也要编译</h2><p>第三方依赖不是免费的外部能力，它们在每一次冷编译里都要走完整链路，而且经常比你的业务代码更占时间。有两类依赖值得单独认识。</p>
+<p>第一类是过程宏（proc macro）依赖。它的成本结构与普通 crate 不同：过程宏本质上一段在编译期被运行的程序，构建系统必须先把这个 crate 用宿主工具链完整编译成一个可加载的动态库，然后才能开始编译任何使用它的下游 crate；这意味着它在依赖图上是一个“必须先完成”的前置节点，处在关键路径的起点附近。更要紧的是现象层面的一个事实：过程宏 crate 自身通常享受不到增量优化带来的好处，改动它往往触发把它整个重新编译一遍，而它一重编，所有用了它的 crate 都要重新展开宏、重新检查展开结果。于是“动一下宏实现、全工程回到起点”在带大量派生宏（derive macro）的项目里是常态。围绕它的治理方向是把宏数量与宏展开体积当作指标来管：能用普通代码或 const 上下文表达的就不上宏；能合并的派生入口合并成一个；把宏 crate 的接口保持稳定，把实现细节关在私有模块里；避免让业务 crate 直接依赖语法树处理类基础设施 crate，那类 crate 体量不小、又几乎只为宏服务。这里只讲方向，不写任何“某版本之后如何”的断言——这类结论必须用你锁定的工具链自己验证。</p>
+<p>第二类是体积大的通用 crate 被全工程间接引入。它的代价有四个来源：一是元数据视图变大，每个下游 crate 读到的类型与签名数量增加，前端检查更贵；二是单态化在多个下游各做一遍，同一个泛型接口在你的每个 crate 里都会实例化它实际用到的类型；三是它常常带一堆默认打开的 feature，顺地把 TLS 实现、命令行解析、异步运行时之类的子树一起拉进构建；四是链接阶段要处理更多符号。治理方向是把“谁引入了它”查清楚：依赖树工具（例如 Cargo 自带的 <code>cargo tree</code>）能把某个 crate 从哪个依赖的哪个 feature 间接进入你的构建说明白，配合检查未使用依赖的社区工具（例如 <code>cargo-udeps</code>）能找出“已经在编译却没人用”的节点。本文只写工具名与用途，不写版本，也不承诺任何一次清理的收益比例；你要做的是把清理前后的冷编译时间按第 2 节的方法各测一次，把量级差异写进自己的记录表。</p>
+<p>一条容易漏的习惯：把依赖清单当作性能资产来 review。新增一个依赖时问三件事——它带来多少编译单元、它的默认 feature 是什么、能否用已有依赖或几十行代码替代。这三个问题在功能评审里常被忽略，但它们直接决定一年后你的 CI 有多长。</p>
+<h2 id="并行与链接：调度、内存与那条串行尾巴"><a href="#并行与链接：调度、内存与那条串行尾巴" class="headerlink" title="并行与链接：调度、内存与那条串行尾巴"></a>并行与链接：调度、内存与那条串行尾巴</h2><p>并行度不是越高越好，方向比数值重要。构建工具的并发参数（例如并发生成任务数）应与机器的物理核数与内存容量同时匹配：每个并行任务都要占据一份内存工作集，编译器后端与链接器又都是内存大户，并发档拉高到工作集总和超过可用物理内存时，系统开始换页，磁盘与内存带宽成为瓶颈，整体等待反而变长，严重时任务被杀死还得重跑。这就是“并发档明显高于核数、内存跟不上时整体反而更慢”的机理。正确做法是把并发当作一个待测变量：在冷编译与热增量两个场景下，各测一档“接近核数”的设置与一档“明显低于核数”的设置，观察哪个在你的内存约束下更稳；CI 上要注意并发档应与 runner 的 CPU 配额与内存配额一致，而不是照抄本地配置。</p>
+<p>链接（linking）之所以单独成为瓶颈，是因为它的性质与其他阶段相反：其他阶段可以按 crate、按 codegen 单元高度并行，链接却天然是汇聚点——它必须等所有输入就绪，然后把散落的符号表、重定位信息、调试信息在一处合并。参与链接的目标文件越多、符号越多、调试信息越厚，这一段越长；一个 workspace 里可执行入口多、每个入口都各链接一遍时，链接成本还会乘以入口数量。这也是为什么在“依赖图重复劳动”之后，链接常常是那条谁也躲不掉的串行尾巴。</p>
+<p>链接段的环境相关项要用正确的方式表述：社区里常见做法是换更快的链接器，或者减少调试信息的量来缩短链接与产物处理。你可能会听到 lld、mold 这类名字被作为“更快的链接器”提到，也可能听到调试信息格式与档位被讨论，但本文刻意不给具体配置细节与效果数字：链接器是否可用、以何种方式启用、在你这个平台与工具链渠道上表现如何，都依赖当时的实际组合，换一台机器结论就可能变化。可迁移的做法只有一条——把这类环境项当作“每次只改一个因素”的实验：固定代码与工具链，只动一个环境项，测冷编译与热增量两个场景的等待量级，并把结果记进那张表；同时在 CI 里为它留一个可以关闭的开关，方便出问题时回退定位。顺带记住一个副作用：调试信息减少会让本地与线上的问题定位变难，这是拿可观测性换时间，收益与代价要放在一起权衡。</p>
+<h2 id="构建缓存：把它当开关，不要当魔法"><a href="#构建缓存：把它当开关，不要当魔法" class="headerlink" title="构建缓存：把它当开关，不要当魔法"></a>构建缓存：把它当开关，不要当魔法</h2><p>缓存至少分四层，越往下越通用、也越容易出问题。第一层是本地 target 目录复用，它按 feature 集合、profile、工具链把产物分开放，收益最大也最直观：只要这些条件不变，第二次构建就能跳过已完成的部分。第二层是本地跨工作区复用，做法是把 target 指到统一的存储位置、或用同一份依赖版本锁让不同分支共享产物，代价是磁盘占用与路径相关问题。第三层是编译缓存（把“输入完全一致的编译任务”的产物与诊断缓存到可共享的地方，社区里常见的是这类缓存代理工具），它能让不同机器、不同分支上的相同任务只编一次。第四层是 CI 侧的缓存：把 target 目录或缓存内容随流水线保存与恢复，让下一次运行不从零开始。这套“分层缓存加按阶段拆门禁”的方法论在前端工具链的编译优化里已经被讲过一轮，本文不重复那些工具细节，只谈 Rust 侧的翻车点。</p>
+<p>最容易翻车的一点是：缓存命中依赖工具链版本、feature 组合、环境变量三者的一致性，而这三者常常在你没意识到的时候变化。缓存的键本质上是“这次编译的全部输入签名”，其中包含编译器版本与渠道、生效的 feature 集合、进入编译命令行的环境变量、构建配置的完整内容、乃至源码路径。你在本地把某个变量导出用于构建脚本、CI 上加了一个影响编译命令行的开关、或者升级了工具链，键就变了；表现是“缓存明明配了却全 miss”。更麻烦的是反向情况：键的粒度不够细时，缓存会给出“看起来命中、实际与全新构建结果不一致”的产物，这类问题定位成本极高。因此缓存必须被设计成能关掉的开关：保留一条明确的路径，可以在一次流水线运行里完全绕过所有缓存层跑一次全新构建，用它验证“缓存没有欺骗我”。这条 no-cache 路径要么定时跑，要么在改动构建配置、升级工具链、调整 feature 之后必跑一次。</p>
+<p>CI 里缓存 target 目录的收益与风险要成对评估。收益方向：重复依赖构建被跳过，冷编译里属于“依赖那部分”的工作不再每次付。风险方向：target 目录体积大，保存与恢复本身要时间与磁盘 IO，可能吃掉一部分收益；跨运行复用的产物里混着旧工具链的输出，指纹判定负担变重；缓存把同一个错误反复带回流水线，让“这真是新引入的问题吗”变得难以判断。可行的做法是按分支与按构建配置把缓存分开，宁可比预期少命中，也不要跨配置共享。下面这份 CI 分层骨架可以直接改成本仓库的作业名，它的要点是“每层只做该层的事、失败时能立刻定位是哪一层”：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 分层骨架：成本从低到高，越靠前越便宜、越该先跑</span></span><br><span class="line"><span class="attr">stages_sketch:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">job:</span> <span class="string">fmt_and_lint</span>     <span class="comment"># 格式与静态检查，独立作业，不参与测试依赖</span></span><br><span class="line">    <span class="attr">run:</span> <span class="string">&quot;cargo fmt --check / cargo clippy&quot;</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">job:</span> <span class="string">check_workspace</span>   <span class="comment"># 只做检查，覆盖主要 feature 组合</span></span><br><span class="line">    <span class="attr">run:</span> <span class="string">&quot;cargo check --workspace&quot;</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">job:</span> <span class="string">unit_tests</span>        <span class="comment"># 只跑受影响范围的测试</span></span><br><span class="line">    <span class="attr">run:</span> <span class="string">&quot;cargo test -p &lt;affected-package&gt;&quot;</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">job:</span> <span class="string">release_build</span>     <span class="comment"># 只有主干或标签才进入</span></span><br><span class="line">    <span class="attr">run:</span> <span class="string">&quot;cargo build --release&quot;</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">job:</span> <span class="string">nocache_probe</span>     <span class="comment"># 定期或改配置后：绕过全部缓存的全新构建</span></span><br><span class="line">    <span class="attr">run:</span> <span class="string">&quot;clean build&quot;</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="CI-分层与裁剪：把不该一起跑的东西拆开"><a href="#CI-分层与裁剪：把不该一起跑的东西拆开" class="headerlink" title="CI 分层与裁剪：把不该一起跑的东西拆开"></a>CI 分层与裁剪：把不该一起跑的东西拆开</h2><p>为什么把格式与静态检查和测试分到不同作业，理由有三条。一是它们回答的问题不同：前者回答“这段代码是否符合规范”，后者回答“行为是否正确”，把它们混在一个作业里，任何一条 lint 违规都会连带让测试结论不可用。二是失败定位：独立作业能直接告诉你“只有 clippy 红了”，而不是在一堆构建输出里找。三是成本结构不同：静态检查不产出可运行产物，测试要构建链接再跑，两者放在一起会人为拉长门禁反馈链条。分层以后，你还能只对最便宜的那层设置“每次都跑”，对昂贵的那层设置“按条件跑”。</p>
+<p>按改动路径做受影响范围构建（affected-range build）是第二根杠杆。思路是把“改了哪些目录”映射到“哪些 crate 受影响”，再只对这些 crate 以及依赖它们的下游做检查与测试——工具层面就表现为按包选择要构建与测试的目标，而映射关系来自你对 workspace 依赖图的了解。它的收益集中在增量类场景：改一个叶子 crate 的内部实现时，全工程其余部分没有理由再跑一遍测试。风险也要说清：如果影响范围判定漏掉了间接依赖（比如通过共享类型 crate 或构建脚本传递的依赖），你会得到“CI 绿了但主干坏了”的结果，所以必须保留一个每日或每周的全量作业作为兜底，并让受影响范围算法偏向保守（宁可多跑）。</p>
+<p>矩阵裁剪是最容易省却最少被做的一项。真实支持的 feature 组合往往比矩阵里的格子少：把没有用户、没有承诺的组合删掉；把只在极端组合下才编译的代码路径挪到单独的可选验证作业；把“必须通过”和“尽力保障”分成两档，后者失败不阻塞主干。判定依据是产品承诺而不是“反正能配上”。</p>
+<p>失败重试与缓存失效要划清边界。测试不稳定（flaky test）该重跑的是测试本身，不应该顺手清缓存；缓存可疑（同一错误跨多次运行、全新构建不复现）该做的是清缓存重跑而不是无限重试。两者混在一起的结果是你永远不知道问题出在代码还是在环境。建议的规则写成一句话：先按“重跑是否改变结论”分类，再决定动作。</p>
+<p>下面这份清单按出现频率列出 CI 上 Rust 项目的常见浪费，逐条对着自己的流水线打勾即可：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">1. 每个作业都做一遍完整的依赖构建，而 target 或缓存没有跨作业复用。</span><br><span class="line">2. 每个作业用不同的 feature 组合或不同的构建配置，产物彼此完全无法复用。</span><br><span class="line">3. 静态检查、测试、文档构建、发布构建塞在同一个作业串行执行。</span><br><span class="line">4. 每个提交都跑发布构建与多平台交叉编译，而发布只在主干需要。</span><br><span class="line">5. 全量测试每个提交都跑，即使改动只落在一个叶子 crate。</span><br><span class="line">6. 并发档与 runner 的 CPU/内存配额不匹配，触发换页或任务被杀后重跑。</span><br><span class="line">7. 矩阵里保留着没有任何用户承诺的 feature 格子。</span><br><span class="line">8. 没有一条&quot;绕过缓存的全新构建&quot;路径，缓存是否骗人无从验证。</span><br><span class="line">9. 依赖版本没有锁定文件参与缓存键，同一提交在不同时间编译出不同输入签名。</span><br><span class="line">10. 每次失败都清缓存重跑，把环境问题与代码问题混成一团。</span><br></pre></td></tr></table></figure>
+
+<h2 id="开发体验侧的杠杆：反馈环才是真成本"><a href="#开发体验侧的杠杆：反馈环才是真成本" class="headerlink" title="开发体验侧的杠杆：反馈环才是真成本"></a>开发体验侧的杠杆：反馈环才是真成本</h2><p>日常开发里，等待发生在编辑器与终端之间，而它们其实在抢同一份资源。语言服务器（例如 rust-analyzer 这类编辑器侧检查工具）会在后台持续做大量 <code>check</code> 级别的工作：加载依赖图、构建项目模型、随文件变化重新分析，这些工作既吃 CPU 也吃内存。你在终端里手动发起一次完整构建时，两者同时运行，谁都不会快；更糟的是磁盘与产物目录的争用，以及多个 checkout 各自在后台索引带来的叠乘效应。可行的方向是错开重活：确定“这段时间由编辑器负责反馈、还是由终端负责构建”，避免在同一台机器上并行开多个大项目的后台分析，把 target 目录放在本地磁盘而不要放在网络盘或被同步工具监看的目录（同步工具会因产物高频变化而反复扫描，代价以另一种形式回到你身上）。</p>
+<p>第二个杠杆是把默认动作设成 <code>check</code> 而不是 <code>build</code>。编辑循环里多数问题的答案是“类型过不过、借用对不对”，这些 <code>check</code> 就够；只有要跑二进制、跑集成测试、复现运行时行为时才需要完整构建。把它变成习惯的形式很具体：编辑器里保存时触发的是检查类动作；终端里第一反应敲的是检查；把“完整构建”留给明确需要的时刻。方向上的收益在第 3 节已经解释过——省掉的是中端与后端以及链接，不是前端。</p>
+<p>第三个杠杆是大项目的分层测试（layered testing）。把测试按代价分层：单元级（改哪测哪，属于最快的一档）、crate 级集成、跨 crate 的端到端。改动落在哪个 crate，就先只跑那个包以及它的直接下游；端到端与全量测试交给 CI 的对应作业与定时任务，而不是每次手工等待。配合第 4 节的依赖分层，“哪测”这件事才有明确依据。</p>
+<p>第四个杠杆是把已有的可视化产物读对。<code>cargo build --timings</code> 生成的报告是一份按 crate 展开的时间轴：每行是一个 crate，条形显示它什么时候开始、什么时候结束，依赖边显示谁在等谁，另有整体并发占用的视图。读它的时候不要问“总共多少秒”，而是问三个结构性问题：最长的那条依赖链是哪几个 crate 串起来的（这是关键路径，只有拆它才缩短端到端等待）；图里有没有大片空白（空白说明并发没被填满，往往是依赖链串行而非机器不够快）；有没有一两个 crate 的条块明显长于同层其他块（那是单点，值得单独看它内部在做什么，比如宏展开、单态化还是它自身体量巨大）。这三问的答案决定你下一步用哪一类手段；本文不给任何“看这张图应该读到多少秒”的结论，因为那张图只在你的机器上成立。</p>
+<h2 id="一次诊断复盘：从“改一行等太久”开始"><a href="#一次诊断复盘：从“改一行等太久”开始" class="headerlink" title="一次诊断复盘：从“改一行等太久”开始"></a>一次诊断复盘：从“改一行等太久”开始</h2><p>这个案例是我见过的项目形态里最典型的一种，为方便叙述做了脱敏，下面所有量级都用相对描述，个别处标注“示意值”，请读者替换成自己仓库的实测记录。</p>
+<p>起点是一句抱怨：某个服务组的同学说，“改一行要等太久，久到思路被打断”。第一轮我们没有动任何配置，只做第 2 节的测量：固定在同一个提交上，分别记录冷编译、改一个内部实现文件的热增量、改一个公共类型签名的热增量这三类动作的等待量级，并把当时的并发档、target 状态、编辑器是否开着都记进表。一轮下来得到三个事实：内部实现改动的等待已经属于“可以接受”量级；公共类型签名的改动等待是“极高”量级；冷编译与 CI 全新构建同为“极高”量级，且彼此不相上下。</p>
+<p>第二轮定位结构。用时间轴报告看关键路径，发现最长的链条穿过一个基础 crate，而示意值上有大半的 workspace 成员直接或间接依赖它——处在“人人依赖”的位置，意味着它的签名变更会波及全工程；再往依赖树里查，发现这个基础 crate 顺带把两个体量不小的通用 crate 透传给了所有下游，其中一个还是带着默认 feature 进来的，于是每个下游 crate 的元数据视图里都塞着一堆用不到的类型。第三轮看阶段：把那次公共签名改动重做一遍，确认时间大头落在前端（大量 crate 重复做类型检查）而不是链接，于是排除了“先动环境项”的思路。第四轮看缓存：CI 每次运行都从零开始，流水线各作业之间不共享产物，本地与 CI 之间没有任何一致性约束，工具链版本靠镜像默认值漂移。</p>
+<p>诊断结论是三条叠在一起：一个公共类型签名改动触发全 workspace 重编；依赖 feature 穿透把无关代码带进每个 crate；没有共享缓存让每次冷编译都付全额。改造分四步做，每步之间都留了测量。第一步拆边界：把基础 crate 里真正需要被广泛引用的类型抽到一个薄接口 crate，实现留在原处，让“公共签名改动”必须发生在薄接口上；同时把透传的通用 crate 收回到只在必要的能力层 crate 出现。第二步收敛 feature：把依赖 crate 的默认 feature 关掉、按需显式打开，并删掉矩阵里没有承诺的组合。第三步给 CI 加分层与复用：检查、静态门禁、按影响范围的测试、发布构建拆成不同作业，并引入一条绕过所有缓存的全新构建路径用于定期验证。第四步处理环境与习惯：并发档按 runner 配额校准，编辑器后台检查与终端构建错开，把 <code>check</code> 定为默认动作。</p>
+<p>验证方式不是“感觉快了些”，而是一份观测计划：改造后重跑同一批固定动作，与第一轮那张表逐行对比同一改动类型的等待量级；观察时间轴报告里最长链是否变短、同层是否出现更多并发；故意做一次公共签名改动，看受影响的 crate 集合是否真的收敛（示意值：从“几乎全仓”收敛到“薄接口的直接下游那一层”）；跑一次绕过缓存的全新构建，确认结果与带缓存的构建一致，以证明缓存没有给出假象。这些观测里唯一有意义的数字是你自己前后的对比，任何跨机器的绝对耗时都不成立——这也正是本文通篇拒绝写死耗时数字的原因。</p>
+<h2 id="手段对照表：谁改善哪一段，谁有代价"><a href="#手段对照表：谁改善哪一段，谁有代价" class="headerlink" title="手段对照表：谁改善哪一段，谁有代价"></a>手段对照表：谁改善哪一段，谁有代价</h2><p>把前面九类手段放回同一张表里对照，可以避免“听说有用就上”。表里的“受益场景”指该手段主要缩短哪一类构建：冷编译（从零开始）、增量（改一点重编）、还是 CI 全新（流水线）。运行时性能不在讨论范围内，那是另一篇的主题。</p>
+<table>
+<thead>
+<tr>
+<th>手段</th>
+<th>真正改善的是哪一段</th>
+<th>受益场景</th>
+<th>副作用与维护成本</th>
+<th>什么情况下不值得做</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>增量编译</td>
+<td>前端为主，连带减少下游重复劳动</td>
+<td>增量</td>
+<td>产物体积增大；指纹判定有额外开销；失效时收益归零</td>
+<td>构建本来就极短；或磁盘吃紧且几乎每次都是全新构建</td>
+</tr>
+<tr>
+<td>crate 拆分</td>
+<td>前端（元数据视图变小）、依赖图（关键路径变短、并行变高）</td>
+<td>增量与冷编译都受益</td>
+<td>契约面变多、版本管理成本、每个编译单元的固定开销</td>
+<td>拆分问题序列里有两三条答“否”；团队小、无人维护边界</td>
+</tr>
+<tr>
+<td>feature 收敛</td>
+<td>全链路（参与编译的代码总量变少）</td>
+<td>冷编译与 CI</td>
+<td>需要维护“支持哪些组合”的承诺；漏测真实组合会引入隐患</td>
+<td>项目本来就只有一两种组合；feature 是对外 API 的一部分且用户确实在用</td>
+</tr>
+<tr>
+<td>泛型改动态分发</td>
+<td>中端与后端（单态化产物数量减少）</td>
+<td>冷编译</td>
+<td>多一层运行时间接与装箱，损失部分运行期性能；接口表达力下降</td>
+<td>泛型只被少数类型实例化；或该路径本身就是性能热点</td>
+</tr>
+<tr>
+<td>依赖瘦身</td>
+<td>全链路，尤其是前端与链接</td>
+<td>冷编译与增量</td>
+<td>需要持续审查新增依赖；自研替代部分要自己维护</td>
+<td>依赖体量小且无 feature 穿透；替换成本高于收益</td>
+</tr>
+<tr>
+<td>并行度调整</td>
+<td>后端与整体的墙钟时间</td>
+<td>冷编译与 CI</td>
+<td>内存压力上升可能反而变慢；配置需与机器配额绑定</td>
+<td>机器内存本就紧张；任务间依赖已把并发填满，调了也没空间</td>
+</tr>
+<tr>
+<td>构建缓存</td>
+<td>依赖图重复劳动与链接（跳过已完成任务）</td>
+<td>冷编译与 CI</td>
+<td>键不一致就全 miss；错误产物难定位；归档保存与恢复本身要成本</td>
+<td>构建输入签名极不稳定（频繁换工具链或路径）；无法保留一条绕过缓存的验证路径</td>
+</tr>
+<tr>
+<td>CI 分层与裁剪</td>
+<td>依赖图重复劳动与墙钟反馈时间</td>
+<td>CI</td>
+<td>作业编排复杂度上升；影响范围判定漏判会造成假绿</td>
+<td>项目本身就一个 crate 一套测试；无全量兜底作业时不要贸然裁剪</td>
+</tr>
+<tr>
+<td>编辑器与本地习惯</td>
+<td>前端为主的日常反馈</td>
+<td>增量</td>
+<td>需要改变个人工作流；偶尔要手动触发一次完整构建</td>
+<td>单人小项目、构建本来就快；或工作内容高度依赖运行结果</td>
+</tr>
+</tbody></table>
+<p>这张表最右一列比中间几列更重要。编译优化最容易犯的错，是不看条件地把所有手段都上一层，结果换来一堆难维护的配置与无法解释的现象。判断标准始终是前面测出来的那张表：你的等待到底落在哪一段，值不值得为它付这份维护成本。</p>
+<h2 id="定位顺序：一张可以直接贴的清单"><a href="#定位顺序：一张可以直接贴的清单" class="headerlink" title="定位顺序：一张可以直接贴的清单"></a>定位顺序：一张可以直接贴的清单</h2><p>最后把全文收敛成一份可贴在工位或 wiki 上的定位顺序。它的作用是防止“跳过归因直接调参”。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">编译慢的定位顺序（每次只往下走一步，找到能解释现象的那一层再动手）</span><br><span class="line"></span><br><span class="line">0. 先分清场景：冷编译 / 热增量 / CI 全新，三者的结论互不通用。</span><br><span class="line">1. 分阶段计时：拿一次带计时与分 crate 统计的构建输出，确认时间落在</span><br><span class="line">   前端、中端、后端、链接还是产物处理。</span><br><span class="line">2. 看最慢 crate：是&quot;少数几个 crate 吃掉大半时间&quot;，还是&quot;一条长链串行等待&quot;。</span><br><span class="line">   前者查该 crate 内部，后者查依赖图。</span><br><span class="line">3. 看是否宏或单态化：改动是否触发大范围宏展开；泛型接口是否被大量类型</span><br><span class="line">   实例化。前者指向过程宏与派生宏治理，后者指向动态分发或收敛类型参数。</span><br><span class="line">4. 看依赖 feature 穿透：用依赖树工具核对&quot;实际生效的 feature 全集&quot;与</span><br><span class="line">   &quot;我声明的 feature&quot;是否一致；关注默认打开的 feature 与间接引入的大 crate。</span><br><span class="line">5. 看链接：链接是否是那条谁也躲不掉的串行尾巴；符号量与调试信息量是否过大。</span><br><span class="line">6. 看缓存是否命中：确认工具链版本、feature 组合、环境变量、路径四项一致；</span><br><span class="line">   必要时跑一次绕过全部缓存的全新构建，判断缓存有没有给出假象。</span><br><span class="line">7. 才谈并行：并发档与机器核数、内存、runner 配额是否匹配；并行度过高时</span><br><span class="line">   内存换页会让整体更慢，这一步不能提前做。</span><br><span class="line">8. 改完之后回到第 0 步重测：用同一批固定动作与同一张记录表验证收益，</span><br><span class="line">   并确保每次只改了一个因素。</span><br></pre></td></tr></table></figure>
+
+<p>这份清单里“第 7 步才谈并行”和“第 8 步要回测”是最容易被略过、却最能避免折腾的两条。绝大多数“配了半天没变化”的经历，都是因为从第 7 步开始动手。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>本文的主线只有一条：把“编译慢”拆成可归因的阶段，再让每类手段去对应它真正改善的那一段。前端慢，看宏、看元数据视图、看增量边界；中端慢，看单态化与 feature 组合；后端慢，看优化档位、调试信息档位与并发；链接慢，看符号量与产物处理；而依赖图上的重复劳动，只能靠 crate 拆分、缓存与 CI 分层来消。</p>
+<p>第二件事是把测量放在手段之前。冷编译、热增量、CI 全新三种场景要分别计时，控制变量、每次只改一个因素、把结果记进一张固定的表——没有这套动作，任何优化都只是在黑盒里试参数。本文通篇不给具体耗时数字，正因为绝对数值只在你的机器、你的仓库上成立；能迁移的只有方法与判断标准。</p>
+<p>第三件事是对“优化”本身保持警惕。增量编译会让产物膨胀、crate 拆分会带来契约成本、动态分发会牺牲运行期性能、缓存会造成难定位的不一致、并行度过高反而更慢。每一项收益旁边都写着账单，而本文反复强调的做法是：留一条绕过所有缓存的全新构建路径，定期用它证明优化没有骗你。若你只能记住一件可立即执行的事，那就是把下一次要改的编译配置当作实验对象——先测、再改一个变量、然后回测。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://doc.rust-lang.org/cargo/">The Cargo Book（Cargo 官方手册，含构建配置 profiles、工作区 workspaces、feature 机制、依赖解析与 cargo tree 主题）</a></li>
+<li><a href="https://doc.rust-lang.org/reference/">The Rust Reference（Rust 参考手册，含泛型与单态化、trait 对象与动态分发、过程宏主题）</a></li>
+<li><a href="https://doc.rust-lang.org/rustc/">The rustc book（编译器文档，含编译代码相关选项与分阶段计时 per-pass timing 主题）</a></li>
+<li><a href="https://rust-lang.github.io/rustup/">rustup 官方文档（工具链渠道 stable &#x2F; beta &#x2F; nightly 管理主题）</a></li>
+<li>Cargo 构建时间可视化报告（build timings 报告）主题：见上文 Cargo 官方手册中的构建命令与诊断相关章节</li>
+<li>Rust 增量编译（incremental compilation）与产物复用判定（fingerprint）相关的编译器文档主题：见上文 rustc 官方手册</li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Rust 编译加速实践</p><p><a href="https://987763485.github.io/2025/07/09/Rust编译加速实践/">https://987763485.github.io/2025/07/09/Rust编译加速实践/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2025-07-09</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-20</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/rust/">rust</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2025/07/14/Rust%E4%B8%8ESIMD%E4%BC%98%E5%8C%96/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Rust 与 SIMD 优化</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2025/07/02/Rust%E4%B8%8EWebAssembly%E7%BB%93%E5%90%88/"><span class="level-item">Rust 与 WebAssembly 结合</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

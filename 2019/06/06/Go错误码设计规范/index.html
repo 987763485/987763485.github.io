@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Go 错误码设计规范 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="HTTP 状态码只能说明“哪一类请求失败了”，却说不清“具体为什么失败”。同一套接口同时服务 Web、移动端与第三方系统时，靠匹配错误文案来分支处理既不牢靠，也无法跨语言复用。本文从码段划分、错误类型、分层转换、文档契约与可观测性几个角度，整理一套可以直接落地的 Go 错误码规范，适合刚开始做多团队协作的后端开发者。读完后你应当能为自己的业务设计出一套稳定、可治理的错误码体系。"><meta property="og:type" content="blog"><meta property="og:title" content="Go 错误码设计规范"><meta property="og:url" content="https://987763485.github.io/2019/06/06/Go%E9%94%99%E8%AF%AF%E7%A0%81%E8%AE%BE%E8%AE%A1%E8%A7%84%E8%8C%83/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="HTTP 状态码只能说明“哪一类请求失败了”，却说不清“具体为什么失败”。同一套接口同时服务 Web、移动端与第三方系统时，靠匹配错误文案来分支处理既不牢靠，也无法跨语言复用。本文从码段划分、错误类型、分层转换、文档契约与可观测性几个角度，整理一套可以直接落地的 Go 错误码规范，适合刚开始做多团队协作的后端开发者。读完后你应当能为自己的业务设计出一套稳定、可治理的错误码体系。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2019-06-06T12:37:38.000Z"><meta property="article:modified_time" content="2026-10-18T13:15:53.227Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="golang"><meta property="article:tag" content="微服务"><meta property="article:tag" content="后端开发"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2019/06/06/Go%E9%94%99%E8%AF%AF%E7%A0%81%E8%AE%BE%E8%AE%A1%E8%A7%84%E8%8C%83/"},"headline":"Go 错误码设计规范","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2019-06-06T12:37:38.000Z","dateModified":"2026-10-18T13:15:53.227Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"HTTP 状态码只能说明“哪一类请求失败了”，却说不清“具体为什么失败”。同一套接口同时服务 Web、移动端与第三方系统时，靠匹配错误文案来分支处理既不牢靠，也无法跨语言复用。本文从码段划分、错误类型、分层转换、文档契约与可观测性几个角度，整理一套可以直接落地的 Go 错误码规范，适合刚开始做多团队协作的后端开发者。读完后你应当能为自己的业务设计出一套稳定、可治理的错误码体系。"}</script><link rel="canonical" href="https://987763485.github.io/2019/06/06/Go%E9%94%99%E8%AF%AF%E7%A0%81%E8%AE%BE%E8%AE%A1%E8%A7%84%E8%8C%83/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2019-06-06T12:37:38.000Z" title="6/6/2019, 8:37:38 PM">2019-06-06</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></span><span class="level-item">30 分钟读完 (大约4541个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Go 错误码设计规范</h1><nav class="series-nav" aria-label="系列文章导航"><div class="series-nav-meta"><i class="fas fa-book-open" aria-hidden="true"></i><span>本文属于《<a class="series-nav-title" href="/series/go/">Go 语言与工程</a>》第 65/78 篇</span></div><div class="series-nav-links"><a class="series-nav-link series-nav-prev" href="/2019/05/09/GORM%E5%85%B3%E8%81%94%E6%9F%A5%E8%AF%A2%E4%B8%8E%E9%A2%84%E5%8A%A0%E8%BD%BD/"><i class="fas fa-chevron-left" aria-hidden="true"></i><span>上一篇</span></a><a class="series-nav-link series-nav-index" href="/series/go/">系列目录</a><a class="series-nav-link series-nav-next" href="/2019/07/01/Go%E5%AE%9E%E7%8E%B0%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0%E4%B8%8E%E5%88%86%E7%89%87/"><span>下一篇</span><i class="fas fa-chevron-right" aria-hidden="true"></i></a></div></nav><div class="content"><p>HTTP 状态码只能说明“哪一类请求失败了”，却说不清“具体为什么失败”。同一套接口同时服务 Web、移动端与第三方系统时，靠匹配错误文案来分支处理既不牢靠，也无法跨语言复用。本文从码段划分、错误类型、分层转换、文档契约与可观测性几个角度，整理一套可以直接落地的 Go 错误码规范，适合刚开始做多团队协作的后端开发者。读完后你应当能为自己的业务设计出一套稳定、可治理的错误码体系。</p>
+<h2 id="错误码要解决的三个问题"><a href="#错误码要解决的三个问题" class="headerlink" title="错误码要解决的三个问题"></a>错误码要解决的三个问题</h2><p>很多团队最初并不设错误码：接口失败时返回一段中文描述，客户端用 <code>strings.Contains</code> 判断关键字。这种做法在单团队、单语言、文案几乎不变的项目里能撑一阵，一旦接口要同时服务 App、小程序与开放平台，问题就暴露了：文案改一个字，客户端的分支就失效；同一个“库存不足”在不同接口里措辞不同；日志里只能按字符串聚合，告警规则越写越乱。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 反例：靠文案判断错误类型，改一个字就失效</span></span><br><span class="line"><span class="keyword">if</span> strings.Contains(err.Error(), <span class="string">&quot;库存不足&quot;</span>) &#123;</span><br><span class="line">    showToast(<span class="string">&quot;商品暂时卖完了&quot;</span>)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>错误码的第一个价值，是让客户端可以编程处理。客户端拿到一个稳定的整数，就能决定是提示用户修改参数、引导重新登录、自动重试，还是跳转人工客服，而不必理解服务端的自然语言。</p>
+<p>第二个价值，是形成跨语言、跨团队的契约。Go 服务、Java 老系统、iOS 与 Android 客户端，甚至外部对接方，都可以围绕同一张码表开发。码表和字段名、枚举值一样，是接口文档的一部分，不能只存在于某位开发者的记忆里。</p>
+<p>第三个价值，是让日志与告警可以聚合。按错误码计数，能快速看出“今天下单失败里有多少是库存不足、多少是参数错误”；按错误码配置告警阈值，也比匹配日志文本可靠得多。</p>
+<p>需要强调：错误码不是给用户看的文案。用户看到的是“商品暂时卖完了，换一件试试”，这句话可以随运营策略、语言和语气随时调整；错误码则是给程序与排障人员看的稳定标识，不应直接展示给终端用户，也不应把文案本身当成码。两者的生命周期完全不同，混在一起设计，后面一定互相拖累。</p>
+<h2 id="码段划分：让数字自己说话"><a href="#码段划分：让数字自己说话" class="headerlink" title="码段划分：让数字自己说话"></a>码段划分：让数字自己说话</h2><p>错误码建议使用定长数字，并把每一个位段赋予含义。笔者常用的是 5 位十进制：前 2 位表示业务域，第 3 位表示错误类型，后 2 位表示域内序号。这样全站最多 100 个业务域，每个域 10 类错误、每类 100 个具体码，对中等规模的系统足够用。</p>
+<p>先按业务域分段：</p>
+<table>
+<thead>
+<tr>
+<th>码段</th>
+<th>业务域</th>
+<th>维护团队</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>10xxx</td>
+<td>用户与账号</td>
+<td>用户平台组</td>
+</tr>
+<tr>
+<td>20xxx</td>
+<td>订单与交易</td>
+<td>交易组</td>
+</tr>
+<tr>
+<td>30xxx</td>
+<td>商品与库存</td>
+<td>商品组</td>
+</tr>
+<tr>
+<td>40xxx</td>
+<td>支付与结算</td>
+<td>支付组</td>
+</tr>
+<tr>
+<td>90xxx</td>
+<td>通用与系统</td>
+<td>基础架构组</td>
+</tr>
+<tr>
+<td>99xxx</td>
+<td>预留扩展</td>
+<td>暂不分配</td>
+</tr>
+</tbody></table>
+<p>再在每个域内按错误类型细分子段，以订单域为例：</p>
+<table>
+<thead>
+<tr>
+<th>子段</th>
+<th>错误类型</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>201xx</td>
+<td>参数与校验</td>
+<td>20101 参数缺失或格式错误</td>
+</tr>
+<tr>
+<td>202xx</td>
+<td>状态与冲突</td>
+<td>20202 库存不足</td>
+</tr>
+<tr>
+<td>203xx</td>
+<td>资源不存在</td>
+<td>20301 订单不存在</td>
+</tr>
+<tr>
+<td>204xx</td>
+<td>权限与身份</td>
+<td>20401 无权操作该订单</td>
+</tr>
+<tr>
+<td>205xx</td>
+<td>依赖与系统</td>
+<td>20501 库存服务不可用</td>
+</tr>
+<tr>
+<td>209xx</td>
+<td>域内预留</td>
+<td>暂不分配</td>
+</tr>
+</tbody></table>
+<p>这种“域 + 类型 + 序号”的结构有两个好处。其一，看到 20202 就能猜到它属于订单域的状态冲突类，排障时不必先查表；其二，新增错误时只在对应子段里追加序号，不会打乱既有码。各域还应保留一段不分配的区间，用于临时活动、内部试验或未来拆分业务域，避免新业务无处安放。</p>
+<p>段位长度是取舍。4 位只能容纳 100 个域、每域 100 个码，业务一多就会被迫跨段借用；6 位空间充裕，但念起来、记起来、在表格里对齐都更费劲，排查时也容易抄错。5 位是多数团队能接受的折中。若坚持使用字符串码，例如 <code>ORDER_STOCK_SHORTAGE</code>，可读性更好，但更长、更易拼错，还可能被客户端按前缀解析，反而形成隐式耦合。无论选数字还是字符串，全站只能有一种风格，不能在同一个响应里混用。</p>
+<p>还有一个细节：数字码若以 0 开头，部分客户端会按整数解析而丢掉前导零，因此码段最好从 1 开头；若确实要用 <code>0xxxx</code>，文档里必须声明字段是字符串。本文示例统一按 5 位整数处理。</p>
+<h2 id="业务码与-HTTP-状态码的分工"><a href="#业务码与-HTTP-状态码的分工" class="headerlink" title="业务码与 HTTP 状态码的分工"></a>业务码与 HTTP 状态码的分工</h2><p>HTTP 状态码工作在传输与协议语义层，业务码工作在业务语义层。两者不是替代关系，而是分工：状态码告诉网关、负载均衡与监控系统“这次请求大体属于哪类结果”，业务码告诉调用方“具体是哪条业务规则没有通过”。</p>
+<table>
+<thead>
+<tr>
+<th>HTTP 状态</th>
+<th>语义</th>
+<th>典型业务错误</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>400</td>
+<td>请求格式或参数不合法</td>
+<td>参数缺失、类型错误、字段越界</td>
+</tr>
+<tr>
+<td>401</td>
+<td>未认证或凭证失效</td>
+<td>未登录、令牌过期</td>
+</tr>
+<tr>
+<td>403</td>
+<td>已认证但无权限</td>
+<td>越权访问、角色不足</td>
+</tr>
+<tr>
+<td>404</td>
+<td>资源不存在</td>
+<td>订单不存在、商品已删除</td>
+</tr>
+<tr>
+<td>409</td>
+<td>与资源当前状态冲突</td>
+<td>库存不足、重复提交、状态不允许</td>
+</tr>
+<tr>
+<td>429</td>
+<td>触发限流</td>
+<td>请求过于频繁</td>
+</tr>
+<tr>
+<td>5xx</td>
+<td>服务端故障</td>
+<td>依赖超时、数据库不可用、未知崩溃</td>
+</tr>
+</tbody></table>
+<p>映射是多对一的：一个 409 可以对应库存不足、优惠券已使用、订单已取消等多个业务码；反过来，一个业务码只应固定映射到一个 HTTP 状态。这个方向不能反，否则监控按状态码统计时，会把“用户输错参数”算成“服务端故障”。</p>
+<p>不要把业务码塞进 HTTP 状态码。有人把“订单不存在”定义成 444，把“库存不足”定义成 445，看起来一一对应，实际上破坏了协议：网关不认识这些状态，浏览器与 CDN 按标准语义处理，监控面板也只认标准分类。更常见的反模式是无论成败都返回 200，把错误藏在响应体的业务码里。这样前端确实省事，但网关、日志采集和 SLA 统计都看不到失败，线上故障会被“200 率 100%”掩盖。</p>
+<p>同样，也不要把业务失败放进 5xx。库存不足是正常的业务结果，不是服务故障；用 500 返回它，会污染错误率、触发无意义的告警，还可能让客户端或网关误以为可以重试。5xx 只留给“没有预料到、需要人介入”的情况。</p>
+<h2 id="AppError：错误类型的骨架"><a href="#AppError：错误类型的骨架" class="headerlink" title="AppError：错误类型的骨架"></a>AppError：错误类型的骨架</h2><p>要让业务码在层与层之间传递而不丢失，需要一个统一的错误类型。笔者通常定义 <code>AppError</code>，把业务码、开发者消息、建议的 HTTP 状态、内部原因与结构化细节放在一起：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> apperr</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> (</span><br><span class="line">    <span class="string">&quot;fmt&quot;</span></span><br><span class="line">    <span class="string">&quot;net/http&quot;</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment">// AppError 是业务错误的统一载体，可直接作为 error 使用。</span></span><br><span class="line"><span class="keyword">type</span> AppError <span class="keyword">struct</span> &#123;</span><br><span class="line">    Code       <span class="type">int</span>               <span class="string">`json:&quot;code&quot;`</span></span><br><span class="line">    Message    <span class="type">string</span>            <span class="string">`json:&quot;message&quot;`</span>           <span class="comment">// 面向开发者，不直接给用户</span></span><br><span class="line">    HTTPStatus <span class="type">int</span>               <span class="string">`json:&quot;-&quot;`</span>                 <span class="comment">// 只用于映射响应状态</span></span><br><span class="line">    Details    <span class="keyword">map</span>[<span class="type">string</span>]<span class="type">string</span> <span class="string">`json:&quot;details,omitempty&quot;`</span> <span class="comment">// 可安全暴露的补充信息</span></span><br><span class="line">    Cause      <span class="type">error</span>             <span class="string">`json:&quot;-&quot;`</span>                 <span class="comment">// 内部原因，绝不外发</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(e *AppError)</span></span> Error() <span class="type">string</span> &#123;</span><br><span class="line">    <span class="keyword">if</span> e.Cause != <span class="literal">nil</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> fmt.Sprintf(<span class="string">&quot;%d %s: %v&quot;</span>, e.Code, e.Message, e.Cause)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> fmt.Sprintf(<span class="string">&quot;%d %s&quot;</span>, e.Code, e.Message)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">New</span><span class="params">(code <span class="type">int</span>, message <span class="type">string</span>, status <span class="type">int</span>)</span></span> *AppError &#123;</span><br><span class="line">    <span class="keyword">return</span> &amp;AppError&#123;Code: code, Message: message, HTTPStatus: status&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">Wrap</span><span class="params">(code <span class="type">int</span>, message <span class="type">string</span>, status <span class="type">int</span>, cause <span class="type">error</span>)</span></span> *AppError &#123;</span><br><span class="line">    <span class="keyword">return</span> &amp;AppError&#123;Code: code, Message: message, HTTPStatus: status, Cause: cause&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(e *AppError)</span></span> WithDetails(kv ...<span class="type">string</span>) *AppError &#123;</span><br><span class="line">    <span class="keyword">if</span> e.Details == <span class="literal">nil</span> &#123;</span><br><span class="line">        e.Details = <span class="built_in">make</span>(<span class="keyword">map</span>[<span class="type">string</span>]<span class="type">string</span>, <span class="built_in">len</span>(kv)/<span class="number">2</span>)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">for</span> i := <span class="number">0</span>; i+<span class="number">1</span> &lt; <span class="built_in">len</span>(kv); i += <span class="number">2</span> &#123;</span><br><span class="line">        e.Details[kv[i]] = kv[i+<span class="number">1</span>]</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> e</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>AppError</code> 实现了 <code>error</code> 接口，可以像普通错误一样返回、包装和记录。<code>Error()</code> 把内部原因也拼进去，是给日志看的；响应体只取 <code>Code</code>、<code>Message</code> 和经过筛选的 <code>Details</code>，不要直接把错误对象序列化，否则原因里的 SQL 语句、文件路径就可能一起泄露。字段上的 <code>json:&quot;-&quot;</code> 只是第二道保险，不能替代响应组装时的白名单。</p>
+<p>包装与解包沿用 <code>github.com/pkg/errors</code>。repository 用 <code>errors.Wrap</code> 补充上下文，service 判断出领域语义后，再用 <code>apperr.New</code> 或 <code>apperr.Wrap</code> 转成业务错误：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> ErrOrderNotFound = errors.New(<span class="string">&quot;order not found&quot;</span>)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(r *orderRepo)</span></span> GetByID(id <span class="type">int64</span>) (*Order, <span class="type">error</span>) &#123;</span><br><span class="line">    row := r.db.QueryRow(<span class="string">&quot;SELECT id, status FROM orders WHERE id = ?&quot;</span>, id)</span><br><span class="line">    <span class="keyword">var</span> o Order</span><br><span class="line">    <span class="keyword">if</span> err := row.Scan(&amp;o.ID, &amp;o.Status); err != <span class="literal">nil</span> &#123;</span><br><span class="line">        <span class="keyword">if</span> err == sql.ErrNoRows &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">nil</span>, ErrOrderNotFound <span class="comment">// 领域事实，不带 HTTP 语义</span></span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">nil</span>, errors.Wrap(err, <span class="string">&quot;query order&quot;</span>)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> &amp;o, <span class="literal">nil</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(s *OrderService)</span></span> Cancel(ctx context.Context, id, uid <span class="type">int64</span>) <span class="type">error</span> &#123;</span><br><span class="line">    <span class="keyword">if</span> _, err := s.repo.GetByID(id); err != <span class="literal">nil</span> &#123;</span><br><span class="line">        <span class="keyword">if</span> errors.Cause(err) == ErrOrderNotFound &#123;</span><br><span class="line">            <span class="keyword">return</span> apperr.New(apperr.CodeOrderNotFound, <span class="string">&quot;order not found&quot;</span>, http.StatusNotFound)</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> apperr.Wrap(apperr.CodeInternal, <span class="string">&quot;cancel order failed&quot;</span>, http.StatusInternalServerError, err)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 省略状态校验与写库</span></span><br><span class="line">    <span class="keyword">return</span> <span class="literal">nil</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这里有个容易踩的细节：<code>AppError</code> 的字段已经叫 <code>Cause</code>，就不能再定义 <code>Cause() error</code> 方法，Go 不允许字段与方法同名；而 <code>pkg/errors.Cause</code> 遇到不实现 <code>causer</code> 接口的错误，会把它当作错误链的终点，这恰好符合“业务错误是包装边界”的定位。需要拿内部原因写日志时，直接读 <code>appErr.Cause</code> 即可。</p>
+<h2 id="分层：只在懂业务的地方分配码"><a href="#分层：只在懂业务的地方分配码" class="headerlink" title="分层：只在懂业务的地方分配码"></a>分层：只在懂业务的地方分配码</h2><p>错误从存储层往上走，职责要分清：repository 只返回领域错误，例如“记录不存在”“唯一键冲突”，它不认识 HTTP，也不引用业务码包；service 判定业务语义，把领域错误转换成 <code>AppError</code>，业务码只在这一层分配；handler 只做映射，把 <code>HTTPStatus</code> 与 <code>Code</code> 写进响应。</p>
+<pre class="mermaid">flowchart TD
+    A[repository 返回领域错误] --> B[service 判定语义并分配业务码]
+    B --> C[handler 映射 HTTP 状态与响应体]
+    C --> D[客户端按 code 分支处理]
+    B --> E[未识别错误折叠为内部错误]
+    E --> F[堆栈只写入日志]</pre>
+
+<p>一个错误只能分配一次业务码。不要在 repository 给一个码，service 觉得不合适又换一个，handler 再兜底换第三个。层层换码会让同一个原因在不同接口下表现不一致，客户端也无法依据码表预期结果。下层已经标成 <code>AppError</code> 的，上层应原样透传，只在获得新信息时补充 <code>Details</code>。</p>
+<p>handler 面对两类输入：已经是 <code>AppError</code> 的直接映射；不是的说明是未预期错误，统一折叠成内部错误码，原始错误写日志。折叠逻辑很短：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">From</span><span class="params">(err <span class="type">error</span>)</span></span> *AppError &#123;</span><br><span class="line">    <span class="keyword">if</span> e, ok := errors.Cause(err).(*AppError); ok &#123;</span><br><span class="line">        <span class="keyword">return</span> e</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> Wrap(CodeInternal, <span class="string">&quot;internal error&quot;</span>, http.StatusInternalServerError, err)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="消息、i18n-与文档契约"><a href="#消息、i18n-与文档契约" class="headerlink" title="消息、i18n 与文档契约"></a>消息、i18n 与文档契约</h2><p><code>Message</code> 建议使用面向开发者的英文，例如 <code>insufficient stock</code>，服务于日志检索与排障；用户看到的中文、英文、日文文案应单独维护。可以放在客户端以错误码为 key 查表，也可以由服务端按 <code>Accept-Language</code> 返回 <code>user_message</code>。无论放哪边，原则都是“码稳定、文案可改”：运营改一句提示不必改码，新增一种语言也不动业务逻辑。</p>
+<p>参数化消息不要把变量拼进 <code>Message</code>。“库存只剩 3 件”里的 3 应放在 <code>Details</code>，由展示层套模板；否则 message 随数据变化，既无法聚合，也可能把敏感信息带进日志。文案表同样以 code 为 key，而不是以英文 message 为 key。</p>
+<p>错误码表是契约的一部分，至少应包含：码、含义、HTTP 状态、触发条件、处理建议、是否可重试、引入版本、当前状态。文档与代码放在同一个仓库，改码时同步改表。版本化遵循“只增不改”，已有码的含义永不改变；废弃时先标为 deprecated，公告并保留若干版本，确认没有客户端依赖后再移除。移除已发布的码属于破坏性变更，应随接口主版本发生。客户端 SDK 最好由同一份码表生成，至少暴露码常量、可重试判断与文案查询，避免三处各写一遍。</p>
+<h2 id="可观测性：让错误码可聚合"><a href="#可观测性：让错误码可聚合" class="headerlink" title="可观测性：让错误码可聚合"></a>可观测性：让错误码可聚合</h2><p>日志用结构化字段记录 <code>code</code>、<code>http_status</code>、<code>route</code>、<code>trace_id</code>、耗时与用户标识，不要把这一切拼进 message。trace id 由网关生成并透传，经 context 带到各层，排障时可以从一条响应串起整条调用链。指标按 code 计数，告警分两层：5xx 与未知错误看总量，具体业务码看突增，例如 20202 突然翻十倍，往往意味着库存同步出了问题。Details 与 message 都可能进日志，手机号、身份证、令牌等敏感字段必须在写入前脱敏，或者干脆不记。</p>
+<h2 id="设计演练：虚构电商的订单域"><a href="#设计演练：虚构电商的订单域" class="headerlink" title="设计演练：虚构电商的订单域"></a>设计演练：虚构电商的订单域</h2><p>假设订单域按前面的规则占用了 20xxx，下单链路涉及订单、库存与优惠券三个服务。先把码表落下来：</p>
+<table>
+<thead>
+<tr>
+<th>码</th>
+<th>含义</th>
+<th>HTTP</th>
+<th>可重试</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>20101</td>
+<td>下单参数缺失或格式错误</td>
+<td>400</td>
+<td>否</td>
+</tr>
+<tr>
+<td>20102</td>
+<td>购买数量超出上限</td>
+<td>400</td>
+<td>否</td>
+</tr>
+<tr>
+<td>20201</td>
+<td>商品已下架</td>
+<td>409</td>
+<td>否</td>
+</tr>
+<tr>
+<td>20202</td>
+<td>库存不足</td>
+<td>409</td>
+<td>否</td>
+</tr>
+<tr>
+<td>20203</td>
+<td>订单状态不允许该操作</td>
+<td>409</td>
+<td>否</td>
+</tr>
+<tr>
+<td>20301</td>
+<td>订单不存在</td>
+<td>404</td>
+<td>否</td>
+</tr>
+<tr>
+<td>20401</td>
+<td>无权操作该订单</td>
+<td>403</td>
+<td>否</td>
+</tr>
+<tr>
+<td>20501</td>
+<td>库存服务不可用</td>
+<td>503</td>
+<td>是</td>
+</tr>
+</tbody></table>
+<p>service 在创建订单时完成转换：库存不足补上 <code>Details</code>，依赖故障包装底层错误，业务码不越过 service 向上抛。代码里的常量与上表一一对应：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> (</span><br><span class="line">    CodeOrderInvalidParam  = <span class="number">20101</span></span><br><span class="line">    CodeOrderQtyExceeded   = <span class="number">20102</span></span><br><span class="line">    CodeOrderOffShelf      = <span class="number">20201</span></span><br><span class="line">    CodeOrderStockShortage = <span class="number">20202</span></span><br><span class="line">    CodeOrderBadState      = <span class="number">20203</span></span><br><span class="line">    CodeOrderNotFound      = <span class="number">20301</span></span><br><span class="line">    CodeOrderForbidden     = <span class="number">20401</span></span><br><span class="line">    CodeStockUnavailable   = <span class="number">20501</span></span><br><span class="line">    CodeInternal           = <span class="number">90000</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(s *OrderService)</span></span> Create(ctx context.Context, req CreateOrderRequest) (*Order, <span class="type">error</span>) &#123;</span><br><span class="line">    <span class="keyword">if</span> err := req.Validate(); err != <span class="literal">nil</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">nil</span>, apperr.New(apperr.CodeOrderInvalidParam, <span class="string">&quot;invalid order payload&quot;</span>, http.StatusBadRequest)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> err := s.stock.Reserve(ctx, req.SKU, req.Quantity); err != <span class="literal">nil</span> &#123;</span><br><span class="line">        <span class="keyword">if</span> errors.Cause(err) == stock.ErrInsufficient &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">nil</span>, apperr.New(apperr.CodeOrderStockShortage, <span class="string">&quot;insufficient stock&quot;</span>, http.StatusConflict).</span><br><span class="line">                WithDetails(<span class="string">&quot;sku&quot;</span>, req.SKU)</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">nil</span>, apperr.Wrap(apperr.CodeStockUnavailable, <span class="string">&quot;stock service unavailable&quot;</span>, http.StatusServiceUnavailable, err)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 创建订单、写库略</span></span><br><span class="line">    <span class="keyword">return</span> order, <span class="literal">nil</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>handler 不重新判断业务，只调用 <code>From</code> 并输出；响应封套与中间件不在本文展开，这里只关心错误字段：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(h *OrderHandler)</span></span> Create(c *gin.Context) &#123;</span><br><span class="line">    <span class="keyword">var</span> req CreateOrderRequest</span><br><span class="line">    <span class="keyword">if</span> err := c.ShouldBindJSON(&amp;req); err != <span class="literal">nil</span> &#123;</span><br><span class="line">        h.fail(c, apperr.New(apperr.CodeOrderInvalidParam, <span class="string">&quot;invalid order payload&quot;</span>, http.StatusBadRequest))</span><br><span class="line">        <span class="keyword">return</span></span><br><span class="line">    &#125;</span><br><span class="line">    order, err := h.svc.Create(c.Request.Context(), req)</span><br><span class="line">    <span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">        h.fail(c, apperr.From(err))</span><br><span class="line">        <span class="keyword">return</span></span><br><span class="line">    &#125;</span><br><span class="line">    c.JSON(http.StatusCreated, order)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(h *OrderHandler)</span></span> fail(c *gin.Context, e *apperr.AppError) &#123;</span><br><span class="line">    c.JSON(e.HTTPStatus, gin.H&#123;</span><br><span class="line">        <span class="string">&quot;code&quot;</span>:    e.Code,</span><br><span class="line">        <span class="string">&quot;message&quot;</span>: e.Message,</span><br><span class="line">        <span class="string">&quot;details&quot;</span>: e.Details,</span><br><span class="line">    &#125;)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>库存不足时，客户端收到 409 与这样一段响应体：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;code&quot;</span><span class="punctuation">:</span> <span class="number">20202</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;message&quot;</span><span class="punctuation">:</span> <span class="string">&quot;insufficient stock&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;details&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;sku&quot;</span><span class="punctuation">:</span> <span class="string">&quot;SKU-1001&quot;</span></span><br><span class="line">  <span class="punctuation">&#125;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>注意 20201 与 20202 都映射 409：商品下架和库存不足都不是参数错误，而是资源状态与请求冲突；20301 用 404，因为订单确实不存在；20501 用 503 且标记可重试，客户端可以退避重试，而 20202 重试多少次都不会成功。码表里的“可重试”列比 HTTP 状态更精确，客户端应优先看它。</p>
+<h2 id="常见坑"><a href="#常见坑" class="headerlink" title="常见坑"></a>常见坑</h2><ul>
+<li>一个错误多个码：同一个原因在不同接口返回不同码，码表就失去意义。码应在语义源头分配一次。</li>
+<li>码随文案变：把文案哈希或自增序号当码，改一个字就换码。码与 message 必须解耦。</li>
+<li>把堆栈返回客户端：会暴露表名、文件路径与内部实现。堆栈只进日志，响应只给码与安全的细节。</li>
+<li>5xx 里混业务错误：污染错误率、触发误告警，还会诱导客户端做无意义的重试。</li>
+<li>既不复用也不废弃：复用旧码会让老客户端误判；永不废弃则码表膨胀。应标记 deprecated，观察调用量后再移除。</li>
+</ul>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>错误码是一份长期契约：码段负责可读与可扩展，<code>AppError</code> 负责在层间无损传递，HTTP 映射负责与协议对齐，文档、监控与废弃流程负责让它可治理。先把码表和治理规则定下来，再写业务代码，比事后补一套码省力得多。示例中的码段是虚构的，治理方法却是通用的。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Go 错误码设计规范</p><p><a href="https://987763485.github.io/2019/06/06/Go错误码设计规范/">https://987763485.github.io/2019/06/06/Go错误码设计规范/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2019-06-06</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/golang/">golang</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/">微服务</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2019/06/13/Gochannel%E5%BA%95%E5%B1%82%E5%AE%9E%E7%8E%B0%E4%B8%8E%E5%B8%B8%E8%A7%81%E9%99%B7%E9%98%B1/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Go channel 底层实现与常见陷阱</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2019/05/30/%E5%AF%86%E7%A0%81%E5%BA%94%E7%94%A8%E5%AE%89%E5%85%A8%E5%A8%81%E8%83%81%E5%88%86%E6%9E%90/"><span class="level-item">密码应用安全威胁分析</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

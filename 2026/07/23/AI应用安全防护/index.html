@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>AI 应用安全防护 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="本文只讲防御与流程，不给可复制的攻击手法，不提供任何注入样例、越狱话术、逃逸步骤或绕过手段。要解决的工程问题是：一个会读外部内容、会调工具、会执行产出、会花钱和改数据的智能体应用，应该把防线摆在哪些层次、每层放什么控制、用什么方法证明这些控制真的生效。"><meta property="og:type" content="blog"><meta property="og:title" content="AI 应用安全防护"><meta property="og:url" content="https://987763485.github.io/2026/07/23/AI%E5%BA%94%E7%94%A8%E5%AE%89%E5%85%A8%E9%98%B2%E6%8A%A4/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="本文只讲防御与流程，不给可复制的攻击手法，不提供任何注入样例、越狱话术、逃逸步骤或绕过手段。要解决的工程问题是：一个会读外部内容、会调工具、会执行产出、会花钱和改数据的智能体应用，应该把防线摆在哪些层次、每层放什么控制、用什么方法证明这些控制真的生效。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2026-07-22T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-20T17:22:51.504Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="大模型"><meta property="article:tag" content="python"><meta property="article:tag" content="rust"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2026/07/23/AI%E5%BA%94%E7%94%A8%E5%AE%89%E5%85%A8%E9%98%B2%E6%8A%A4/"},"headline":"AI 应用安全防护","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2026-07-22T16:00:00.000Z","dateModified":"2026-10-20T17:22:51.504Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"本文只讲防御与流程，不给可复制的攻击手法，不提供任何注入样例、越狱话术、逃逸步骤或绕过手段。要解决的工程问题是：一个会读外部内容、会调工具、会执行产出、会花钱和改数据的智能体应用，应该把防线摆在哪些层次、每层放什么控制、用什么方法证明这些控制真的生效。"}</script><link rel="canonical" href="https://987763485.github.io/2026/07/23/AI%E5%BA%94%E7%94%A8%E5%AE%89%E5%85%A8%E9%98%B2%E6%8A%A4/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2026-07-22T16:00:00.000Z" title="7/23/2026, 12:00:00 AM">2026-07-23</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></span><span class="level-item">1 小时读完 (大约10163个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">AI 应用安全防护</h1><div class="content"><p>本文只讲防御与流程，不给可复制的攻击手法，不提供任何注入样例、越狱话术、逃逸步骤或绕过手段。要解决的工程问题是：一个会读外部内容、会调工具、会执行产出、会花钱和改数据的智能体应用，应该把防线摆在哪些层次、每层放什么控制、用什么方法证明这些控制真的生效。</p>
+<p>风险来源一律按类别讨论，例如“外部内容携带指令”“工具返回值进入上下文”“模型生成的代码被执行”，不指向任何具体产品，也不引用漏洞编号、受影响版本或事件归因。文中阈值都是团队约定示例，不是行业统计结论；需要举例时用占位符或标注示意值。</p>
+<h2 id="传统-Web-防护为什么不够用"><a href="#传统-Web-防护为什么不够用" class="headerlink" title="传统 Web 防护为什么不够用"></a>传统 Web 防护为什么不够用</h2><p>把 AI 应用当成“带搜索框的 Web 服务”来做防护，是多数事故的起点。智能体应用在三个地方与传统 Web 结构性不同，这三个不同决定了防线必须重排。</p>
+<p>第一个特殊性是指令与数据同通道。传统架构里代码与输入走不同路径，SQL 参数不会被当作语句解析，模板变量不会被当作模板执行，这种分离由解析器强制保证。大模型应用把自然语言既当数据又当指令：用户提问、检索回来的网页片段、工具返回值字段、上传文档页眉，全部混进同一段上下文。分离不再自动成立，必须由设计显式建立——谁有资格影响系统行为，谁只能作为被处理的材料，这个边界要在提示组装、权限判定与输出校验三处同时表达。提示注入主题的专文已展开不可信内容的工程写法，本文只把它当作纵深防御的一层来排位置。</p>
+<p>第二个特殊性是产出会被执行。模型生成的代码、命令、脚本、配置、富文本片段，下游往往真的有人消费。传统 Web 假设服务端逻辑是人写的、经过评审的；这里执行对象的文本在运行时生成，评审来不及参与。于是“输出即代码”这条路径只能靠执行隔离、出口策略与依赖供给的信任边界兜住，而不是靠生成质量的好坏来判断。命令执行与反序列化主题的专文处理的是同一条老规矩在新场景里的延续，本文不重复其手法描述。</p>
+<p>第三个特殊性是动作有外部副作用。退款、下单、发消息、改权限、删数据、发布内容，一旦执行就消耗真实预算或改变他人状态。传统 Web 的写操作有事务与幂等键，智能体的动作长度、分支与重试次数却由模型在运行时决定。副作用必须分级——只读、可回滚写、需补偿的写、不可逆写，并把后两档放到人工确认之后。这一点与《Agent 安全与权限控制》的授权模型直接衔接，本文不展开权限判定本身，只引用它的结论：先把“能做什么”盘清楚，再谈“怎么做才安全”。</p>
+<p>三点合起来，防线要沿数据流动重排一遍，下图是本文后续各节的骨架。</p>
+<pre class="mermaid">flowchart TD
+  U["用户输入"] --> S1["来源标记与信任分级"]
+  E["检索结果 网页 邮件 文档 工具返回值"] --> S1
+  S1 --> S2["数据与指令分离 长度与编码探测"]
+  S2 --> P["策略引擎 意图与风险归类"]
+  P --> S3["工具白名单与参数模式校验"]
+  S3 --> D{"副作用分级"}
+  D -->|只读| X["直接执行"]
+  D -->|可回滚写| L["额度与限流后执行"]
+  D -->|不可逆| H["人工确认门槛"]
+  H --> X
+  L --> X
+  X --> S4["执行侧隔离与网络出口策略"]
+  S4 --> O["输出侧敏感信息检测"]
+  O --> R["引用与证据链回指"]
+  R --> A["审计事件与可重放记录"]
+  A --> G{"异常信号命中"}
+  G -->|是| C["暂停 降级 事件响应"]
+  G -->|否| K["用例沉淀进回归集"]</pre>
+
+<h2 id="输入侧：把不可信内容当数据处理"><a href="#输入侧：把不可信内容当数据处理" class="headerlink" title="输入侧：把不可信内容当数据处理"></a>输入侧：把不可信内容当数据处理</h2><p>输入侧的目标不是识别坏句子，而是让坏句子即使出现也拿不到执行权。这个区别很关键：基于文本特征的拦截永远追不上表述变化，基于来源与权限的边界才是结构性的。</p>
+<p>第一层是来源标记。上下文里每段文本都要携带可机读的来源属性：会话内用户输入、系统提示与策略文本、检索库文档、网页抓取、邮件正文、上传文件解析结果、工具返回值、子智能体回传、技能包说明。来源属性不是给人看的注释，而是策略引擎的判定输入：只有被列为可信来源的文本才允许影响系统行为，其余一律作为被处理的材料注入。工程上常见做法是给外部文本套一层固定信封，信封边界与内容分别校验，内容中出现信封结束标记时必须转义或截断，不能被解析成结构。</p>
+<p>第二层是信任分级与降权。检索结果与网页内容默认按最低信任处理：不进入系统提示的影响范围，不参与工具选择，不作为必须遵循的规则来源；邮件正文、工单描述、上传文档同样按不可信处理。若某类外部文本确实承载业务规则，例如合同条款抽取，要把它降级为待核对的候选依据，并在输出侧要求可指回原始文档的段落位置。这里与《浏览器 Agent 与 GUI 自动化》的界面内容边界讨论相邻，那篇专文处理页面文本与控件标签的信任问题，本文不复述。</p>
+<p>第三层是长度、编码与结构探测。风险信号是形态而不是措辞：接近上下文窗口的超长输入、多层嵌套的转义与编码、同一指令以多种编码重复投递、异常密集的不可见字符、纯文本字段里塞入结构化载荷、解析产物中出现脚本或外部资源引用。这些形态应触发可判定的处理动作：截断并告知、要求分段提交、剥离载荷后再解析、拒绝进入工具链路。探测规则要能灰度与回滚，写成策略配置而不是散落在业务代码里。</p>
+<p>第四层是越权指令识别。判定信号写在类别层：请求的操作超出当前会话已授权的工具集合；要求绕过确认、绕过审批或绕过日志；要求使用其他身份或更高权限；试图让系统输出内部凭据或配置；要求在无人参与时完成不可逆动作。命中信号的正确反应是降级并确认，不是解释为什么不行，更不是把内部策略文本回显出去。</p>
+<h2 id="工具侧：白名单、参数校验与确认门槛"><a href="#工具侧：白名单、参数校验与确认门槛" class="headerlink" title="工具侧：白名单、参数校验与确认门槛"></a>工具侧：白名单、参数校验与确认门槛</h2><p>工具是智能体唯一应当产生副作用的出口，因此这层的控制密度要高于其他层。目标是任何一次外部动作都能回答三个问题：这个工具有没有被授权、参数是不是合法、结果需不需要人点头。</p>
+<p>工具白名单按每个智能体角色一套来维护，而不是全局一份。只做客服问答的角色不应持有部署类工具，只做数据汇总的角色不应持有写库工具。白名单条目本身是配置项，纳入变更评审与版本发布，改一条等于改一次权限。此处划一句界：协议层次与能力协商见《Agent 工具协议标准化》，供给生态见《模型上下文协议生态》，本文只关心工具作为攻击面与副作用面怎么管。以 MCP 为例，可引用口径只到已发布的 2025-11-25 修订；官方已给出 2026-05-29 的 RC，方向涉及更清晰的授权与生命周期语义，仍是草案、可能变动，本文不写端点与字段拼写。工具目录与注册中心的供应链风险按类别纳入白名单审核即可；MCP Registry 到本文日期仍是预览状态，预览态目录不适合作为生产唯一信任源。</p>
+<p>参数校验的关键是校验对象。把 JSON 字符串交给正则看一眼并不够，必须在解析后的语法树上校验。落地做法是用模式声明约束每个工具的入参，骨架如下，字段值一律是占位符：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;tool&quot;</span><span class="punctuation">:</span> <span class="string">&quot;finance.query_invoice&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;args_schema&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;type&quot;</span><span class="punctuation">:</span> <span class="string">&quot;object&quot;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;additionalProperties&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">false</span></span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;required&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span><span class="string">&quot;tenant_id&quot;</span><span class="punctuation">,</span> <span class="string">&quot;invoice_ref&quot;</span><span class="punctuation">]</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;properties&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">      <span class="attr">&quot;tenant_id&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;type&quot;</span><span class="punctuation">:</span> <span class="string">&quot;string&quot;</span><span class="punctuation">,</span> <span class="attr">&quot;pattern&quot;</span><span class="punctuation">:</span> <span class="string">&quot;^t_[0-9a-f]&#123;16&#125;$&quot;</span> <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;invoice_ref&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;type&quot;</span><span class="punctuation">:</span> <span class="string">&quot;string&quot;</span><span class="punctuation">,</span> <span class="attr">&quot;maxLength&quot;</span><span class="punctuation">:</span> <span class="number">32</span> <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;page_size&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;type&quot;</span><span class="punctuation">:</span> <span class="string">&quot;integer&quot;</span><span class="punctuation">,</span> <span class="attr">&quot;minimum&quot;</span><span class="punctuation">:</span> <span class="number">1</span><span class="punctuation">,</span> <span class="attr">&quot;maximum&quot;</span><span class="punctuation">:</span> <span class="number">50</span> <span class="punctuation">&#125;</span></span><br><span class="line">    <span class="punctuation">&#125;</span></span><br><span class="line">  <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;side_effect&quot;</span><span class="punctuation">:</span> <span class="string">&quot;read&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;confirmation&quot;</span><span class="punctuation">:</span> <span class="string">&quot;not_required&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;budget&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;per_run_calls&quot;</span><span class="punctuation">:</span> <span class="number">20</span><span class="punctuation">,</span> <span class="attr">&quot;amount_cap&quot;</span><span class="punctuation">:</span> <span class="string">&quot;placeholder&quot;</span> <span class="punctuation">&#125;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>危险动作的确认门槛，设计要点是确认信息本身要可读、可核、不可绕过。确认界面展示的四元组应当是决策所需内容：调用哪个工具、关键参数的实际值、影响的资源范围、不可逆程度。确认是一次带签名的授权记录，绑定本次执行参数的散列，参数变了就必须重新确认。子智能体、定时任务、批处理这三类没有人在屏幕前的路径尤其容易漏，必须走预授权额度包，超限即挂起等待人类。人工审批的判定规则本身不在本文展开，这里只补一点：确认链路的可用性本身就是安全属性，天天弹确认的团队最终会养成盲点，所以要靠副作用分级把确认次数压到必要范围。</p>
+<p>可逆性分级按四档维护：只读、可回滚写、需补偿的写、不可逆。需补偿这一档最容易出事，例如已发出的通知技术上可撤回，但读者已经看见。分级结果要写进目录元数据作为策略引擎的硬输入，同时作为审计事件的必填字段，让事后回溯能看出当时判成了哪一档。</p>
+<h2 id="执行侧：生成代码的隔离与供给的信任边界"><a href="#执行侧：生成代码的隔离与供给的信任边界" class="headerlink" title="执行侧：生成代码的隔离与供给的信任边界"></a>执行侧：生成代码的隔离与供给的信任边界</h2><p>只要应用会运行模型生成的代码、命令或脚本，执行侧就是最硬的一层，因为它把文本重新变成行为。此处的分工是：隔离层次选型、文件系统策略与网络出口策略的展开见《Agent 代码执行沙箱设计》，本文不复述其清单；尚未成文的《Agent 沙箱与执行安全》会进一步处理执行时策略，这里也不替它展开。本文只讲应用侧必须自己拍板的三件事。</p>
+<p>第一件是默认能力假设。执行环境假设输入不可信、假设代码会尝试访问环境、假设有外联冲动，因此起步能力为零：不注入业务凭据、不挂载生产数据卷、不提供内网路由。需要的能力按任务临时授予，用完即失效。Anthropic 工程栏目自 2026-06-24 起的《how we contain Claude》把隔离、权限最小化、出口控制与人工在环当成一组配套而非单选，这个结构判断与本文一致；同一栏目的《code execution with MCP》讨论把工具调用改写成代码执行以压缩上下文占用，它带来的直接安全后果是执行频次上升，因此执行侧配额要跟着重算——每加一层便利就要补一层约束。</p>
+<p>第二件是资源与时长上限的机制层描述。要同时约束墙钟时间、CPU 与内存配额、文件描述符数量、进程与线程数量、磁盘写入量与临时层容量、外联次数与目标数量、输出字节数。这些配额的意义不止于防资源挤兑，更在于把失控循环变成可观测的失败。上限数值属于团队约定示例，但必须有上限，且触达上限时返回结构化错误码，让策略引擎能判定终止、重试还是升级到人工。</p>
+<p>第三件是出口策略。网络出口默认拒绝、按需开洞，洞的粒度按目标与路径而不是按端口给；域名解析与直连地址要一致处理，避免解析绕过；元数据服务一类的高敏端点默认不可达。出口策略同时是数据外传的最后一道闸：即便前面几层都被绕过，未登记的目的地也连不出去。它与数据隐私主题的传输面控制互补——那篇专文处理上传前脱敏与字段级最小必要，本文只强调一点：出口策略必须能被审计事件验证，否则它只是一份没人检查的配置。</p>
+<p>依赖与镜像供给属于执行侧的上游。构建产物里混入的包、被替换的基础镜像、动态拉取的脚本，都是模型生成代码之外的第二个执行来源。控制手段按类别列：锁定文件与摘要校验、来源白名单、构建与工作流权限分离、镜像最小化与只读根、运行时禁止再次拉包。生产镜像要能在无网络条件下启动核心功能，这一条能挡住大部分运行时取料的形态，供应链清单本身不在本文重复。</p>
+<p>平台版本口径放在这一节交代，避免“版本旧所以做不了隔离”这类推辞：编排侧按当期 Kubernetes 1.36 的支持与安全基线口径核对策略能力，Node.js 侧区分 Node 26 Current 与 Node 24 LTS 的落地节奏，Go 侧以 Go 1.26 为工具链口径，推理与训练依赖按 PyTorch 当期 2.x 核对；框架层 LangChain 1.3 与 LangGraph 1.2 提供了图执行与检查点能力，可用来承载挂起等待人工确认这类流程，本文不写接口签名。</p>
+<h2 id="输出侧：敏感信息阻断、危险指令过滤与可追溯"><a href="#输出侧：敏感信息阻断、危险指令过滤与可追溯" class="headerlink" title="输出侧：敏感信息阻断、危险指令过滤与可追溯"></a>输出侧：敏感信息阻断、危险指令过滤与可追溯</h2><p>输出是最后一道可机检的关口，也是直接面向用户与下游系统的接口。这层要同时处理三类问题：不该出去的内容、不该被下游执行的内容、说不清来源的结论。</p>
+<p>第一类是敏感信息检测与阻断。检测对象按形态而非字面匹配组织：凭据形态（长随机串、带算法前缀的签名串、私钥封装块、内网令牌样式）、个人数据形态（联系方式样式、证件样式、账户与地址字段组合）、业务形态（内部工单号、数据库主键、未发布价格、内部接口路径）。文档与示例一律使用占位符，绝不把真实凭据、真实标识或可解密的中间值写进配置、日志、缓存键、测试固件或提示词。命中后的处理分级：阻断并回结构化错误、脱敏后放行、转人工复核，哪类字段走哪条路属于团队约定示例，但必须在配置里显式声明并可被回归测试覆盖。这里与《AI 应用的数据隐私保护》分工明确，那篇专文处理脱敏算法与准入表，本文只补两个输出侧的工程事实：检测必须覆盖流式输出的分片边界，避免跨片拼接绕过；检测结果要可解释，让被阻断方知道是哪一类被拦以及申诉路径，而不是一个含糊的失败。</p>
+<p>第二类是危险指令的出站过滤。对象是输出会被下游再次解析的路径：生成的 SQL、脚本、配置、富文本、发往消息系统的正文、写入知识库的条目。控制点是把出站内容按目标消费器的语法再校验一遍：SQL 过解析器与语句类型限制，脚本过语法与能力检查，富文本按白名单标签属性转义，链接与媒体地址过目的地策略。原则是不要假设模型自己会克制，也不要假设上游校验覆盖了下游语法，跨消费器的语法要各自校验一遍。</p>
+<p>第三类是引用与可追溯。凡依赖外部知识的事实性结论都应携带能回指证据的结构：来源标识、文档版本、段落或行号定位、抓取时间、检索得分。引用不是装饰，它承担三个安全功能：让复核者能验证，让下游能判断新鲜度，让依据缺失本身成为可机检信号。建议把结论与证据的关系写成结构化伴随数据而非内联正文，校验器据此检查高风险结论是否具备足够证据，缺证据时降级为待核实；低风险对话式输出可按团队约定示例豁免，但豁免清单要在评审里出现过。</p>
+<h2 id="身份与授权：委托链、短时凭据与代理身份"><a href="#身份与授权：委托链、短时凭据与代理身份" class="headerlink" title="身份与授权：委托链、短时凭据与代理身份"></a>身份与授权：委托链、短时凭据与代理身份</h2><p>授权难点在于链条变长：人类用户授权应用，应用通过智能体委托工具，工具再调用下游服务。每一段都要有可验证的授权表达，不能靠“这个进程一直很有权限”的隐性继承。</p>
+<p>委托链要回答三个问题：谁发起、授权范围到哪里、链上是否可验证。发起者身份要一路透传到副作用判定与审计事件，不能在中段被替换成服务账号后丢失。范围表达只能收窄不能放大：下游拿到的权限必须是上游授权集合的子集，任何扩权请求都回到人类授权节点；跨服务跳转用可验证断言而不是共享长期密钥。多智能体协作里父与子是委托而非继承，子智能体拿到本次任务的受限能力包，任务结束即回收；跨组织或跨租户的委托要额外记录被委托方身份与用途。本文不展开委托判定的算法细节，只补一句生态观察：Anthropic 工程栏目的《managed agents》讨论托管式执行体，与 2025-12-09 公告中由 Agentic AI Foundation 托管 MCP、AGENTS.md 与 goose 的思路一致，身份与生命周期需要平台化承接；互操作可参考 A2A v1.0.0 与 v1.0.1 及 AGNTCY 这类社区工作，Agent Skills（2025-10-16）把能力包变成可分发单元后，技能包被授予什么身份就成了新问题。</p>
+<p>短时凭据是这层最直接的收益。凭据生命周期要短于任务生命周期，避免任务结束后凭据仍可用。凭据的三个禁区一句带过：上下文窗口、日志、缓存键都不该出现凭据，展开见《Agent 安全与权限控制》。工程上要额外检查的是发放方与轮换机制，以及配置里看起来无害的默认值：默认管理员口令、长期有效的测试令牌、被复制到其他环境的开发凭据，是三类最常见的越权入口，应在发布流水线上做存在性检查。</p>
+<p>租户边界要在数据访问层而不是界面层落地。多租户应用里最危险的形态是上下文混装：把租户 A 的文档、模板与历史片段和租户 B 的请求送进同一次推理。控制手段按层次列：检索与索引按租户物理隔离；上下文组装阶段校验每条材料的归属；向量库过滤条件不能仅依赖调用方传入；导出与共享默认关闭并需显式审批；同一会话内角色切换要清空受信任状态。浏览器与界面自动化的登录态边界见《浏览器 Agent 与 GUI 自动化》，本文只保留总则：任何账号相关操作，包括点击、提交、读取页面数据与保存凭据，都仅在用户明确授权的账号与环境内进行，且该授权要作为可审计记录留存。</p>
+<h2 id="审计与留痕：记什么、不记什么、能不能重放"><a href="#审计与留痕：记什么、不记什么、能不能重放" class="headerlink" title="审计与留痕：记什么、不记什么、能不能重放"></a>审计与留痕：记什么、不记什么、能不能重放</h2><p>审计的目标是可重放与可归因，不是把所有文本存下来。这一点决定采集设计：记判定过程，不记被判定内容的原文。</p>
+<p>应当记录的事件字段按四组组织：动作（谁在哪个会话下、对哪个工具、带什么参数摘要、副作用档位、结果状态）、判定依据（命中的策略标识与版本、信任分级结果、参数校验结论、确认走哪条分支）、授权来源（发起者、委托链上游身份、本次能力包标识、确认记录标识）、预算消耗（令牌与调用次数、额度占用、时长与资源触顶）。参数只记散列或经字段白名单过滤的摘要。事件结构示意如下，值均为占位符：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">event:</span> <span class="string">agent.tool_invocation</span></span><br><span class="line"><span class="attr">schema_version:</span> <span class="string">&quot;1&quot;</span></span><br><span class="line"><span class="attr">trace_id:</span> <span class="string">&quot;tr_placeholder&quot;</span></span><br><span class="line"><span class="attr">actor:</span></span><br><span class="line">  <span class="attr">principal:</span> <span class="string">&quot;u_placeholder&quot;</span></span><br><span class="line">  <span class="attr">delegate_chain:</span> [<span class="string">&quot;app_placeholder&quot;</span>, <span class="string">&quot;agent_placeholder&quot;</span>]</span><br><span class="line"><span class="attr">decision:</span></span><br><span class="line">  <span class="attr">policy_ref:</span> <span class="string">&quot;pol_placeholder&quot;</span></span><br><span class="line">  <span class="attr">policy_version:</span> <span class="string">&quot;2026-07-placeholder&quot;</span></span><br><span class="line">  <span class="attr">trust_class:</span> <span class="string">&quot;untrusted_external&quot;</span></span><br><span class="line">  <span class="attr">side_effect:</span> <span class="string">&quot;compensable_write&quot;</span></span><br><span class="line">  <span class="attr">confirmation:</span> <span class="string">&quot;human_confirmed&quot;</span></span><br><span class="line"><span class="attr">args_digest:</span> <span class="string">&quot;sha256:placeholder&quot;</span></span><br><span class="line"><span class="attr">budget:</span></span><br><span class="line">  <span class="attr">tokens_placeholder:</span> <span class="number">0</span></span><br><span class="line">  <span class="attr">calls_placeholder:</span> <span class="number">0</span></span><br><span class="line"><span class="attr">result:</span> <span class="string">ok</span></span><br></pre></td></tr></table></figure>
+
+<p>明确不该记的内容：用户提问与回答原文、凭据与令牌、精确地理位置、身份证件号与手机号、剪贴板内容、上传文件原始副本，以及任何“先存下来再说”的字段。采集遵循最小必要与脱敏，口径与《AI 应用的数据隐私保护》一致，本文补充审计侧两个陷阱：调试用的完整上下文快照常被视为临时开关，但只要它能在生产开启，就一定会在某次事故里被开启，因此要从生产配置中物理移除；第三方观测服务的默认采集项常包含请求体，接入前必须逐字段确认关闭或替换为摘要，而不是依赖口头承诺。</p>
+<p>证据链要能重放，含义是给定一条事件记录，能重建当时的策略版本、上下文组装的可信摘要、工具目录元数据与权限判定输入，从而回答这个动作在当时是否被允许。重放不要求恢复原文，要求恢复决策条件。为此需要三件基础设施：策略配置版本化并保留历史；上下文组装产出结构化摘要而非只留最终字符串；工具目录与能力包按版本快照存档。重放能力还要被演练检验，按季度挑若干历史事件做重建，把重建失败当作缺陷记录。</p>
+<h2 id="事件响应：分级、暂停与对外口径"><a href="#事件响应：分级、暂停与对外口径" class="headerlink" title="事件响应：分级、暂停与对外口径"></a>事件响应：分级、暂停与对外口径</h2><p>再完整的防线也会遇到没预料到的形态，因此事件响应是纵深防御最后一层，也是唯一必须平时演练的层。</p>
+<p>分级按两条轴走。影响来源分三类：内容型（错误信息被输出、被污染的指令影响了行为）、动作型（不该执行的副作用发生了）、暴露型（不该离开边界的材料离开了）。影响范围按单会话、单租户、跨租户、平台级四档判定。两轴交叉得到处置优先级，不需要给事件起花名。</p>
+<p>暂停与降级开关必须提前设计，而不是事故里现编。至少要有四档能力：按工具暂停并保留只读、按副作用档位冻结需补偿与不可逆写、按信任来源降级即停止外部文本进入上下文、整体停摆即会话只读并停止新任务。开关要满足三个条件：可灰度到单个租户或单个智能体角色、可在数分钟内生效、每次拨动都产生审计事件并通知值班与业务方。开关有效性要定期验证，从没被测试过的紧急停止按钮在事故中不可信；这与发布门禁的思路同源，但这里检查的是运行态能力，本文点到为止。</p>
+<p>影响面判定沿两条线索同时做。行为线索：从审计事件回溯该策略版本下经过同一判定分支的所有动作，列出可能的误放行集合。数据线索：涉及哪些数据范围、是否外传、目的地是否在出口允许列表内。两线交叉出已确认受影响、疑似受影响、未受影响三档，每档给出对应补救与判定依据。补救要考虑可逆性分级：可回滚的走回滚，需补偿的走补偿与通知，不可逆的走止损与善后，补偿动作本身也要授权。</p>
+<p>对外沟通遵循三条纪律：只讲已确认事实与正在采取的措施，未验证的因果不写；不透露绕过路径、规则细节与阈值，避免沟通本身变成第二手教程；给出复查询询方式与时间线承诺。通报时限不编造，一律按当期监管要求与合同约定核对后执行，需法务与合规确认的路径要在预案里写明由谁签。涉及合成内容的场景要核对标识义务：我国《人工智能生成合成内容标识办法》自 2025-09-01 施行，配套强制性国标 GB 45438-2025 同日实施；《网络数据安全管理条例》自 2025-01-01 施行，与《个人信息保护法》《数据安全法》这两部既有法律一起构成核对基线。欧盟侧，一般适用日 2026-08-02 即将到来，通用目的模型的义务自 2025-08-02 起已经适用，而被称为“数字 Omnibus”的调整仍只是欧委会 2025-11-19 提出的提案（COM(2025) 837），三方谈判未确认，不能写成已生效或已推迟。条款编号、罚则金额与解释口径本文一律不写，长文交给《大模型与安全合规》。</p>
+<h2 id="红队与回归：只谈流程与验收"><a href="#红队与回归：只谈流程与验收" class="headerlink" title="红队与回归：只谈流程与验收"></a>红队与回归：只谈流程与验收</h2><p>红队是验证防线是否真的生效的手段，不是产出震撼报告的手段。本节只写流程与验收，不写具体攻击手法与载荷；手法层描述交给对齐评估与红队主题的专文，本文不重复其清单。</p>
+<p>第一步是范围授权，必须书面且有边界。授权内容至少写清：允许触达的环境（只限测试环境，或明确列出的生产子集）、可用账号与数据范围、是否允许对外发送真实消息或产生真实费用、时间窗口与并发强度、以及发现即停的熔断条件。任何需要借用真实账号或真实用户数据的路径，都仅在用户明确授权的账号与环境内进行并保留授权记录。红队成员对生产凭据、客户数据与内部文档的访问权应与业务人员同等约束，不能因为是安全测试就默认放开。</p>
+<p>参与角色建议固定五方：红队执行者、应用负责人、平台与基础设施负责人、法务与合规代表、拥有停摆开关使用权的值班负责人。职责在预案里写死，避免事故时才发现没人能拍停。节奏上建议常态化小步演练加季度综合演练，而不是年度一次性大检查。</p>
+<p>场景清单按类别组织，条目本身不写载荷。可用的类别包括：外部内容携带指令并影响工具选择；工具返回值进入上下文后影响后续决策；模型生成的代码被执行时试图越出隔离与出口边界；参数与副作用档位被误判；委托链与跨租户边界被混淆；凭据与敏感字段经输出、日志或缓存外泄；确认门槛在无人参与路径上缺失；观测与调试通路成为额外数据出口。每族只给验收目标，即防线应当在哪一层拦住，不给实现细节。OWASP 一类公开风险清单在这里只当类别词汇表使用，例如提示注入、不安全的输出处理、供应链、权限升级这些名称，本文不写条目编号与年份对应关系。</p>
+<p>发现分级不看戏剧效果，看四个可核要素：被突破的是哪一层防线、需要什么样的前置授权、影响面落在哪一档范围、是否已有可观测信号。分级结果直接映射修复优先级与是否触发事件响应。每个发现必须写清防线缺口而不是技巧描述，报告以控制缺失为主体，手法细节停留在必要最小。</p>
+<p>闭环定义为五步：确认可复现的判定路径、定位应当拦住它的控制点、实现或调整该控制、在同环境与同等授权下复验、把验收断言写成回归用例入库。用例库与场景族分类对齐并保留元数据，即属于哪一层防线、依赖哪一版策略、当前状态，因为下一版模型或工具目录变更时，这批用例就是判断防线是否退化的依据。评测与门禁机制见《AI 应用评测体系》，本文只强调安全回归的两个特殊性：通过标准是控制点拦住而不是回答质量高；用例本身可能包含敏感材料形态，因此存储与访问按敏感数据管理。</p>
+<h2 id="一页纵深防御对照表"><a href="#一页纵深防御对照表" class="headerlink" title="一页纵深防御对照表"></a>一页纵深防御对照表</h2><p>下表供评审与交接使用，五列含义固定：层次指防线位置，主要风险类别只写成因类别，控制手段是必须存在的能力，验证方式说明我们凭什么相信它生效，常见失效是最典型的漏法。</p>
+<table>
+<thead>
+<tr>
+<th>层次</th>
+<th>主要风险类别</th>
+<th>控制手段</th>
+<th>验证方式</th>
+<th>常见失效</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>输入侧</td>
+<td>外部内容携带指令</td>
+<td>来源标记、信任分级、数据与指令分离、长度与编码探测</td>
+<td>来源属性覆盖率、组装快照审计、策略灰度用例</td>
+<td>外部文本被当作系统级规则</td>
+</tr>
+<tr>
+<td>检索与网页</td>
+<td>污染或过期依据进入结论</td>
+<td>最低信任、降权、时效标注、引用回指</td>
+<td>证据完整性校验、缺证据即降级</td>
+<td>只记来源名称不记版本</td>
+</tr>
+<tr>
+<td>工具侧</td>
+<td>返回值进入上下文；越权调用</td>
+<td>按角色白名单、树上校验、额度与限流、副作用分级</td>
+<td>元数据完备性扫描、参数边界回归</td>
+<td>用正则代替模式校验</td>
+</tr>
+<tr>
+<td>确认门槛</td>
+<td>不可逆动作无人参与</td>
+<td>四元组确认、参数散列绑定、预授权额度包、超限挂起</td>
+<td>开关拨测、确认与执行一致性核对</td>
+<td>确认泛滥形成盲点</td>
+</tr>
+<tr>
+<td>执行侧</td>
+<td>生成代码被执行</td>
+<td>零起步能力、资源与时长上限、默认拒绝出口、供给锁定</td>
+<td>隔离边界用例、出口命中日志核对</td>
+<td>临时授予的凭据长期驻留</td>
+</tr>
+<tr>
+<td>输出侧</td>
+<td>敏感信息与危险指令外发</td>
+<td>形态检测、分片边界覆盖、下游语法再校验、占位符规范</td>
+<td>跨片拼接用例、阻断分级抽样复核</td>
+<td>只检最终结果漏掉分片</td>
+</tr>
+<tr>
+<td>身份授权</td>
+<td>委托扩权、跨租户混装</td>
+<td>子集授权、短时凭据、租户物理隔离、代理身份可验证</td>
+<td>委托链完整性核对、跨租户读取用例</td>
+<td>发起者身份被服务账号吞掉</td>
+</tr>
+<tr>
+<td>审计留痕</td>
+<td>证据不可重放、采集越界</td>
+<td>记判定过程、参数只记摘要、生产移除完整快照</td>
+<td>历史事件重建演练、采集字段清单核对</td>
+<td>观测服务默认收集请求体</td>
+</tr>
+<tr>
+<td>事件响应</td>
+<td>停摆不可用、影响面判错</td>
+<td>四档开关、双线索回溯、三档影响面</td>
+<td>开关时限测量、预案桌面推演</td>
+<td>紧急按钮从未被测试</td>
+</tr>
+<tr>
+<td>红队回归</td>
+<td>防线退化未被察觉</td>
+<td>书面授权、五方角色、类别级场景族、五步闭环</td>
+<td>闭环率与超期数、变更前跑安全回归</td>
+<td>报告写技巧不写缺口</td>
+</tr>
+</tbody></table>
+<h2 id="落地节奏与度量"><a href="#落地节奏与度量" class="headerlink" title="落地节奏与度量"></a>落地节奏与度量</h2><p>安全体系不会一次成型，按季度推进更容易验收，每格都要有可核对的交付物。</p>
+<p>按季度推进的起点建议是：第一季度做可观测，结构化事件全量落库、工具目录补齐副作用与确认元数据、上下文组装产出可信摘要，缺这三件后面所有控制都无法验证。第二季度做边界，来源标记与信任分级全量落地、参数校验从字符串改为解析后的树、出口策略改为默认拒绝。第三季度做人与钱，确认门槛与额度包上线、凭据短时化与轮换改造、多租物理隔离核对。第四季度做检验，安全回归用例库成型、停摆开关拨测常态化、历史事件重放演练，此后每年重跑一次元数据与授权链完备性审计。</p>
+<p>有效性用覆盖率、时效、闭环、残余四类内部指标衡量，四类阈值均为团队约定示例，重点看趋势与解释；策略、模式、出口允许列表与确认档位这些配置同样要版本化、能回滚，否则事后无法还原当时生效的是哪一版。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>防护难点不在某一层做得不够细，而在三条结构性变化：指令与数据同通道、产出会被执行、动作有外部副作用。传统 Web 的前提假设要全部重做，方式是沿数据流动把防线排队：输入侧用来源与信任分级代替措辞识别，工具侧用白名单、解析后树上的模式校验与副作用分级收口动作，执行侧用零起步能力、资源上限与默认拒绝出口承接生成代码，输出侧用形态检测、下游语法再校验与证据回指守住最后关口，授权与审计把整条链变成可验证、可重放的记录，事件响应与红队回归负责证明这些控制确实在工作。</p>
+<p>写作与评审时请坚持本文边界：风险只在成因类别层讨论，不写漏洞编号与事件归因；凭据一律用占位符；账号与环境相关操作只在用户明确授权的范围内描述；观测保持最小必要与脱敏；红队只交付流程与验收；所有阈值标注为团队约定示例。防线的价值不体现在它支撑了多少惊人的故事，而体现在它能被检验、被重放、被回归覆盖。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li>OWASP 生成式 AI 与智能体应用安全风险清单 —— OWASP 项目主页 <a href="https://owasp.org/">https://owasp.org</a></li>
+<li>Model Context Protocol 规范与文档（已发布 2025-11-25 修订与 RC 说明）—— <a href="https://modelcontextprotocol.io/">https://modelcontextprotocol.io</a></li>
+<li>How we contain Claude —— Anthropic 工程栏目 <a href="https://www.anthropic.com/engineering">https://www.anthropic.com/engineering</a></li>
+<li>Code execution with MCP、Managed agents、Agent evals —— Anthropic 工程栏目 <a href="https://www.anthropic.com/engineering">https://www.anthropic.com/engineering</a></li>
+<li>欧盟人工智能法案文本与适用时间线 —— 欧盟官方文本库 <a href="https://eur-lex.europa.eu/">https://eur-lex.europa.eu</a></li>
+<li>数字 Omnibus 提案 COM(2025) 837 —— 欧委会数字战略栏目 <a href="https://digital-strategy.ec.europa.eu/">https://digital-strategy.ec.europa.eu</a></li>
+<li>《人工智能生成合成内容标识办法》与强制性国标 GB 45438-2025 —— 中国政府网 <a href="https://www.gov.cn/">https://www.gov.cn</a> 、国家标准全文公开系统 <a href="https://openstd.samr.gov.cn/">https://openstd.samr.gov.cn</a></li>
+<li>《网络数据安全管理条例》与《个人信息保护法》《数据安全法》文本 —— 中国政府网 <a href="https://www.gov.cn/">https://www.gov.cn</a></li>
+<li>Kubernetes 版本与支持政策 —— <a href="https://kubernetes.io/">https://kubernetes.io</a></li>
+<li>Node.js 发布计划 —— <a href="https://nodejs.org/">https://nodejs.org</a></li>
+<li>Go 版本发布说明 —— <a href="https://go.dev/">https://go.dev</a></li>
+<li>LangChain 与 LangGraph 发布信息 —— <a href="https://www.langchain.com/">https://www.langchain.com</a></li>
+<li>PyTorch 版本发布说明 —— <a href="https://pytorch.org/">https://pytorch.org</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>AI 应用安全防护</p><p><a href="https://987763485.github.io/2026/07/23/AI应用安全防护/">https://987763485.github.io/2026/07/23/AI应用安全防护/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2026-07-23</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-21</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="link-muted mr-2" rel="tag" href="/tags/python/">python</a><a class="link-muted mr-2" rel="tag" href="/tags/rust/">rust</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2026/07/25/%E4%BB%8ECopilot%E5%88%B0Agent%E7%9A%84%E6%BC%94%E8%BF%9B/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">从 Copilot 到 Agent 的演进</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2026/07/18/Agent%E5%B7%A5%E5%85%B7%E5%8D%8F%E8%AE%AE%E6%A0%87%E5%87%86%E5%8C%96/"><span class="level-item">Agent 工具协议标准化</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

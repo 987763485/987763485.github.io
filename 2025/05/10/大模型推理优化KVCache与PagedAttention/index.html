@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>大模型推理优化：KV Cache 与 PagedAttention - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="问题起点：解码卡在访存而不是算力"><meta property="og:type" content="blog"><meta property="og:title" content="大模型推理优化：KV Cache 与 PagedAttention"><meta property="og:url" content="https://987763485.github.io/2025/05/10/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E6%8E%A8%E7%90%86%E4%BC%98%E5%8C%96KVCache%E4%B8%8EPagedAttention/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="问题起点：解码卡在访存而不是算力"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2025-05-09T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-20T12:44:21.298Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="大模型"><meta property="article:tag" content="python"><meta property="article:tag" content="typescript"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2025/05/10/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E6%8E%A8%E7%90%86%E4%BC%98%E5%8C%96KVCache%E4%B8%8EPagedAttention/"},"headline":"大模型推理优化：KV Cache 与 PagedAttention","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2025-05-09T16:00:00.000Z","dateModified":"2026-10-20T12:44:21.298Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"问题起点：解码卡在访存而不是算力"}</script><link rel="canonical" href="https://987763485.github.io/2025/05/10/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E6%8E%A8%E7%90%86%E4%BC%98%E5%8C%96KVCache%E4%B8%8EPagedAttention/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2025-05-09T16:00:00.000Z" title="5/10/2025, 12:00:00 AM">2025-05-10</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></span><span class="level-item">1 小时读完 (大约10491个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">大模型推理优化：KV Cache 与 PagedAttention</h1><div class="content"><h2 id="问题起点：解码卡在访存而不是算力"><a href="#问题起点：解码卡在访存而不是算力" class="headerlink" title="问题起点：解码卡在访存而不是算力"></a>问题起点：解码卡在访存而不是算力</h2><p>大模型的生成是自回归（autoregressive）的：一次前向只产出词表上的一个分布，采样得到下一个 token，再把它接回输入序列继续算下一步。这个循环带来一个不对称——单步的产出极小，单步要读的数据却随历史长度线性增长。要理解推理优化为什么大多围绕键值缓存展开，得先把这个不对称讲清楚。</p>
+<p>假设序列已经走到长度 S。第 S+1 步的前向要穿过 L 层，每一层的注意力都要拿新位置的 query 与此前 S 个位置的 key 做一次点积，再对这 S 个位置的 value 做加权求和。也就是说，历史部分的 K、V 每一步都被完整读一遍。如果不缓存，第 S+1 步还得把前 S 个位置的 K、V 重新投影出来：S 次投影乘 L 层，产出却只有 1 个 token。把每一步都这样重算，整个生成过程的计算量按 S 的平方增长。</p>
+<p>为什么不重算是正确的？因为因果掩码（causal mask）保证第 i 个位置的隐状态只看得到它自己和它之前的 token，看不见之后生成的内容。只要模型权重固定、前缀 token 固定，第 i 个位置在每一层投影出的 K、V 就是一个常量，算一次即可长期复用。这就是键值缓存（KV Cache）的立足点：用一块显存，把每步 <code>O(S)</code> 的重复投影换成 <code>O(1)</code> 的读取。同一个理由也解释了为什么只缓存 K、V 而不去缓存 Q——历史位置的 query 在它自己那一步用完之后，再也不会被任何后续步骤读到。</p>
+<p>省下了计算，却把成本搬到了访存上。单步解码里，权重矩阵被整个批次共享，读一次可以服务批次内所有请求；而 KV Cache 是每请求一份、每步全读。于是一个批次单步要搬运的字节数大致等于「每个序列的 KV 占用乘并发数」，它随并发数和上下文长度同时增长，不像权重那样能被摊薄。更麻烦的是这些读的算术强度（arithmetic intensity，每读入一字节所对应的浮点运算数）很低：注意力里历史部分的形式接近矩阵乘向量，运算数与字节数的比值只有个位数到十几的量级，远低于现代 GPU 由峰值算力与显存带宽之比给出的拐点。结果就是算力单元大量空转，卡在执行内存指令——我们称这种状态为访存受限（memory-bound），而不是算力受限（compute-bound）。</p>
+<p>这也解释了两件看起来矛盾的事。其一，训练时一个大批次的前向能吃满 GPU，推理时同样的模型在单步解码上却常常只用掉一小部分算力，区别就在算术强度。其二，推理引擎最重要的优化往往不是把矩阵乘写得更快，而是想办法让更多请求在同一轮前向里排队，把每一份被读进来的 KV 都用满。FlashAttention 一类工作消掉了注意力内部中间矩阵的显存往返，让长上下文的注意力不再按 S 的平方占用显存，属于同一层的带宽优化；但它管的是注意力的计算内核，和历史 K、V 常驻显存这件事是两码事——后者由 KV Cache 的容量管理与调度决定，也正是本文后半部分的主线。至于把上下文本身做稀疏化或线性化改造，那是《上下文窗口扩展技术》的话题，本文不展开。</p>
+<p>至于服务怎么部署、参数怎么调，往期《vLLM 大模型推理引擎实践》已经写过，本文只谈 KV 显存与调度的机制，实操指向那篇。</p>
+<h2 id="显存怎么算：一条能自己推的式子"><a href="#显存怎么算：一条能自己推的式子" class="headerlink" title="显存怎么算：一条能自己推的式子"></a>显存怎么算：一条能自己推的式子</h2><p>关于「一个模型能开多大上下文、能扛多少并发」的争论，多半源于没有先把账算清楚。这里给一条可以自洽推算的估算式，字段名直接对齐训练配置，读者可以拿自己手上的权重去套。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">每 token 的 KV 字节数 = 2 × L × H_kv × d_head × b</span><br><span class="line">单序列占用            = 每 token 字节数 × S_cached</span><br><span class="line">单批次占用            = 单序列占用 × B</span><br><span class="line">单步读入字节数（近似） = 单批次占用 + 权重与激活</span><br></pre></td></tr></table></figure>
+
+<p>各个符号在训练配置里都有对应字段，不必记住抽象定义：</p>
+<ul>
+<li><code>L</code>：Transformer 层数，对应 <code>num_hidden_layers</code>。层与层之间的 KV 互不通用，所以是乘法而不是加法。</li>
+<li><code>H_kv</code>：这一层实际存几份 K、V，对应 <code>num_key_value_heads</code>。在标准多头注意力里它等于 <code>num_attention_heads</code>；一旦引入共享，它就可能远小于头数，这正是第 3 节的内容。</li>
+<li><code>d_head</code>：每个头的向量长度，对应 <code>head_dim</code>，或者按 <code>hidden_size ÷ num_attention_heads</code> 推出来。RoPE 之类的旋转位置编码作用在这些向量的写法上，不额外增加每 token 的字节数。</li>
+<li><code>b</code>：每个元素占几字节。bf16、fp16 记 2，int8、fp8 记 1，四比特量化记 0.5 上下。</li>
+<li>最前面的 <code>2</code>：K 与 V 各一份。</li>
+<li><code>S_cached</code>：当前已经落进缓存的长度，等于提示词长度加已生成步数，而不是配置里的最大位置编码长度。这两个数差别很大，后面讲预留时会回来。</li>
+<li><code>B</code>：同时在飞的序列数，也就是并发。</li>
+</ul>
+<p>下面三组配置都是示意值，取的都是好算的整数，跟任何模型的公开规格无关，只用来验证式子能推：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">配置 A：L=32, H_kv=32, d_head=128, bf16</span><br><span class="line">  每 token = 2 × 32 × 32 × 128 × 2 = 524288 字节 = 512 KiB</span><br><span class="line">  S=8192   → 512 KiB × 8192 = 4 GiB</span><br><span class="line">  B=32     → 4 GiB × 32 = 128 GiB</span><br><span class="line"></span><br><span class="line">配置 B：L=32, H_kv=8, d_head=128, bf16</span><br><span class="line">  每 token = 2 × 32 × 8 × 128 × 2 = 131072 字节 = 128 KiB</span><br><span class="line">  S=8192   → 1 GiB</span><br><span class="line">  B=32     → 32 GiB</span><br><span class="line"></span><br><span class="line">配置 C：L=32, 每层每 token 缓存 576 维低秩隐式, bf16</span><br><span class="line">  每 token = 32 × 576 × 2 = 36864 字节 = 36 KiB</span><br><span class="line">  S=8192   → 288 MiB</span><br><span class="line">  B=32     → 9 GiB</span><br></pre></td></tr></table></figure>
+
+<table>
+<thead>
+<tr>
+<th>配置（示意值）</th>
+<th>结构特征</th>
+<th>L</th>
+<th>H_kv</th>
+<th>每头维度</th>
+<th>每 token KV</th>
+<th>单序列 S&#x3D;8192</th>
+<th>单批次 B&#x3D;32</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A</td>
+<td>多头不共享</td>
+<td>32</td>
+<td>32</td>
+<td>128</td>
+<td>512 KiB</td>
+<td>4 GiB</td>
+<td>128 GiB</td>
+</tr>
+<tr>
+<td>B</td>
+<td>分组共享</td>
+<td>32</td>
+<td>8</td>
+<td>128</td>
+<td>128 KiB</td>
+<td>1 GiB</td>
+<td>32 GiB</td>
+</tr>
+<tr>
+<td>C</td>
+<td>低秩隐式</td>
+<td>32</td>
+<td>不适用</td>
+<td>576 维隐式</td>
+<td>36 KiB</td>
+<td>288 MiB</td>
+<td>9 GiB</td>
+</tr>
+</tbody></table>
+<p>三行的差别全部来自 <code>H_kv</code> 与缓存对象本身，式子没有任何暗箱。有了这张表，访存受限这件事也有了量感：配置 B 在并发 32、长度 8192 时单步要读约 32 GiB 缓存，在一台显存带宽按 2 TB&#x2F;s 记的机器上（同样是示意值），单步光读缓存的下限约 17 毫秒，逐 token 延迟的上限就在几十 token&#x2F;s 附近——这是纯带宽推出的天花板，还没算采样、通信与调度开销。真要压这个数，能动的只有三件事：把 <code>H_kv</code> 或 <code>b</code> 变小、把 <code>B</code> 变大以提高每次读取的复用率、把 <code>S_cached</code> 里没用的部分删掉。后面每一节讲的技术，都能落到这三条上。</p>
+<p>最后提醒账外项目。上面的式子只覆盖 KV 本体，实际占用还要加上块表与元数据、每步的激活与中间缓冲、图捕获所用的固定缓冲区，以及权重和优化器之外的常驻显存；这些都不是可以忽略的零头。反过来，<code>B</code> 也不能拿单批次占用去除以可用显存的商直接当作答案，因为预留策略与碎片会吃掉一部分——这正是分页那一节要解决的问题。</p>
+<h2 id="少存几份-K-和-V：从-MHA-到-GQA，再到低秩隐式"><a href="#少存几份-K-和-V：从-MHA-到-GQA，再到低秩隐式" class="headerlink" title="少存几份 K 和 V：从 MHA 到 GQA，再到低秩隐式"></a>少存几份 K 和 V：从 MHA 到 GQA，再到低秩隐式</h2><p>回看估算式，<code>H_kv</code> 是一个纯粹的乘数。这就给结构层面留出了一个非常朴素的方向：让多个 query 头共用同一份 K、V，占用就按共用的倍数线性下降。</p>
+<p>多头注意力（Multi-Head Attention，MHA）里每个 query 头都有自己的 key 头和 value 头，<code>H_kv</code> 等于头数。多查询注意力（Multi-Query Attention，MQA）把它压到极致：所有 query 头共用同一份 K、V，<code>H_kv</code> 变成 1，KV 字节数直接除以头数，单步解码要搬运的历史数据同比例下降，访存受限的天花板被显著抬高。分组查询注意力（Grouped-Query Attention，GQA）取中间值，把 query 头分成若干部组，每组共享一份 K、V，<code>H_kv</code> 等于组数。它是目前开源权重里最常见的形态：Llama 3.x、Qwen2.5 这类模型的配置文件中都直接写着 <code>num_key_value_heads</code>，与 <code>num_attention_heads</code> 是两个字段，读者可以从 Hugging Face 的 <code>config.json</code> 里读到真实取值再回去套第 2 节的式子。共享得越狠，<code>H_kv</code> 越小，缓存与带宽越省。</p>
+<p>代价要诚实地说清楚三点。第一，质量不是免费的：K、V 是模型对上下文的表征，让多个头共用一份表征，等于减少了它们各自“看历史”的角度，模型需要为此重新训练或做补偿性微调才能收敛到可用水平。公开论文说明了机制与方向，但没有一个可以照抄的质量结论；本文也因此不给压缩比和精度损失的数字，只给出结论性判断：结构改动必须由自己目标任务上的评测来验收。第二，这是训练期决策。对一个已经发布的 MHA 权重做“事后共享”，本质是把若干份 K、V 投影强行合并，属于近似改写，效果和风险都不可控；反过来，GQA 化通常要从头训练或长周期继续训练。第三，实现复杂度会转移而非消失：内核要处理头与 KV 的映射关系，缓存要按 KV 组而不是按头组织，早期一批推理代码为此重写过索引逻辑。</p>
+<p>再往前走一步，就不只是“少存几份”，而是“换一个东西存”。以 DeepSeek-V2、DeepSeek-V3（2024 年 12 月发布）与其上的 DeepSeek-R1（2025 年 1 月发布）为代表的路线，把每层每 token 的 K、V 投影压到一个共享的低维隐式向量（常称低秩键值压缩或多头潜在注意力），缓存里放的是这个隐向量加上一小段与位置相关的维度，解码时再借助投影矩阵在需要时把它还原或吸收进计算。这样每 token 的缓存宽度就和头数解耦：<code>H_kv</code> 这个字段在这类配置里不再决定占用，决定占用的是隐式维度。第 2 节示意表里的配置 C 就是照这个形状写的——把 512 维隐式与 64 维位置相关维度记成 576，层数仍取 32。收益很可观，代价是推理侧必须专门支持：还原路径要重写注意力内核，缓存布局与常见实现不兼容，调度器、块管理都得跟着改。一个工程现实是：这类布局必须由推理引擎专门实现支持，否则权重虽在手上，缓存路径却根本接不起来。</p>
+<p>顺带划一条轴：本节动的是 K、V 的“形状与份数”，和权重侧的量化（可参考《模型量化与 GGUF 格式》）是两件事。权重压缩减少的是每步读入的参数体积，KV 压缩减少的是每步读入的历史体积，两者可以叠加，但评测与排查时要分开归因。</p>
+<h2 id="连续批处理：跑完一个就补一个"><a href="#连续批处理：跑完一个就补一个" class="headerlink" title="连续批处理：跑完一个就补一个"></a>连续批处理：跑完一个就补一个</h2><p>结构改动改变的是每一份请求的体积，调度决定的是同一时刻有多少份请求在共享那一次读取。第 1 节说过，单步解码的开销里权重可以被批次摊薄而 KV 不能，所以提高“每次读入 KV 所产生的有效 token 数”是第二根主要杠杆。</p>
+<p>最朴素的做法是按请求批处理（request-level batching）：凑齐若干个请求，一起进前向，直到这一批全部生成结束才收工、再放下一批进来。问题在于生成长度天然不齐。一个批次里的短请求早就吐完了结束符，却还要占着批次槽位、占着已经分配好的 KV 空间空转，等最长的请求跑完。更糟的是为了不把批次撑爆，预留必须按“最长可能长度”来，于是大量显存被尚未写满的缓存占着。结果是显存看着满了，实际有效并发很低。</p>
+<p>连续批处理（continuous batching，也写作 iteration-level batching，即逐步批处理）把调度粒度从“一个请求的生命周期”缩小到“一次前向”。每完成一步，调度器检查哪些序列已经生成结束，立刻把它们移出活跃批次并把显存还给池子；然后从等待队列里取新请求补位，只要剩余缓存够它跑一步。这样活跃批次始终维持在能维持的最大并发上，被读进显存的 KV 几乎每一份都在产出 token。</p>
+<p>它与 KV 占用是互相制约的，这层关系比“提并发就是省”要微妙。并发上得越高，单位时间的产出越划算，但缓存占用线性上涨，很快就撞上显存上限；一旦撞顶，调度器要么停止收新请求（吞吐被限流），要么对已经在跑的序列动手（抢占，下一节讲）。所以真实的引擎里并发数不是一个静态配置，而是被可用缓存块数动态决定的准入结果。一个可用的准入判据大致如下：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">准入检查（每一步前向之前）</span><br><span class="line">  1. 新请求的提示词需要 ceil(prompt_len / block_size) 个块</span><br><span class="line">  2. 它还要为可能的输出预留若干块：按 min(output_reserve, 剩余块数) 判断</span><br><span class="line">  3. 若空闲块不足以覆盖 1 + 2 的最小可运行量，则不入队，继续排队</span><br><span class="line">  4. 若入队后总占用超过阈值水位，触发对低优先级序列的抢占</span><br><span class="line">  5. 抢占释放的块先进入待回收列表，等本次前向写完再归还</span><br></pre></td></tr></table></figure>
+
+<p>第 2 条里的 <code>output_reserve</code> 是事故高发区：如果把最大输出长度当作预留量，长输出配置的请求会把并发压到个位数；如果完全不给预留，请求跑到中途只能靠抢占续命。第 9 节的排查清单会回到这里。另外，把提示词处理（prefill）和逐 token 生成（decode）混在同一轮前向里会互相干扰——前者吃算力、后者吃带宽，二者步长时间尺度差很多。把长提示词切成块分多轮处理的做法通常称为分块预填充（chunked prefill），属于调度策略细节，本文只点出它与 KV 占用同属一个资源池，不展开。至于跨机器的集群拓扑与成本核算，分别由《大模型推理服务集群》和《大模型私有化部署方案》负责，本文只谈单机显存内的机制。</p>
+<h2 id="分页式-KV-管理：块表、碎片与两种抢占"><a href="#分页式-KV-管理：块表、碎片与两种抢占" class="headerlink" title="分页式 KV 管理：块表、碎片与两种抢占"></a>分页式 KV 管理：块表、碎片与两种抢占</h2><p>有了连续批处理，显存分配器就成了瓶颈。原始做法是按请求预留：每个序列进来时，一次性圈出一段连续显存，长度按“最大上下文”算，也就是 <code>max_model_len</code> 乘每 token 字节数。这个策略有两个致命浪费。其一，绝大多数请求远没有跑到最大长度，预留而没用满的部分是内部碎片，别人不能用；其二，请求长度各不相同，池子里被反复切分后剩下的空洞大小不一，而新请求要的是一整块足够大的连续区间，于是明明总空闲量够，却分配不出来——这是典型的外部碎片。显存占用率很高、有效并发很低，两个数字同时出现，基本就能断定分配策略在漏气。</p>
+<p>解决思路直接借自操作系统的分页（Paging）。在虚拟内存里，程序看到的是连续的虚拟地址，物理内存却是零散的页框，中间靠页表把虚拟页号翻译成物理页框号。KV Cache 的对应关系是这样的：一个序列的逻辑 token 位置序列相当于虚拟地址空间；把连续若干个 token 的 KV 打包成一个固定大小的物理块（KV block，块大小常取 16 或 32 个 token 每块）相当于页框；每个序列持有一张块表（block table），把逻辑块号映射到物理块号，相当于页表；注意力内核在第 <code>l</code> 层要读历史 K、V 时，先按逻辑位置算出逻辑块号，再查这张表得到真实显存地址。因为物理块尺寸统一，任何空闲块都可以服务任何序列，外部碎片被消掉了，浪费只剩最后一个未写满块的尾部，上界是一个块。</p>
+<p>代价同样要摆出来。多了一层间接寻址，内核从一段连续拷贝变成按块表聚合读取（gather），访存不如纯连续布局友好；块表本身要占显存与主机内存，序列数一多就是可观的一笔；每块装多少个 token 是一个要权衡的参数——块太小则映射表长、内核碎片化，块太大则尾部浪费大、也让前缀共享的粒度变粗。这些代价换回来的，是分配器可以“按需增长”：解码一步只写当前块的剩余位置，写满才申请下一个块，于是预留策略从“按最大长度”变成“按实际用量”，第 4 节里 <code>output_reserve</code> 的两难才被真正缓解。</p>
+<p>资源仍然会不够。当 admit 一个新请求或给老请求续块而无空闲块时，调度器必须抢占（preemption）某个在跑的序列，把它腾出显存。两条路子恰好互补。换出（swap）是把它的 KV 块整批拷贝到主机内存（CPU RAM），等轮到它时再拷回显存继续跑：不损失任何计算成果，代价是占用主存、消耗 PCIe 带宽，恢复时还有一段不可忽略的数据搬运。重算（recompute by preemption，抢占后重计算）是直接把块丢掉、记下它当时已经生成到哪一步，恢复时把这段序列重新做一次前向：不占主存，代价是要重付一份计算，而重算量与该序列已缓存的长度成正比——上下文越长，重算越贵。取舍框架因此很清楚：主机内存富裕、模型算子昂贵、序列很长时偏向换出；显存余量小而主存紧张、序列短、重算快时偏向重算。工程上两者常常共存，按被抢占序列的长度选边。顺带说一句，这套机制出自 PagedAttention 的论文（SOSP 2023）并在 vLLM 中落地，如今已是主流引擎的公共做法；本文侧重机制本身，具体引擎的参数与部署细节请回看《vLLM 大模型推理引擎实践》。</p>
+<p>把上面几节串起来，一个请求在显存里的生命周期是这样的：</p>
+<pre class="mermaid">flowchart TD
+  A[请求进入队列] --> B{前缀块表能否命中}
+  B -->|命中| C[复用共享物理块并引用计数加一]
+  B -->|未命中| D[预填充逐块写入新物理块]
+  C --> E[进入活跃批次解码]
+  D --> E
+  E --> F{空闲块是否够用}
+  F -->|够用| G[按需申请下一块继续生成]
+  F -->|不够| H{选择抢占方式}
+  H -->|换出| I[KV 块拷贝到主机内存排队]
+  H -->|重算| J[丢弃块记录已生成步数]
+  I --> K[显存回落后拷回续跑]
+  J --> L[重新前向补算历史后续跑]
+  K --> E
+  L --> E
+  G --> M{是否产出结束符或触顶}
+  M -->|否| E
+  M -->|是| N[归还全部物理块进入可复用池]</pre>
+
+<h2 id="前缀缓存复用：把同一段历史算一次"><a href="#前缀缓存复用：把同一段历史算一次" class="headerlink" title="前缀缓存复用：把同一段历史算一次"></a>前缀缓存复用：把同一段历史算一次</h2><p>分页把显存切成了可共享的块，于是同一份内容在显存里只可能有一份；前缀缓存复用（prefix caching，也叫自动前缀缓存）就是把这句话用上：如果两个请求的开头若干 token 完全相同，那它们在这段前缀上的 K、V 值也完全相同（第 1 节的因果性论证在这里第二次生效），第二个请求没必要重跑这段预填充。引擎按块计算内容的键，命中就把共享物理块挂到新的块表上并给引用计数加一；只有当某个序列需要在共享块的中间位置写入时，才复制出一个新块改写，这正是写时复制（copy-on-write）的思路。省下来的是预填充的算力与时间，同时也少占一批块。</p>
+<p>能稳定命中的场景有几类。固定的系统提示词（system prompt）是最典型的一类，只要它一字不动地排在请求最前面就能命中。少样本示例（few-shot）同理：把示例集合放在系统提示之后、用户输入之前，且每次顺序与文本完全一致。多轮对话是天然的重叠结构——每一轮请求都把此前的对话历史原样带上，只要拼接模板不变，前面若干轮的 KV 就是可复用的长前缀。工具调用密集的智能体（agent）负载也受益：同一份工具描述、同一份被反复引用的长文档，都会被重复送进模型。</p>
+<p>命中判定要看三件事，缺一不可。第一是分块对齐：只有写满的整块才能被哈希与共享，序列尾部那个未满的块通常不参与复用，需要重新算，所以前缀长度越接近块大小的整数倍越划算。第二是逐 token 相等：共享的粒度是 token 而不是语义，任何一处 token 级差异都会让差异点之后的前缀全部落空。这意味着模板里的时间戳、请求标识、随机化的推荐语、每次变化的“当前日期”都是杀手；更隐蔽的是分词与模板层的变化——换分词器、改聊天模板、调整特殊 token 的拼接方式，等于给整个缓存池清零。第三是缓存键不能含用户敏感原文：键要用内容哈希或受控的键标识，而不是把提示词明文当索引；即便只存哈希，也要考虑长度、公共前缀带来的可推断性，并对键做隔离与生命周期管理。把隐私风险关在键设计这一环里，是前缀缓存能不能进生产的分水岭。</p>
+<p>失效与淘汰要提前想好。引用计数归零的块不会立刻消失，而是进入按最近使用淘汰（LRU）的候选队列，在显存压力下被回收；这带来一个直接后果——冷前缀会在热度不够时被淘汰，下一次又得重算，于是池子大小与前缀热度分布之间需要一个容量决策，指标见第 8 节。必须做到整池失效的情况有：权重换版本或做继续训练、分词器与模板变更、以及键的盐值轮换。另外，llama.cpp 那类本地引擎也有各自的会话缓存机制，细节归《llama.cpp 源码解析》，本文不重复。</p>
+<h2 id="KV-量化与淘汰：省下的体积要用评测换回来"><a href="#KV-量化与淘汰：省下的体积要用评测换回来" class="headerlink" title="KV 量化与淘汰：省下的体积要用评测换回来"></a>KV 量化与淘汰：省下的体积要用评测换回来</h2><p>第 2 节的式子里还剩两个可以动的量：数据类型 <code>b</code> 与实际保留的历史长度。前者是 KV 量化（KV quantization），后者是淘汰类优化（eviction）。</p>
+<p>KV 量化的机制与权重量化同类但对象不同：把 K、V 张量从 2 字节降到 1 字节甚至更低，按通道、按 token 或按块做分组，为每组维护缩放系数与零点。难点在于 KV 的数值分布不是一开始就知道的——它由输入决定，随层、随位置、随话题漂移，因此缩放系数往往要在线统计或分阶段校准，写入时同步更新。压缩的收益直接：每 token 字节数按 <code>b</code> 同比例下降，可容纳的并发或上下文随之上升。风险则来自注意力的数学形式：量化的 K 进入点积，误差被 softmax 的非线性放大，误差在长序列上还要跨很多项累积。因此精度风险有明显的形态特征——上下文越长越容易受影响，因为读取的历史项更多；检索式任务（在很长的材料里找出一处关键片段并复述）比概括式任务更容易受影响，因为它依赖个别 token 的精确匹配，而这些恰好可能落在被粗糙量化的位置上；同理，位置相关与首尾 token 常被认为值得单独保留高精度。这些是判断“该往哪儿测”的方向，不是可以直接引用的结论。</p>
+<p>淘汰类优化更激进：不再把全部历史留在缓存里，而是按某种重要性判断丢弃一部分。常见形状有滑动窗口加保留开头若干 token、按累积注意力分数保留所谓重要 token、按层分配缓存预算等。它们的共同点是让注意力只看一份近似的历史，于是省的既有显存也有带宽。代价也更大：丢了哪些 token 取决于输入内容，同一个请求重跑可能不一致，归因困难；对需要回溯早期细节的任务，风险高于量化。这里要与第 6 节的“淘汰”划清界限：那里的淘汰是缓存块回收策略，块还在、内容还在，只是不再优先保留；这里的淘汰是把历史 token 从模型视野里删掉，是算法近似的决定。</p>
+<p>因此两类优化的上线门槛是同一条：必须自建评测。我们的做法是固定一套覆盖三类能力的评测集——长上下文检索、多轮一致性、格式严格的工具调用或结构化输出；先在 bf16 基线上跑通并保存输入，再用同一份输入、同一套模板与聊天格式、同一套采样参数跑量化或淘汰版本，逐条比对而不是只看总分，因为总分常常掩盖了检索类的局部塌陷。工程上还要保留一条随时可切换的高精度回退路径，并让变更按请求灰度放量。第 10 节的对照表把这一列写成了“代价与风险”，读起来像形式，但它实际是这类优化唯一可靠的入场券。</p>
+<h2 id="观测与容量规划：先定口径，再谈数字"><a href="#观测与容量规划：先定口径，再谈数字" class="headerlink" title="观测与容量规划：先定口径，再谈数字"></a>观测与容量规划：先定口径，再谈数字</h2><p>没有指标就没法判断上述任何一项优化值不值得做。要采的东西与口径可以这样定：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">首 token 延迟 TTFT（Time To First Token）</span><br><span class="line">  起点：请求到达网关或入队完成的时刻（两种口径要写明并保持一致）</span><br><span class="line">  终点：第一个生成 token 交付客户端；分位数取 p50 / p90 / p99</span><br><span class="line">  拆解：排队时长 + 预填充时长，二者成因完全不同</span><br><span class="line">逐 token 延迟 TPOT（Time Per Output Token）</span><br><span class="line">  用总生成时长除以生成步数，或直接采步间隔 ITL（Inter-Token Latency）</span><br><span class="line">吞吐</span><br><span class="line">  输出 token 每秒与输入 token 每秒分开统计，另记请求每秒</span><br><span class="line">KV 占用率</span><br><span class="line">  已分配物理块数 / 池内总块数；同时记有效长度分布与预留长度分布</span><br><span class="line">抢占次数</span><br><span class="line">  换出次数与重算次数分开计；重算还要折算被浪费的重算 token 数</span><br><span class="line">块表未命中率</span><br><span class="line">  按整块口径：参与复用的前缀整块数 与 实际命中复用的整块数之比</span><br><span class="line">批次质量</span><br><span class="line">  活跃序列数、批次中已完成却仍占槽位的序列数</span><br></pre></td></tr></table></figure>
+
+<p>压测要在没有现成数据时自己搭一次，方法是把变量摆成阶梯而不是找一个“最优值”。并发按倍增档位推进，从很低一直到明显过载；输入长度与输出长度分别控制，因为它们压力方向不同——长输入考验预填充算力与一次性块分配，长输出考验驻留时长与块增长。每个档位至少跑两组：一组是固定长度的干净组，用来看得失是否线性；一组是带长尾的混合组，因为抢占几乎总是在长尾出现时才被触发。跑正式统计前先预热，让缓存池、图捕获与前缀块进入稳定状态，丢弃预热批次的结果。限额必须提前设好：最大并发、最大输出长度、显存水位告警线，触线就停止加压而不是继续冲；判停条件写成可执行的形式，例如 p99 首 token 延迟超出目标或抢占率超出阈值。</p>
+<p>判读框架比数字更有用。占用率随并发上升而逐 token 延迟基本不动，说明还在带宽摊薄区，加并发是划算的。占用率上升同时延迟同步恶化、抢占从零星变成常态，说明已经触顶，此时要么缩小每 token 字节数（走结构或量化那条路），要么限制驻留（淘汰或缩短最大长度），要么承认容量就是不够。吞吐不再随并发增长而排队时间暴涨，说明瓶颈已经从前向移到了准入控制。最后这一种现象很容易被误读成“模型变慢了”，而指标上要区分得很干净：分配失败与限流排队是两回事，第 9 节的清单第一条就是它。</p>
+<h2 id="常见误用与排查清单"><a href="#常见误用与排查清单" class="headerlink" title="常见误用与排查清单"></a>常见误用与排查清单</h2><p>第一个误用最贵：把长上下文当免费。上下文长度在估算式里是乘数，双倍的长度意味着双倍的每步读取与双倍的驻留显存，它同时压低可容纳的并发并抬高每步耗时，绝不会因为“模型支持一百二十万”而变成装饰性数字。第二个误用是忽略最大输出长度对预留的影响：在还没有分页的栈上，预留按 <code>max_model_len</code> 或按“提示加最大输出”圈地，把最大输出长度设成远大于实际需求，等于凭空造出大量未写满的预留，有效并发被腰斩；即便上了分页，调度器的准入判据里那个 <code>output_reserve</code> 仍然沿用这个上限。第三个误用发生在提示词工程一侧：改一个标点、调整一个空格、往系统提示里塞进当前时间，都会让原本可复用的整块前缀全部落空，表现为块表未命中率突然跳高而模型与配置没动。第四个是把 OOM 与抢占混为一谈：分配失败是池子真的没有可用块（或碎片化、或被预留吃掉），症状是报错或请求被拒；抢占是可恢复的调度动作，症状是延迟毛刺与重算量上升，请求最终还能完成。处理路径完全不同，前者调容量与碎片，后者调水位与优先级。第五个是缓存键里含用户敏感原文：图一时方便用提示词明文或其可逆编码做键，等于在服务内部保留了一份可被侧信道推断的索引，风险远大于它省下的算力。</p>
+<p>一段可以直接贴进工单模板的排查顺序：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">01 现象归类：分配失败 / 请求被拒 / 延迟毛刺 / 吞吐不涨 —— 四条路不同，先分对</span><br><span class="line">02 复核每 token KV 字节数：按 2 × L × H_kv × d_head × b 从 config.json 取字段重算</span><br><span class="line">03 对齐三个长度：实际提示长度分布、实际生成长度分布、配置的最大上下文与最大输出</span><br><span class="line">04 看占用曲线与抢占计数：换出次数、重算次数、重算 token 数分开读，别只看总水位</span><br><span class="line">05 看块表命中率：整块口径统计命中，异常时核对块大小、前缀长度是否块对齐</span><br><span class="line">06 核对模板与分词：聊天模板、特殊 token、分词器版本、系统提示是否近期变更</span><br><span class="line">07 核对键设计：缓存键是否含明文原文、是否做过隔离与轮换、是否有整池失效预案</span><br><span class="line">08 若上了量化或淘汰：用同一份输入跑高精度基线对照，重点看长上下文检索与结构化输出</span><br><span class="line">09 变更纪律：一次只动一个轴（结构 / 分页 / 前缀 / 量化），保留回退路径与灰度开关</span><br></pre></td></tr></table></figure>
+
+<h2 id="技术对照表"><a href="#技术对照表" class="headerlink" title="技术对照表"></a>技术对照表</h2><table>
+<thead>
+<tr>
+<th>技术</th>
+<th>解决什么问题</th>
+<th>省在哪里</th>
+<th>代价与风险</th>
+<th>什么负载下值得</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>连续批处理</td>
+<td>按请求批处理导致槽位空转与显存闲置</td>
+<td>提高每步读取的复用率，间接摊薄权重</td>
+<td>调度复杂度上升，准入与优先级要重新设计</td>
+<td>请求长短不一、到达连续的服务负载</td>
+</tr>
+<tr>
+<td>分页式 KV 管理</td>
+<td>按最大上下文连续预留造成的内外碎片</td>
+<td>把浪费压到一个块的尾部，按需增长</td>
+<td>多一层寻址，块大小需调参，块表占元数据</td>
+<td>上下文长度方差大、并发高的负载</td>
+</tr>
+<tr>
+<td>前缀缓存复用</td>
+<td>同一份系统提示或历史被反复预填充</td>
+<td>省预填充算力与首 token 延迟，少占块</td>
+<td>命中率依赖模板稳定；键设计有隐私风险</td>
+<td>固定前缀、多轮对话、智能体反复带长文档</td>
+</tr>
+<tr>
+<td>GQA 一类结构改动</td>
+<td>每 token 缓存体积本身过大</td>
+<td>按共享倍数线性降低占用与带宽</td>
+<td>需训练期决策，质量必须自测，内核要适配</td>
+<td>新模型选型或长周期继续训练时最划算</td>
+</tr>
+<tr>
+<td>KV 量化</td>
+<td>数据类型 <code>b</code> 太宽</td>
+<td>按位宽比例直接降显存与带宽</td>
+<td>精度风险随长度与检索型任务上升</td>
+<td>容量确实撞顶且评测已通过的稳定负载</td>
+</tr>
+<tr>
+<td>重算对比换出</td>
+<td>显存不够时必须抢占，抢占要选边</td>
+<td>本身不省显存，决定抢占的开销形状</td>
+<td>重算重付计算，换出占用主存与 PCIe</td>
+<td>长序列重计算贵则偏换出，短序列池子紧则偏重算</td>
+</tr>
+</tbody></table>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>本文把 KV Cache 相关的优化收敛到一条式子上：每 token 字节数由层数、KV 头数、每头维度与数据类型相乘得到，占用再由驻留长度与并发放大。所有能做的事要么在缩小这个乘积，要么在提高每次读取里有效产出的比例，要么在给这个乘积腾地方。这三条路彼此不冲突，但它们的失效模式很不一样，所以一次只动一条轴、一次只归因一件事，是这类优化能持续下去的前提。</p>
+<p>调度侧的连续批处理与分页是收益最确定、风险最低的一层，因为它不改变模型的数学行为，只改变显存的组织方式；代价都付在内核间接寻址与调度器复杂度上，可以靠指标直接验收。结构侧的共享与低秩压缩收益最大，却必须付训练期的决策成本，事后改写不是工程问题而是模型能力问题。量化与淘汰处在中间：改动很轻，验收很重，因为误差以长度和任务形态为函数出现，总分看不出局部塌陷。前缀缓存则把工程与合规绑在了一起——省的是预填充，赌的是模板稳定与键设计干净。</p>
+<p>如果要给一个落地次序，我们会按“先把账算清楚，再把碎片消掉，再把重复的读取省掉，最后才动数值精度”推进：用第 2 节的式子对照配置文件复核每 token 成本，把长度分布与预留策略摆平；上分页与连续批处理，把块水位、抢占计数与命中率纳入常规采集；然后审视前缀是否稳定可复用；只有在容量确实撞顶且自建评测通过时，才把 KV 的位宽降下来。至于长上下文算法本身、集群拓扑与私有化成本，属于另几篇的分工范围，本文不越界。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li>Efficient Memory Management for Large Language Model Serving with PagedAttention，SOSP 2023（分页式 KV 管理的原始论文）</li>
+<li>vLLM 项目仓库：<a href="https://github.com/vllm-project/vllm">https://github.com/vllm-project/vllm</a></li>
+<li>Orca: A Distributed Serving System for Transformer-Based Generative Models，OSDI 2022（逐步批处理即连续批处理的早期论述）</li>
+<li>FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness，NeurIPS 2022</li>
+<li>FlashAttention-2: Faster Attention with Better Parallelism and Work Partitioning，2023 年公开的预印本</li>
+<li>Multi-Query Attention，Noam Shazeer，2019 年公开的预印本</li>
+<li>Grouped-Query Attention for Effective Multi-Head Decoding，Ainslie 等，ICLR 2023</li>
+<li>DeepSeek-V2: A Strong, Economical, and Efficient Mixture-of-Experts Language Model，2024 年技术报告（低秩隐式缓存压缩的公开描述）</li>
+<li>Efficient Streaming Language Models with Attention Sinks，2023 年公开的预印本（保留首尾窗口的缓存裁剪思路）</li>
+<li>H2O: Heavy-Hitter Oracle for Efficient Generative Inference of Large Language Models，2023 年公开的论文（按注意力重要性淘汰历史）</li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>大模型推理优化：KV Cache 与 PagedAttention</p><p><a href="https://987763485.github.io/2025/05/10/大模型推理优化KVCache与PagedAttention/">https://987763485.github.io/2025/05/10/大模型推理优化KVCache与PagedAttention/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2025-05-10</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-20</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="link-muted mr-2" rel="tag" href="/tags/python/">python</a><a class="link-muted mr-2" rel="tag" href="/tags/typescript/">typescript</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2025/05/12/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%AE%89%E5%85%A8%E4%B8%8E%E6%8F%90%E7%A4%BA%E6%B3%A8%E5%85%A5%E9%98%B2%E6%8A%A4/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">大模型安全与提示注入防护</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2025/05/08/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E8%AF%84%E6%B5%8B%E5%9F%BA%E5%87%86%E4%B8%8E%E6%A6%9C%E5%8D%95%E8%A7%A3%E8%AF%BB/"><span class="level-item">大模型评测基准与榜单解读</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

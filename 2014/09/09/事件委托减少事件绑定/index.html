@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>事件委托减少事件绑定 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="上个月写的《DOM 事件委托的边界情况》把委托的原理、事件流走法和哪些事件接不了讲完了，那一篇的落点是”能不能用”。这篇只谈后半件事：”绑定策略怎么选”。读者留言问得最多的三个问题是：委托到底快多少、代价出在哪一步、IE8 还活着的项目里哪种写法可行。本文把逐个原生绑定、原生委托、jQuery 委托和 $.live 四种策略放进同一个测量口径里对比，给一张按场景查的选型表，最后专门写一节反面结论—"><meta property="og:type" content="blog"><meta property="og:title" content="事件委托减少事件绑定"><meta property="og:url" content="https://987763485.github.io/2014/09/09/%E4%BA%8B%E4%BB%B6%E5%A7%94%E6%89%98%E5%87%8F%E5%B0%91%E4%BA%8B%E4%BB%B6%E7%BB%91%E5%AE%9A/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="上个月写的《DOM 事件委托的边界情况》把委托的原理、事件流走法和哪些事件接不了讲完了，那一篇的落点是”能不能用”。这篇只谈后半件事：”绑定策略怎么选”。读者留言问得最多的三个问题是：委托到底快多少、代价出在哪一步、IE8 还活着的项目里哪种写法可行。本文把逐个原生绑定、原生委托、jQuery 委托和 $.live 四种策略放进同一个测量口径里对比，给一张按场景查的选型表，最后专门写一节反面结论—"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2014-09-09T06:04:27.000Z"><meta property="article:modified_time" content="2026-10-17T14:08:00.866Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="web前端"><meta property="article:tag" content="性能优化"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2014/09/09/%E4%BA%8B%E4%BB%B6%E5%A7%94%E6%89%98%E5%87%8F%E5%B0%91%E4%BA%8B%E4%BB%B6%E7%BB%91%E5%AE%9A/"},"headline":"事件委托减少事件绑定","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2014-09-09T06:04:27.000Z","dateModified":"2026-10-17T14:08:00.866Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"上个月写的《DOM 事件委托的边界情况》把委托的原理、事件流走法和哪些事件接不了讲完了，那一篇的落点是”能不能用”。这篇只谈后半件事：”绑定策略怎么选”。读者留言问得最多的三个问题是：委托到底快多少、代价出在哪一步、IE8 还活着的项目里哪种写法可行。本文把逐个原生绑定、原生委托、jQuery 委托和 $.live 四种策略放进同一个测量口径里对比，给一张按场景查的选型表，最后专门写一节反面结论—"}</script><link rel="canonical" href="https://987763485.github.io/2014/09/09/%E4%BA%8B%E4%BB%B6%E5%A7%94%E6%89%98%E5%87%8F%E5%B0%91%E4%BA%8B%E4%BB%B6%E7%BB%91%E5%AE%9A/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2014-09-09T06:04:27.000Z" title="9/9/2014, 2:04:27 PM">2014-09-09</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/">前端开发</a></span><span class="level-item">28 分钟读完 (大约4265个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">事件委托减少事件绑定</h1><div class="content"><p>上个月写的《DOM 事件委托的边界情况》把委托的原理、事件流走法和哪些事件接不了讲完了，那一篇的落点是”能不能用”。这篇只谈后半件事：”绑定策略怎么选”。读者留言问得最多的三个问题是：委托到底快多少、代价出在哪一步、IE8 还活着的项目里哪种写法可行。本文把逐个原生绑定、原生委托、jQuery 委托和 <code>$.live</code> 四种策略放进同一个测量口径里对比，给一张按场景查的选型表，最后专门写一节反面结论——什么时候不该用委托。至于为什么还要把 <code>$.live</code> 拉进来，因为存量项目里它还没清干净；而二月那篇《jQuery 的 on、off 与事件委托》已经测过 jQuery 内部两种绑法的差距，这次把原生写法和 live 补进同一个框架，只讲测量与选型，原理一律不重复。</p>
+<h2 id="四种候选策略"><a href="#四种候选策略" class="headerlink" title="四种候选策略"></a>四种候选策略</h2><p>统一一个场景再谈选型：一个 1000 行的任务列表，每行一个删除按钮，只有 click 一类交互；容器 <code>&lt;ul id=&quot;list&quot;&gt;</code> 稳定不销毁，行内容会被搜索、筛选整段重渲染。四种写法如下。</p>
+<h3 id="策略-A：逐个原生绑定"><a href="#策略-A：逐个原生绑定" class="headerlink" title="策略 A：逐个原生绑定"></a>策略 A：逐个原生绑定</h3><figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 兼容包装：标准走 addEventListener，IE8 走 attachEvent</span></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">addListener</span>(<span class="params">el, type, fn</span>) &#123;</span><br><span class="line">  <span class="keyword">if</span> (el.<span class="property">addEventListener</span>) &#123;</span><br><span class="line">    el.<span class="title function_">addEventListener</span>(type, fn, <span class="literal">false</span>);</span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    el.<span class="title function_">attachEvent</span>(<span class="string">&#x27;on&#x27;</span> + type, fn);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">var</span> list = <span class="variable language_">document</span>.<span class="title function_">getElementById</span>(<span class="string">&#x27;list&#x27;</span>);</span><br><span class="line"><span class="comment">// querySelectorAll 在 IE8 可用；getElementsByClassName 反而不行</span></span><br><span class="line"><span class="keyword">var</span> dels = list.<span class="title function_">querySelectorAll</span>(<span class="string">&#x27;.del&#x27;</span>);</span><br><span class="line"><span class="keyword">for</span> (<span class="keyword">var</span> i = <span class="number">0</span>; i &lt; dels.<span class="property">length</span>; i++) &#123;</span><br><span class="line">  <span class="title function_">addListener</span>(dels[i], <span class="string">&#x27;click&#x27;</span>, onDel);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>监听器数量等于节点数，1000 行就是 1000 个。IE8 只有 <code>attachEvent</code>：没有捕获阶段、事件对象挂在 <code>window</code> 上，所以上面这层十几行的包装就是为它准备的。这是所有账的起点。</p>
+<h3 id="策略-B：容器委托-手写上溯"><a href="#策略-B：容器委托-手写上溯" class="headerlink" title="策略 B：容器委托 + 手写上溯"></a>策略 B：容器委托 + 手写上溯</h3><figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 主干逻辑；带捕获开关与卸载句柄的完整版见旧文，不重复</span></span><br><span class="line"><span class="keyword">var</span> matchFn = <span class="title class_">Element</span>.<span class="property"><span class="keyword">prototype</span></span>.<span class="property">matches</span> ||</span><br><span class="line">  <span class="title class_">Element</span>.<span class="property"><span class="keyword">prototype</span></span>.<span class="property">webkitMatchesSelector</span> ||</span><br><span class="line">  <span class="title class_">Element</span>.<span class="property"><span class="keyword">prototype</span></span>.<span class="property">mozMatchesSelector</span> ||</span><br><span class="line">  <span class="title class_">Element</span>.<span class="property"><span class="keyword">prototype</span></span>.<span class="property">msMatchesSelector</span>;   <span class="comment">// 2014 年仍要带前缀</span></span><br><span class="line"></span><br><span class="line">list.<span class="title function_">addEventListener</span>(<span class="string">&#x27;click&#x27;</span>, <span class="keyword">function</span> (<span class="params">e</span>) &#123;</span><br><span class="line">  <span class="keyword">var</span> node = e.<span class="property">target</span>;</span><br><span class="line">  <span class="keyword">while</span> (node &amp;&amp; node !== list) &#123;</span><br><span class="line">    <span class="keyword">if</span> (node.<span class="property">nodeType</span> === <span class="number">1</span> &amp;&amp; matchFn.<span class="title function_">call</span>(node, <span class="string">&#x27;.del&#x27;</span>)) &#123;</span><br><span class="line">      onDel.<span class="title function_">call</span>(node, e);               <span class="comment">// 原生不改 this，自己 call</span></span><br><span class="line">      <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    node = node.<span class="property">parentNode</span>;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;, <span class="literal">false</span>);</span><br></pre></td></tr></table></figure>
+
+<p>监听器只有一个。成本从绑定端挪到了分发端：每次点击要从 <code>event.target</code> 沿祖先链上溯到容器，逐层做一次选择器匹配。在 IE8 上这条分支要换成 <code>attachEvent</code>、目标从 <code>window.event.srcElement</code> 取，兼容层的体量正是这个策略”代码复杂度高”的来源。</p>
+<h3 id="策略-C：jQuery-委托"><a href="#策略-C：jQuery-委托" class="headerlink" title="策略 C：jQuery 委托"></a>策略 C：jQuery 委托</h3><figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// jQuery 1.7 引入 on，1.11 是当前维护版本，签名三年没变</span></span><br><span class="line">$(<span class="string">&#x27;#list&#x27;</span>).<span class="title function_">on</span>(<span class="string">&#x27;click&#x27;</span>, <span class="string">&#x27;.del&#x27;</span>, onDel);</span><br></pre></td></tr></table></figure>
+
+<p>一行，监听器同样只有一个，匹配和浏览器差异都交给库。<code>on</code> 的委托形态 2011 年底就在 1.7 里定下来了，到 1.11 参数形状没有任何变动，所以它可以当作 2014 年默认答案——前提是 jQuery 已经在页面里。</p>
+<h3 id="策略-D：-live"><a href="#策略-D：-live" class="headerlink" title="策略 D：$.live"></a>策略 D：$.live</h3><figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 只活在 jQuery 1.8 及更早；1.9 起调用直接报错</span></span><br><span class="line">$(<span class="string">&#x27;li .del&#x27;</span>).<span class="title function_">live</span>(<span class="string">&#x27;click&#x27;</span>, onDel);</span><br></pre></td></tr></table></figure>
+
+<p>版本事实要写清楚：<code>live</code> 是 1.3（2009 年）的旧物；1.7 引入 <code>on</code> 的同一年它被标记废弃，实现退化成”绑在 document 上的 <code>on</code>“；1.9（2013 年初）连人带机制一起删除。本文写作时手里是 jQuery 1.11，<code>live</code> 一行都跑不起来。它为什么慢：1.9 之前的实现里，每次点击都要从 target 一路走到 document，沿途靠挂在元素上的 <code>dataEvents</code> 处理器清单逐个试选择器；1.7 之后旧机制拆了，但”绑在最远处”这个结构没变，冒泡链依旧最长、候选清单是全页共享的。它和策略 C 的绑定数量相同，分发的账却明显更贵，还要额外背一笔迁移债——迁移成本不在改签名（一行搜索替换），而在容器从 document 上移到稳定祖先、<code>die</code> 换成带命名空间的 <code>off</code>、原来依赖”全页点击都被接住”的逻辑重新走查这三件事。清单在旧文里写过，这里只保留结论：<code>live</code> 是欠债写法，新项目禁用，存量项目按升级阻塞项处理。</p>
+<h2 id="一张横向对比表"><a href="#一张横向对比表" class="headerlink" title="一张横向对比表"></a>一张横向对比表</h2><table>
+<thead>
+<tr>
+<th>维度（以 1000 行计）</th>
+<th>A 逐个原生</th>
+<th>B 原生委托</th>
+<th>C jQuery 委托</th>
+<th>D live（≤1.8）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>监听器数量</td>
+<td>1000</td>
+<td>1</td>
+<td>1</td>
+<td>1，挂在 document</td>
+</tr>
+<tr>
+<td>DOM 重建后是否需重绑</td>
+<td>需要，全量重来</td>
+<td>不需要</td>
+<td>不需要</td>
+<td>不需要</td>
+</tr>
+<tr>
+<td>匹配开销</td>
+<td>无，直接命中</td>
+<td>手写上溯，深浅决定成本</td>
+<td>库沿链匹配，略高于手写</td>
+<td>上溯到 document，链最长</td>
+</tr>
+<tr>
+<td>内存</td>
+<td>千份监听器加闭包，最大</td>
+<td>最小</td>
+<td>小，另有事件表记账</td>
+<td>小，但全页共享 document</td>
+</tr>
+<tr>
+<td>IE8 可行性</td>
+<td>可行，走 attachEvent</td>
+<td>可行，兼容层自己写</td>
+<td>可行，差异已被库抹平</td>
+<td>1.8 能跑，1.9 起禁止</td>
+</tr>
+<tr>
+<td>代码复杂度</td>
+<td>中：绑定簿记与卸载</td>
+<td>高：匹配、兼容、卸载全手写</td>
+<td>低</td>
+<td>低，但欠升级债</td>
+</tr>
+</tbody></table>
+<p>这张表是定性的，数字在哪一档，下一节用测量说话。</p>
+<h2 id="计时方法与测量口径"><a href="#计时方法与测量口径" class="headerlink" title="计时方法与测量口径"></a>计时方法与测量口径</h2><p>先交代环境和量法，免得数字被当成权威基准引用。环境是当时在 Chrome 30（2014 年 7 月发布的版本）与一台装着 IE8 的 Windows 虚拟机上的手工计时，jQuery 版本 1.11.1，单台机器，跑十次去掉最高最低取中间值。所有结论只认量级，小数点后的数字没有意义。</p>
+<p>绑定的量法：列表渲染完成到绑定语句返回之间的耗时，DOM 构造不计入。分发的量法：<code>createEvent</code> 造一个同步派发的 click，在处理器入口打点，与派发调用之间取差。毫秒级时钟量不出亚毫秒事件，所以分发一律循环派发一千次再除以一千；IE8 的 <code>fireEvent</code> 不保证沿链冒泡，这条路走不通，那一侧改成手工连点取差值，只和 Chrome 侧比量级、不比小数值。打点统一用 <code>new Date().getTime()</code>：<code>console.time</code> 在 Chrome 30 的工具里已经可用，但 IE8 的开发者工具没有，两边写同一份手工打点代码，避免工具差异混进结果。<code>performance.now</code> 在 IE8 上不存在，从头到尾没考虑过。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 构造 N 行；一次 innerHTML 重写，渲染时间不计入绑定</span></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">buildList</span>(<span class="params">n</span>) &#123;</span><br><span class="line">  <span class="keyword">var</span> html = [];</span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">var</span> i = <span class="number">0</span>; i &lt; n; i++) &#123;</span><br><span class="line">    html.<span class="title function_">push</span>(<span class="string">&#x27;&lt;li class=&quot;row&quot;&gt;&lt;span class=&quot;txt&quot;&gt;任务 &#x27;</span> + i + <span class="string">&#x27;&lt;/span&gt;&#x27;</span> +</span><br><span class="line">              <span class="string">&#x27;&lt;button class=&quot;del&quot;&gt;删除&lt;/button&gt;&lt;/li&gt;&#x27;</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="variable language_">document</span>.<span class="title function_">getElementById</span>(<span class="string">&#x27;list&#x27;</span>).<span class="property">innerHTML</span> = html.<span class="title function_">join</span>(<span class="string">&#x27;&#x27;</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 绑定耗时：t0 与 t1 之间夹入对应策略的绑定代码</span></span><br><span class="line"><span class="title function_">buildList</span>(<span class="number">1000</span>);</span><br><span class="line"><span class="keyword">var</span> t0 = <span class="keyword">new</span> <span class="title class_">Date</span>().<span class="title function_">getTime</span>();</span><br><span class="line"><span class="comment">/* 策略 A / B / C / D 的绑定语句 */</span></span><br><span class="line"><span class="keyword">var</span> bindMs = <span class="keyword">new</span> <span class="title class_">Date</span>().<span class="title function_">getTime</span>() - t0;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 分发耗时：合成事件同步派发，处理器入口打点，循环取平均</span></span><br><span class="line"><span class="keyword">var</span> hitAt = <span class="number">0</span>, sum = <span class="number">0</span>;</span><br><span class="line"><span class="keyword">function</span> <span class="title function_">onDel</span>(<span class="params">e</span>) &#123; hitAt = <span class="keyword">new</span> <span class="title class_">Date</span>().<span class="title function_">getTime</span>(); &#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">var</span> btn = <span class="variable language_">document</span>.<span class="title function_">querySelector</span>(<span class="string">&#x27;#list .del&#x27;</span>);</span><br><span class="line"><span class="keyword">var</span> evt = <span class="variable language_">document</span>.<span class="title function_">createEvent</span>(<span class="string">&#x27;HTMLEvents&#x27;</span>);</span><br><span class="line">evt.<span class="title function_">initEvent</span>(<span class="string">&#x27;click&#x27;</span>, <span class="literal">true</span>, <span class="literal">false</span>);      <span class="comment">// 必须允许冒泡，委托才收得到</span></span><br><span class="line"><span class="keyword">for</span> (<span class="keyword">var</span> k = <span class="number">0</span>; k &lt; <span class="number">1000</span>; k++) &#123;</span><br><span class="line">  <span class="keyword">var</span> t0 = <span class="keyword">new</span> <span class="title class_">Date</span>().<span class="title function_">getTime</span>();</span><br><span class="line">  btn.<span class="title function_">dispatchEvent</span>(evt);</span><br><span class="line">  sum += hitAt - t0;</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">var</span> perDispatch = sum / <span class="number">1000</span>;             <span class="comment">// 只看它在哪个量级</span></span><br></pre></td></tr></table></figure>
+
+<p>顺带交代这份测量的局限，免得数字被过度引用。虚拟机里的 IE8 计时受宿主调度影响，同一段代码两次结果差三成是常态；Chrome 首次执行的即时编译开销会污染第一轮，所以每组数据都跑满十轮再取中位；GC 暂停偶尔混进绑定阶段的尾部测量，处理办法是把明显离群的那一轮整轮作废。也正因为误差项这么多，笔者只把结果写成”哪个量级”，任何精确到小数点的表述在这套手工口径下都是假精确——表格里的区间是复测后仍然稳定的那部分，量级差在一倍以内的两栏，实际上应当视为”测不出差别”。</p>
+<p>最后对齐旧账：二月那篇测得 jQuery 逐个绑定约 90 - 130 ms、容器委托 1 - 3 ms。这次把原生拉进同一框架，原生逐个绑定在 Chrome 30 上比 jQuery 版略快一些，但与委托仍是百倍量级的差距——旧结论扩大样本后依然成立。</p>
+<h2 id="测量结果：收益在绑定，代价在分发"><a href="#测量结果：收益在绑定，代价在分发" class="headerlink" title="测量结果：收益在绑定，代价在分发"></a>测量结果：收益在绑定，代价在分发</h2><table>
+<thead>
+<tr>
+<th>指标（量级，非精确值）</th>
+<th>A 逐个原生</th>
+<th>B 原生委托</th>
+<th>C jQuery 委托</th>
+<th>D live（1.8）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>绑定 1000 个 · Chrome 30</td>
+<td>30 - 80 ms</td>
+<td>1 ms 上下</td>
+<td>1 - 3 ms</td>
+<td>1 - 3 ms</td>
+</tr>
+<tr>
+<td>绑定 1000 个 · IE8</td>
+<td>300 - 600 ms</td>
+<td>几 ms</td>
+<td>5 - 10 ms</td>
+<td>5 - 10 ms</td>
+</tr>
+<tr>
+<td>重渲染 1000 行后的补绑成本</td>
+<td>全量再来一遍</td>
+<td>零</td>
+<td>零</td>
+<td>零</td>
+</tr>
+<tr>
+<td>单次分发 · 浅容器</td>
+<td>基准</td>
+<td>与基准同量级</td>
+<td>略高于基准</td>
+<td>明显高于 C</td>
+</tr>
+<tr>
+<td>单次分发 · 十几层深链</td>
+<td>基准</td>
+<td>升一档</td>
+<td>升一档</td>
+<td>全场最贵</td>
+</tr>
+</tbody></table>
+<p>三句话读这张表。第一，收益全部集中在绑定与重建阶段：IE8 上首绑 300 - 600 ms 对 10 ms 以内，是用户唯一感得到的差距；列表每被筛选重写一次，逐个绑定就要把这笔账再付一次，委托一次付清。第二，分发阶段委托是付钱的一方：多出来的是一次上溯加一次匹配，浅容器场景循环平均下来在亚毫秒量级，按用户一天几百次点击累计，也摸不到一秒——这点代价不值得为它放弃委托，但也不该被”委托全面更快”的说法掩盖。第三，”N 大且交互频繁时委托必赢”是常见高估：真正让分发的账变可观的是三件事——冒泡链很深、同容器挂的选择器种类多、高频事件参与委托。N 大只保证绑定端收益大，分发端好不好，取决于上面这三件事，和 N 无关。</p>
+<p>B 与 C 的分发差异同样在量级内：手写上溯只做一条 selector 的判断，jQuery 沿链匹配还要过事件表筛选。但换到的是捕获开关、<code>attachEvent</code> 归一化、<code>this</code> 修正这些自己维护的代码，几百字节换几十行——项目里已有 jQuery 就没必要省，这一层的取舍是工程问题不是性能问题。</p>
+<p>内存这一栏表格里没给数字，因为它只能定性观测：Chrome 30 的开发者工具 timeline 里能直接数出堆在页面上的监听器个数，策略 A 是一千，B、C、D 都是一个；IE8 侧没有这种面板，只能挂任务管理器看进程内存曲线，逐个绑定那一版从首绑起就抬高了一截，反复重建列表时台阶还在往上走。至于解绑之后曲线为什么不回落，那是《DOM 事件移除与内存泄漏》里讲过的引用链问题，本文不重复，只需要带走一个选型层面的事实：监听器个数直接决定这条内存账的厚度，这正是”减少事件绑定”这个标题在本篇语境下的全部含义。</p>
+<h2 id="场景选型表"><a href="#场景选型表" class="headerlink" title="场景选型表"></a>场景选型表</h2><p>把四种策略放回具体场景。推荐栏里 A 表示逐个直接绑，C 表示 jQuery 容器委托，B 表示无库时的原生委托。</p>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>推荐</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>千行列表，整表重渲染</td>
+<td>C；无库则 B</td>
+<td>一次绑定，重建免重绑，IE8 首屏差距最大</td>
+</tr>
+<tr>
+<td>富文本工具条（contenteditable 周边）</td>
+<td>A</td>
+<td>按钮总共十几个；编辑器内核常在中途掐掉冒泡，委托收不到</td>
+</tr>
+<tr>
+<td>大型表单的 change、submit、focus</td>
+<td>A</td>
+<td>旧文结论一句话：这批事件的语义不配合委托，直接绑</td>
+</tr>
+<tr>
+<td>DOM 高频局部重建（补行、删行）</td>
+<td>C，容器选稳定祖先</td>
+<td>重写 innerHTML 不丢监听；绑在会消失的节点上等于没委托</td>
+</tr>
+<tr>
+<td>需要精确到行的 hover</td>
+<td>先 CSS :hover，其次 A</td>
+<td>原生 mouseenter 委托不了，库模拟版每跨边界匹配一次</td>
+</tr>
+<tr>
+<td>组件内部 stopPropagation 风险高</td>
+<td>A，绑到组件根或目标</td>
+<td>上游一掐，外层容器委托整条失效；排查成本远超绑定成本</td>
+</tr>
+</tbody></table>
+<p>两条补充。没引 jQuery 的页面里只有 A、B 两个选项，B 的兼容层要自己写全套，节点不过百就别为难自己。移动端 Zepto 1.1.x 的 <code>$(document).on(type, selector, fn)</code> 与 jQuery 委托同形，上面这张表可以直接搬，结论不变。</p>
+<h2 id="反面结论：什么时候不要委托"><a href="#反面结论：什么时候不要委托" class="headerlink" title="反面结论：什么时候不要委托"></a>反面结论：什么时候不要委托</h2><p>选型表的反面单独拎出来讲，这节才是本文最容易踩空的地方。</p>
+<p>其一，容器挪不近、链很深。每次点击都要从 target 上溯到委托容器，匹配代价与深度成正比。业务组件把一行数据包进七八层包装 div、容器又只能放在更外圈时，分发的账会反超绑定的账——此时要么重排结构把容器拉近，要么退回直接绑。委托省的是监听器个数，不是上溯层数。</p>
+<p>其二，focus、blur 一族。冒泡问题旧文已经讲透，这里只留一句结论：焦点类事件和 change、submit 一样直接绑。IE8 没有捕获可走、Firefox 到 2014 年还不支持 <code>focusin</code>，两条兜底路各断一半，委托方案凑不齐跨浏览器。</p>
+<p>其三，需要 mouseenter 语义的场景。原生层面这对事件不走传播链，委托无从谈起；库的模拟版靠 mouseover 加 relatedTarget 判断，容器内鼠标每跨一次元素边界就触发一次匹配。千行列表上用户按住滚动条来回扫，这份开销是实时支付的。行悬停先用 CSS <code>:hover</code> 解决，JS 是最后手段。</p>
+<p>其四，一个容器混了很多 selector。三个模块各在同一条容器上挂五六个委托，每次点击处理器都要按绑定顺序把候选清单过一遍。委托的收益建立在”种类少”之上，种类一多，先变贵的是分发端。解法是按模块拆容器，让每条委托的归属清晰，而不是继续往上堆。</p>
+<h2 id="与分片渲染、虚拟滚动的分工"><a href="#与分片渲染、虚拟滚动的分工" class="headerlink" title="与分片渲染、虚拟滚动的分工"></a>与分片渲染、虚拟滚动的分工</h2><p>最后摆正位置：委托管的是”绑多少个监听器”，不管”渲染多少个 DOM 节点”。1000 个 li 的绑定从 1000 个降到 1 个之后，这 1000 个节点的创建、布局、绘制成本一分没少——那是分片渲染的账：定时器分批插入、按滚动位置做视口切片再补节点。2014 年还没有成熟的虚拟滚动库，自研前身在《大列表渲染优化思路》里整理过。三类手段的分工排一条线就清楚了：先控节点数量，再控监听器数量，最后控事件分发频率；它们解决的不是同一个问题，只做一个都别宣称列表优化完成。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>给三条可以直接抄进团队规约的结论。第一条，一锤子判据：容器内交互节点超过一百个，或内容会被渲染整段重建，就绑到最近的稳定容器上（有库用 jQuery 的 on，无库用原生双分支委托）；否则直接绑，不为可忽略的绑定收益去付分发的复杂度。第二条，范围限定：change、submit、焦点类事件，以及有掐冒泡习惯的第三方组件内部，一律直接绑；行 hover 先 CSS。委托只适用于 click 一族、容器挪得近、同容器 selector 种类在个位数的场景。第三条，先测再写规约：绑定耗时用手表式打点量首绑与重建，分发耗时用循环合成事件取平均，只认十倍数级的差异，亚毫秒的”提升”不进结论；存量 live 按升级阻塞项排期清掉，移动端 Zepto 的委托签名同形，规约直接复用。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>事件委托减少事件绑定</p><p><a href="https://987763485.github.io/2014/09/09/事件委托减少事件绑定/">https://987763485.github.io/2014/09/09/事件委托减少事件绑定/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2014-09-09</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-17</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/web%E5%89%8D%E7%AB%AF/">web前端</a><a class="link-muted mr-2" rel="tag" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/">性能优化</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2014/09/16/CSS3%E4%BC%AA%E5%85%83%E7%B4%A0%E5%AE%9E%E6%88%98%E6%8A%80%E5%B7%A7/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">CSS3 伪元素实战技巧</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2014/09/04/localStorage%E4%B8%8EsessionStorage%E6%9C%AC%E5%9C%B0%E5%AD%98%E5%82%A8%E5%AE%9E%E6%88%98/"><span class="level-item">localStorage 与 sessionStorage 本地存储实战</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

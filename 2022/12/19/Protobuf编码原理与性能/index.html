@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Protobuf 编码原理与性能 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="Protobuf 是后端服务之间最常见的序列化格式之一，但多数人只停留在“写 .proto、跑 protoc、调 Marshal”这一层。一旦抓包看到 08 ac 02 10 03 这样的字节串，或者面对一个“加个字段会不会把线上打挂”的问题，底层的规则就变得重要了。"><meta property="og:type" content="blog"><meta property="og:title" content="Protobuf 编码原理与性能"><meta property="og:url" content="https://987763485.github.io/2022/12/19/Protobuf%E7%BC%96%E7%A0%81%E5%8E%9F%E7%90%86%E4%B8%8E%E6%80%A7%E8%83%BD/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="Protobuf 是后端服务之间最常见的序列化格式之一，但多数人只停留在“写 .proto、跑 protoc、调 Marshal”这一层。一旦抓包看到 08 ac 02 10 03 这样的字节串，或者面对一个“加个字段会不会把线上打挂”的问题，底层的规则就变得重要了。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2022-12-19T06:28:18.000Z"><meta property="article:modified_time" content="2026-10-19T02:03:41.831Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="golang"><meta property="article:tag" content="微服务"><meta property="article:tag" content="后端开发"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2022/12/19/Protobuf%E7%BC%96%E7%A0%81%E5%8E%9F%E7%90%86%E4%B8%8E%E6%80%A7%E8%83%BD/"},"headline":"Protobuf 编码原理与性能","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2022-12-19T06:28:18.000Z","dateModified":"2026-10-19T02:03:41.831Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"Protobuf 是后端服务之间最常见的序列化格式之一，但多数人只停留在“写 .proto、跑 protoc、调 Marshal”这一层。一旦抓包看到 08 ac 02 10 03 这样的字节串，或者面对一个“加个字段会不会把线上打挂”的问题，底层的规则就变得重要了。"}</script><link rel="canonical" href="https://987763485.github.io/2022/12/19/Protobuf%E7%BC%96%E7%A0%81%E5%8E%9F%E7%90%86%E4%B8%8E%E6%80%A7%E8%83%BD/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-12-19T06:28:18.000Z" title="12/19/2022, 2:28:18 PM">2022-12-19</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></span><span class="level-item">1 小时读完 (大约7961个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Protobuf 编码原理与性能</h1><nav class="series-nav" aria-label="系列文章导航"><div class="series-nav-meta"><i class="fas fa-book-open" aria-hidden="true"></i><span>本文属于《<a class="series-nav-title" href="/series/go-arch/">Go 微服务架构</a>》第 9/35 篇</span></div><div class="series-nav-links"><a class="series-nav-link series-nav-prev" href="/2021/04/24/gRPC%E4%B8%8EProtobuf%E5%AE%9E%E6%88%98/"><i class="fas fa-chevron-left" aria-hidden="true"></i><span>上一篇</span></a><a class="series-nav-link series-nav-index" href="/series/go-arch/">系列目录</a><a class="series-nav-link series-nav-next" href="/2022/08/30/%E5%BE%AE%E6%9C%8D%E5%8A%A1%E6%8E%A5%E5%8F%A3%E5%A5%91%E7%BA%A6%E7%AE%A1%E7%90%86/"><span>下一篇</span><i class="fas fa-chevron-right" aria-hidden="true"></i></a></div></nav><div class="content"><p>Protobuf 是后端服务之间最常见的序列化格式之一，但多数人只停留在“写 <code>.proto</code>、跑 <code>protoc</code>、调 <code>Marshal</code>”这一层。一旦抓包看到 <code>08 ac 02 10 03</code> 这样的字节串，或者面对一个“加个字段会不会把线上打挂”的问题，底层的规则就变得重要了。</p>
+<p>本文只讨论编码本身：一条消息如何变成字节、如何被读回来，这套规则又如何决定了体积、解析开销与向后兼容的边界。gRPC 的调用方式、拦截器与流式传输不在讨论范围内。读完之后，你应该能手工解析一条简单报文，能判断某次字段改动是否会破坏兼容性，也能对“Protobuf 一定比 JSON 快”这类说法给出更有条件的回答。本文以 protobuf 3.21（即 <code>protoc</code> 21.x）为准，语法用 proto3，示例代码用 Go。</p>
+<h2 id="从一条字节串说起"><a href="#从一条字节串说起" class="headerlink" title="从一条字节串说起"></a>从一条字节串说起</h2><p>假设有一个采集服务，每隔几秒把传感器的读数发给聚合服务。线上偶发“数据对不上”的问题，运维从抓包工具里导出一段报文，内容是十几个字节的十六进制：<code>08 ac 02 10 03 1a 02 61 62 ...</code>。它既没有字段名，也没有分隔符，人眼完全读不出含义。</p>
+<p>很多人第一反应是“这是加密过的吧”。并不是。Protobuf 不做加密，也不做压缩，它只是把“字段叫什么”这件事从报文里搬到了 <code>.proto</code> 文件里。通信双方在编译期就约定了字段编号与类型，运行时只需要传编号和值。信息并没有消失，只是被移到了带外，而带外的那份契约恰好是可以放进版本库、可以 review、可以生成代码的。</p>
+<p>这个设计带来两个直接后果，也是理解全文的钥匙。</p>
+<p>第一，报文里没有冗余的元信息。JSON 里每一条 <code>&quot;sensorId&quot;: 300</code> 都要重复一遍字段名，Protobuf 只写一个字节的编号。字段名越长、消息条数越多，省下来的字节就越可观。</p>
+<p>第二，解析依赖 schema。拿到一段字节，如果没有对应的 <code>.proto</code>，你只能知道“字段 1 是一个 varint，值是 300”，无法知道它叫 <code>sensor_id</code>，也无法知道 300 这个数字代表什么。这既是 Protobuf 紧凑的原因，也是它调试不便的原因。后面会看到，这种“强依赖契约”的特性同样塑造了它的兼容性规则。</p>
+<p>要读懂那段字节，只需要掌握三个概念：tag、wire type 和 varint。这三者构成了 Protobuf 编码的全部骨架，剩下的都是组合。</p>
+<h2 id="TLV-与-wire-type"><a href="#TLV-与-wire-type" class="headerlink" title="TLV 与 wire type"></a>TLV 与 wire type</h2><p>Protobuf 的报文是一条条“字段记录”首尾相接，每条记录采用 TLV 结构：先写 tag，需要时写长度，最后写值。没有全局的消息头，没有字段总数，也没有结束标记，解析器一直读到字节流末尾为止。</p>
+<p>tag 本身是一个 varint，它的低 3 位是 wire type，高位是字段编号。用公式表达就是 <code>tag = (field_number &lt;&lt; 3) | wire_type</code>。之所以把两者打包在一起，是为了让解析器在读到一个 tag 的瞬间就能同时知道“这是第几号字段”和“这个值有多长、该怎么读”。</p>
+<p>wire type 只有五种有效取值，它们决定了值的物理形态。</p>
+<table>
+<thead>
+<tr>
+<th>wire type</th>
+<th>名称</th>
+<th>含义</th>
+<th>对应类型</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0</td>
+<td>VARINT</td>
+<td>变长整数，读到最高位为 0 为止</td>
+<td>int32、int64、uint32、uint64、sint32、sint64、bool、enum</td>
+</tr>
+<tr>
+<td>1</td>
+<td>I64</td>
+<td>固定 8 字节，小端序</td>
+<td>fixed64、sfixed64、double</td>
+</tr>
+<tr>
+<td>2</td>
+<td>LEN</td>
+<td>先读长度（varint），再读该长度的内容</td>
+<td>string、bytes、嵌套消息、packed repeated</td>
+</tr>
+<tr>
+<td>5</td>
+<td>I32</td>
+<td>固定 4 字节，小端序</td>
+<td>fixed32、sfixed32、float</td>
+</tr>
+<tr>
+<td>3 &#x2F; 4</td>
+<td>SGROUP &#x2F; EGROUP</td>
+<td>分组开始与结束，已废弃</td>
+<td>proto2 的 group</td>
+</tr>
+</tbody></table>
+<p>这张表解释了一件容易被忽略的事：字段类型在报文里被“降维”成了三种物理形态加两种定长。int32 与 bool 在字节层面没有区别，都是 varint；float 与 fixed32 也没有区别，都是 4 字节。真正区分它们的是 <code>.proto</code> 里声明的类型，而不是报文本身。</p>
+<p>这种设计给解析器留了一条捷径：遇到不认识的字段号，可以根据 wire type 直接跳过。wire type 0 就一直读到高位为 0 的字节；1 跳过 8 字节；5 跳过 4 字节；2 先读一个 varint 长度再跳过对应字节数。整个过程中不需要理解值的内容，甚至不需要知道这个字段存在。这正是“给旧版本程序发新版本消息”能够工作的物理基础。</p>
+<h2 id="varint-与-zigzag"><a href="#varint-与-zigzag" class="headerlink" title="varint 与 zigzag"></a>varint 与 zigzag</h2><p>varint 是 Protobuf 里出现频率最高的编码。规则只有两条：每个字节用低 7 位承载数据，最高位表示“后面还有没有字节”；多个字节时低位组在前，也就是按小端序拼接。解码时把每字节的低 7 位取出来，依次左移 0 位、7 位、14 位累加即可。</p>
+<p>一个字节的 7 位能表示 0 到 127，两个字节能表示 0 到 16383。所以 300 需要两个字节：300 的二进制是 <code>1 0010 1100</code>，切成 7 位一组从低位开始是 <code>0101100</code> 和 <code>10</code>。前者补上续位标记得到 <code>1010 1100</code>，即 <code>0xAC</code>；后者不需要续位，就是 <code>0x02</code>。于是 300 编码为 <code>ac 02</code>。反过来说，看到 <code>ac 02</code> 时先取 <code>0x2C</code>，再取 <code>0x02</code> 左移 7 位加进去，得到 300。</p>
+<p>这种编码对“小整数多”的场景非常友好：取值在 0 到 127 之间的字段只占一个字节，比固定 4 字节省了四分之三。但它对负数极其不友好。int32 的负数在编码前会被符号扩展成 64 位，最高位全为 1，于是每一个负数都固定占 10 个字节。<code>-2</code> 会被写成 <code>fe ff ff ff ff ff ff ff ff 01</code>，整整 10 个字节，仅仅为了表示一个负号。</p>
+<p>zigzag 就是为解决这个问题而生的。它把有符号整数做一个双射变换，让绝对值小的数映射到绝对值小的无符号数：正数变成原来的两倍，负数变成绝对值的两倍减一。用位运算写就是 <code>(n &lt;&lt; 1) ^ (n &gt;&gt; 31)</code>（sint32）或 <code>(n &lt;&lt; 1) ^ (n &gt;&gt; 63)</code>（sint64）。<code>-2</code> 经过变换得到 3，编码成单字节 <code>03</code>；<code>1</code> 得到 2，编码成 <code>02</code>；<code>-1</code> 得到 1，编码成 <code>01</code>。</p>
+<table>
+<thead>
+<tr>
+<th>原值</th>
+<th>int32 编码</th>
+<th>字节数</th>
+<th>sint32 编码</th>
+<th>字节数</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0</td>
+<td><code>00</code></td>
+<td>1</td>
+<td><code>00</code></td>
+<td>1</td>
+</tr>
+<tr>
+<td>1</td>
+<td><code>01</code></td>
+<td>1</td>
+<td><code>02</code></td>
+<td>1</td>
+</tr>
+<tr>
+<td>-1</td>
+<td><code>ff ff ff ff ff ff ff ff ff 01</code></td>
+<td>10</td>
+<td><code>01</code></td>
+<td>1</td>
+</tr>
+<tr>
+<td>300</td>
+<td><code>ac 02</code></td>
+<td>2</td>
+<td><code>d8 04</code></td>
+<td>2</td>
+</tr>
+<tr>
+<td>-300</td>
+<td>10 字节</td>
+<td>10</td>
+<td><code>d7 04</code></td>
+<td>2</td>
+</tr>
+</tbody></table>
+<p>结论很直接：字段可能出现负数时，用 sint32 &#x2F; sint64 而不是 int32 &#x2F; int64，时间差、坐标偏移、库存增减量是最典型的受益者。语义上永远非负的计数与长度，用 int32 或 uint32 就够了，不必再套一层 zigzag。</p>
+<p>还有一点需要留意：varint 的解析对畸形输入是敏感的。规范把 varint 限制在 10 个字节以内，超过就应当报错；而 int32 字段收到一个超出 32 位范围的值时，会被截断成低 32 位，不会报错。这类“静默截断”在跨语言互通时偶尔会造成难以定位的偏差，写入方应当保证取值范围与声明类型一致。</p>
+<h2 id="长度前缀与-packed-repeated"><a href="#长度前缀与-packed-repeated" class="headerlink" title="长度前缀与 packed repeated"></a>长度前缀与 packed repeated</h2><p>wire type 2 是结构最丰富的一类。它的格式是“tag + 长度 + 内容”，长度本身也是一个 varint，表示后面内容的字节数。字符串、字节数组、嵌套消息都走这条路：解析器先拿到长度的精确值，就能一次性分配缓冲区、一次性拷贝，不需要像解析 JSON 字符串那样逐字符扫描找结束引号。</p>
+<p>这里的长度是内容字节数，不是字符数。UTF-8 下一个汉字占 3 字节，一个 4 字的标签长度前缀写的是 12 而不是 4。proto3 还要求 string 必须是合法 UTF-8，遇到非法字节序列时主流实现直接报错，而 bytes 不做任何校验。把二进制数据塞进 string 字段是常见错误，它在 Go 里可能侥幸跑通，到了严格校验的语言就会失败。</p>
+<p>repeated 字段的编码有两种形态。非 packed 形态下，每个元素都带一个完整的 tag，语义上等价于“同名字段重复出现多次”，解析器把它们依次追加进列表。packed 形态则把所有元素的值首尾相接，外面套一个 wire type 2 的长度前缀，整个数组只有一个 tag。</p>
+<figure class="highlight proto"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">message </span><span class="title class_">Sample</span> &#123;</span><br><span class="line">  <span class="keyword">repeated</span> <span class="type">int32</span> values = <span class="number">1</span>;   <span class="comment">// proto3 默认 packed</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>当 <code>values = [1, 300, 5]</code> 时，packed 编码是 <code>0a 04 01 ac 02 05</code>，一个 tag 加一个长度，后面 4 个字节是三个 varint 拼在一起。非 packed 编码则是 <code>08 01 08 ac 02 08 05</code>，多出了两个 tag 和一个长度。元素越多，差距越大，因为 packed 把“每个元素一个 tag”摊薄成了“整个数组一个 tag”。</p>
+<p>proto3 规定标量数值类型的 repeated 字段默认 packed，而 proto2 默认不 packed，需要显式写 <code>[packed = true]</code>。但无论声明如何，解析器都必须同时接受两种形态，这是规范的硬性要求，原因很现实：老版本 proto2 代码可能还在发非 packed 的数据。这条规则也提醒我们，判断兼容性时不能只看自己这一端的声明。</p>
+<p>packed 只适用于数值标量，字符串、bytes、嵌套消息本身就是长度前缀结构，规范不允许再套一层。所以看到 wire type 2 时不要急着判定它是 packed 数组，它同样可能是嵌套消息或一段文本，最终要靠 <code>.proto</code> 里的声明来区分。</p>
+<h2 id="手写一条消息：十六进制逐字节解析"><a href="#手写一条消息：十六进制逐字节解析" class="headerlink" title="手写一条消息：十六进制逐字节解析"></a>手写一条消息：十六进制逐字节解析</h2><p>理论说得再多，不如亲手解一条。下面这条消息刻意混合了几种典型类型，便于把前面的规则串起来。</p>
+<figure class="highlight proto"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">syntax = <span class="string">&quot;proto3&quot;</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">message </span><span class="title class_">Reading</span> &#123;</span><br><span class="line">  <span class="type">int32</span>  sensor_id = <span class="number">1</span>;    <span class="comment">// 小整数，用 varint 占优</span></span><br><span class="line">  <span class="type">sint32</span> delta     = <span class="number">2</span>;    <span class="comment">// 可能为负，用 zigzag</span></span><br><span class="line">  <span class="type">string</span> label     = <span class="number">3</span>;    <span class="comment">// 长度前缀</span></span><br><span class="line">  <span class="keyword">repeated</span> <span class="type">int32</span> samples = <span class="number">4</span>;  <span class="comment">// packed</span></span><br><span class="line">  <span class="type">bool</span>   ok        = <span class="number">5</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>赋值：<code>sensor_id = 300</code>，<code>delta = -2</code>，<code>label = &quot;ab&quot;</code>，<code>samples = [1, 300, 5]</code>，<code>ok = true</code>。序列化后得到 17 个字节，用 <code>xxd</code> 之类的工具看是这样：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">00000000  08 ac 02 10 03 1a 02 61  62 22 04 01 ac 02 05 28  |.......ab&quot;.....(  |</span><br><span class="line">00000010  01                                                |.                |</span><br></pre></td></tr></table></figure>
+
+<p>现在逐段拆开。第一个字节 <code>08</code> 是 tag：低 3 位 <code>000</code> 说明 wire type 是 0（varint），高位 <code>00001</code> 说明字段号是 1，正是 <code>sensor_id</code>。紧接着的 <code>ac 02</code> 按 varint 解码得到 300。三个字节，没有字段名，没有冒号，没有任何分隔符。</p>
+<p>第二个 tag 是 <code>10</code>，低 3 位为 0，字段号 2，即 <code>delta</code>。值 <code>03</code> 是 zigzag 编码，反变换 <code>(3 &gt;&gt; 1) ^ -(3 &amp; 1)</code> 得到 -2。如果当初把 <code>delta</code> 声明成 int32，这里会变成 10 个字节，整条消息立刻胖了一圈。</p>
+<p>第三个 tag 是 <code>1a</code>，二进制 <code>0001 1010</code>，低 3 位 <code>010</code> 即 wire type 2，字段号 3。后面 <code>02</code> 是长度，再后面 <code>61 62</code> 是 ASCII 的 <code>a</code>、<code>b</code>。三个部分构成了一个完整的长度前缀记录。</p>
+<p>第四个 tag 是 <code>22</code>，低 3 位 <code>010</code>，wire type 2，字段号 4。长度 <code>04</code> 说明后面 4 个字节都是数组内容：<code>01</code> 解出 1，<code>ac 02</code> 解出 300，<code>05</code> 解出 5。注意这里只有一个 tag，如果换成非 packed，同样的三个数要多花 3 个字节。</p>
+<p>最后 <code>28 01</code>：tag <code>28</code> 的低 3 位为 0，字段号 5，值 <code>01</code> 表示 true。bool 在字节层面就是一个取值 0 或 1 的 varint，没有任何特殊性。</p>
+<p>同样的内容写成 JSON 是 <code>{&quot;sensorId&quot;:300,&quot;delta&quot;:-2,&quot;label&quot;:&quot;ab&quot;,&quot;samples&quot;:[1,300,5],&quot;ok&quot;:true}</code>，六十多个字节。这个对比只是为了说明结构差异，并不是 Benchmark：换成一段长文本，两者的差距会迅速收窄，这一点在性能一节还会展开。</p>
+<p>调试时不必每次都手算。<code>protoc --decode_raw</code> 可以在没有 <code>.proto</code> 的情况下把字节流打印成字段号加推断值的形式；如果有 <code>.proto</code>，用 <code>protoc --decode=Reading reading.proto</code> 就能得到可读的文本格式。这两个命令在排查线上报文时非常实用。</p>
+<h2 id="字段号与兼容性演进"><a href="#字段号与兼容性演进" class="headerlink" title="字段号与兼容性演进"></a>字段号与兼容性演进</h2><p>字段号是 Protobuf 兼容性体系的基石，而它的取值区间被设计得很有层次。字段号 1 到 15 编码后的 tag 只占一个字节，因为 <code>(15 &lt;&lt; 3) | 7 = 127</code>，正好塞满 7 位。字段号 16 到 2047 的 tag 需要两个字节。再往上直到 2 的 29 次方减一（536870911）是三到五个字节。区间 19000 到 19999 被保留给 protobuf 实现自身，写进 <code>.proto</code> 会直接编译报错。</p>
+<p>于是就有一条常识：把最常出现、体积最敏感的字段放在 1 到 15 之间，偶尔出现的往后放。这不是微优化，在每秒几十万条消息的链路上，每个字段省下的一字节会累积成带宽。</p>
+<p>真正的风险来自字段号的“回收”。设想第一版有 <code>string phone = 3;</code>，后来业务下线了这个字段，有人把声明删掉，半年后新同事为了加一个 <code>int32 level = 3;</code> 而复用了这个编号。此时线上还残留着老版本写入的数据、消息队列里还有积压的旧消息、某些边缘节点还没升级。新代码读到这些字节时，看到 tag 是字段 3 且 wire type 是 2，会认为这是一段合法的长度前缀数据，于是把一个电话号码当成 <code>level</code> 解析，得到一个荒唐的数值，而且不会报错。这类问题极难定位，因为每一端都“正常工作”。</p>
+<p>正确的做法是删字段时保留占位：</p>
+<figure class="highlight proto"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">message </span><span class="title class_">User</span> &#123;</span><br><span class="line">  reserved <span class="number">3</span>, <span class="number">8</span> to <span class="number">11</span>;        <span class="comment">// 这些字段号永久废弃</span></span><br><span class="line">  reserved <span class="string">&quot;phone&quot;</span>, <span class="string">&quot;old_tag&quot;</span>; <span class="comment">// 字段名也一并保留</span></span><br><span class="line">  <span class="type">string</span> name = <span class="number">1</span>;</span><br><span class="line">  <span class="type">int32</span>  level = <span class="number">12</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>reserved</code> 会让任何复用这些编号或名字的改动在编译期失败，把线上事故提前成一次编译错误。保留字段名同样重要，因为 proto3 的 JSON 映射依赖字段名，名字被复用到语义完全不同的字段上，会让日志、配置、外部对接方产生误读。实践中还有一条经验：字段号一旦分配出去，就当作永久占用，宁可让编号出现空洞。</p>
+<p>类型变更则需要看 wire type 是否一致。同一 wire type 内的替换在字节层面是兼容的，但可能有精度损失：int32、int64、uint32、uint64、bool 之间可以互转，因为都是 varint，只是取值范围不同；sint32 与 sint64 之间可以互转，但它们与 int32、int64 之间不兼容，因为 zigzag 变换改变了数值本身。fixed32 与 sfixed32 可以互转，fixed64、sfixed64 与 double 可以互转，都是 4 字节或 8 字节的定长。string 与 bytes 在字节层面兼容，前提是 bytes 的内容确实是合法 UTF-8。嵌套消息与 bytes 也兼容，这正是 <code>Any</code> 能够工作的原因。</p>
+<p>反向的兼容也需要说清楚。给消息新增字段是最安全的操作：旧代码读到不认识的 tag，按 wire type 跳过，其余部分照常解析。proto3 从 3.5 起会保留这些未知字段，重新序列化时原样带出去，这对代理、网关这类“只转发不消费”的服务很重要。副作用是消息被反复读写后体积不会缩小，调试时还会看到一堆自己代码里不存在的字段。</p>
+<p>枚举的演进规则常被忽略。proto3 要求第一个枚举值必须是 0，且 0 值不参与序列化，所以枚举的默认值天然是“未指定”。当旧代码收到一个新枚举值时，proto3 会把它当作普通数字保留下来，不会丢弃；proto2 则会把它放进未知字段，读取时得到的是默认值。这两种行为都意味着业务代码必须对未知枚举值做兜底，不能假设 <code>switch</code> 覆盖了所有分支。</p>
+<h2 id="proto2-与-proto3-的默认值差异"><a href="#proto2-与-proto3-的默认值差异" class="headerlink" title="proto2 与 proto3 的默认值差异"></a>proto2 与 proto3 的默认值差异</h2><p>这一节值得单独拿出来讲，因为它是线上“字段丢了”问题最常见的来源。</p>
+<p>proto2 的每个 singular 字段都有显式的存在性标记。生成代码里会有 <code>has_phone()</code> 这样的方法，能区分“从没设置过”和“显式设置成了空字符串”。如果显式把一个字段设成默认值，序列化时它照样会被写进报文，因为存在性标记为真。</p>
+<p>proto3 在 3.0 到 3.14 这段时间里走了另一条路：标量字段只有隐式存在性（implicit presence）。序列化时，等于默认值的字段直接不写；反序列化时，没出现的字段就填默认值。两条路径最终得到同一个对象，于是“未设置”和“设置为零值”在语义上彻底不可区分。字符串的空串、数字的 0、bool 的 false、枚举的 0 值，全都会在报文里消失。</p>
+<p>这个设计在多数场景下没有问题，甚至是体积优势的来源之一：一个刚创建、大部分字段为空的对象，序列化出来可能只有几个字节。但它有三个后果。</p>
+<p>第一，无法表达“把字段清空”。做一个 PATCH 接口，客户端想把昵称改成空字符串，序列化后这个字段根本不出现，服务端无法区分“不要改昵称”和“把昵称改成空”。第二，用零值表达业务含义会失效，比如 <code>int32 status = 3</code> 里 0 代表“正常”，一个正常状态的对象里根本读不到这个字段，日志里看就是缺失。第三，基于报文做审计或对账时，统计“多少条消息设置了某字段”会系统性偏低。</p>
+<p>社区为此演化出几种补丁方案。最经典的是 wrapper 类型，<code>google.protobuf.Int32Value</code>、<code>StringValue</code> 包一层消息，存在性就变成“消息是否为空”，可以判断。另一种是 <code>google.protobuf.FieldMask</code>，让客户端显式列出要更新的字段路径，语义清晰但对接成本高。用额外 bool 字段做标记可读性最差，不推荐。</p>
+<p>真正的解决方案在 2021 年落地：proto3 重新引入了 <code>optional</code>。protobuf 3.15 起，在 proto3 里写 <code>optional int32 level = 3;</code>，该字段就恢复了显式存在性，生成代码里有对应的 <code>HasLevel()</code> 与指针或可选类型。实现上它被编译成一个只含单个成员的合成 oneof（synthetic oneof），因此在 wire 层面与普通字段完全一致，老代码读它不会有任何问题，只是看不到存在性。</p>
+<figure class="highlight proto"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">syntax = <span class="string">&quot;proto3&quot;</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">message </span><span class="title class_">Profile</span> &#123;</span><br><span class="line">  <span class="keyword">optional</span> <span class="type">string</span> nickname = <span class="number">1</span>;  <span class="comment">// 需要区分&quot;未设置&quot;时必须加 optional</span></span><br><span class="line">  <span class="type">int32</span>  login_count = <span class="number">2</span>;        <span class="comment">// 纯计数，零值即未登录，无需 optional</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>使用它有两个约束：需要 <code>protoc</code> 3.15 及以上且运行时代码库版本匹配，老工具链会直接报错；它只解决“有没有”，不解决“该不该更新”，PATCH 语义仍建议配合 FieldMask 或明确的更新掩码。</p>
+<p>至于 <code>required</code>，proto3 直接取消了它，proto2 里也早就不推荐使用。原因很直接：required 把校验前移到了序列化环节，一个字段缺失会让整条消息无法解析，而字段一旦 required 就永远不能删除，等于把自己锁死在契约里。</p>
+<h2 id="体积与解析开销"><a href="#体积与解析开销" class="headerlink" title="体积与解析开销"></a>体积与解析开销</h2><p>把前面的规则汇总一下，Protobuf 的体积优势来自四处：字段名不进入报文，只留一到几个字节的 tag；小整数用 varint，一个字节就能表达 0 到 127；数值数组用 packed，整个列表共享一个 tag；没有冒号、引号、逗号、缩进，也没有浮点数的十进制文本。</p>
+<p>但这些优势都不是无条件的。以长文本为主的消息里，一段 2 KB 的描写会让字段名省下的几十个字节显得微不足道，两者的主体都是那段原文。取值分布很宽的整数也不划算：varint 的长度取决于数值大小，随机生成的 64 位 ID 有一半概率落到 10 字节区间，反而比 fixed64 固定 8 字节更费，这类字段应当用 fixed64 或 string 承载。</p>
+<p>字段稀疏的小消息同样差距有限，Protobuf 每个出现的字段至少贡献一个 tag 字节。而经过压缩的链路最容易被忽略：JSON 里重复出现的字段名恰好是通用压缩算法最擅长处理的内容，gzip 或 zstd 之后两者会明显靠拢。所以“Protobuf 比 JSON 小”在“传输前已压缩”的场景下要打个折扣。本文不给具体倍数，任何倍数都强烈依赖数据形态，可靠的做法是拿自己的样本序列化一遍，比较长度与耗时。</p>
+<p>解析速度的逻辑则不太一样。Protobuf 的解析器不需要做词法分析，不需要在字节流里找引号与转义，数字直接从二进制读出来，不需要 <code>strconv</code> 那样的字符串到数值的转换。更关键的是，wire type 让解析器可以跳过不关心的内容：一个只读取 <code>sensor_id</code> 的消费者，可以对其余字段一概不看，直接按长度跳过。JSON 做不到这一点，它必须把整段文本完整地切分成 token 才能保证结构正确。</p>
+<p>不过“Protobuf 解析快”同样有条件，条件不满足时它也会慢。</p>
+<p>首先是必须有 schema，并且最好是代码生成的解析器。用反射遍历字段、按名字查表、动态构建结构的实现，会把省下来的时间又吐回去。Go 的 <code>google.golang.org/protobuf</code> 在 v1.20 之后重写了运行时，代码生成的消息类型走的是生成好的快速路径，反射只作为兜底。</p>
+<p>其次是内存分配。反序列化要为每个 string、bytes 和嵌套消息分配新内存，这部分开销与格式无关，只与数据量有关。热路径上应当复用消息对象，用 <code>proto.Reset</code> 清空后重新填充，或借助 <code>Merge</code> 选项把新数据合并进已有实例；缓冲区则可以用 <code>sync.Pool</code> 缓存，避免每条消息都触发一轮 GC。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> decoder <span class="keyword">struct</span> &#123;</span><br><span class="line">	msg Reading <span class="comment">// 跟随连接或协程复用，避免每条消息都重新分配</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(d *decoder)</span></span> decode(data []<span class="type">byte</span>) <span class="type">error</span> &#123;</span><br><span class="line">	proto.Reset(&amp;d.msg)</span><br><span class="line">	<span class="keyword">return</span> proto.Unmarshal(data, &amp;d.msg)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>第三是字符串转换。Go 里 <code>[]byte</code> 转 <code>string</code> 默认会拷贝，一条消息里字符串字段越多，拷贝成本越高。这是语言层面的成本，不是编码格式的问题，但在做容量规划时经常被算到 Protobuf 头上。</p>
+<p>第四是未知字段的保留。前面提到 proto3 会保存不认识的字段，这份保存是有代价的：需要额外的结构和内存。如果一个服务只是转发，且确定上游不会再读这些字段，可以用 <code>proto.UnmarshalOptions{DiscardUnknown: true}</code> 关掉它，换来更小的内存占用。</p>
+<p>把这些放在一起看，选型判断就清楚了。内部 RPC、移动端弱网、大流量消息主题，Protobuf 优势明显：字段多、小整数多、结构稳定、双方都能接受重新生成代码。对外开放的 API、需要人直接读写的配置、浏览器请求，JSON 更合适：无需 schema、调试直观、工具链现成。真正不该做的是把两者当成信仰之争，为一个每天几千次调用的内部接口引入代码生成。</p>
+<h2 id="使用注意：嵌套、map、oneof、Any"><a href="#使用注意：嵌套、map、oneof、Any" class="headerlink" title="使用注意：嵌套、map、oneof、Any"></a>使用注意：嵌套、map、oneof、Any</h2><p>这几种结构在语法上很简单，但它们的编码行为各有各的坑。</p>
+<p>嵌套消息就是 wire type 2 的一种：内层先独立序列化，再作为外层字段的内容写入，外层长度前缀等于内层字节数。这意味着编码必须从内向外进行，任何一层内容变化都会让外层长度失效，需要逐层回填。这也是 Protobuf 无法“边算边拼”的原因：不知道内层多长，就写不出外层长度。层数越深，回填与拷贝越多，实践中建议控制在两三层以内。</p>
+<p>map 在编码上没有特殊类型，它被展开成 repeated 的 entry 消息，key 是字段 1、value 是字段 2，entry 自己再套一层长度前缀。由此有三个约束：遍历与序列化顺序都不保证，Go 的实现甚至刻意随机化，所以不能用序列化结果做签名或哈希；同一个 key 出现多次时后者覆盖前者；key 只能是整数或字符串。</p>
+<p>oneof 表示“一组字段中最多只有一个生效”，设置新成员会清空旧成员，序列化时只写当前那个。它在 wire 层面与普通字段完全一样，成员各自保留字段号，所以把字段移进或移出 oneof 不会解析失败。但语义会变：老代码把成员当普通字段看，如果新代码先后设置了两个成员，老代码会看到两个字段都存在，行为取决于它自己的处理顺序。另外 oneof 成员不能是 repeated 或 map。</p>
+<p>Any 承载“类型在运行时才确定”的消息，编码上是两个字段：<code>type_url</code> 存完整类型名，<code>value</code> 存序列化后的字节。代价是接收方必须持有对应类型并注册到解析器，否则只能拿到一段不透明的 bytes；<code>type_url</code> 里的类型名一旦变化，解析就会失败。它适合插件、事件总线这类确实需要开放类型的场景，不适合日常建模。</p>
+<p>最后补一个容易被忽视的组合问题：如果消息里要先压缩再传输，顺序必须是先序列化、再压缩，接收方先解压、再反序列化。反过来把压缩后的字节塞进 bytes 字段，虽然也能工作，但会让长度前缀失去意义，也让抓包工具彻底无法解析。</p>
+<h2 id="编码之外：gRPC-只是传输"><a href="#编码之外：gRPC-只是传输" class="headerlink" title="编码之外：gRPC 只是传输"></a>编码之外：gRPC 只是传输</h2><p>最后需要把两件事分开：Protobuf 是编码格式，gRPC 是传输协议。二者经常一起出现，边界却很清楚。</p>
+<p>gRPC 在 HTTP&#x2F;2 之上定义了一种消息帧：1 个字节的压缩标志，4 个字节的大端长度，然后是消息体。消息体默认是 Protobuf 序列化后的字节，但帧格式本身并不关心里面是什么。方法名、超时、鉴权令牌、链路标识都放在 HTTP&#x2F;2 的 header 里，属于 metadata，与 Protobuf 编码无关。响应状态码与错误详情走 trailer，也不在消息体里。</p>
+<p>这种解耦带来两个影响。其一，同一个 <code>.proto</code> 可以走 gRPC，也可以塞进 Kafka 消息体、写进对象存储、作为缓存值。序列化与传输是两套独立的决策，换了传输方式，编码规则一条都不用改。其二，gRPC 的 codec 可替换，理论上能用 JSON 承载同样的服务定义，只是生态里几乎没人这么做。</p>
+<p>更重要的是性能归因。一条 RPC 变慢时，原因至少有四层：序列化本身、网络往返与队头阻塞、服务端业务处理、框架层的拦截器与元数据开销。Protobuf 只负责第一层，而且往往是最便宜的一层。真正拖慢链路的是多次序列化、深拷贝、字段膨胀，以及把大消息塞进同步调用。排查时先确认消息大小与序列化次数，再谈换格式。</p>
+<p>至于 gRPC 的服务定义、四种调用方式、拦截器与流控，那是另一篇文章的主题，本文不再展开。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>Protobuf 的编码规则其实只有三条：tag 把字段号与 wire type 打包成 varint，varint 让常见的小整数只占一字节，长度前缀让解析器能够精确跳过不认识的内容。剩下的 zigzag、packed、未知字段保留，都是这三条规则的推论。</p>
+<p>理解这套规则的收益有三个。排查问题时，你能从十六进制里读出字段号和值。设计接口时，你会把热字段放在 1 到 15、删字段时写 <code>reserved</code>、需要区分“未设置”时加 <code>optional</code>。做性能判断时，你会先问数据形态，而不是笼统地说“二进制比文本快”。</p>
+<p>如果你只记住一句话，那就是：Protobuf 的紧凑与兼容，都是用“强依赖 schema”换来的。契约维护得好，它是一套非常划算的交换；契约被随意改动，它出的问题会比 JSON 隐蔽得多。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://developers.google.com/protocol-buffers/docs/encoding">Protocol Buffers Encoding</a></li>
+<li><a href="https://developers.google.com/protocol-buffers/docs/proto3">Language Guide (proto3)</a></li>
+<li><a href="https://developers.google.com/protocol-buffers/docs/proto">Language Guide (proto2)</a></li>
+<li><a href="https://developers.google.com/protocol-buffers/docs/proto3#json">Proto3 JSON Mapping</a></li>
+<li><a href="https://developers.google.com/protocol-buffers/docs/style">Protobuf Style Guide</a></li>
+<li><a href="https://github.com/protocolbuffers/protobuf/releases">protobuf releases</a></li>
+<li><a href="https://pkg.go.dev/google.golang.org/protobuf/proto">Go package google.golang.org&#x2F;protobuf&#x2F;proto</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Protobuf 编码原理与性能</p><p><a href="https://987763485.github.io/2022/12/19/Protobuf编码原理与性能/">https://987763485.github.io/2022/12/19/Protobuf编码原理与性能/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2022-12-19</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-19</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/golang/">golang</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/">微服务</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2022/12/24/LoRA%E4%BD%8E%E7%A7%A9%E9%80%82%E9%85%8D%E5%BE%AE%E8%B0%83/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">LoRA 低秩适配微调</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2022/12/12/%E7%AD%89%E4%BF%9D%E6%B5%8B%E8%AF%84%E9%A1%B9%E8%AF%A6%E8%A7%A3%E5%AE%89%E5%85%A8%E9%80%9A%E4%BF%A1%E7%BD%91%E7%BB%9C/"><span class="level-item">等保测评项详解：安全通信网络</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

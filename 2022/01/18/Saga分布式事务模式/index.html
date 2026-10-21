@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Saga 分布式事务模式 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="当一个下单请求要跨越订单、库存、账户、优惠券四个服务时，本地事务的 ACID 承诺瞬间失效，剩下的只有一条条无法回滚的远程调用。Saga 是应对这类问题最务实的一条路线：把长事务拆成一串本地事务，每一步都配一个语义相反的补偿动作，失败时按反向顺序退回去。本文从分布式事务的几条主流路线讲起，重点拆解 Saga 的两种编排形态、补偿设计的细节、隔离性缺失带来的中间状态问题，以及工程落地时那些容易被忽略"><meta property="og:type" content="blog"><meta property="og:title" content="Saga 分布式事务模式"><meta property="og:url" content="https://987763485.github.io/2022/01/18/Saga%E5%88%86%E5%B8%83%E5%BC%8F%E4%BA%8B%E5%8A%A1%E6%A8%A1%E5%BC%8F/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="当一个下单请求要跨越订单、库存、账户、优惠券四个服务时，本地事务的 ACID 承诺瞬间失效，剩下的只有一条条无法回滚的远程调用。Saga 是应对这类问题最务实的一条路线：把长事务拆成一串本地事务，每一步都配一个语义相反的补偿动作，失败时按反向顺序退回去。本文从分布式事务的几条主流路线讲起，重点拆解 Saga 的两种编排形态、补偿设计的细节、隔离性缺失带来的中间状态问题，以及工程落地时那些容易被忽略"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2022-01-18T10:20:38.000Z"><meta property="article:modified_time" content="2026-10-18T16:16:09.353Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="golang"><meta property="article:tag" content="微服务"><meta property="article:tag" content="后端开发"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2022/01/18/Saga%E5%88%86%E5%B8%83%E5%BC%8F%E4%BA%8B%E5%8A%A1%E6%A8%A1%E5%BC%8F/"},"headline":"Saga 分布式事务模式","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2022-01-18T10:20:38.000Z","dateModified":"2026-10-18T16:16:09.353Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"当一个下单请求要跨越订单、库存、账户、优惠券四个服务时，本地事务的 ACID 承诺瞬间失效，剩下的只有一条条无法回滚的远程调用。Saga 是应对这类问题最务实的一条路线：把长事务拆成一串本地事务，每一步都配一个语义相反的补偿动作，失败时按反向顺序退回去。本文从分布式事务的几条主流路线讲起，重点拆解 Saga 的两种编排形态、补偿设计的细节、隔离性缺失带来的中间状态问题，以及工程落地时那些容易被忽略"}</script><link rel="canonical" href="https://987763485.github.io/2022/01/18/Saga%E5%88%86%E5%B8%83%E5%BC%8F%E4%BA%8B%E5%8A%A1%E6%A8%A1%E5%BC%8F/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-01-18T10:20:38.000Z" title="1/18/2022, 6:20:38 PM">2022-01-18</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></span><span class="level-item">1 小时读完 (大约7835个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Saga 分布式事务模式</h1><nav class="series-nav" aria-label="系列文章导航"><div class="series-nav-meta"><i class="fas fa-book-open" aria-hidden="true"></i><span>本文属于《<a class="series-nav-title" href="/series/go-arch/">Go 微服务架构</a>》第 26/35 篇</span></div><div class="series-nav-links"><a class="series-nav-link series-nav-prev" href="/2021/11/14/%E6%9C%8D%E5%8A%A1%E5%AE%B9%E7%81%BE%E4%B8%8E%E5%A4%9A%E6%B4%BB%E6%9E%B6%E6%9E%84/"><i class="fas fa-chevron-left" aria-hidden="true"></i><span>上一篇</span></a><a class="series-nav-link series-nav-index" href="/series/go-arch/">系列目录</a><a class="series-nav-link series-nav-next" href="/2022/05/05/%E5%88%86%E5%B8%83%E5%BC%8F%E4%BA%8B%E5%8A%A12PC3PC%E4%B8%8ETCC/"><span>下一篇</span><i class="fas fa-chevron-right" aria-hidden="true"></i></a></div></nav><div class="content"><p>当一个下单请求要跨越订单、库存、账户、优惠券四个服务时，本地事务的 ACID 承诺瞬间失效，剩下的只有一条条无法回滚的远程调用。Saga 是应对这类问题最务实的一条路线：把长事务拆成一串本地事务，每一步都配一个语义相反的补偿动作，失败时按反向顺序退回去。本文从分布式事务的几条主流路线讲起，重点拆解 Saga 的两种编排形态、补偿设计的细节、隔离性缺失带来的中间状态问题，以及工程落地时那些容易被忽略的坑。</p>
+<p>本文面向已经写过若干微服务、被跨服务数据一致性折磨过的后端开发者，读完之后，你应该能判断一个业务该不该用 Saga、该选编排式还是协同式，以及如何把补偿、状态机、超时重试和监控这几件事落到实处。</p>
+<h2 id="分布式事务的几条路线"><a href="#分布式事务的几条路线" class="headerlink" title="分布式事务的几条路线"></a>分布式事务的几条路线</h2><p>在单机数据库里，我们习惯了 <code>BEGIN</code> 到 <code>COMMIT</code> 之间那段“要么全成、要么全败”的确定性。一旦参与方分散到多个进程、多个数据库，这份确定性就必须靠协议或者靠业务代码重新构建。业界摸索出的路线大致有五条，理解它们的取舍，才能理解 Saga 为什么存在。</p>
+<p><strong>两阶段提交（2PC）</strong> 是最经典的一条。协调者先向所有参与者发送 prepare 请求，等全部回复 yes 之后再发 commit。它提供强一致，但代价是同步阻塞：prepare 之后资源被锁住，协调者宕机时参与者只能干等。三阶段提交（3PC）在 prepare 和 commit 之间加了一个 pre-commit 阶段，并引入超时，缓解了阻塞，却仍然无法彻底解决网络分区下的不一致，实际生产中用得很少。</p>
+<p><strong>TCC（Try-Confirm-Cancel）</strong> 把锁的粒度交给业务自己控制。Try 阶段预留资源，Confirm 确认扣减，Cancel 释放预留。它比 2PC 灵活，性能也好，但要求每个参与方实现三个接口，且要处理空回滚、悬挂、幂等这三类经典问题。业务侵入性最强，适合资金、库存这类对一致性要求高的核心链路。</p>
+<p><strong>Saga</strong> 的思路更朴素：不做资源预留，直接提交本地事务，失败时用补偿操作把已经发生的事实“抵消”掉。它放弃了隔离性，换来长事务的可行性和参与方之间的松耦合。</p>
+<p><strong>本地消息表</strong> 把“业务写入”和“消息投递”放在同一个本地事务里，再由后台任务把消息表里的记录投递出去，消费方保证幂等。它解决的是“业务成功但消息丢了”的问题，本质是可靠事件驱动，通常作为 Saga 某一步的实现手段。</p>
+<p><strong>最大努力通知</strong> 则干脆放弃强保证：发起方反复通知，接收方按约定处理，允许最终没收到，靠对账兜底。它适合支付结果通知这类场景，成本最低，一致性最弱。</p>
+<p>把这几条放在一根轴上，左端是强一致、高侵入、低吞吐的 2PC，右端是弱一致、低侵入、高吞吐的最大努力通知。Saga 落在中间偏右：它接受中间状态对外可见，但要求每一步都可补偿，并且整个流程最终收敛。</p>
+<table>
+<thead>
+<tr>
+<th>路线</th>
+<th>一致性</th>
+<th>隔离性</th>
+<th>业务侵入</th>
+<th>典型场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>2PC&#x2F;3PC</td>
+<td>强</td>
+<td>有</td>
+<td>低</td>
+<td>同构数据库、短事务</td>
+</tr>
+<tr>
+<td>TCC</td>
+<td>强（最终）</td>
+<td>靠资源预留</td>
+<td>高</td>
+<td>资金、库存扣减</td>
+</tr>
+<tr>
+<td>Saga</td>
+<td>最终</td>
+<td>无</td>
+<td>中</td>
+<td>长流程、跨服务编排</td>
+</tr>
+<tr>
+<td>本地消息表</td>
+<td>最终</td>
+<td>无</td>
+<td>中</td>
+<td>事件驱动、异步解耦</td>
+</tr>
+<tr>
+<td>最大努力通知</td>
+<td>弱</td>
+<td>无</td>
+<td>低</td>
+<td>外部通知、对账兜底</td>
+</tr>
+</tbody></table>
+<p>需要强调的是，这张表只是起点。真实系统里往往是混合的：订单创建用 Saga 串起各个服务，每一步内部用本地消息表保证事件不丢，资金扣减那一步单独用 TCC。模式是积木，不是教条。</p>
+<h2 id="Saga-的基本模型"><a href="#Saga-的基本模型" class="headerlink" title="Saga 的基本模型"></a>Saga 的基本模型</h2><p>Saga 这个概念最早由 Hector Garcia-Molina 和 Kenneth Salem 在 1987 年的论文里提出，原本是为了解决长事务（long-lived transaction）持有锁太久的问题。它的定义非常简洁：一个 Saga 由一串事务 T1, T2, …, Tn 组成，每个 Ti 都有对应的补偿事务 Ci。正常执行时依次跑 T1 到 Tn；如果 Tk 失败，就依次执行 C(k-1), C(k-2), …, C1，把前面已经完成的工作撤销。</p>
+<p>这个模型里有两个容易被忽视的细节。</p>
+<p>第一，补偿不是回滚。回滚是数据库层面的物理撤销，页面上什么痕迹都不会留下；补偿是业务层面的语义抵消，它本身也是一个新的、会留下痕迹的事务。用户退了 100 元，账上会多一条退款流水，而不是那条扣款记录凭空消失。理解这一点，后面所有关于补偿设计的讨论才有基础。</p>
+<p>第二，Saga 只保证 A（原子性）和 D（持久性）的某种弱化版本，不保证 I（隔离性）。中间状态对其他事务是可见的，这是 Saga 与生俱来的代价，而不是实现缺陷。后面的小节会专门讨论怎么用语义锁和业务手段把这份代价控制住。</p>
+<p>一个典型的跨服务下单流程可以画成这样：</p>
+<pre class="mermaid">sequenceDiagram
+    participant O as 订单服务
+    participant S as 库存服务
+    participant A as 账户服务
+    participant C as 优惠券服务
+    O->>S: 锁定库存
+    S-->>O: 成功
+    O->>A: 扣减余额
+    A-->>O: 成功
+    O->>C: 核销优惠券
+    C-->>O: 失败
+    O->>A: 补偿：退回余额
+    O->>S: 补偿：释放库存</pre>
+
+<p>图中订单服务承担了协调者的角色，它知道整个流程，也知道失败时该按什么顺序调用谁的补偿接口。这就是编排式 Saga 的雏形。参与方只需要提供正向和补偿两个接口，不需要知道自己在整个流程里的位置，这一点是 Saga 相比 TCC 在耦合度上的优势。</p>
+<p>还有一个常见的误解：Saga 的每一步必须是本地事务。严格来说，Ti 可以是任何具备“可补偿语义”的操作，包括调用一个只支持最终一致的下游服务。但工程上我们强烈建议 Ti 落在本地事务边界内，因为只有本地事务才能保证“业务数据写入”和“步骤完成标记”的原子性。一旦这两者分离，就会出现“业务做了但状态没记”或者“状态记了但业务没做”的裂缝，而这正是后面状态机持久化要解决的问题。</p>
+<h2 id="编排式与协同式"><a href="#编排式与协同式" class="headerlink" title="编排式与协同式"></a>编排式与协同式</h2><p>Saga 有两种组织方式，选型时最常争论的就是这一节的内容。</p>
+<p><strong>编排式（orchestration）</strong> 有一个显式的协调者，通常是一个状态机或者一段流程代码。协调者按顺序调用各参与方的正向接口，记录每一步的结果，失败时决定回滚到哪一步。上面的时序图就是编排式。它的好处是流程集中可见：谁在什么时候调用了谁、当前走到第几步、失败卡在哪里，都能从协调者的状态里读出来。缺点是协调者容易变成“上帝对象”，随着流程分支增多而膨胀，并且它天然是一个需要高可用的中心节点。</p>
+<p><strong>协同式（choreography）</strong> 没有协调者，各参与方通过事件互相驱动。订单服务发布“订单已创建”，库存服务订阅后锁库存并发布“库存已锁定”，账户服务订阅后扣款……任何一个参与方失败时发布失败事件，其他参与方订阅到之后自行执行补偿。它的好处是松耦合、无单点、天然异步，新增一个参与方只需要订阅事件，不必改动中心流程。缺点同样明显：整个业务流程散落在各个服务的订阅关系里，没有任何一个地方能看到全貌。当流程有十几个步骤、若干条件分支时，排查一次失败就像在迷宫里找出口。</p>
+<p>两者的取舍可以归纳成几条经验。</p>
+<p>流程步骤少（三到五步）、参与方稳定、团队规模小，协同式更轻快，省掉了协调者的开发和运维。流程步骤多、有明确的条件分支和超时策略、需要人工介入和流程可视化，编排式几乎必然胜出——不是因为编排更“高级”，而是因为协同式在复杂流程下的可观测性和可维护性会迅速崩塌。</p>
+<p>运维代价的差异也值得说清楚。编排式的协调者是有状态的，需要持久化、需要高可用部署、需要监控卡单；协同式没有中心状态，但每个参与方都要维护自己的“我处理到哪了”，故障排查需要在多个服务的日志之间拼图。前者是“一个地方复杂”，后者是“处处简单但整体复杂”。</p>
+<p>实践中还有一种混合形态：宏观上用编排式管住主干流程，每个步骤内部用协同式处理旁路逻辑，比如发积分、发通知、写审计日志。这些旁路动作失败不应该导致主流程回滚，用事件驱动的方式异步处理更合适。判断标准很简单：这一步失败是否必须让整个业务失败？如果是，进编排；如果否，走事件。</p>
+<h2 id="补偿设计：幂等、可重试与人工兜底"><a href="#补偿设计：幂等、可重试与人工兜底" class="headerlink" title="补偿设计：幂等、可重试与人工兜底"></a>补偿设计：幂等、可重试与人工兜底</h2><p>Saga 的成败几乎全部押在补偿上。正向操作写错，影响一次请求；补偿写错，影响的是数据一致性，而且往往在故障发生时才暴露。补偿设计有几条硬性要求，值得逐条对照。</p>
+<p><strong>补偿必须幂等。</strong> 补偿调用可能因为超时、网络抖动、协调者重试而被执行多次。如果“退余额”执行两次，用户就白拿了一笔钱。实现方式与普通接口的幂等没有本质区别，用 Saga 事务号加步骤号做幂等键，落一张去重表，或者直接利用业务唯一索引。这里要特别注意一点：去重记录的写入与补偿动作的落库必须在同一个本地事务里，否则依然存在“补偿做了、记录没写”的窗口。</p>
+<p><strong>补偿必须可重试，并且要区分错误类型。</strong> 网络超时、下游 503 这类瞬时错误可以重试；参数错误、账户已注销、资源不存在这类业务错误重试多少次都没用，应该直接进入失败处理流程。把所有错误一律重试，结果只是把一次失败拖成十分钟的失败。</p>
+<p><strong>补偿失败要有归宿。</strong> 这是最容易被低估的一环。补偿接口本身也可能挂掉，此时 Saga 既不能前进也不能后退，只能停在中间。工程上的做法是给补偿设置有限次重试，超过阈值后把 Saga 实例标记为 <code>COMPENSATING_FAILED</code>，产生一条高优先级告警，进入人工处理队列。人工处理不是耻辱，而是分布式系统的正常组成部分；真正危险的是没人知道有这么一笔单子卡住了。</p>
+<p>下面是一个 Go 里的补偿接口与幂等实现示意：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 每个参与方实现这两个方法，payload 由协调者透传</span></span><br><span class="line"><span class="keyword">type</span> Compensable <span class="keyword">interface</span> &#123;</span><br><span class="line">    Execute(ctx context.Context, sagaID <span class="type">string</span>, payload []<span class="type">byte</span>) <span class="type">error</span></span><br><span class="line">    Compensate(ctx context.Context, sagaID <span class="type">string</span>, payload []<span class="type">byte</span>) <span class="type">error</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(s *StockService)</span></span> Compensate(ctx context.Context, sagaID <span class="type">string</span>, payload []<span class="type">byte</span>) <span class="type">error</span> &#123;</span><br><span class="line">    <span class="comment">// 幂等键由 sagaID 与步骤名组成，重复补偿直接返回成功</span></span><br><span class="line">    done, err := s.store.MarkCompensated(ctx, sagaID, <span class="string">&quot;reserve_stock&quot;</span>)</span><br><span class="line">    <span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> err</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> done &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">nil</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 去重标记与释放库存在同一个本地事务中提交</span></span><br><span class="line">    <span class="keyword">return</span> s.store.ReleaseReserved(ctx, sagaID)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>正向操作要为补偿留好信息。</strong> 补偿往往需要正向操作产生的标识，比如扣款流水号、锁定的库存批次、生成的优惠券实例 ID。这些信息要么在正向接口的返回值里带回来并持久化，要么在正向操作时写进业务表，靠业务主键反查。等到补偿时再去“猜”当初扣了哪一笔，是最常见的翻车方式。</p>
+<p><strong>把不可逆的动作排在最后。</strong> 发短信、推送、调用外部物流、给用户账户加息，这类动作一旦发生就无法真正撤销。合理的排布是把它们放在流程末端，或者干脆移出 Saga，改为在 Saga 成功之后由事件触发。这样即使前面全部回滚，也不会出现“短信已经发了三条，订单却没创建成功”的尴尬。</p>
+<p>还有一个细节值得强调：补偿接口要允许“空补偿”。由于网络乱序或协调者重试，补偿请求可能先于正向请求到达，或者在正向请求根本没成功时到达。此时补偿应该返回成功而不是报错，否则协调者会陷入无意义的重试。</p>
+<h2 id="隔离性缺失与中间状态治理"><a href="#隔离性缺失与中间状态治理" class="headerlink" title="隔离性缺失与中间状态治理"></a>隔离性缺失与中间状态治理</h2><p>Saga 不做资源预留，每一步本地事务提交后立即对其他事务可见，因此它天然不满足隔离性。数据库理论把这种场景下的异常归纳为几类：脏读（读到了最终会被补偿掉的数据）、模糊读（同一事务内两次读到不同结果）、丢失更新（两个 Saga 基于同一份旧数据各自推进）。这些问题在单机事务里靠锁解决，在 Saga 里只能靠业务手段。</p>
+<p><strong>语义锁</strong> 是最常用的一种。它的做法是在业务数据上加一个状态位，表示“这笔数据正在被某个 Saga 处理，暂时不可他用”。比如库存表里增加 <code>reserved</code> 字段，扣减时先 <code>reserved = reserved + n</code>，而不是直接改 <code>available</code>；订单表用 <code>status = PENDING</code> 表示流程未终结。其他事务看到这个状态就知道要等待、拒绝或者走另一条路径。</p>
+<p>语义锁与数据库行锁的区别在于：行锁由数据库自动释放，语义锁必须由业务代码显式释放，而且释放时机可能与 Saga 的最终结果绑定。这意味着要考虑“锁悬挂”——一个 Saga 崩溃后再也没人释放锁。所以语义锁一定要配超时和巡检，不能指望流程一定会走完。</p>
+<p>下面是一个用条件更新实现语义锁的例子：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 预占库存：只有可用量足够时才成功，且记录预占量</span></span><br><span class="line"><span class="keyword">UPDATE</span> stock</span><br><span class="line"><span class="keyword">SET</span> reserved <span class="operator">=</span> reserved <span class="operator">+</span> ?</span><br><span class="line"><span class="keyword">WHERE</span> sku_id <span class="operator">=</span> ? <span class="keyword">AND</span> available <span class="operator">-</span> reserved <span class="operator">&gt;=</span> ?;</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 确认扣减：Saga 成功后把预占量真正扣掉</span></span><br><span class="line"><span class="keyword">UPDATE</span> stock</span><br><span class="line"><span class="keyword">SET</span> available <span class="operator">=</span> available <span class="operator">-</span> ?, reserved <span class="operator">=</span> reserved <span class="operator">-</span> ?</span><br><span class="line"><span class="keyword">WHERE</span> sku_id <span class="operator">=</span> ? <span class="keyword">AND</span> reserved <span class="operator">&gt;=</span> ?;</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 补偿释放：Saga 失败后归还预占量</span></span><br><span class="line"><span class="keyword">UPDATE</span> stock</span><br><span class="line"><span class="keyword">SET</span> reserved <span class="operator">=</span> reserved <span class="operator">-</span> ?</span><br><span class="line"><span class="keyword">WHERE</span> sku_id <span class="operator">=</span> ? <span class="keyword">AND</span> reserved <span class="operator">&gt;=</span> ?;</span><br></pre></td></tr></table></figure>
+
+<p>三条语句都带上了 <code>reserved &gt;= ?</code> 的条件，这样重复执行不会把预占量减成负数，天然具备一定的幂等性。这是把幂等做进 SQL 条件里的典型写法，比在应用层加锁更可靠。</p>
+<p><strong>业务补偿</strong> 是另一层保险。有些中间状态无法用状态位屏蔽，比如“库存已锁定但订单还没支付”，此时用户在前端看到的是“待支付”，这是合理可见的状态；但如果用户在支付的同时点了取消，就可能出现取消成功而支付也成功的双重结果。解决办法不是禁止并发，而是让两个操作都带上前置条件：取消只能作用于 <code>PENDING</code> 状态，支付回调也只能作用于 <code>PENDING</code> 状态，谁先成功谁就把状态改走，后到的一方读到状态不符直接失败并触发退款。用状态机把并发收敛到一个确定的结果，比试图消灭并发要现实得多。</p>
+<p>还有一个常被忽略的点：<strong>中间状态要能被用户理解</strong>。Saga 执行期间订单可能处于“处理中”，如果前端把它展示成“失败”，用户会重复下单，反而制造出更多需要补偿的脏数据。把中间态显式建模、显式展示，是隔离性治理的一部分，而不只是交互设计问题。</p>
+<h2 id="状态机、持久化与执行顺序"><a href="#状态机、持久化与执行顺序" class="headerlink" title="状态机、持久化与执行顺序"></a>状态机、持久化与执行顺序</h2><p>一个能跑在生产上的 Saga，核心不是那串远程调用，而是一张持久化的状态表。协调者随时可能崩溃、重启、被发布流程杀掉，它必须能在恢复后准确知道“这个 Saga 走到哪了、哪些步骤已经确认成功、下一步该做什么”。</p>
+<p>状态机的建模通常分两层。第一层是流程定义，描述有哪些步骤、依赖关系、每个步骤的正向与补偿动作；第二层是实例状态，记录某个具体 Saga 的当前进度。流程定义是静态的，可以放在代码里，也可以放在配置里；实例状态是动态的，必须落库。</p>
+<p>实例状态至少要包含这些字段：Saga 的唯一 ID、业务关联键（比如订单号）、流程定义的版本、当前状态、当前步骤、已完成的步骤列表、重试次数、创建与更新时间。步骤级别的记录同样重要，因为补偿需要知道哪些步骤真的执行过，而不是“按定义应该执行过”。</p>
+<p>写入时机有一个原则：<strong>先记录意图，再执行动作，最后记录结果</strong>。如果先调远程接口再写状态，中间崩溃就会出现“事情做了但没人知道”，恢复时无法判断该不该补偿。先写一条“准备执行第 3 步”的记录，再发起调用，成功后把记录改成“已完成”，失败则改成“待补偿”。这样任何时刻崩溃，恢复逻辑都能从最后一条确定的记录继续。当然，调用成功但结果没写下来的窗口依然存在，这时只能靠步骤本身的幂等加上下游的查询接口来兜底，这也是为什么每一步都要能被安全地重复执行。</p>
+<p>如果步骤的业务数据与状态表在同一个数据库，可以把“业务写入”和“步骤完成标记”放进同一个本地事务，裂缝就彻底消失了。</p>
+<p>执行顺序上有两条规则。正向按依赖顺序执行，没有依赖的步骤可以并行，但并行会显著增加状态机的复杂度，除非步骤之间确实互不影响，否则建议串行。补偿严格按正向的逆序执行，因为后面的步骤往往依赖前面步骤产生的资源：先释放了库存，再去退优惠券，优惠券退回时可能需要校验订单状态，而订单状态又依赖库存。逆序能保证每一步补偿执行时，它所依赖的后置条件还没有被拆掉。</p>
+<p>并行步骤的补偿要特别小心。假设第 2、3 步并行执行，第 4 步失败，那么 2 和 3 都要补偿，但它们之间没有顺序要求，可以并行补偿；如果 3 依赖 2 的结果，那它们本来就不该并行。补偿顺序错误的典型后果是“补偿一个已经不存在的东西”，接口报错，Saga 卡死。设计时把步骤依赖画成有向图，补偿就是这张图的反向拓扑序，按图执行不会错。</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 流程定义示意：steps 声明依赖，补偿按依赖逆序调度</span></span><br><span class="line"><span class="attr">name:</span> <span class="string">place_order</span></span><br><span class="line"><span class="attr">steps:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">reserve_stock</span></span><br><span class="line">    <span class="attr">compensate:</span> <span class="string">release_stock</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">deduct_balance</span></span><br><span class="line">    <span class="attr">depends_on:</span> [<span class="string">reserve_stock</span>]</span><br><span class="line">    <span class="attr">compensate:</span> <span class="string">refund_balance</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">lock_coupon</span></span><br><span class="line">    <span class="attr">depends_on:</span> [<span class="string">deduct_balance</span>]</span><br><span class="line">    <span class="attr">compensate:</span> <span class="string">unlock_coupon</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">create_order</span></span><br><span class="line">    <span class="attr">depends_on:</span> [<span class="string">lock_coupon</span>]</span><br><span class="line">    <span class="attr">compensate:</span> <span class="string">cancel_order</span></span><br></pre></td></tr></table></figure>
+
+<p>这份定义里，<code>create_order</code> 失败时，协调者按 <code>cancel_order</code>、<code>unlock_coupon</code>、<code>refund_balance</code>、<code>release_stock</code> 的顺序补偿。把依赖关系显式写出来，比在代码里靠 if-else 硬编码回滚路径要可靠得多，也更容易做流程变更。</p>
+<h2 id="超时、重试、死信与消息配合"><a href="#超时、重试、死信与消息配合" class="headerlink" title="超时、重试、死信与消息配合"></a>超时、重试、死信与消息配合</h2><p>分布式系统里最危险的不是明确的失败，而是“不知道成功还是失败”。超时正是这种状态。调用库存服务扣减，5 秒没返回，可能是请求没到、可能是到了但处理慢、也可能是处理成功而响应丢了。此时如果直接发起补偿，就可能把一笔已经成功的扣减再退一次；如果不补偿，又可能永远卡住。</p>
+<p>正确的做法是：<strong>超时后先查询，再决定</strong>。每个正向接口都应该配一个查询接口，用业务唯一键或 Saga 事务号查询该步骤的真实结果。查询到成功就继续，查询到失败就补偿，查询不到（比如对方也没记录）才按失败处理。这套“查询—决策”的逻辑是 Saga 协调者的核心职责之一，也是很多自研实现缺失的部分。</p>
+<p>重试策略上，指数退避加随机抖动是标配。固定间隔重试会在下游故障恢复的瞬间制造出一波同步的流量洪峰，把刚恢复的服务再次打挂。退避的基数、上限和最大次数要按业务容忍度设定，比如 1 秒起步、翻倍、上限 30 秒、最多 8 次，具体数值是示意，需要按实际链路压测确定。</p>
+<p>重试耗尽之后进入死信。死信不是一个抽象概念，而是一张具体的表或者一个具体的队列，里面躺着无法自动处理的 Saga 实例，附带失败原因、最后错误、重试次数和上下文快照。死信必须有告警、有归属人、有处理时限，否则它只是把问题从“卡住”变成了“安静地卡住”。</p>
+<p>消息队列在 Saga 里扮演两个角色。一是作为异步步骤的传输层：正向操作不直接调用下游，而是发一条命令消息，下游消费后执行并回执。二是作为步骤之间的解耦手段：某个步骤成功后发布事件，由订阅方推进下一步。两种用法都要求消息可靠投递与消费幂等，这部分内容在消息可靠性的专题里已经详细讨论过，此处不展开。</p>
+<p>真正与 Saga 强相关的是 <strong>outbox 模式</strong>。业务代码在本地事务里同时写业务表和 outbox 表，再由一个独立的 relay 进程轮询 outbox，把消息投递到队列。这样“业务成功”与“消息一定发出”就绑定了，不会出现订单创建成功但事件丢失的情况。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CREATE TABLE</span> outbox (</span><br><span class="line">  id          <span class="type">BIGINT</span> <span class="keyword">PRIMARY KEY</span> AUTO_INCREMENT,</span><br><span class="line">  aggregate   <span class="type">VARCHAR</span>(<span class="number">64</span>)  <span class="keyword">NOT NULL</span>,  <span class="comment">-- 业务聚合类型</span></span><br><span class="line">  aggregate_id <span class="type">VARCHAR</span>(<span class="number">64</span>) <span class="keyword">NOT NULL</span>,  <span class="comment">-- 业务主键</span></span><br><span class="line">  event_type  <span class="type">VARCHAR</span>(<span class="number">64</span>)  <span class="keyword">NOT NULL</span>,</span><br><span class="line">  payload     TEXT         <span class="keyword">NOT NULL</span>,</span><br><span class="line">  status      TINYINT      <span class="keyword">NOT NULL</span> <span class="keyword">DEFAULT</span> <span class="number">0</span>, <span class="comment">-- 0 待投递 1 已投递</span></span><br><span class="line">  created_at  DATETIME     <span class="keyword">NOT NULL</span>,</span><br><span class="line">  KEY idx_status_created (status, created_at)</span><br><span class="line">);</span><br></pre></td></tr></table></figure>
+
+<p>relay 进程按 <code>status = 0</code> 扫描并投递，成功后置为 1。投递本身可能重复，所以消费方必须幂等；也可能在置位前崩溃，导致重复投递，同样靠消费方兜底。这套机制看起来笨拙，却把不确定性收敛到了“至少一次投递”这一个点上。</p>
+<p>需要提醒的是，不要指望用消息队列的“事务消息”替代 Saga 本身。事务消息解决的是“本地事务与消息发送的原子性”，它只是 Saga 某一步的实现细节，无法替你完成多步骤的补偿编排。</p>
+<h2 id="可观测性、卡单与对账兜底"><a href="#可观测性、卡单与对账兜底" class="headerlink" title="可观测性、卡单与对账兜底"></a>可观测性、卡单与对账兜底</h2><p>Saga 的故障很少表现为接口报错，更多表现为“不动了”。因此监控的重心不是单次调用成功率，而是实例的生命周期。</p>
+<p>三类指标必须常看：运行中的实例数（按流程类型拆分）、实例停留时长分布、补偿触发率与补偿失败数。运行中实例持续上涨，通常意味着某一步在积压；停留时长超过业务阈值，就是卡单；补偿率突然抬升，往往对应下游故障。每个实例要有唯一 ID，并注入日志与链路追踪上下文，排查时能从实例详情直接跳到各参与方的日志。</p>
+<p>卡单巡检要主动做：定时扫描未终结且更新时间超过阈值的记录，按流程类型告警，后台提供重试、跳过、强制终结三个操作。没有巡检，状态表只会变成一张越来越大的墓碑。</p>
+<p>对账是最后一道防线。按小时或按天比对两边的业务事实，例如订单与支付流水、库存预占与实扣，差异生成工单而不是直接改数。对账不能替代补偿，它负责发现补偿漏掉的那部分。</p>
+<h2 id="框架定位、适用边界与常见坑"><a href="#框架定位、适用边界与常见坑" class="headerlink" title="框架定位、适用边界与常见坑"></a>框架定位、适用边界与常见坑</h2><p>Seata 的 Saga 模式提供一个状态机引擎，流程用状态语言描述，由协调者持久化执行，偏编排式；它与同项目的 AT、TCC 并列，可按链路分别选型。Apache ServiceComb 的 Saga 组件出现更早，提供协调者与参与方 SDK，文档对补偿边界讨论得比较细。两者都只保证“按定义调用、失败重试、状态可查”，不替你设计业务补偿。</p>
+<p>Saga 适合这样的业务：流程长、参与方多、单步能落在本地事务、可接受中间状态、每一步都有语义清晰的逆向操作。跨团队甚至跨组织时，Saga 的接口契约也比 2PC 的资源管理器契约更容易谈。它不适合核心账务这类强一致场景，不适合动作不可逆又无法用业务手段抵消的流程，也不适合步骤极短、并发极高的链路——后者的协调开销可能超过收益。</p>
+<p>常见坑可以列成一张表：</p>
+<table>
+<thead>
+<tr>
+<th>常见坑</th>
+<th>后果</th>
+<th>规避手段</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>补偿不可逆</td>
+<td>只能赔付，无法回滚</td>
+<td>不可逆动作后置或移出 Saga</td>
+</tr>
+<tr>
+<td>补偿顺序错误</td>
+<td>补偿依赖的资源已释放</td>
+<td>按依赖图的反向拓扑序执行</td>
+</tr>
+<tr>
+<td>重复补偿</td>
+<td>多退款、多发货</td>
+<td>幂等键加唯一索引</td>
+</tr>
+<tr>
+<td>状态丢失</td>
+<td>恢复后重复执行</td>
+<td>先写意图再执行，状态与业务同库</td>
+</tr>
+<tr>
+<td>超时误判</td>
+<td>把成功当失败，触发错误补偿</td>
+<td>超时后先查询再决策</td>
+</tr>
+</tbody></table>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>Saga 把分布式事务从“协议保证”降级为“业务保证”，用一串本地事务加补偿换取长流程的可行性。它的难点不在调用链路，而在补偿的幂等与可重试、状态机的持久化、超时后的查询确认，以及中间状态对外可见时的一整套治理手段。选型时先问三个问题：业务能否接受最终一致、每一步是否真的可补偿、团队是否愿意为卡单和对账投入长期运维。三个答案都是肯定，Saga 才值得上场。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://microservices.io/patterns/data/saga.html">Pattern: Saga（microservices.io）</a></li>
+<li><a href="https://seata.apache.org/docs/user/mode/saga/">Seata Saga 模式文档</a></li>
+<li><a href="https://servicecomb.apache.org/docs/distributed_saga_1/">Apache ServiceComb：分布式 Saga 实践（第一部分）</a></li>
+<li><a href="https://www.cs.cornell.edu/andru/cs711/2002fa/reading/sagas.pdf">Sagas（Garcia-Molina 与 Salem，1987）</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Saga 分布式事务模式</p><p><a href="https://987763485.github.io/2022/01/18/Saga分布式事务模式/">https://987763485.github.io/2022/01/18/Saga分布式事务模式/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2022-01-18</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-19</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/golang/">golang</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/">微服务</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2022/01/25/%E5%A4%A7%E6%96%87%E4%BB%B6%E6%8E%92%E5%BA%8F%E5%A4%96%E6%8E%92%E5%BA%8F%E4%B8%8EMapReduce/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">大文件排序：外排序与 MapReduce</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2022/01/16/%E7%B3%BB%E7%BB%9F%E5%AE%B9%E9%87%8F%E8%AF%84%E4%BC%B0%E4%B8%8E%E8%A7%84%E5%88%92/"><span class="level-item">系统容量评估与规划</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

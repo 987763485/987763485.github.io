@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>模型上下文协议生态 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="模型上下文协议（MCP）从 2024 年底走到 2025-11-25 修订，已经把“宿主如何发现并调用外部能力”这件事固化成一套可协商的接口。但真正决定落地成败的往往不是原语设计得多优雅，而是版本节奏、授权边界与分发信任这三件工程琐事。本文不重复协议入门内容，只讨论它在生态里的位置：一个服务器要承受多少种上游变化，一次工具调用的信任边界到底划在哪一跳，以及该用什么口径判断第三方实现值不值得引入。"><meta property="og:type" content="blog"><meta property="og:title" content="模型上下文协议生态"><meta property="og:url" content="https://987763485.github.io/2026/07/11/%E6%A8%A1%E5%9E%8B%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8D%8F%E8%AE%AE%E7%94%9F%E6%80%81/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="模型上下文协议（MCP）从 2024 年底走到 2025-11-25 修订，已经把“宿主如何发现并调用外部能力”这件事固化成一套可协商的接口。但真正决定落地成败的往往不是原语设计得多优雅，而是版本节奏、授权边界与分发信任这三件工程琐事。本文不重复协议入门内容，只讨论它在生态里的位置：一个服务器要承受多少种上游变化，一次工具调用的信任边界到底划在哪一跳，以及该用什么口径判断第三方实现值不值得引入。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2026-07-10T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-20T17:11:28.874Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="大模型"><meta property="article:tag" content="python"><meta property="article:tag" content="rust"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2026/07/11/%E6%A8%A1%E5%9E%8B%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8D%8F%E8%AE%AE%E7%94%9F%E6%80%81/"},"headline":"模型上下文协议生态","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2026-07-10T16:00:00.000Z","dateModified":"2026-10-20T17:11:28.874Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"模型上下文协议（MCP）从 2024 年底走到 2025-11-25 修订，已经把“宿主如何发现并调用外部能力”这件事固化成一套可协商的接口。但真正决定落地成败的往往不是原语设计得多优雅，而是版本节奏、授权边界与分发信任这三件工程琐事。本文不重复协议入门内容，只讨论它在生态里的位置：一个服务器要承受多少种上游变化，一次工具调用的信任边界到底划在哪一跳，以及该用什么口径判断第三方实现值不值得引入。"}</script><link rel="canonical" href="https://987763485.github.io/2026/07/11/%E6%A8%A1%E5%9E%8B%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8D%8F%E8%AE%AE%E7%94%9F%E6%80%81/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2026-07-10T16:00:00.000Z" title="7/11/2026, 12:00:00 AM">2026-07-11</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></span><span class="level-item">1 小时读完 (大约8880个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">模型上下文协议生态</h1><div class="content"><p>模型上下文协议（MCP）从 2024 年底走到 2025-11-25 修订，已经把“宿主如何发现并调用外部能力”这件事固化成一套可协商的接口。但真正决定落地成败的往往不是原语设计得多优雅，而是版本节奏、授权边界与分发信任这三件工程琐事。本文不重复协议入门内容，只讨论它在生态里的位置：一个服务器要承受多少种上游变化，一次工具调用的信任边界到底划在哪一跳，以及该用什么口径判断第三方实现值不值得引入。</p>
+<h2 id="协议要解决的三件事"><a href="#协议要解决的三件事" class="headerlink" title="协议要解决的三件事"></a>协议要解决的三件事</h2><p>把 MCP 当成“一层 JSON-RPC 包装”是常见误读。它真正要处理的是三件互相牵制的事：工具发现、能力声明、上下文注入。</p>
+<p>工具发现回答“这里有什么可以调”。一个宿主接入的服务器可能同时暴露十几项能力，名称、描述、输入形状都由服务器给出；客户端在会话建立时抓取一次快照，之后依靠变更通知感知列表变化。这件事的难点不在请求本身，而在快照的生命周期：宿主侧的提示缓存以工具列表为前缀，一次列表变更会让下游一整段缓存失效，于是“服务器有权随时通知”与“宿主希望列表稳定”之间必须有工程上的节流与灰度约定。</p>
+<p>能力声明回答“双方各自支持什么”。声明不是装饰性标签，而是决定后续请求能否成立的开关：对侧没有在声明里出现的能力，不应假定它存在，也不应指望它能应答。这条规则看起来弱，实际是整个协议能持续演化的前提——正因为能力是可选的，修订才可以在不破坏既有部署的前提下加入新形态。</p>
+<p>上下文注入回答“这段内容以什么身份进入模型视野”。同样是把一段文本放进对话，作为工具返回值、作为被显式选中的资源内容、作为人手工附上的提示片段，三者的可信度等级、可撤销性与审计要求完全不同。协议把这三条路径分开表达，就是在提醒宿主：不要在拼接阶段把它们抹平成同一种东西。</p>
+<p>那为什么“函数调用 schema”不够。第一，函数调用只描述单个函数的形状，不描述提供方是谁、实现到哪一版、语义是否已经变更，跨宿主复用只能靠人工粘贴与口头约定。第二，函数调用不携带授权语义：谁允许这次调用、访问下游用谁的身份、令牌从哪个授权服务器来，在 schema 里根本没有位置。第三，函数调用没有版本协商，双方约定一旦写死，上游改一个字段的必填性就等于破坏性变更，而且变更无法被消费方感知。MCP 把这三件事分别交给了发现类请求、能力声明与握手阶段的版本协商，代价是你从此要长期维护一个协议对等体——这才是真正的成本所在。</p>
+<h2 id="三类原语的分工与责任边界"><a href="#三类原语的分工与责任边界" class="headerlink" title="三类原语的分工与责任边界"></a>三类原语的分工与责任边界</h2><p>tools、resources、prompts 经常被并列介绍，但三者的失败模式完全不同，选错的后果也不同。</p>
+<p>tools 是“可能改变世界的调用”。它有副作用的可能，有明确的输入形状，返回值要参与下一轮推理。适合放在 tools 里的：查询工单系统、创建一次受控的计算、提交一段代码到评审队列。不适合的：把“读一下本机某个已知路径的文件”做成 tool——它没有需要模型现场决定的参数自由度，而且会把一次纯粹的人为选择变成模型自主行为，扩大不可预期执行的面积。</p>
+<p>resources 是“可被引用的只读内容”。它有标识符、有内容类型，通常由人或宿主策略选择注入，而不是由模型自由决定。适合的：配置快照、指标看板导出、某次构建的产物清单。不适合的：任何需要写回的东西，以及任何“读了之后还要按调用者身份决定是否给出”的敏感内容——后者往往需要同时具备资源标识与访问控制，实现成本会迅速上升，很多团队在这里退回到 tool。</p>
+<p>prompts 是“由人发起的模板”。它的设计意图是用户在宿主界面上点选一次，模板由服务器渲染后交给宿主。把业务能力塞进 prompts 是最常见的架构错误：一段“帮我复盘上周事故”的流程一旦被写成模板，它就会随宿主数量被复制成多份，版本无法协商、灰度无法控制、调用不留痕；等到需要把它接到审批流上时，你只能再写一个 tool，两套实现并存并且开始漂移。</p>
+<p>判断口径只有三问：这段逻辑需要在服务器侧独立演进吗？需要按调用者鉴权吗？需要留下可回溯的调用记录吗？三问里有两个“是”，它就该是 tool，或者 resource 与 tool 的组合，而不是 prompt。</p>
+<p>客户端与服务器的责任划分，我建议按下面这张表写进内部规范，而不是靠口口相传：</p>
+<table>
+<thead>
+<tr>
+<th>事项</th>
+<th>客户端（宿主侧）</th>
+<th>服务器</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>决定调用哪项能力、何时调用</td>
+<td>负责</td>
+<td>不参与</td>
+</tr>
+<tr>
+<td>给出能力的名称、描述与输入形状</td>
+<td>只消费</td>
+<td>负责</td>
+</tr>
+<tr>
+<td>决定结果何时以及以何种身份进入上下文</td>
+<td>负责</td>
+<td>不参与</td>
+</tr>
+<tr>
+<td>访问下游系统并完成实际鉴权</td>
+<td>不参与</td>
+<td>负责</td>
+</tr>
+<tr>
+<td>维护能力语义随版本的向后兼容</td>
+<td>无法代劳</td>
+<td>负责</td>
+</tr>
+<tr>
+<td>控制并发、超时与重试预算</td>
+<td>负责</td>
+<td>需提供幂等性说明</td>
+</tr>
+<tr>
+<td>把结果裁剪到合适长度</td>
+<td>兜底</td>
+<td>优先负责</td>
+</tr>
+<tr>
+<td>对外来文本做边界标记与长度限制</td>
+<td>负责</td>
+<td>不适用</td>
+</tr>
+</tbody></table>
+<p>最后一行值得单独强调：服务器返回的正文、以及工具描述本身，都是外来文本。工具描述会以极高信任度进入模型的上下文，因此它的修改权限等同于一次代码发布。宿主在把任何服务器内容拼进对话之前，应有明确的边界标记与长度上限，这一条不属于可选加固。</p>
+<h2 id="传输形态与授权要求的演进"><a href="#传输形态与授权要求的演进" class="headerlink" title="传输形态与授权要求的演进"></a>传输形态与授权要求的演进</h2><p>本地 stdio 与远端 HTTP 的差别不在吞吐，而在信任根。</p>
+<p>stdio 场景里，服务器进程由宿主用本机配置启动，可执行文件路径、环境变量、工作目录全部来自一份人工维护的本机配置。这里几乎没有协议级的访问控制，边界就是操作系统账号：进程能读到什么、能以谁的身份写什么，取决于启动它的那份配置和那个用户。它的优点极其朴素——没有网络暴露面，也没有令牌生命周期要管；缺点同样朴素——一次更新的生效路径就是“有人改了本机配置并重启了宿主”，无法集中审计。</p>
+<p>远端形态把问题换了性质：进程不再由宿主直接拥有，身份必须从令牌来。于是修订序列里授权部分的重量一路增加。2024-11-05 把基于授权码流程的授权正式纳入 HTTP 传输；2025-03-26 把要求提高到 OAuth 2.1 一族（含 PKCE）并要求访问令牌绑定受众，也就是把“这个令牌是给哪个资源服务器用的”写进请求（RFC 8707 的路子）。到本文可写的现行口径 2025-11-25 为止，累积的方向是稳定的四件事：授权必须走标准 OAuth 家族而非自定义头；访问令牌要有明确的受众绑定；受保护资源要能被客户端通过元数据自行发现；客户端注册要能自动化且可校验。更细的逐版本归因请以官方各版本文档的变更记录为准，这里不展开，因为这类细节在草案期仍然会动。</p>
+<p>同一版本序列里另外两件值得注意的事：2025-11-25 这一版把异步任务与扩展机制纳入口径——这意味着“一次调用一次返回”不再是唯一合法形状；而这条线之后的变化目前只到草案。</p>
+<p>官方已经给出下一个修订的 RC（2026-05-29），方向包括：把异步任务归入扩展；新增发现类方法（<code>server/discover</code> 一类）；去掉会话与初始化握手的强绑定；强化授权服务器侧对 issuer 的校验；以客户端 ID 元数据文档取代动态注册；把 HTTP 加 SSE 的传输形态与 Roots、Sampling 等能力列入废弃，并给出约 12 个月的移除窗口。<strong>这是草案，内容可能变动</strong>，包括窗口长度、条目取舍与最终发布时点。除上述已核实的方向外，本文不写任何端点名与字段拼写，也不把 2026-07-28 这个尚未发布的修订当已发布来讨论。对工程来说，草案唯一确定的价值是：它给了你一个可以提前排期的信号，而不是可以提前依赖的承诺。</p>
+<p>授权落地最常见的事故不是算法错，而是凭据被放在了错误的地方。令牌、含令牌的请求头、以及可以从令牌反推出身份的长标识串，都不应出现在明文配置、日志与缓存键里——配置会被同步进仓库，日志会被采集到集中平台，缓存键会出现在指标标签和故障截图里。这三处的扩散路径不同，但结果一样：一次故障排查就是一次凭据广播。传输层的正确姿势是把令牌留在进程内存里，按受众分次获取，并且只记录令牌的指纹与过期时间这一类不可逆信息。</p>
+<h2 id="注册与分发：Registry-解决什么、不解决什么"><a href="#注册与分发：Registry-解决什么、不解决什么" class="headerlink" title="注册与分发：Registry 解决什么、不解决什么"></a>注册与分发：Registry 解决什么、不解决什么</h2><p>MCP Registry 目前仍是预览阶段，接口冻结在 v0.1，仍在演进。因此本文不写它的可用性与采用度结论——这两类判断在 v0.1 阶段写下来，三个月后大概率是错的。</p>
+<p>它解决的问题是两类。第一类是可发现性：服务器的机器可读描述、命名空间归属与版本信息集中在一处，宿主与工具链不必再去各自的 README 里抓取形状不一致的元数据。第二类是来源核验：包的发布主体与注册条目的归属可以核对，“这个名字确实属于这个组织”第一次变成一个可验证命题而不是社交判断。</p>
+<p>它不解决的问题更关键：注册不等于审核。条目存在只说明它被以某种格式收录过，不说明它的权限范围合理、依赖被审过、更新策略可控。任何把“官方注册表里有”直接写成导入理由的流程，都是在把安全决策外包给一个并没有承担这个责任的目录服务。这条边界要写进采购规范，因为它很容易被“来自官方清单”这种语感绕过。</p>
+<p>由此可以给出供应链信任边界的真实定义：边界不在协议层，也不在网络层，而在“谁能在什么时候把新代码放进你的进程”。引入一个第三方服务器，你同时引入的是它的依赖树、它的发布习惯、它对下游凭据的处理方式，以及它的维护者流失风险。stdio 形态下这条边界尤其锐利，因为新代码进入进程的路径就是本机配置里那一行启动命令。</p>
+<p>与之相邻的分发尝试值得放在同一张地图上：AGNTCY 于 2025-07-29 启动，走的是跨组织的目录与标识路线；A2A 在 2026-03-12 发布 v1.0.0、2026-05-26 发布 v1.0.1，其能力描述与发现机制解决的是“智能体之间”而非“宿主与工具之间”的分发问题。治理侧的一个事实是：2025-12-09 公告的治理主体目前托管 MCP、AGENTS.md 与 goose 三件事。把它们放在同一处，说明这些项目愿意接受统一的变更流程与规范节奏，这本身就是评估生态成熟度时一个比“支持列表长度”更有信息量的信号。</p>
+<h2 id="三种能力封装形态的共存"><a href="#三种能力封装形态的共存" class="headerlink" title="三种能力封装形态的共存"></a>三种能力封装形态的共存</h2><p>今天要把一段“能力”交给模型使用，实际有三种形态：协议工具（MCP 服务器暴露的 tools）、厂商函数调用（宿主自带模型接口里的工具声明）、技能包（以 Agent Skills 为代表，2025-10-16 发布，规格放在 <code>anthropics/skills</code> 项目的 spec 目录，本文只写到项目层级）。三者不是替代关系，而是三种不同的发布单元。</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>协议工具</th>
+<th>厂商函数调用</th>
+<th>技能包</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>版本管理单元</td>
+<td>服务器，一次发布影响所有宿主</td>
+<td>随宿主 SDK 与模型接口一起走</td>
+<td>一个目录，随内容更新即生效</td>
+</tr>
+<tr>
+<td>权限模型</td>
+<td>由服务器与授权链路共同决定，可独立鉴权</td>
+<td>由宿主的执行器决定，常与宿主同权限</td>
+<td>通常继承宿主权限，本身不声明新边界</td>
+</tr>
+<tr>
+<td>可移植性</td>
+<td>跨宿主复用是设计目标</td>
+<td>绑定具体厂商接口形状</td>
+<td>取决于宿主是否实现同一目录约定</td>
+</tr>
+<tr>
+<td>更新粒度</td>
+<td>能力级（一个工具可单独改）</td>
+<td>通常要改宿主代码并重发</td>
+<td>文件级，最轻</td>
+</tr>
+<tr>
+<td>审计可见性</td>
+<td>有明确的调用请求与结果</td>
+<td>混在宿主日志里</td>
+<td>常常只有“被读过”没有“被执行”</td>
+</tr>
+<tr>
+<td>协商能力</td>
+<td>有版本与能力声明</td>
+<td>无协商，靠不兼容报错</td>
+<td>无协商</td>
+</tr>
+</tbody></table>
+<p>需要说明的是，这里不做优劣排名。三者的差别只在你的约束条件下谁更省心，而约束条件是组织相关的。我建议用四个问题定位：这段能力需要跨宿主复用吗？需要独立的发布周期吗？需要为它单独做授权决策吗？需要留下可回溯的调用记录吗？四个都答“是”，它应该是协议工具；只有前两个是、后两个否，厂商函数调用足够，而且更省；四个都是“否”但内容需要随人评审、随版本沉淀，那更像技能包的活。</p>
+<p>一个反复出现的组合陷阱是同一段逻辑在两种形态里各存一份。比如把同一个查询同时实现成服务器工具和宿主内置函数，模型面对两个形状近似但语义不同的入口，行为方差立刻上升。若确实需要并存（迁移期不可避免），至少要做到：两侧描述里显式互相指向、只有一侧允许写操作、并让两侧走同一个下游鉴权主体。</p>
+<h2 id="一次调用的完整链路"><a href="#一次调用的完整链路" class="headerlink" title="一次调用的完整链路"></a>一次调用的完整链路</h2><p>链路图看起来直观，但工程上真正有用的是把每一跳的日志责任标清楚。下面这张时序图按最常见的远端形态画出，宿主内部的模型循环被单独列成一个参与者，因为多数事故恰好发生在“模型循环与协议客户端之间”。</p>
+<pre class="mermaid">sequenceDiagram
+    participant U as 用户
+    participant H as 宿主模型循环
+    participant C as MCP 客户端
+    participant S as MCP 服务器
+    participant D as 下游系统
+    U->>H: 提出请求
+    H->>C: 选择能力并给出参数
+    C->>S: 调用请求（带受众绑定的访问令牌）
+    S->>D: 以服务器身份或代理用户身份访问
+    D-->>S: 返回原始结果
+    S-->>C: 结果（可能被裁剪或改写）
+    C-->>H: 工具结果进入上下文
+    H-->>U: 组装回答
+    S-->>C: 若为异步形态：先受理，后续按状态取结果</pre>
+
+<p>逐跳的日志口径如下。表里“绝不能记”这一列是硬约束，不是建议。</p>
+<table>
+<thead>
+<tr>
+<th>跳</th>
+<th>该记</th>
+<th>绝不能记</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>用户到宿主</td>
+<td>会话标识、请求时间、请求长度</td>
+<td>用户原文全文（按数据分级抽样落盘）</td>
+</tr>
+<tr>
+<td>宿主到客户端</td>
+<td>能力名与版本、参数摘要指纹、模型侧选择理由</td>
+<td>参数里任何凭据字段与个人敏感字段原值</td>
+</tr>
+<tr>
+<td>客户端到服务器</td>
+<td>关联标识、协商到的协议版本与能力集、耗时、返回码</td>
+<td>访问令牌、刷新令牌、含令牌的完整请求头</td>
+</tr>
+<tr>
+<td>服务器到下游</td>
+<td>下游目标标识、以谁的身份访问、受众值指纹</td>
+<td>下游长期凭据、把令牌拼进 URL 的完整地址</td>
+</tr>
+<tr>
+<td>服务器回客户端</td>
+<td>结果长度、是否被裁剪、裁剪比例</td>
+<td>结果正文的全量副本</td>
+</tr>
+<tr>
+<td>客户端回宿主</td>
+<td>注入路径标识（工具结果还是资源）</td>
+<td>未经边界标记的原始正文</td>
+</tr>
+</tbody></table>
+<p>关于异步形态多说一句。现行口径允许一次调用先受理、后取结果，这会把上面那条链路从“一跳一次返回”变成“一跳加若干次轮询”，日志关联标识因此必须能跨越时间：受理时的标识要等于后续每次取结果的标识，否则一次长任务在观测面上会碎成一堆无法归因的独立请求，事后排查只能靠时间窗猜。</p>
+<h2 id="服务端怎么写才不被上游改版本打穿"><a href="#服务端怎么写才不被上游改版本打穿" class="headerlink" title="服务端怎么写才不被上游改版本打穿"></a>服务端怎么写才不被上游改版本打穿</h2><p>协议在两年内走了五个修订：2024-10-07、2024-11-05、2025-03-26、2025-06-18、2025-11-25。每一个都改变过可被依赖的形状。服务端要活下来，靠的不是跟得勤，而是把“跟随上游”这件事结构化。</p>
+<p>第一条是版本协商要当成运行时事实，不是编译期常量。握手阶段协商到的版本应该记录在每条日志与每个指标维度上，因为故障最常见形态不是“不支持”，而是同一个部署里不同客户端协商到不同版本、走了不同分支代码。同时要给自己一条纪律：至少同时支持两个修订，一个当前、一个上一个，且新修订的支持以旧修订仍可运行为前提。只支持单一版本的实现在宿主生态里等于把自己绑到最快的宿主发布节奏上。</p>
+<p>第二条是能力探测要按声明做，不按版本号推断。“对侧版本不早于某修订，所以它一定支持某能力”是典型的不稳定假设，因为能力从这一族规范起就是声明制的，同一版本完全可以声明不同的能力集合。所有分支判断都应该读声明，读不到就走保守路径。</p>
+<p>第三条是把废弃窗口当成排期事件。草案里给出的约 12 个月移除窗口（<strong>这是草案，内容可能变动</strong>）在工程上的正确读法不是“还有一年可以不动”，而是“从现在起有 12 个月可以在无告警状态下并行支持”。合理的节奏是三段：收到废弃信号的一周内把它变成一条带 owner 与截止日的内部工单，中间用计数器和日志确认还有多少真实流量走旧形态，最后设一个比官方窗口更早的内部停止日期，留出回滚余量。移除窗口一旦被当成“到期再说”，就必然以故障收尾。</p>
+<p>第四条是分层。把协议适配层写成薄壳——只做形状转换、版本分派与错误映射；业务能力放在与协议无关的内部接口后面。这样上游改的是壳，不是业务。判断标准很实际：如果新加入一个传输形态需要改动业务代码，分层就是失败的。</p>
+<pre class="mermaid">flowchart TD
+    A[收到上游修订或草案信号] --> B{是否影响已声明能力}
+    B -->|否| C[记录并观察]
+    B -->|是| D[拆成兼容工单，指定 owner 与截止日]
+    D --> E[旧路径加流量计数]
+    E --> F{计数是否降到可接受水位}
+    F -->|否| G[继续并行支持]
+    G --> E
+    F -->|是| H[内部停止日期前下线旧路径]
+    H --> I[保留一个发布周期的回滚开关]</pre>
+
+<p>第五条是把契约测试按修订做矩阵。测试对象不是“我们实现了什么”，而是“对每种客户端协商结果，我们的响应形状分别是什么”。矩阵至少覆盖当前修订与上一个修订，草案阶段则额外加一列按草案编写的失败测试，但这一列必须不参与发布判定——草案可以准备，不可以依赖。</p>
+<p>还有一类变化容易被忽略：宿主侧模型迭代本身不动协议，但会动上下文预算与提示缓存命中。宿主换到新一代型号（Anthropic 侧可点名的有 Opus 4.6、4.7、4.8 与 Sonnet 4.6，以及 Fable 5、Mythos 5 这一代；具体能力、上下文长度与价目请以官方当期公布为准）时，工具列表前缀的缓存价值会重算，模型对长描述的容忍度也会变。服务端能做的准备是把描述写短、把可选项写成结构而不是散文，这既是给模型看的，也是给缓存看的。</p>
+<h2 id="供应链与信任边界"><a href="#供应链与信任边界" class="headerlink" title="供应链与信任边界"></a>供应链与信任边界</h2><p>第三方服务器的引入流程，本质是一次小型软件供应链采购。这里只讲防御与流程，不讲攻击手法。</p>
+<p>权限审查要前置到引入决策，而不是留到事故复盘。审查清单不必长，但要能判定：这个服务器会写哪些系统、以谁的身份写、能不能只授予只读、它的下游凭据存在哪里、它有没有理由需要长期凭据。判定输出应该是“允许接入 &#x2F; 降权后接入 &#x2F; 不接入”三态之一，且三态都要有可追溯依据，否则评审会在两个季度后退化成盖章。</p>
+<p>依赖来源钉定是 stdio 形态下最有效的一条。安装方式要固定到可校验的摘要，而不是“跟着 latest 走”；镜像与构建产物的来源要显式声明；升级动作要产生一条与人为改动同级的变更记录。远端形态下这条边界由提供方持有，你无法钉定它的实现，因此对远端服务器要改用另一种约束：把它的行为纳入可观测范围，并对它的权限做更严格的收缩。</p>
+<p>更新审批要把“上游发了新版”当成变更事件而不是自动行为。可行的最小流程是：订阅发布通知，内部按周或按迭代窗口集中处理，每次升级前核对能力列表差异与描述差异（描述文本的变化同样是行为变更，因为它直接改变模型的调用倾向），升级后保留一个可快速回退的版本对。禁止的做法是让宿主启动时自动拉取最新版——那等于把发布权交给了外部仓库。</p>
+<p>最小权限与出口白名单要在部署层落地：服务器进程只应拿到它这项能力所需的那一点权限，运行账号与宿主账号分离，能访问的外部目标以清单形式给出而不是默认放行。这一层的具体网络策略设计不在本文范围，本文只强调它在 MCP 引入流程里不能被省略：一个只读的工单查询服务器没有任何理由可以访问对象存储的写端点。</p>
+<p>最后一件事是维护者风险的可见化。生态里相当一部分服务器由单一维护者支撑，仓库的发布间隔、issue 响应、依赖新鲜度这三项就足以给出一个粗略但有效的健康信号。把它写成采购表里的一栏，比写“社区热度高”要可靠得多。</p>
+<h2 id="生态评估口径：一个-server-值不值得引入"><a href="#生态评估口径：一个-server-值不值得引入" class="headerlink" title="生态评估口径：一个 server 值不值得引入"></a>生态评估口径：一个 server 值不值得引入</h2><p>评估第三方服务器时，最常见的错误是用“功能覆盖度”这一个维度做决定。下面四个维度是我认为无法互相替代的。</p>
+<p>维护活跃度看的是它是否还活着，但“活着”要用可核查的信号表达：最近一次发布的间隔、未关闭问题的处理速度、依赖是否跟得上当期运行时。这里要留意运行时基线本身：Node.js 侧 24 仍在 Active LTS、26 属于 Current 线还不是长期支持选择，Go 侧当期是 1.26，部署到集群上的实现还要对齐 Kubernetes 1.36 的口径。一个把 CI 固定在即将退场运行时上的服务器，其维护状态要比看起来差一档。</p>
+<p>权限范围看的是它需要多少才能干活，以及它是否肯说清楚自己要多少。一个只读查询的服务器如果要求写权限或长期凭据，这本身就是评估结论，不需要等到事故来证明。</p>
+<p>可观测性看的是出问题时你能不能自己定位。具体信号有三个：调用是否带可传递的关联标识、错误是否有区分度（而不是统一一个内部错误）、慢调用是否能被拆分到“客户端排队、网络、服务器处理、下游访问”四段中的某一段。这三条都缺的服务器，在生产环境里等价于一个黑盒依赖。</p>
+<p>退出成本看的是它拿走了什么不可替代的东西。如果它只是转发一组下游 API，替换相对干净；如果它把状态、授权关系或历史结果沉淀在自己的存储里，退出就是一次数据工程。把退出成本写成评估项的最大好处，是它会让“先接一个试试”变成有期限的尝试而不是一段时间后的既成事实。</p>
+<p>空白评估表如下，判定列留空由评审填写，任何一栏证据来源写“听说”应当退回补充。</p>
+<table>
+<thead>
+<tr>
+<th>评估维度</th>
+<th>要回答的问题</th>
+<th>证据来源</th>
+<th>判定（通过／降权／拒绝）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>维护活跃度</td>
+<td>发布间隔、问题响应、依赖新鲜度</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>运行时基线</td>
+<td>所依赖的运行时与集群版本是否仍在支持期</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>能力声明</td>
+<td>声明了什么、是否随版本变化、有无变更记录</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>权限范围</td>
+<td>读写性质、下游凭据形态、能否只授予只读</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>鉴权链路</td>
+<td>令牌受众是否绑定、注册方式是否可校验</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>可观测性</td>
+<td>关联标识、错误区分度、耗时分段</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>数据落点</td>
+<td>结果是否沉淀在提供方侧、能否取回与迁移</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>更新机制</td>
+<td>是否可钉定、升级是否需要人为批准</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>出口范围</td>
+<td>需要访问的外部目标清单</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>退出成本</td>
+<td>替换需要多少工作、有无并行迁移窗口</td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<p>这张表没有给出分数线，因为分数线属于组织而不是属于协议：同一个服务器在内部工具链里可接受，在面向客户的自动化里可能直接拒绝。表的作用是迫使判定显式化，让它可被复核，而不是可被感觉。</p>
+<h2 id="与相邻主题的划界"><a href="#与相邻主题的划界" class="headerlink" title="与相邻主题的划界"></a>与相邻主题的划界</h2><p>本文讨论范围之外但有交叉的几件事，各用一句划清：MCP 的基础概念与最小可运行接入属于协议入门范畴，不在这里重复；模型如何决定调用哪个工具、如何生成参数，是工具调用机制的主题，本文只接住调用发出去之后的部分；消息编码与序列化取舍属于序列化协议对比的讨论，本文不比较 JSON-RPC 与其他编码的优劣；多份工具协议之间的横向对比与标准化走势，由工具协议标准化一文展开；具体服务器怎么写、怎么运维，由工具生态与 MCP Server 实践一文展开；可判定的授权模型、凭据放置与审计留痕的通用设计由 Agent 安全与权限控制一文承担，本文只在协议链路上标注记录字段；网络出口与沙箱隔离的机制设计由 Agent 代码执行沙箱设计一文承担；智能体之间的协商与交接、以及框架选型与编排范式的讨论，与本文的协议生态视角不是同一问题。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>MCP 的生态问题可以压缩成三句判断。第一，它的价值不在原语数量，而在把发现、声明与注入三件事放进同一个可协商的会话里，因而能力第一次成为可以被跨宿主复用的发布单元；也正因如此，函数调用 schema 那类静态约定无法替代它。第二，选择 tools、resources 还是 prompts，本质是在选择“这段逻辑归谁演进、按谁鉴权、留不留痕”，把它塞进 prompts 是省了一时的接线，欠下长期的不可观测。第三，真正会打穿实现的是节奏：五个修订走过的两年里，授权要求持续加重，能力改为声明制，异步形态进入现行口径，而草案阶段又给出了约 12 个月的移除窗口——把这些当成带 owner 与截止日的排期事件，而不是到期再看的公告，是唯一稳妥的应对。</p>
+<p>对分发与供应链，本文的结论偏保守：注册表仍是预览、接口冻结在 v0.1 且仍在演进，因此它只能作为可发现性与来源核验的手段，不能作为安全审核的依据；治理主体在 2025-12-09 之后同时托管 MCP、AGENTS.md 与 goose，说明规范节奏正在被统一流程约束，这对长期维护预期是正面信号，但任何采用度与规模数字都应该等官方口径稳定后再引用。最后留一句给准备引入服务器的人：先填完那张评估表的证据来源列，再谈接入速度。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li>模型上下文协议规范与各修订变更记录（2024-10-07、2024-11-05、2025-03-26、2025-06-18、2025-11-25），MCP 官方文档站点 modelcontextprotocol.io</li>
+<li>模型上下文协议发布计划与 RC 说明（2026-05-29），MCP 官方文档站点 modelcontextprotocol.io</li>
+<li>MCP Registry 项目说明与接口约定（预览阶段，v0.1），MCP 官方站点与 GitHub 组织页 github.com&#x2F;modelcontextprotocol</li>
+<li>MCP 治理主体公告（2025-12-09），MCP 官方站点 modelcontextprotocol.io</li>
+<li>Anthropic 工程栏目：code execution with MCP（2025-11-04）、long-running harnesses（2025-11-26）、agent evals（2026-01-09）、managed agents（2026-04-08）、how we contain Claude，anthropic.com&#x2F;engineering</li>
+<li>Agent Skills 规格目录（2025-10-16），GitHub 项目页 github.com&#x2F;anthropics&#x2F;skills</li>
+<li>A2A 协议规范 v1.0.0（2026-03-12）与 v1.0.1（2026-05-26），A2A 开源项目主页（Linux 基金会旗下项目）</li>
+<li>AGNTCY 项目说明（2025-07-29 启动），AGNTCY 开源项目主页</li>
+<li>OAuth 2.1 规范草案，OAuth 官方站点 oauth.net</li>
+<li>RFC 8707（Resource Indicators for OAuth 2.0），IETF 文档站点 datatracker.ietf.org</li>
+<li>LangChain 1.3 与 LangGraph 1.2 发布说明，官方文档站点</li>
+<li>OpenAI Agents SDK（当期仍为 0.x）、CrewAI、AutoGen、Eino 项目主页，仅作生态定位参考</li>
+<li>Node.js 发布计划（24 Active LTS 与 26 Current），nodejs.org</li>
+<li>Go 1.26 发布说明，go.dev</li>
+<li>Kubernetes 1.36 文档与版本口径，kubernetes.io</li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>模型上下文协议生态</p><p><a href="https://987763485.github.io/2026/07/11/模型上下文协议生态/">https://987763485.github.io/2026/07/11/模型上下文协议生态/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2026-07-11</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-21</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="link-muted mr-2" rel="tag" href="/tags/python/">python</a><a class="link-muted mr-2" rel="tag" href="/tags/rust/">rust</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2026/07/18/Agent%E5%B7%A5%E5%85%B7%E5%8D%8F%E8%AE%AE%E6%A0%87%E5%87%86%E5%8C%96/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Agent 工具协议标准化</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2026/07/04/%E7%AB%AF%E4%BE%A7Agent%E4%B8%8E%E6%9C%AC%E5%9C%B0%E6%8E%A8%E7%90%86/"><span class="level-item">端侧 Agent 与本地推理</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

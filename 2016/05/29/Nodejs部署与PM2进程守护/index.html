@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Node.js 部署与 PM2 进程守护 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="凌晨三点半，没人知道进程已经死了"><meta property="og:type" content="blog"><meta property="og:title" content="Node.js 部署与 PM2 进程守护"><meta property="og:url" content="https://987763485.github.io/2016/05/29/Nodejs%E9%83%A8%E7%BD%B2%E4%B8%8EPM2%E8%BF%9B%E7%A8%8B%E5%AE%88%E6%8A%A4/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="凌晨三点半，没人知道进程已经死了"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2016-05-29T10:09:56.000Z"><meta property="article:modified_time" content="2026-10-18T04:48:36.264Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="javascript"><meta property="article:tag" content="后端开发"><meta property="article:tag" content="nodejs"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2016/05/29/Nodejs%E9%83%A8%E7%BD%B2%E4%B8%8EPM2%E8%BF%9B%E7%A8%8B%E5%AE%88%E6%8A%A4/"},"headline":"Node.js 部署与 PM2 进程守护","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2016-05-29T10:09:56.000Z","dateModified":"2026-10-18T04:48:36.264Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"凌晨三点半，没人知道进程已经死了"}</script><link rel="canonical" href="https://987763485.github.io/2016/05/29/Nodejs%E9%83%A8%E7%BD%B2%E4%B8%8EPM2%E8%BF%9B%E7%A8%8B%E5%AE%88%E6%8A%A4/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2016-05-29T10:09:56.000Z" title="5/29/2016, 6:09:56 PM">2016-05-29</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></span><span class="level-item">29 分钟读完 (大约4339个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Node.js 部署与 PM2 进程守护</h1><div class="content"><h2 id="凌晨三点半，没人知道进程已经死了"><a href="#凌晨三点半，没人知道进程已经死了" class="headerlink" title="凌晨三点半，没人知道进程已经死了"></a>凌晨三点半，没人知道进程已经死了</h2><p>2016 年 5 月中旬的一个周四早上，运营过来拍桌子：昨夜开始，报价单导出页面一直在转圈。那是一台 2 核 4G 的 CentOS 6 虚机，跑的就是一个 <code>nohup node app.js &amp;</code> 起的 Express 应用，输出重定向到 <code>app.log</code>。ssh 上去 <code>ps -ef | grep node</code>，进程不在了。日志翻到底，最后一行是 <code>FATAL ERROR: ... process out of memory</code>，时间戳凌晨三点四十几。从挂掉到第二天上午，七八个小时没人知道。原因扒开看，是导出接口一次把整张表读进内存，跟部署方式无关。真正让我心里没底的是另一件事：服务能不能活，全看有没有人恰好在那个点打开页面。</p>
+<p>同期还搭进两起。一起是改了代码忘了重启，线上跑的还是旧逻辑，最后靠重启机器才恢复；另一起是例行维护重启后，nginx 自己起来了，Node 服务没起来——因为压根没写开机自启。三起事故指向同一个缺口：<code>nohup</code> 只负责把进程扔到后台，不负责它活着。</p>
+<p>先把边界说清。Socket.io 多进程下的广播与适配器，5 月 10 日那篇已讲，本文只留部署侧要开的这一行 nginx 配置；Express 中间件的六个坑是 5 月 24 日专文，这里只用一句”模块级变量在多实例下各算各的”；nvm 装老版本在 5 月 15 日那篇，libuv 在事件循环篇，产物缓存与静态化各有专文，都不重讲。这篇只谈一件事：怎么把一个 Node 进程放到机器上，让它活得久、看得见、起得来、换得掉。</p>
+<h2 id="当期能用的候选，一个个过"><a href="#当期能用的候选，一个个过" class="headerlink" title="当期能用的候选，一个个过"></a>当期能用的候选，一个个过</h2><p><code>nohup</code> 加一段 shell。最省事，也最脆弱。我们写过一版 <code>start.sh</code>，判断完端口占用再包一层 <code>while true; do node app.js; sleep 2; done</code>。进程死了确实会再来，但它不懂为什么死：启动即崩时这个循环刷屏刷到磁盘吃紧，机器重启它自己也不在。</p>
+<p><code>forever</code>。公司另一个小接口用的是它，强在会重启、能记 pid。但它只管单进程，多核要手动开多份；日志切成一堆带时间戳的文件，翻着抓瞎，也没有查询接口。</p>
+<p>Node 自带的 <code>cluster</code>。主进程 fork 出跟 CPU 数一样的 worker，共享同一个监听端口。它解决多核，不解决挂了拉起，更不解决开机自启，业务入口还要改代码。</p>
+<p>upstart。CentOS 6 的 init 就是它，写一份 <code>/etc/init/app.conf</code>，<code>start on startup</code> 加 <code>respawn</code>，拉起与自启一次覆盖。缺点是语法隐晦，日志只能指到一个文件，CentOS 7 上已经不是它了。</p>
+<p>systemd。CentOS 7 才是 systemd，<code>Restart=always</code> 配 <code>RestartSec</code>，写得比 upstart 清楚。问题是当时那批老机器大半还是 6，一份逻辑要在两个发行版各维护一版。</p>
+<p>supervisord。Python 那一套，进程组、日志轮转、web 界面都齐，跨语言是最大优点，运维同事本来就熟。减分项是多一个环境依赖，且它管进程不管 Node 的多核，还得配 cluster。</p>
+<p>nginx 反代加手工多实例。开 4 个进程监听 4001 到 4004，upstream 里写四行。端口冲突没了，负载也分开了，但进程列表是手抄的，加一台机器要改两处，重启仍要靠上面那些脚本。</p>
+<p>Docker 当时是 1.10 一线。我确实拿它跑过两天，结论放在最后一节，不写成展望。</p>
+<h2 id="横向对比：我们当时的判断"><a href="#横向对比：我们当时的判断" class="headerlink" title="横向对比：我们当时的判断"></a>横向对比：我们当时的判断</h2><p>下表是两台 2 核 4G 老机器上各跑一遍后的判断，不是客观结论。</p>
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>多核利用</th>
+<th>崩溃自动重启</th>
+<th>开机自启</th>
+<th>日志收集</th>
+<th>零停机重载</th>
+<th>监控&#x2F;查询接口</th>
+<th>接入门槛</th>
+<th>老内核老发行版兼容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>nohup + shell</td>
+<td>无，要手开</td>
+<td>while 循环，会打挂磁盘</td>
+<td>无</td>
+<td>全压一个文件</td>
+<td>无</td>
+<td>无</td>
+<td>极低</td>
+<td>都行</td>
+</tr>
+<tr>
+<td>forever</td>
+<td>手动开多份</td>
+<td>有</td>
+<td>要自己写</td>
+<td>切文件，翻着抓瞎</td>
+<td>无</td>
+<td>只有列表</td>
+<td>低</td>
+<td>好</td>
+</tr>
+<tr>
+<td>PM2</td>
+<td><code>-i 0</code> 一行</td>
+<td>有</td>
+<td><code>startup</code> 生成脚本</td>
+<td>分两种日志，不轮转</td>
+<td><code>reload</code></td>
+<td><code>monit</code>、<code>jlist</code></td>
+<td>低，不改代码</td>
+<td>靠 upstart&#x2F;systemd</td>
+</tr>
+<tr>
+<td>cluster</td>
+<td>原生</td>
+<td>无，要自己监听</td>
+<td>无</td>
+<td>不管</td>
+<td>要自己写信号</td>
+<td>无</td>
+<td>中，要改入口</td>
+<td>好</td>
+</tr>
+<tr>
+<td>upstart</td>
+<td>不管</td>
+<td><code>respawn</code></td>
+<td>原生</td>
+<td>指一个文件</td>
+<td>无</td>
+<td><code>status</code></td>
+<td>中，语法隐晦</td>
+<td>CentOS 6 就是它</td>
+</tr>
+<tr>
+<td>systemd</td>
+<td>不管</td>
+<td><code>Restart=always</code></td>
+<td>原生</td>
+<td>交 journald</td>
+<td>无</td>
+<td><code>status</code></td>
+<td>中</td>
+<td>CentOS 6 上没有</td>
+</tr>
+<tr>
+<td>supervisord</td>
+<td>不管</td>
+<td>有</td>
+<td>有</td>
+<td>自带轮转</td>
+<td>无</td>
+<td>web 和 RPC</td>
+<td>中高，多一套 Python</td>
+<td>好，依赖烦</td>
+</tr>
+<tr>
+<td>nginx + 手工多实例</td>
+<td>四行 upstream</td>
+<td>无</td>
+<td>无</td>
+<td>不管</td>
+<td>逐台摘流</td>
+<td>只有状态页</td>
+<td>低</td>
+<td>好</td>
+</tr>
+<tr>
+<td>Docker 1.10</td>
+<td>靠宿主</td>
+<td><code>restart=always</code></td>
+<td>靠宿主服务</td>
+<td>内网要自己收</td>
+<td>换容器，不算零停机</td>
+<td><code>ps</code>、<code>stats</code></td>
+<td>高</td>
+<td>老内核坑最多</td>
+</tr>
+</tbody></table>
+<h2 id="PM2-上手：我们真用到的那几条"><a href="#PM2-上手：我们真用到的那几条" class="headerlink" title="PM2 上手：我们真用到的那几条"></a>PM2 上手：我们真用到的那几条</h2><p>先在项目根目录试 <code>pm2 start app.js -i 0</code>。<code>-i 0</code> 是按 CPU 数开 worker，2 核 4G 上就是两个进程，这一步把 cluster 那段入口代码省了。之后每天用的就四条：<code>pm2 list</code> 看状态，<code>pm2 logs</code> 看输出，<code>pm2 restart</code> 整个换一遍，<code>pm2 reload</code> 一个个换。restart 会让服务空白一小会儿，reload 不会；改配置换依赖用 restart，日常发版用 reload。</p>
+<p>开机自启最终靠两步：<code>pm2 startup</code> 生成一份 upstart 或 systemd 的启动脚本（CentOS 6 出 upstart，7 出 systemd，这一步只是生成文件并回显一条要你复制执行的命令），<code>pm2 save</code> 再把进程列表冻到 <code>~/.pm2/dump.pm2</code>，重启后守护脚本读这份 dump 恢复进程。坑我们踩过：只 <code>startup</code> 不 <code>save</code>，或者 save 之前新加的服务还没 start 上，重启后就是空的。</p>
+<p>环境变量走 <code>ecosystem.json</code>，下面这段就是我们当时的文件：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;apps&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span></span><br><span class="line">    <span class="punctuation">&#123;</span></span><br><span class="line">      <span class="attr">&quot;name&quot;</span><span class="punctuation">:</span> <span class="string">&quot;quote-api&quot;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;script&quot;</span><span class="punctuation">:</span> <span class="string">&quot;app.js&quot;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;instances&quot;</span><span class="punctuation">:</span> <span class="number">2</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;log_date_format&quot;</span><span class="punctuation">:</span> <span class="string">&quot;YYYY-MM-DD HH:mm:ss&quot;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;env_production&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">        <span class="attr">&quot;NODE_ENV&quot;</span><span class="punctuation">:</span> <span class="string">&quot;production&quot;</span><span class="punctuation">,</span></span><br><span class="line">        <span class="attr">&quot;PORT&quot;</span><span class="punctuation">:</span> <span class="string">&quot;4001&quot;</span></span><br><span class="line">      <span class="punctuation">&#125;</span></span><br><span class="line">    <span class="punctuation">&#125;</span></span><br><span class="line">  <span class="punctuation">]</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>起法两种：<code>pm2 start ecosystem.json --env production</code> 读的就是 <code>env_production</code> 这一段，不带 <code>--env</code> 只拿 <code>env</code> 段。<code>pm2 env quote-api</code> 查生效的变量。要改实例数，<code>pm2 scale quote-api 4</code> 比杀掉重起干净。</p>
+<h2 id="cluster-与-PM2-怎么分工"><a href="#cluster-与-PM2-怎么分工" class="headerlink" title="cluster 与 PM2 怎么分工"></a>cluster 与 PM2 怎么分工</h2><p>划分很简单：多核交给 PM2 的 <code>-i</code>，不再自己写 cluster 入口。<code>-i 0</code> 按 CPU 数开 worker，2 核 4G 上开 2 个；写死 <code>-i 4</code> 也试过，结果只是 RSS 涨、请求排队，所以原则是 worker 数不超过核数。worker 之间不共享内存，同一个模块在每个进程里各加载一份，模块级变量也就各算各的——Express 中间件那篇里那个计数器就是这个坑。要记住的是：任何进程内的状态都不是全局的，做统计要么落库要么走 redis。端口复用由主进程负责，它拿到监听句柄再派给子进程，机制细节在事件循环篇。已经写了 cluster 入口的应用，把那段代码摘掉，只留 <code>app.listen</code>，让 PM2 去 fork。</p>
+<h2 id="零停机-reload-的真实代价"><a href="#零停机-reload-的真实代价" class="headerlink" title="零停机 reload 的真实代价"></a>零停机 reload 的真实代价</h2><p><code>pm2 reload quote-api</code> 是逐个 worker 换：起一个新的，接过来，再等老的把手上请求跑完后退掉。代价有两条，我们都被咬过。</p>
+<p>第一条是内存。切换那一刻新老 worker 同时在世，2 核 4G 上原来两个各 300 多 M，reload 时瞬间变四份，峰值接近 1.3 G，这是同一台机器上的粗略观察。内存本来吃紧的话，reload 等于自己触发 OOM，比原来的事故还难看；只能挑低峰发版，或先把实例数减一半。第二条是老 worker 退不掉：只要还挂着一条没断的连接，PM2 就得等。我们那个页面有长轮询，一次 reload 后 <code>pm2 list</code> 里老进程长时间停在 stopping。解法不在 PM2 上，在应用要有超时、反代别把连接拖太长。</p>
+<p>长连接多进程要粘性会话和广播适配器，那套东西 5 月 10 日那篇讲完了，本文只留部署侧这一行：nginx 的 upstream 里加 <code>ip_hash</code>，让同一个用户落回同一个 worker，否则长轮询会随机拿到不同进程的会话。</p>
+<h2 id="日志：谁接-stdout，谁来轮转"><a href="#日志：谁接-stdout，谁来轮转" class="headerlink" title="日志：谁接 stdout，谁来轮转"></a>日志：谁接 stdout，谁来轮转</h2><p>PM2 把输出分成 <code>out-&lt;id&gt;.log</code> 和 <code>error-&lt;id&gt;.log</code>，默认写在 <code>~/.pm2/logs/</code>，无限追加。那台机器上线第三天 <code>df -h</code> 就见底了，一个 out 文件 2.7 G。解法是上 logrotate：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">/var/www/quote/logs/pm2-*.log &#123;</span><br><span class="line">    daily</span><br><span class="line">    rotate 14</span><br><span class="line">    missingok</span><br><span class="line">    notifempty</span><br><span class="line">    compress</span><br><span class="line">    dateext</span><br><span class="line">    copytruncate</span><br><span class="line">    create 0644 root root</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>copytruncate</code> 是关键：PM2 握着文件句柄，若用默认的 rename 再新建，日志会继续写进那个已被改名走的旧文件，新文件一直是空的。我们一度想靠 <code>pm2 delete</code> 再 <code>start</code> 来释放句柄，后来发现那等于每次轮转都把服务重启一遍。</p>
+<p>应用侧的取舍是另一件事。一开始我们用 <code>morgan</code> 把访问日志写到 <code>logs/access.log</code>，加了 worker 后两个进程写同一个文件，行会交错，看着像乱码。最后改成 <code>morgan</code> 只输出 stdout，文件交给 PM2 接、轮转交给 logrotate：应用少一套文件逻辑，多实例同写一个文件的问题也没了，代价是访问日志和其他 <code>console.log</code> 混在一个 out 文件里，<code>grep</code> 得靠关键字。</p>
+<h2 id="开机自启这一步为什么老是起不来"><a href="#开机自启这一步为什么老是起不来" class="headerlink" title="开机自启这一步为什么老是起不来"></a>开机自启这一步为什么老是起不来</h2><p>第一次配好 <code>pm2 startup</code> 后重启验证，<code>pm2 list</code> 是空的。翻 upstart 日志只有一行 <code>/usr/local/bin/node: No such file or directory</code>。原因扒开看：<code>startup</code> 生成的脚本按绝对路径执行 node，而那个路径取自生成脚本那一刻的环境。我们的 node 是 nvm 装的，登录 shell 能用是因为 <code>.bashrc</code> 改了 PATH，守护脚本不走 <code>.bashrc</code>，两边不是同一个 PATH。那两天只能把 <code>pm2 describe quote-api</code> 和 <code>pm2 env quote-api</code> 的输出抄在本子上对，才发现登录 shell 的 PATH 和进程实际拿到的差了两段——当时没别的手段，就是抓瞎式一条条查。</p>
+<p>当期只有两种可靠解法。一是写绝对路径，把解释器固定到 nvm 下那个具体版本，别指望默认 node。二是把 PM2 本身指到同一版本：切好版本再 <code>pm2 delete</code>、<code>start</code>、<code>save</code>，保证守护进程和 worker 用同一个二进制。混着用最糟——守护进程挂在 4.x，脚本里又叫 0.10 的 node，报错完全不指向真原因。还有一点：<code>startup</code> 回显的那条命令要手工用 root 执行一次，漏了就是脚本生成了但服务没注册。</p>
+<h2 id="监控兜底：一段粗暴但有效的定时脚本"><a href="#监控兜底：一段粗暴但有效的定时脚本" class="headerlink" title="监控兜底：一段粗暴但有效的定时脚本"></a>监控兜底：一段粗暴但有效的定时脚本</h2><p><code>pm2 monit</code> 我们开一个终端常驻，看每个 worker 的 CPU 和内存跳；<code>pm2 jlist</code> 输出一段 JSON，方便脚本读。下面是那台 2 核 4G 上每两分钟跑一次的脚本：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#!/bin/bash</span></span><br><span class="line">LOG=/var/log/pm2-guard.log</span><br><span class="line">pm2 jlist | node -e <span class="string">&#x27;</span></span><br><span class="line"><span class="string">var s = &quot;&quot;;</span></span><br><span class="line"><span class="string">process.stdin.on(&quot;data&quot;, function (c) &#123; s += c; &#125;);</span></span><br><span class="line"><span class="string">process.stdin.on(&quot;end&quot;, function () &#123;</span></span><br><span class="line"><span class="string">  var list = JSON.parse(s);</span></span><br><span class="line"><span class="string">  for (var i = 0; i &lt; list.length; i++) &#123;</span></span><br><span class="line"><span class="string">    var p = list[i];</span></span><br><span class="line"><span class="string">    var rss = p.monit.memory;</span></span><br><span class="line"><span class="string">    if (p.name === &quot;quote-api&quot; &amp;&amp; rss &gt; 700 * 1024 * 1024) &#123;</span></span><br><span class="line"><span class="string">      console.log(p.name + &quot; pid &quot; + p.pid + &quot; rss &quot; + rss);</span></span><br><span class="line"><span class="string">    &#125;</span></span><br><span class="line"><span class="string">  &#125;</span></span><br><span class="line"><span class="string">&#125;);&#x27;</span> &gt;&gt; <span class="variable">$LOG</span> 2&gt;&amp;1</span><br></pre></td></tr></table></figure>
+
+<p>阈值 700 M 是同一台机器上的粗略观察：两个 worker 正常各 300 多 M，稳定后一路涨、明显不回落，就是导出接口又在攒内存。攒到 700 M 就 <code>pm2 restart quote-api</code>，先把进程压回去，别等 OOM 把整机拖得一卡。副作用要写清，因为它不透明：restart 会把正在跑的导出任务直接切掉，等了一半的请求拿到的是连接被断，长轮询要等客户端自己重连。所以它是兜底不是修复，脚本里每次 restart 都往日志留一行，第二天好对得上是谁动的。另有一条更轻的：<code>pm2 logs --lines 200</code> 拉 error 文件，看到连续同一个异常就发消息给自己，比什么监控平台都及时。</p>
+<h2 id="nginx-反代的最小可用配置"><a href="#nginx-反代的最小可用配置" class="headerlink" title="nginx 反代的最小可用配置"></a>nginx 反代的最小可用配置</h2><p>nginx 是 1.8 一线，我们最后落到这么一段，只保留真正解决问题的几行：</p>
+<figure class="highlight nginx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">upstream</span> quote_api &#123;</span><br><span class="line">    ip_hash;</span><br><span class="line">    <span class="attribute">server</span> <span class="number">127.0.0.1:4001</span>;</span><br><span class="line">    <span class="attribute">server</span> <span class="number">127.0.0.1:4002</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="section">server</span> &#123;</span><br><span class="line">    <span class="attribute">listen</span> <span class="number">80</span>;</span><br><span class="line">    <span class="attribute">server_name</span> quote.example.internal;</span><br><span class="line"></span><br><span class="line">    <span class="attribute">client_max_body_size</span> <span class="number">20m</span>;</span><br><span class="line"></span><br><span class="line">    <span class="section">location</span> /static/ &#123;</span><br><span class="line">        <span class="attribute">alias</span> /data/www/quote/static/;</span><br><span class="line">        <span class="attribute">expires</span> <span class="number">7d</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="section">location</span> / &#123;</span><br><span class="line">        <span class="attribute">proxy_pass</span> http://quote_api;</span><br><span class="line">        <span class="attribute">proxy_http_version</span> <span class="number">1</span>.<span class="number">1</span>;</span><br><span class="line">        <span class="attribute">proxy_set_header</span> Host <span class="variable">$host</span>;</span><br><span class="line">        <span class="attribute">proxy_set_header</span> X-Real-IP <span class="variable">$remote_addr</span>;</span><br><span class="line">        <span class="attribute">proxy_set_header</span> X-Forwarded-For <span class="variable">$proxy_add_x_forwarded_for</span>;</span><br><span class="line">        <span class="attribute">proxy_read_timeout</span> <span class="number">60s</span>;</span><br><span class="line">        <span class="attribute">proxy_connect_timeout</span> <span class="number">3s</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>几个点。<code>X-Real-IP</code> 和 <code>X-Forwarded-For</code> 不传，应用日志里全是 <code>127.0.0.1</code>，那次排查我们连是哪个客户在打导出都不知道。<code>client_max_body_size</code> 默认 1m，附件上传被 nginx 413 挡掉，报错到不了 Node。<code>proxy_read_timeout</code> 是长轮询的生命线：应用侧超时 70 秒而 nginx 只等 60 秒，永远是 nginx 先断开。静态目录走 <code>alias</code> 由 nginx 发，别让 Node 读磁盘上的 js 和 css——产物命名与缓存在构建产物篇，静态页搬走在静态化篇，这里只记一句：同一台 2 核 4G 上，静态文件归 nginx，Node 的 CPU 才留给接口。</p>
+<h2 id="灰度与回滚：两台机器加一次摘流"><a href="#灰度与回滚：两台机器加一次摘流" class="headerlink" title="灰度与回滚：两台机器加一次摘流"></a>灰度与回滚：两台机器加一次摘流</h2><p>线上只有两台机器，能做的是最土的灰度：两台都在 upstream 里，发布时先摘掉一台。五步固定。一，备份，上一版目录 <code>cp -a</code> 成带时间戳的副本，代码不到 100 M，成本可忽略。二，只发 A 机，<code>pm2 reload</code>，再从公司网外 curl 健康检查接口，接口里只读一个 DB 计数和一个内存水位，非 200 就停手。三，把 A 加回 upstream，<code>nginx -t</code> 通过才 <code>nginx -s reload</code>，观察 error 日志五分钟。四，同样发 B 机。五，回滚触发条件：健康检查连续两次失败，或 error 日志里同一个异常一分钟内超过十次，就把这台从 upstream 注释掉，另一台顶上，同时把备份目录 <code>mv</code> 回来再 <code>pm2 restart</code>。全程最快六分钟。前提是两台代码互不影响，带状态的活儿得先挪出去。</p>
+<h2 id="关于-Docker，当时的判断不漂亮"><a href="#关于-Docker，当时的判断不漂亮" class="headerlink" title="关于 Docker，当时的判断不漂亮"></a>关于 Docker，当时的判断不漂亮</h2><p>2016 年上半年我们用 1.10 把两个小服务装进去跑过，三个问题很实际。镜像体积：带编译工具链的基础镜像拉下来 700 多 M，加上 node_modules 随便上 G，机器间分发只能靠 tar 拷。内核：CentOS 6 那批机器内核太老，跑起来莫名其妙，7 上面才正常，而我们主力是 6。内网拉取：registry 在公司网络外面，一次 pull 十几分钟还经常断，自己搭又是一摊事。所以结论不是”以后要上”，而是一句范围明确的话：2016 年这套东西，新起的独立服务可以试，已经有用户、依赖本机日志路径和老内核的服务不上——容器带来的可复现性收益，抵不过它在老发行版上排查问题的成本。</p>
+<h2 id="结论表"><a href="#结论表" class="headerlink" title="结论表"></a>结论表</h2><table>
+<thead>
+<tr>
+<th>场景</th>
+<th>我们当时的选择</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>手上只有 CentOS 6 的机器</td>
+<td>PM2 管进程，upstart 管开机</td>
+<td>不改代码就能多核</td>
+</tr>
+<tr>
+<td>CentOS 7 的新服务</td>
+<td>PM2 加 systemd</td>
+<td>配置比 upstart 好读</td>
+</tr>
+<tr>
+<td>只要多核、不要别的</td>
+<td>cluster 自己写</td>
+<td>少一个外部依赖</td>
+</tr>
+<tr>
+<td>运维已经管别的项目</td>
+<td>supervisord</td>
+<td>跨语言和轮转现成</td>
+</tr>
+<tr>
+<td>内存已经吃紧的应用</td>
+<td>别用 reload，改低峰 restart</td>
+<td>瞬时翻倍会自己触发 OOM</td>
+</tr>
+</tbody></table>
+<p>最后留一句踩完全程才写下的话：PM2 只解决进程活着，不解决服务可用。它能让崩了的 worker 几秒后回来，能开机自启，能接住日志，但内存一直涨的那个接口、超时链没对齐的反代、没有健康检查就切流量的发布脚本，它一样都管不了——可用性是这三件事叠出来的，进程只是最下面一层。那台 2 核 4G 后来还是被 OOM 打过一次，只是这次是凌晨四点零二分，<code>pm2 list</code> 里多了一行重启计数，而我在告警里先看到了它。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Node.js 部署与 PM2 进程守护</p><p><a href="https://987763485.github.io/2016/05/29/Nodejs部署与PM2进程守护/">https://987763485.github.io/2016/05/29/Nodejs部署与PM2进程守护/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2016-05-29</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/javascript/">javascript</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a><a class="link-muted mr-2" rel="tag" href="/tags/nodejs/">nodejs</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2016/05/31/EventEmitter%E4%BA%8B%E4%BB%B6%E8%A7%A6%E5%8F%91%E5%99%A8%E5%AE%9E%E6%88%98/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">EventEmitter 事件触发器实战</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2016/05/24/Express%E4%B8%AD%E9%97%B4%E4%BB%B6%E7%BC%96%E5%86%99%E5%AE%9E%E8%B7%B5/"><span class="level-item">Express 中间件编写实践</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

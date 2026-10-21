@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>SSR 与边缘渲染实践 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="这篇文章讨论的不是”用哪个框架”，而是”渲染这件事发生在哪一台机器上”。同一个页面，渲染放在浏览器里、放在机房里的 Node 服务上、放在离用户更近的边缘运行时里、或者干脆放在构建期做完，四者的成本结构、失败模式和补救手段完全不同。适合用过 SSR 却说不清”慢在哪一段”的同学，读完应能回答三个问题：首屏的三段时间各被什么吃掉、哪些代码搬不到边缘、一次未命中的边缘请求最终把压力转嫁给谁。框架内的模"><meta property="og:type" content="blog"><meta property="og:title" content="SSR 与边缘渲染实践"><meta property="og:url" content="https://987763485.github.io/2024/11/02/SSR%E4%B8%8E%E8%BE%B9%E7%BC%98%E6%B8%B2%E6%9F%93%E5%AE%9E%E8%B7%B5/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="这篇文章讨论的不是”用哪个框架”，而是”渲染这件事发生在哪一台机器上”。同一个页面，渲染放在浏览器里、放在机房里的 Node 服务上、放在离用户更近的边缘运行时里、或者干脆放在构建期做完，四者的成本结构、失败模式和补救手段完全不同。适合用过 SSR 却说不清”慢在哪一段”的同学，读完应能回答三个问题：首屏的三段时间各被什么吃掉、哪些代码搬不到边缘、一次未命中的边缘请求最终把压力转嫁给谁。框架内的模"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2024-11-01T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-20T05:34:30.205Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="web前端"><meta property="article:tag" content="typescript"><meta property="article:tag" content="react"><meta property="article:tag" content="vue"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2024/11/02/SSR%E4%B8%8E%E8%BE%B9%E7%BC%98%E6%B8%B2%E6%9F%93%E5%AE%9E%E8%B7%B5/"},"headline":"SSR 与边缘渲染实践","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2024-11-01T16:00:00.000Z","dateModified":"2026-10-20T05:34:30.205Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"这篇文章讨论的不是”用哪个框架”，而是”渲染这件事发生在哪一台机器上”。同一个页面，渲染放在浏览器里、放在机房里的 Node 服务上、放在离用户更近的边缘运行时里、或者干脆放在构建期做完，四者的成本结构、失败模式和补救手段完全不同。适合用过 SSR 却说不清”慢在哪一段”的同学，读完应能回答三个问题：首屏的三段时间各被什么吃掉、哪些代码搬不到边缘、一次未命中的边缘请求最终把压力转嫁给谁。框架内的模"}</script><link rel="canonical" href="https://987763485.github.io/2024/11/02/SSR%E4%B8%8E%E8%BE%B9%E7%BC%98%E6%B8%B2%E6%9F%93%E5%AE%9E%E8%B7%B5/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2024-11-01T16:00:00.000Z" title="11/2/2024, 12:00:00 AM">2024-11-02</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/">前端开发</a></span><span class="level-item">1 小时读完 (大约7907个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">SSR 与边缘渲染实践</h1><div class="content"><p>这篇文章讨论的不是”用哪个框架”，而是”渲染这件事发生在哪一台机器上”。同一个页面，渲染放在浏览器里、放在机房里的 Node 服务上、放在离用户更近的边缘运行时里、或者干脆放在构建期做完，四者的成本结构、失败模式和补救手段完全不同。适合用过 SSR 却说不清”慢在哪一段”的同学，读完应能回答三个问题：首屏的三段时间各被什么吃掉、哪些代码搬不到边缘、一次未命中的边缘请求最终把压力转嫁给谁。框架内的模式选型与部署运维不在本文范围。</p>
+<h2 id="渲染位置谱系：谁在为什么付钱"><a href="#渲染位置谱系：谁在为什么付钱" class="headerlink" title="渲染位置谱系：谁在为什么付钱"></a>渲染位置谱系：谁在为什么付钱</h2><p>一段网页从字节变成可交互的界面，中间要发生四件事：取到渲染所需的数据、把数据变成 HTML 字符串、把 HTML 送到用户、把事件与状态接回已有 DOM。这四件事可以在四个不同位置上完成，而位置一旦选定，延迟和成本的分布就基本固定了，后面的工程手段只是在同一条曲线上挪动。</p>
+<p>先看四个位置分别把代价放在哪里。纯客户端渲染把取数和拼装都交给浏览器：服务端只需要吐一份体积很小但内容为空的 HTML，第一段响应几乎只受网络往返和静态文件服务支配，源站压力最低；代价是首屏可见时间被 JavaScript 下载、执行和一轮轮数据请求推后，内容可见性还得看爬虫是否执行脚本。源站 SSR 把取数和拼装集中到自己的机房：HTML 到达时内容已经完整，爬虫和低速设备都受益；代价是”每个请求都要跑一遍渲染函数”必须由一台有状态、要扩缩容、要缓存的长驻服务承担，而且源站通常只在少数几个地域，网络距离本身成了新的延迟项。边缘渲染把渲染函数搬到全球多个节点，把网络距离压回去；代价是执行环境从一台随时可扩容的 Linux 机器换成了一套受限沙箱，能用什么 API、能跑多久、能连谁都被平台写死。构建期静态（SSG 与带再渲染语义的 ISR，本文只作定位）把代价推到构建阶段和新鲜度上：分发几乎免费，但要用明确的过期策略换实时性。</p>
+<pre class="mermaid">flowchart TD
+  U[用户请求] --> P{页面在构建期是否已可确定}
+  P -->|是| G[构建产物直接进入 CDN]
+  P -->|否| E{边缘节点有无可用 HTML}
+  E -->|有且未过期| S[边缘直接返回 HTML]
+  E -->|无或已过期| R[边缘执行渲染函数]
+  R -->|依赖均可在边缘访问| S
+  R -->|需要私有数据或操作系统能力| O[回源到源站 SSR]
+  O --> S
+  G --> B[浏览器解析 HTML]
+  S --> B
+  B --> H[加载脚本并完成水合]
+  H --> D[界面可交互]</pre>
+
+<table>
+<thead>
+<tr>
+<th>渲染位置</th>
+<th>成本落在哪里</th>
+<th>延迟主要消耗在</th>
+<th>失效后能做什么</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>纯客户端渲染</td>
+<td>用户设备的 CPU 与电量</td>
+<td>脚本下载执行加上首屏数据往返</td>
+<td>只能重跑一轮请求</td>
+</tr>
+<tr>
+<td>源站 SSR</td>
+<td>自家机房的计算与内存</td>
+<td>到源站的往返加上渲染与取数</td>
+<td>可以本地缓存、可以降级</td>
+</tr>
+<tr>
+<td>边缘渲染</td>
+<td>按请求计费的执行时间</td>
+<td>到最近节点的往返加上外部服务往返</td>
+<td>靠缓存命中率和回源策略</td>
+</tr>
+<tr>
+<td>构建期静态</td>
+<td>构建时长与存储</td>
+<td>几乎只剩分发距离</td>
+<td>只能重建或等再渲染</td>
+</tr>
+</tbody></table>
+<p>选型上我倾向用一个粗暴但好用的判据：内容是否需要知道”你是谁”，以及多久变一次。不需要身份、变化不快，就往构建期和边缘缓存推；需要身份，就把静态外壳留在边缘、个性化交给客户端；两者都不满足，才做源站 SSR，并配好缓存与降级。</p>
+<h2 id="首屏到底在等什么"><a href="#首屏到底在等什么" class="headerlink" title="首屏到底在等什么"></a>首屏到底在等什么</h2><p>把”首屏慢”当成一个整体来优化几乎一定失败，因为从输入 URL 到能点按钮，中间是三段时间的接力，而 SSR 与边缘渲染对这三段的影响方向并不一致。</p>
+<p>第一段是 TTFB，即请求发出到收到第一个字节，由网络往返、连接建立、服务端排队与响应开始之前的一切同步工作构成。这一段是纯粹的服务端账：源站 SSR 把取数和拼装放在这里，边缘渲染把渲染函数放在离用户更近的地方，两者都在压缩它。第二段是 HTML 到达，也就是文档剩余字节传完、解析器把工作交给脚本的时刻，它由 HTML 体积与带宽决定，与水合无关。第三段是水合完成，浏览器要下载并执行框架运行时与页面组件，在已有 DOM 上重建组件树、绑定事件、把服务端状态灌进客户端 store，直到交互真正可用。</p>
+<p>关键结论是：SSR 降低第一段，却很可能抬高第三段。服务端为了”内容可见”已经把组件树渲染了一遍，客户端为了接管交互还要再构建一遍，代码体积和依赖都没少，只是多了一轮与 DOM 的协调。数据量大的页面还会把序列化后的状态内联进 HTML，这段 JSON 直接挤进第二段让文档更肥，而水合期间的长任务则把”看起来早就好了、点下去没反应”的观感集中引爆。边缘渲染也没有魔法：它缩短的只是第一段里的网络分量，渲染若要等一个跨地域的私有数据库，边缘只是把等待换了地点。</p>
+<p>因此打点要按段拆开：至少把首字节时刻、文档 <code>DOMContentLoaded</code> 时刻和自己埋的”根组件已接管交互”时刻放到同一条时间轴上。看到三段的比例，才知道”首屏慢”该找边缘、找体积还是找主线程。至于预算制度本身怎么定，前端性能预算实践一文已经讲过，本文不重复。</p>
+<h2 id="源站-SSR-的真实工程负担"><a href="#源站-SSR-的真实工程负担" class="headerlink" title="源站 SSR 的真实工程负担"></a>源站 SSR 的真实工程负担</h2><p>源站 SSR 的难点不是”能不能把组件渲染成字符串”——React 18 的 <code>renderToString</code> 与 <code>renderToPipeableStream</code>、Vue 3.4 的服务端渲染器都已经足够稳，传统 Node SSR 的最小实现我在更早那篇 React 服务端渲染初探里写过。难点在于：渲染一旦进入请求路径，这台机器就变成了在线系统，要有超时、降级和缓存，还要回答”挂了怎么办”。</p>
+<p>第一层负担是内存与并发。渲染是 CPU 密集的同步工作：构造组件树、执行生命周期、拼接字符串，全跑在事件循环上，单进程的并发约等于”一次只能认真渲染一个页面”，其余请求只能排队。于是 QPS 上去之后最先恶化的指标恰恰是我们想改善的 TTFB——用户等的是排队而不是渲染。每请求临时对象、模块级缓存状态、误挂在 globalThis 上的请求上下文都会推高常驻内存，接近上限时垃圾回收的停顿进一步放大延迟，形成典型的”越忙越慢”。扩容能解决吞吐，解决不了单请求时长和状态共享的正确性。</p>
+<p>第二层是超时与降级，这是最容易被跳过的一环。必须给渲染路径设一个每请求时间预算，超了就放弃完整渲染，改发一个仍然可用的响应：旧缓存 HTML、只含外壳的骨架、或者直接退回纯客户端渲染。三者都比”等到用户关掉页面”好。</p>
+<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> <span class="variable constant_">RENDER_BUDGET_MS</span> = <span class="number">300</span>; <span class="comment">// 每请求渲染时间预算（示意值）</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">async</span> <span class="keyword">function</span> <span class="title function_">renderWithDeadline</span>(<span class="params"><span class="attr">tree</span>: <span class="built_in">unknown</span>, <span class="attr">deadlineMs</span>: <span class="built_in">number</span></span>) &#123;</span><br><span class="line">  <span class="keyword">let</span> <span class="attr">timer</span>: <span class="title class_">ReturnType</span>&lt;<span class="keyword">typeof</span> <span class="built_in">setTimeout</span>&gt;;</span><br><span class="line">  <span class="keyword">const</span> timeout = <span class="keyword">new</span> <span class="title class_">Promise</span>&lt;<span class="built_in">never</span>&gt;(<span class="function">(<span class="params">_, reject</span>) =&gt;</span> &#123;</span><br><span class="line">    timer = <span class="built_in">setTimeout</span>(<span class="function">() =&gt;</span> <span class="title function_">reject</span>(<span class="keyword">new</span> <span class="title class_">Error</span>(<span class="string">&#x27;render-timeout&#x27;</span>)), deadlineMs);</span><br><span class="line">  &#125;);</span><br><span class="line">  <span class="keyword">try</span> &#123;</span><br><span class="line">    <span class="comment">// 真正的渲染：取数 + 字符串拼装，必须与超时竞争</span></span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">await</span> <span class="title class_">Promise</span>.<span class="title function_">race</span>([<span class="title function_">renderToString</span>(tree), timeout]);</span><br><span class="line">  &#125; <span class="keyword">catch</span> (err) &#123;</span><br><span class="line">    <span class="comment">// 降级顺序：旧缓存 &gt; 外壳 &gt; 空壳，绝不返回 5xx</span></span><br><span class="line">    <span class="keyword">return</span> (<span class="keyword">await</span> <span class="title function_">readStaleHtml</span>()) ?? <span class="variable constant_">SHELL_HTML</span>;</span><br><span class="line">  &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">    <span class="built_in">clearTimeout</span>(timer!);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>第三层是缓存一致性。源站 SSR 通常有两级缓存：整页 HTML 缓存和依赖数据缓存，失效顺序必须固定——先失效依赖、再失效 HTML，否则会出现”新数据配旧 HTML”，或更糟的”旧数据配新 HTML 又被缓存住”。</p>
+<p>第四层是对下游的放大，这是最昂贵的一课。”每个请求跑一次渲染”意味着页面里有多少次取数，数据库就承受多少倍于静态站点的压力：一个首屏串行发起八个查询、还带 N+1 的页面，在五千 QPS 下就是四万次查询每秒，而其中绝大部分在算同一件事。缓解手段按性价比排序：串行取数改并行或批量合并、给渲染路径加短 TTL 缓存、给慢查询设熔断并在超时时走降级而不是走等待。要不要上源站 SSR，最实用的判据是”能不能给出这一页在峰值 QPS 下的每请求查询次数”。</p>
+<h2 id="边缘运行时的能力与限制"><a href="#边缘运行时的能力与限制" class="headerlink" title="边缘运行时的能力与限制"></a>边缘运行时的能力与限制</h2><p>边缘渲染的吸引力来自距离：把渲染函数部署到靠近用户的节点，用短往返替代跨洲际往返。要理解限制，得先理解执行模型。主流边缘平台跑的是 V8 隔离而不是容器或虚拟机：一个底层进程同时承载大量互相隔离的执行上下文。这带来两个直接后果。其一，冷启动的语义变了——没有虚拟机启动和进程 fork，但模块实例化、顶层代码求值和闭包构建仍是真实开销，一个上下文刚被回收，下一个请求就要重付这笔账，量级通常在几十到上百毫秒（示意值，各平台差异极大，不要照抄博客里的数字）。其二，进程内缓存不可靠——全局对象上的 Map 不保证跨请求、跨上下文命中，把它当分布式缓存用一定会出错，真正可依赖的是平台提供的键值或对象存储。至于容量，隔离上下文数量受宿主资源约束，峰值时新上下文要现建，冷启动比例会随流量上升。</p>
+<p>限制清单如下，每一条都会在真实项目里至少踩一次。</p>
+<table>
+<thead>
+<tr>
+<th>限制</th>
+<th>表现</th>
+<th>常见应对</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>没有完整 Node 运行时</td>
+<td>文件系统、子进程、动态端口监听、原生依赖不可用</td>
+<td>把相关工作推到源站或构建期</td>
+</tr>
+<tr>
+<td>CPU 时间片与请求时长有硬上限</td>
+<td>超限请求被直接终止，而非变慢</td>
+<td>拆分渲染、把慢模块后置</td>
+</tr>
+<tr>
+<td>并发连接数受限</td>
+<td>同时打给多个上游时部分请求被拒</td>
+<td>减少上游数量、合并取数</td>
+</tr>
+<tr>
+<td>到”内部服务”的往返更远</td>
+<td>边缘连源站数据库比源站自己连更慢</td>
+<td>边缘只取可缓存数据</td>
+</tr>
+<tr>
+<td>模块加载即计费</td>
+<td>引入大而全的库会同时抬高冷启动与账单</td>
+<td>按最小 API 组织依赖</td>
+</tr>
+</tbody></table>
+<h3 id="什么代码能跑到边缘"><a href="#什么代码能跑到边缘" class="headerlink" title="什么代码能跑到边缘"></a>什么代码能跑到边缘</h3><p>我用的判据只有一条：<strong>只依赖 Web 标准 API 的纯计算，加上边缘可访问的数据源</strong>。前半句是能力问题，后半句是网络拓扑问题，很多人只检查前半句，结果代码在边缘跑起来了、却在每次取数时超时。</p>
+<p>常见失败清单值得背下来。<code>Buffer</code> 不是全局对象，除非平台提供 polyfill，要改成 <code>Uint8Array</code> 加 <code>TextEncoder</code> 与 <code>TextDecoder</code>；<code>fs</code>、<code>child_process</code>、<code>net</code>、<code>dns</code>、<code>worker_threads</code> 一律不可用；<code>node:</code> 前缀的说明符即使有实现也不保证同名；原生 addon 与需要 node-gyp 编译的依赖进不去，纯 JavaScript 或 WebAssembly 实现才有资格；<code>process.env</code> 通常只保证模块顶层被静态读取的键有值，运行时动态下标可能拿到 undefined，正确写法是在模块作用域一次性解构并在构建期内联。</p>
+<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 可行：模块顶层静态解构，构建期可被内联替换</span></span><br><span class="line"><span class="keyword">const</span> &#123; <span class="variable constant_">PARTNER_API_BASE</span> &#125; = process.<span class="property">env</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 危险：运行时动态下标，部分边缘运行时拿不到值</span></span><br><span class="line"><span class="keyword">const</span> val = process.<span class="property">env</span>[userProvidedKey];</span><br></pre></td></tr></table></figure>
+
+<p>还有一类更麻烦的失败：依赖内部做运行时探测，探测不到 Node 就抛错，这类问题在构建期常常只是一条警告，所以值得把”边缘入口能否导入每个页面模块”做成构建期冒烟检查。</p>
+<p>框架里哪些代码天然满足这个判据，Next.js 的 App Router 与 <code>runtime</code> 边界在 Next.js 全栈框架实战一文里已经讲清，本文不重讲框架 API；框架内 SSR、SSG 与 ISR 该怎么选，见下一篇专门讲渲染模式选型的文章；而怎么把边缘函数部署上线、灰度与回滚，属于 Next.js 全栈部署实践的范围。</p>
+<h2 id="数据获取的分层与缓存键"><a href="#数据获取的分层与缓存键" class="headerlink" title="数据获取的分层与缓存键"></a>数据获取的分层与缓存键</h2><p>确定渲染位置之后，下一个决定是”在哪一层取哪一份数据”。我建议把首屏数据按”是否与身份相关”切成两堆：匿名可缓存的公共数据，以及只有登录用户才有的个性化数据。前者进边缘，后者干脆不进渲染路径——边缘只输出含占位符的外壳，个性化由客户端补齐。这不是偷懒，而是把不可缓存的东西移出缓存路径的唯一干净做法，它的实质就是 stale-while-revalidate 的精神：先返回一份略旧但完整可用的公共内容，再由后台或客户端补上新数据。</p>
+<p>难点集中在缓存键。键里只要含 cookie、Authorization 头或任何用户标识，缓存就退化成”每用户一份”，命中率断崖式下跌，等于花了边缘的成本却什么都没缓存住。正确做法是把身份信息排除在键外并显式降级：命中公共缓存时返回匿名外壳，个性化由客户端补；确实要按身份区分时，宁可放弃边缘缓存回源。</p>
+<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">buildCacheKey</span>(<span class="params"><span class="attr">req</span>: <span class="title class_">Request</span>, <span class="attr">route</span>: <span class="built_in">string</span></span>): <span class="built_in">string</span> &#123;</span><br><span class="line">  <span class="keyword">const</span> url = <span class="keyword">new</span> <span class="title function_">URL</span>(req.<span class="property">url</span>);</span><br><span class="line">  <span class="comment">// 键只由公开可变的维度构成：路径、显式版本、语言与设备类别</span></span><br><span class="line">  <span class="keyword">const</span> lang = url.<span class="property">searchParams</span>.<span class="title function_">get</span>(<span class="string">&#x27;lang&#x27;</span>) ?? <span class="string">&#x27;zh&#x27;</span>;</span><br><span class="line">  <span class="keyword">const</span> device = <span class="title function_">isMobile</span>(req.<span class="property">headers</span>.<span class="title function_">get</span>(<span class="string">&#x27;user-agent&#x27;</span>)) ? <span class="string">&#x27;m&#x27;</span> : <span class="string">&#x27;d&#x27;</span>;</span><br><span class="line">  <span class="comment">// 绝不包含 cookie、authorization、x-user-id</span></span><br><span class="line">  <span class="keyword">return</span> <span class="string">`<span class="subst">$&#123;route&#125;</span>|v<span class="subst">$&#123;DEPLOY_VERSION&#125;</span>|<span class="subst">$&#123;lang&#125;</span>|<span class="subst">$&#123;device&#125;</span>`</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">cacheHeaders</span>(<span class="params"><span class="attr">privateFragment</span>: <span class="built_in">boolean</span></span>) &#123;</span><br><span class="line">  <span class="keyword">return</span> privateFragment</span><br><span class="line">    ? &#123; <span class="string">&#x27;cache-control&#x27;</span>: <span class="string">&#x27;private, no-store&#x27;</span> &#125; <span class="comment">// 含身份的内容不进共享缓存</span></span><br><span class="line">    : &#123; <span class="string">&#x27;cache-control&#x27;</span>: <span class="string">&#x27;public, max-age=60, stale-while-revalidate=300&#x27;</span> &#125;;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>另一条常被误用的捷径是”边缘直连主库”，我认为它几乎总是错的，原因不是安全而是物理：边缘到源站数据库要跨地域，往返常常比查询本身高一个数量级；数据库要为每个边缘节点维持一批连接，而边缘的连接并发本来就受限；最要命的是主库失去了”请求只从少数几个源站来”这个拓扑前提，一次缓存失效就变成全球数百个节点同时回源。真要边缘取数，应该走一层可缓存的 HTTP 接口或平台自带的边缘可读存储。</p>
+<h2 id="流式与分块：外壳先到、慢模块后补"><a href="#流式与分块：外壳先到、慢模块后补" class="headerlink" title="流式与分块：外壳先到、慢模块后补"></a>流式与分块：外壳先到、慢模块后补</h2><p>分块传输让”等待”可以被重新安排。服务端不再攒齐整个 HTML 才响应，而是一段段地推：先发送头部、关键样式和首屏外壳，慢模块的数据到齐后再追加。浏览器在第一段到达时就能开始解析和绘制，用户看到的不再是白屏而是一个逐步长出来的页面。React 18 的 <code>renderToPipeableStream</code> 把这套语义做成了显式阶段：外壳就绪时通过 <code>onShellReady</code> 开始响应，被 Suspense 边界包裹的慢内容在数据到齐后作为替换片段流出；Vue 3.4 与 3.5 的服务端渲染在这个年代仍是一次性整树输出，要分块得靠手工拼接。</p>
+<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> &#123; renderToPipeableStream &#125; <span class="keyword">from</span> <span class="string">&#x27;react-dom/server&#x27;</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">function</span> <span class="title function_">handle</span>(<span class="params"><span class="attr">req</span>: <span class="title class_">Request</span></span>) &#123;</span><br><span class="line">  <span class="keyword">const</span> &#123; pipe &#125; = <span class="title function_">renderToPipeableStream</span>(</span><br><span class="line">    <span class="language-xml"><span class="tag">&lt;<span class="name">App</span> <span class="attr">url</span>=<span class="string">&#123;new</span> <span class="attr">URL</span>(<span class="attr">req.url</span>)&#125; /&gt;</span></span>,</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="title function_">onShellReady</span>(<span class="params"></span>) &#123;</span><br><span class="line">        <span class="comment">// 外壳就绪即开始响应，慢模块稍后以片段补齐</span></span><br><span class="line">        res.<span class="title function_">writeHead</span>(<span class="number">200</span>, &#123; <span class="string">&#x27;content-type&#x27;</span>: <span class="string">&#x27;text/html; charset=utf-8&#x27;</span> &#125;);</span><br><span class="line">        <span class="title function_">pipe</span>(res);</span><br><span class="line">      &#125;,</span><br><span class="line">      <span class="title function_">onShellError</span>(<span class="params"></span>) &#123;</span><br><span class="line">        <span class="comment">// 外壳都没出来：必须回退到非流式的降级页</span></span><br><span class="line">        res.<span class="title function_">writeHead</span>(<span class="number">500</span>);</span><br><span class="line">        res.<span class="title function_">end</span>(<span class="variable constant_">SHELL_FALLBACK</span>);</span><br><span class="line">      &#125;,</span><br><span class="line">    &#125;</span><br><span class="line">  );</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<pre class="mermaid">sequenceDiagram
+  participant B as 浏览器
+  participant E as 边缘渲染
+  participant D as 慢数据源
+  B->>E: 请求页面
+  E->>D: 发起慢模块取数
+  E-->>B: 首块：外壳与关键样式
+  B->>B: 解析并完成首屏绘制
+  D-->>E: 慢模块数据返回
+  E-->>B: 后续块：替换占位片段
+  E-->>B: 末块：脚本标签与收尾
+  B->>B: 加载运行时并按块水合</pre>
+
+<p>好处要说准，坏处也要说准。好处是 TTFB 和首次绘制都提前了，用户在等待期间获得视觉反馈。坏处有三。第一，如果最大内容元素恰好落在被推迟的慢模块里，真正的首屏指标可能反而变差——外壳来得快但主体来得晚，指标不会替用户撒谎。第二，分块输出的 HTML 在任意时刻都是不完整的文档，而水合要求服务端 DOM 与客户端组件树一致，因此每个片段必须自带边界标识和替换协议。第三，对爬虫是真实风险：搜索引擎的渲染通常发生在抓取之后的队列里，但抓取时看到的内容仍然算数，<code>title</code>、规范链接、结构化数据和主导航必须出现在外壳里。我的实践边界是：延迟块只放推荐位、评论和个性化模块，正文与导航永远在外壳里。</p>
+<h2 id="缓存与失效：三层各自的抓手"><a href="#缓存与失效：三层各自的抓手" class="headerlink" title="缓存与失效：三层各自的抓手"></a>缓存与失效：三层各自的抓手</h2><p>边缘渲染的成败最终由命中率决定，而命中率横跨三层，每层的控制手段和生命周期都不同。</p>
+<p>第一层是浏览器缓存，由响应头支配，作用域只有当前用户，省得下二次访问、省不下首访。动态 HTML 在这里寿命很短，真正长寿的是带内容哈希的资源，用 <code>public, max-age=31536000, immutable</code> 让浏览器一年不再问。第二层是 CDN 与边缘缓存，它的键决定命中率上限，失效必须能按 URL 之外的维度做，否则改一条文案就要等 TTL 过期。第三层是应用内缓存，也就是渲染函数自己的数据缓存，它能被业务语义精确控制，也最容易写脏。</p>
+<p>失效的通用武器只有 TTL。tag 失效——“把打了 <code>product:42</code> 标签的页面一次清掉”——依赖平台是否提供接口，不是 HTTP 标准能力，不要在架构里假设它普遍存在；用了它就要接受与平台绑定，并留一条 TTL 兜底路径，防止失效接口失败时内容永久停在旧版本。</p>
+<p>个性化与命中率的冲突无法两全，只能靠切分缓解：可缓存外壳加不可缓存尾部是标准解法，代价是首屏必须留一块”待填充”区域，而且布局要提前占好，否则内容补上时的位移会同时伤害体验与布局稳定性。</p>
+<p>两个失败模式要有成文的防护。一是穿透：不存在的资源被大量请求，每次都绕过缓存打到渲染路径，做法是让缓存层存住 404 与空结果，并对同一键的并发回源做单飞。二是惊群：热点内容 TTL 到期的瞬间成批请求同时重渲染，做法是让它们复用同一次渲染，或用随机抖动把过期时间打散。</p>
+<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> inflight = <span class="keyword">new</span> <span class="title class_">Map</span>&lt;<span class="built_in">string</span>, <span class="title class_">Promise</span>&lt;<span class="built_in">string</span>&gt;&gt;();</span><br><span class="line"></span><br><span class="line"><span class="keyword">async</span> <span class="keyword">function</span> <span class="title function_">oncePerKey</span>(<span class="params"><span class="attr">key</span>: <span class="built_in">string</span>, <span class="attr">work</span>: () =&gt; <span class="title class_">Promise</span>&lt;<span class="built_in">string</span>&gt;</span>) &#123;</span><br><span class="line">  <span class="keyword">const</span> existing = inflight.<span class="title function_">get</span>(key);</span><br><span class="line">  <span class="keyword">if</span> (existing) <span class="keyword">return</span> existing; <span class="comment">// 同键并发只跑一次渲染</span></span><br><span class="line">  <span class="keyword">const</span> p = <span class="title function_">work</span>().<span class="title function_">finally</span>(<span class="function">() =&gt;</span> inflight.<span class="title function_">delete</span>(key));</span><br><span class="line">  inflight.<span class="title function_">set</span>(key, p);</span><br><span class="line">  <span class="keyword">return</span> p;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="SEO-与可访问性：SSR-换来什么、又要小心的坑"><a href="#SEO-与可访问性：SSR-换来什么、又要小心的坑" class="headerlink" title="SEO 与可访问性：SSR 换来什么、又要小心的坑"></a>SEO 与可访问性：SSR 换来什么、又要小心的坑</h2><p>先说清收益的形状。SSR 或边缘渲染让内容在文档到达时就已存在于 DOM 里，爬虫即使不执行脚本也能读到文本、拿到链接。对内容型站点，这既是收录保险，也是内链被发现速度的保障——只在客户端渲染后才出现的列表项，它的链接在抓取时并不存在。CSR 并非一定不被收录，但爬虫执行脚本要排队、要开销、结果不保证；把确定性拿到自己手里，才是做 SSR 的正当理由。</p>
+<p>代价藏在两个坑里。第一个是重复内容与闪烁：关键 CSS 没在头部就绪时，浏览器会先画一版无样式文本再重画；更常见的是服务端渲染默认状态、客户端 store 灌入真实状态后立刻覆盖，用户看到内容跳一下。根治办法是让服务端渲染的状态与客户端首次读取的状态严格一致，并把它内联成唯一来源。第二个是 hydration mismatch：服务端只要用了当前时间、随机数或依赖语言头的判断，两端就会算出不同结果，React 的恢复策略会重渲染整棵子树，把 SSR 的收益原地销毁。</p>
+<p>meta 与结构化数据的落位只有一条原则：必须出现在外壳的首块里，且只出现一次。<code>title</code>、<code>meta name=&quot;description&quot;</code>、<code>link rel=&quot;canonical&quot;</code>、Open Graph 与 Twitter 卡片标签都要在 <code>head</code> 内完成，因为爬虫和社交抓取器读 <code>head</code> 时不会等你后续分块；JSON-LD 也要在一次输出里给全，半截的脚本块比没有更糟。一条诚实边界：不要为了爬虫而放隐藏文本，也不要按 user agent 输出显著不同的内容。</p>
+<p>可访问性常被漏掉，但它对水合特别敏感。三条实操：占位区域要有明确的忙碌语义（例如容器上标注 <code>aria-busy</code> 并在补齐后去掉）；水合不要重排 DOM 顺序，两端必须产出同一棵树，否则屏幕阅读器的焦点会莫名跳跃；水合失败时页面仍应可读，只要别把关键交互做成”不水合就完全不可用”。</p>
+<h2 id="成本模型与可观测性"><a href="#成本模型与可观测性" class="headerlink" title="成本模型与可观测性"></a>成本模型与可观测性</h2><p>成本上，边缘和源站是两种不同的账。源站按实例付费：容量必须按峰值预留，闲时也烧钱，好处是重计算和长连接都在预算内。边缘按调用付费：账单由请求数与每次调用的执行时间相加，闲时几乎为零，坏处是每次调用的 CPU 时间既是账单单位又是硬上限，而且对命中率极度敏感——命中时你付的是一个静态文件的钱，未命中时付的是一次完整渲染的钱。</p>
+<p>于是分水岭其实是命中率与流量形态。低频但地理分散的站点（海外用户为主、企业官网、长尾内容页）在边缘获益最直接，它同时省下源站预留和往返延迟。每次响应都依赖身份或私有数据的高吞吐站点不适合边缘：缓存留不住，等于用更高单价买同样的工作，还不如让源站的进程内缓存摊薄。重计算的页面也不适合，执行时间既是钱又是超时风险。最麻烦的是”两边都养着”——上了边缘却给源站缩不了容，既付按请求的账单又付按实例的账单。</p>
+<p>失败模式里最贵的是回源放大：边缘未命中时请求要跨地域回源，一次全球范围的热 key 同时过期就可能把源站队列打满，而源站的预留本来就是按”边缘挡住大部分流量”设计的。应对是过期时间加抖动、回源做单飞、给回源路径设并发上限并在超时时返回旧内容。其次是雪崩：数据源抖动推高失败率，失败响应无法被缓存，全部落到重试上形成正反馈——所以让短 TTL 的错误响应也被缓存一会儿，比失败就永远穿透安全。</p>
+<p>可观测性必须按渲染位置分段。核心是每条响应都带上”这份 HTML 从哪来”的标记，并在浏览器侧把三段时间一起上报。</p>
+<table>
+<thead>
+<tr>
+<th>示例字段</th>
+<th>含义</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>render_layer</code></td>
+<td>edge 或 origin 或 build</td>
+<td>分层看延迟与错误率</td>
+</tr>
+<tr>
+<td><code>cache_state</code></td>
+<td>hit 或 miss 或 stale 或 bypass</td>
+<td>命中率与回源放大的分子</td>
+</tr>
+<tr>
+<td><code>render_ms</code></td>
+<td>渲染函数自身耗时</td>
+<td>与总耗时相减即排队与网络</td>
+</tr>
+<tr>
+<td><code>fetch_count</code></td>
+<td>本请求发起的取数次数</td>
+<td>下游放大的直接指标</td>
+</tr>
+<tr>
+<td><code>deadline_hit</code></td>
+<td>是否触达渲染超时预算</td>
+<td>降级率，最该告警的一项</td>
+</tr>
+</tbody></table>
+<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 边缘与源站共用同一份打点结构，字段名保持一致才可对齐</span></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">emit</span>(<span class="params"><span class="attr">page</span>: <span class="built_in">string</span>, <span class="attr">m</span>: <span class="title class_">Partial</span>&lt;<span class="title class_">Metrics</span>&gt;</span>) &#123;</span><br><span class="line">  logger.<span class="title function_">info</span>(<span class="string">&#x27;render&#x27;</span>, &#123;</span><br><span class="line">    <span class="attr">render_layer</span>: m.<span class="property">layer</span> ?? <span class="string">&#x27;origin&#x27;</span>,</span><br><span class="line">    <span class="attr">cache_state</span>: m.<span class="property">cache</span> ?? <span class="string">&#x27;bypass&#x27;</span>,</span><br><span class="line">    <span class="attr">render_ms</span>: <span class="title class_">Math</span>.<span class="title function_">round</span>(m.<span class="property">renderMs</span> ?? <span class="number">0</span>),</span><br><span class="line">    <span class="attr">fetch_count</span>: m.<span class="property">fetchCount</span> ?? <span class="number">0</span>,</span><br><span class="line">    <span class="attr">deadline_hit</span>: (m.<span class="property">renderMs</span> ?? <span class="number">0</span>) &gt;= <span class="variable constant_">RENDER_BUDGET_MS</span>,</span><br><span class="line">    page,</span><br><span class="line">  &#125;);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>采集口径要注意三件事。第一，边缘命中率以边缘日志为准而不是 CDN 面板，两者对”命中”的定义经常不一致。第二，源站要分开统计”来自边缘的回源”和”直达源站”的请求，否则回源放大看不出来。第三，浏览器侧上报的三段时间要带渲染位置标记，才能回答”同一个页面，命中与未命中差多少”。告警只盯两个比例：触达预算的降级占比，和命中率的绝对下跌。</p>
+<h2 id="需求、渲染位置与代价：一张选型表"><a href="#需求、渲染位置与代价：一张选型表" class="headerlink" title="需求、渲染位置与代价：一张选型表"></a>需求、渲染位置与代价：一张选型表</h2><p>把前面的判断收敛成一张能贴进评审文档的表，它的作用是把代价显式化，避免”别人都用边缘所以我们也用”。</p>
+<table>
+<thead>
+<tr>
+<th>需求形态</th>
+<th>建议渲染位置</th>
+<th>要付的代价</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>全站公开、更新以天为单位</td>
+<td>构建期静态进 CDN</td>
+<td>实时性最差，改动要等重建或过期</td>
+</tr>
+<tr>
+<td>公开但更新频繁</td>
+<td>边缘渲染加短 TTL 公共缓存</td>
+<td>成本随命中率波动，要防惊群与穿透</td>
+</tr>
+<tr>
+<td>首屏公开、登录后才个性化</td>
+<td>边缘出外壳，客户端补个性化</td>
+<td>需要预留占位，接受位移与二次请求</td>
+</tr>
+<tr>
+<td>每请求都依赖私有数据</td>
+<td>源站 SSR</td>
+<td>要为峰值预留容量并配齐超时降级</td>
+</tr>
+<tr>
+<td>重计算或依赖原生库、文件系统</td>
+<td>源站 SSR，或构建期预生成</td>
+<td>渲染时长直接进入 TTFB</td>
+</tr>
+<tr>
+<td>用户地域分散、源站只在单一地域</td>
+<td>外壳与静态部分搬边缘</td>
+<td>私有数据仍要回源，收益被抵消</td>
+</tr>
+<tr>
+<td>内部系统、用户集中、并发可控</td>
+<td>源站 SSR 甚至纯客户端</td>
+<td>上边缘换不来延迟收益只添复杂度</td>
+</tr>
+<tr>
+<td>强依赖收录、内容又高度动态</td>
+<td>SSR 且正文永远在外壳</td>
+<td>延迟块只能放非正文模块</td>
+</tr>
+</tbody></table>
+<p>读表方式是横向而不是纵向：先确认内容是否需要身份、多久变一次、渲染要吃多少 CPU、依赖能不能进边缘，四个答案就能把行缩小到一到两行。任何一行都要连同代价一起汇报给业务方——构建期用新鲜度换吞吐，边缘用平台绑定换距离，源站用预留容量换自由度。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>本文的核心判断是：渲染位置决定延迟与成本的形状，框架只是在这个形状上做优化。首屏要拆成 TTFB、HTML 到达与水合完成三段时间分别归因，SSR 压第一段而可能抬第三段。源站 SSR 的负担是内存与并发、超时与降级、两级缓存一致性、以及对下游数据库的放大，缺一项都不算上线完成。边缘的判据是”只依赖 Web API 的纯计算加边缘可访问的数据源”，个性化留给客户端，主库永远不要直连边缘。流式能改善观感，但 <code>head</code> 里的元信息与正文必须在首块给全。最后，命中率同时决定成本与账单，按渲染位置分段打点、盯住降级率与命中率，比任何单次调优都可靠。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://developer.mozilla.org/en-US/docs/Web/API/Streams_API">Streams API - MDN</a></li>
+<li><a href="https://developer.mozilla.org/en-US/docs/Web/API/TextEncoder">TextEncoder - MDN</a></li>
+<li><a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching">HTTP caching - MDN</a></li>
+<li><a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control">Cache-Control - MDN</a></li>
+<li><a href="https://react.dev/reference/react-dom/server/renderToPipeableStream">renderToPipeableStream - React 文档</a></li>
+<li><a href="https://web.dev/articles/ttfb">TTFB - web.dev</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>SSR 与边缘渲染实践</p><p><a href="https://987763485.github.io/2024/11/02/SSR与边缘渲染实践/">https://987763485.github.io/2024/11/02/SSR与边缘渲染实践/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2024-11-02</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-20</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/web%E5%89%8D%E7%AB%AF/">web前端</a><a class="link-muted mr-2" rel="tag" href="/tags/typescript/">typescript</a><a class="link-muted mr-2" rel="tag" href="/tags/react/">react</a><a class="link-muted mr-2" rel="tag" href="/tags/vue/">vue</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2024/11/07/PWA%E6%B8%90%E8%BF%9B%E5%BC%8FWeb%E5%BA%94%E7%94%A8%E5%AE%9E%E8%B7%B5/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">PWA 渐进式 Web 应用实践</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2024/10/31/WebVitals%E6%80%A7%E8%83%BD%E6%8C%87%E6%A0%87%E4%BC%98%E5%8C%96/"><span class="level-item">Web Vitals 性能指标优化</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

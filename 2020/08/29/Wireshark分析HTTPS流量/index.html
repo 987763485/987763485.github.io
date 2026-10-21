@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Wireshark 分析 HTTPS 流量 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="HTTPS 把内容藏进了 TLS 记录，却在链路上留下大量可观察的结构性信息。本文以 Wireshark 3.2 为工具，先梳理握手阶段哪些字段可见，再讨论在什么条件下才能合法解密，以及解密后如何阅读 HTTP&amp;#x2F;2 流量。读者需要具备 TCP 与抓包的基础知识，读完应能独立完成一次有授权的 HTTPS 会话分析，并在拿不到密钥时给出有边界的判断。"><meta property="og:type" content="blog"><meta property="og:title" content="Wireshark 分析 HTTPS 流量"><meta property="og:url" content="https://987763485.github.io/2020/08/29/Wireshark%E5%88%86%E6%9E%90HTTPS%E6%B5%81%E9%87%8F/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="HTTPS 把内容藏进了 TLS 记录，却在链路上留下大量可观察的结构性信息。本文以 Wireshark 3.2 为工具，先梳理握手阶段哪些字段可见，再讨论在什么条件下才能合法解密，以及解密后如何阅读 HTTP&amp;#x2F;2 流量。读者需要具备 TCP 与抓包的基础知识，读完应能独立完成一次有授权的 HTTPS 会话分析，并在拿不到密钥时给出有边界的判断。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2020-08-29T10:51:16.000Z"><meta property="article:modified_time" content="2026-10-18T14:55:54.664Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="网络安全"><meta property="article:tag" content="计算机网络"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2020/08/29/Wireshark%E5%88%86%E6%9E%90HTTPS%E6%B5%81%E9%87%8F/"},"headline":"Wireshark 分析 HTTPS 流量","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2020-08-29T10:51:16.000Z","dateModified":"2026-10-18T14:55:54.664Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"HTTPS 把内容藏进了 TLS 记录，却在链路上留下大量可观察的结构性信息。本文以 Wireshark 3.2 为工具，先梳理握手阶段哪些字段可见，再讨论在什么条件下才能合法解密，以及解密后如何阅读 HTTP&#x2F;2 流量。读者需要具备 TCP 与抓包的基础知识，读完应能独立完成一次有授权的 HTTPS 会话分析，并在拿不到密钥时给出有边界的判断。"}</script><link rel="canonical" href="https://987763485.github.io/2020/08/29/Wireshark%E5%88%86%E6%9E%90HTTPS%E6%B5%81%E9%87%8F/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2020-08-29T10:51:16.000Z" title="8/29/2020, 6:51:16 PM">2020-08-29</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a></span><span class="level-item">1 小时读完 (大约8049个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Wireshark 分析 HTTPS 流量</h1><div class="content"><p>HTTPS 把内容藏进了 TLS 记录，却在链路上留下大量可观察的结构性信息。本文以 Wireshark 3.2 为工具，先梳理握手阶段哪些字段可见，再讨论在什么条件下才能合法解密，以及解密后如何阅读 HTTP&#x2F;2 流量。读者需要具备 TCP 与抓包的基础知识，读完应能独立完成一次有授权的 HTTPS 会话分析，并在拿不到密钥时给出有边界的判断。</p>
+<h2 id="链路上究竟还能看到什么"><a href="#链路上究竟还能看到什么" class="headerlink" title="链路上究竟还能看到什么"></a>链路上究竟还能看到什么</h2><p>HTTPS 的防护目标是机密性、完整性与身份认证，它并不隐藏通信双方的存在、时间与大致体量。把一次页面访问拆成 TCP、TLS、HTTP 三层来看，TCP 头部完全明文，TLS 记录头同样明文（内容类型、记录版本、长度），真正被加密的只是记录负载。因此即使手里没有密钥，我们仍能拿到五元组、连接起止时间、双向字节数、每条 TLS 记录的边界与长度。</p>
+<p>这些看似琐碎的字段，在排障时往往比内容更有用。下面这张表按“在哪一层、是否加密、能回答什么问题”整理了一次 HTTPS 会话中常见的可见信息。</p>
+<table>
+<thead>
+<tr>
+<th>信息</th>
+<th>所在位置</th>
+<th>TLS 1.2</th>
+<th>TLS 1.3</th>
+<th>分析价值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>源目 IP 与端口</td>
+<td>IP&#x2F;TCP 头</td>
+<td>明文</td>
+<td>明文</td>
+<td>定位客户端、服务端与中间设备</td>
+</tr>
+<tr>
+<td>连接建立与关闭时间</td>
+<td>TCP 头与握手包</td>
+<td>明文</td>
+<td>明文</td>
+<td>计算 RTT、连接复用与空闲时长</td>
+</tr>
+<tr>
+<td>TLS 记录长度</td>
+<td>TLS 记录头</td>
+<td>明文</td>
+<td>明文</td>
+<td>粗略估计请求与响应体量</td>
+</tr>
+<tr>
+<td>SNI</td>
+<td>ClientHello 扩展</td>
+<td>明文</td>
+<td>明文</td>
+<td>判断客户端访问了哪个站点</td>
+</tr>
+<tr>
+<td>ALPN</td>
+<td>ClientHello&#x2F;ServerHello 扩展</td>
+<td>明文</td>
+<td>明文</td>
+<td>确认协商到 h2 还是 http&#x2F;1.1</td>
+</tr>
+<tr>
+<td>证书链</td>
+<td>Certificate 消息</td>
+<td>明文</td>
+<td>加密</td>
+<td>查看 SAN、签发者与有效期</td>
+</tr>
+<tr>
+<td>版本与密码套件</td>
+<td>握手消息</td>
+<td>明文</td>
+<td>明文</td>
+<td>判断降级与套件不匹配</td>
+</tr>
+<tr>
+<td>应用层内容</td>
+<td>记录负载</td>
+<td>加密</td>
+<td>加密</td>
+<td>无密钥不可读</td>
+</tr>
+</tbody></table>
+<p>SNI 值得单独说明。它位于 ClientHello 的 server_name 扩展中，目的是让同一 IP 上的虚拟主机在握手开始时就选对证书，因此必须明文传输。2020 年，加密 SNI 的方案还停留在草案阶段，常见的叫法是 ESNI，后来演进为 ECH，实际部署范围很小。所以本文所讨论的抓包里，SNI 基本总是可见的，这也是判断“用户访问了哪个域名”最直接的线索。</p>
+<p>ALPN 同样明文，它决定了握手之后跑 HTTP&#x2F;1.1 还是 HTTP&#x2F;2。若客户端声明了 h2 而服务端只回 http&#x2F;1.1，多数浏览器会接受降级继续通信，但性能特征会明显变化，这类问题在抓包里一眼就能看出来。</p>
+<p>证书的位置则随版本而变。TLS 1.2 的 Certificate 消息在 ServerHello 之后明文发送，Wireshark 可以直接展开证书链、读取主题、SAN 与有效期。TLS 1.3 把 Certificate、CertificateVerify 与 Finished 一起放进了加密的握手阶段，没有密钥就只能看到几个长度不同的 Application Data 记录。很多人在升级到 TLS 1.3 后抱怨“看不到证书了”，原因就在这里，并不是抓包方法出了问题。</p>
+<p>包长能提供的信息有限。TLS 1.3 允许记录填充，HTTP&#x2F;2 有 9 字节帧头与 HPACK 头部压缩，TCP 还会合并、拆分与重传，这些因素叠加后，包长只能给出量级判断。我们可以说“这是一次以下载为主、突发集中在 0.8 秒内的传输”，却不能据此断言“下载的是一张 200 KB 的图片”。443 端口也不证明流量一定是 HTTPS，判定协议要看握手特征。</p>
+<h2 id="在-Wireshark-中走一遍-TLS-握手"><a href="#在-Wireshark-中走一遍-TLS-握手" class="headerlink" title="在 Wireshark 中走一遍 TLS 握手"></a>在 Wireshark 中走一遍 TLS 握手</h2><p>理解握手是读懂 HTTPS 抓包的前提。TLS 1.3 在 TLS 1.2 的基础上把握手压缩到一轮往返，并把大量字段挪进了加密区域。下图是一次完整的 TLS 1.3 握手，兼顾了会话恢复的场景。</p>
+<pre class="mermaid">sequenceDiagram
+    participant C as 客户端
+    participant S as 服务端
+    C->>S: ClientHello 版本 套件 SNI ALPN key_share
+    S->>C: ServerHello 选定套件 key_share
+    S->>C: ChangeCipherSpec 兼容用
+    S->>C: EncryptedExtensions Certificate CertificateVerify Finished
+    C->>S: ChangeCipherSpec 兼容用
+    C->>S: Finished
+    S->>C: NewSessionTicket
+    C->>S: Application Data
+    S->>C: Application Data</pre>
+
+<p>在 Wireshark 里，这对应若干个可逐个点开的包。下表把显示内容与排障关注点对应起来。</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>Wireshark 显示</th>
+<th>关键字段（1.3 需解密）</th>
+<th>排障关注点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>客户端问候</td>
+<td>Client Hello</td>
+<td>supported_versions、cipher suites、server_name、ALPN</td>
+<td>客户端能力、目标域名、是否带 key_share</td>
+</tr>
+<tr>
+<td>服务端问候</td>
+<td>Server Hello</td>
+<td>选定版本、选定套件、key_share</td>
+<td>是否降级、套件是否在客户端列表内</td>
+</tr>
+<tr>
+<td>加密扩展</td>
+<td>Encrypted Extensions</td>
+<td>ALPN、early data</td>
+<td>ALPN 最终结果、SNI 确认</td>
+</tr>
+<tr>
+<td>证书</td>
+<td>Certificate</td>
+<td>证书链、SAN</td>
+<td>链是否完整、SAN 是否匹配</td>
+</tr>
+<tr>
+<td>证书验证</td>
+<td>Certificate Verify</td>
+<td>签名算法</td>
+<td>签名算法是否被接受</td>
+</tr>
+<tr>
+<td>完成</td>
+<td>Finished</td>
+<td>verify_data</td>
+<td>握手转录是否一致</td>
+</tr>
+<tr>
+<td>会话票据</td>
+<td>New Session Ticket</td>
+<td>ticket、有效期</td>
+<td>恢复参数与有效期</td>
+</tr>
+</tbody></table>
+<p>先看 ClientHello。它的 legacy_version 字段固定写成 0x0303，也就是 TLS 1.2，这并非客户端只支持 1.2，而是为了穿过那些不认识新版本号的中间设备；真实版本在 supported_versions 扩展里，通常列出 1.3 与 1.2。legacy_session_id 在 TLS 1.3 中也被复用，非空值用于触发中间盒兼容模式。cipher suites 列表的顺序表达了客户端偏好，TLS 1.3 的套件只剩下 AEAD 组合，例如 TLS_AES_128_GCM_SHA256 与 TLS_CHACHA20_POLY1305_SHA256。key_share 扩展则直接带上客户端为某个椭圆曲线组生成的公钥，这是 1-RTT 握手能成立的关键。</p>
+<p>ServerHello 只做三件事：确认版本、选定套件、回送服务端的 key_share。若服务端启用了会话恢复，还会带上 pre_shared_key 扩展，此时握手可以走 PSK 路径，省掉证书与密钥交换。紧随其后的 ChangeCipherSpec 是一条“假装还在用 1.2”的兼容记录，Wireshark 会标注它是 Ignored Unknown Record 或 CCS，不必紧张，这是正常现象。</p>
+<p>TLS 1.2 的握手则长得多，也更“透明”。ServerHello 之后是明文 Certificate，可以直接看到整条证书链；ServerKeyExchange 携带 ECDHE 的曲线参数与服务端签名；ServerHelloDone 表示服务端发言结束；客户端回 ClientKeyExchange，双方再各发 ChangeCipherSpec 与 Finished。因为证书明文，TLS 1.2 的抓包非常适合排查证书链与主机名问题，这一点在 TLS 1.3 普及之后反而成了“旧版本的便利”。</p>
+<p>握手包也是排障的第一现场。服务端若直接回 Alert 70，说明它不接受客户端提出的版本；Alert 40 或 71 多半指向套件或安全强度不满足；Alert 120 是 ALPN 协商失败，常见于服务端只允许 h2 而客户端只提供 http&#x2F;1.1 的反向配置。Wireshark 的显示过滤器可以把这些包单独筛出来：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">tls.handshake.type == 1</span><br><span class="line">tls.handshake.extensions_server_name contains &quot;example.test&quot;</span><br><span class="line">tls.alert_message</span><br><span class="line">tcp.flags.reset == 1</span><br></pre></td></tr></table></figure>
+
+<p>第一条筛出所有 ClientHello，用来统计有多少次独立连接；第二条按 SNI 过滤，适合在一堆并发连接里锁定目标站点；第三条把告警单独列出，握手失败的现场往往只有一两个 Alert 包。需要提醒的是，TLS 1.3 下证书与告警都可能落在加密记录里，过滤器能筛到包，却未必能读出原因，这时要结合客户端侧的错误提示与服务端日志一起看。</p>
+<h2 id="为什么默认解不开：前向保密与会话密钥"><a href="#为什么默认解不开：前向保密与会话密钥" class="headerlink" title="为什么默认解不开：前向保密与会话密钥"></a>为什么默认解不开：前向保密与会话密钥</h2><p>几乎每个刚接触抓包的人都会问同一个问题：既然我能在服务器上拿到私钥，为什么 Wireshark 还是解不开？答案在于现代 TLS 交换的不是“用公钥加密的会话密钥”，而是一组双方各自算出来的临时秘密。</p>
+<p>TLS 1.3 的密钥交换基本只剩 ECDHE，恢复会话时走 PSK；TLS 1.2 也早已把 ECDHE 套件作为默认选项。以常用的 x25519 为例，客户端与服务端在握手时各自生成一对临时的椭圆曲线密钥，只把公钥放进 key_share 或 ServerKeyExchange 发出去。双方用自己的私钥和对方的公钥做一次 Diffie-Hellman 运算，得到同一个共享秘密，再经过 HKDF（TLS 1.3）或 PRF（TLS 1.2）逐层派生出握手密钥与应用密钥。整个过程里，会话密钥从来没有以任何形式出现在链路上，临时私钥也在握手结束后被丢弃。</p>
+<p>这就是前向保密的含义：即使攻击者在若干年后拿到了服务端的长期私钥，也无法回溯解密当时录下的流量，因为那对临时私钥早已不存在。反过来说，这也决定了抓包分析的边界：没有会话密钥，任何人都无法从密文还原明文，这不是工具能力问题，而是密码学保证。</p>
+<p>与 ECDHE 相对的是静态 RSA 密钥交换，也就是 TLS_RSA_WITH_* 系列套件。客户端用服务端证书里的公钥直接加密一个预主密钥发过去，服务端用私钥解开，双方再据此派生会话密钥。在这种模式下，长期私钥确实足以解密历史流量，但它不具备前向保密，一旦私钥泄露，此前录下的所有会话都会暴露。也正因如此，主流浏览器从 2018 年起陆续移除了对静态 RSA 密钥交换的支持，2020 年的公网服务基本只剩下 ECDHE 一种选择。</p>
+<p>可以用一棵简单的判断树来概括“能不能解”：</p>
+<pre class="mermaid">flowchart TD
+    A[拿到一段 HTTPS 抓包] --> B{有会话密钥吗}
+    B -->|有 key log| C[可以解密 与套件无关]
+    B -->|没有| D{是静态 RSA 套件吗}
+    D -->|是 且有服务器私钥| E[可以解密 仅限该会话]
+    D -->|否 ECDHE| F[无法解密 只能看元数据]
+    C --> G[继续分析 HTTP 层]
+    E --> G
+    F --> H[转向元数据推断]</pre>
+
+<p>判断套件类型并不难。在 TLS 1.2 的 ServerHello 里看 Cipher Suite 字段，名字以 TLS_ECDHE_ 开头的就是临时密钥交换，以 TLS_RSA_WITH_ 开头的才是静态 RSA。TLS 1.3 的套件名统一是 TLS_AES_* 或 TLS_CHACHA20_*，不再体现密钥交换方式，因为它只允许 ECDHE 与 PSK，看到 1.3 就可以直接判定“无私钥路径”。</p>
+<p>还有一个常被忽略的点：会话恢复。TLS 1.2 的 Session ID 与 Session Ticket、TLS 1.3 的 PSK，都是把上一次握手的密钥材料保存下来复用，抓包里表现为握手包数量骤减。恢复会话同样不会把密钥放到链路上，因此“三个包完成握手”并不奇怪，也不意味着加密变弱。</p>
+<h2 id="获准解密：从-key-log-到服务器私钥"><a href="#获准解密：从-key-log-到服务器私钥" class="headerlink" title="获准解密：从 key log 到服务器私钥"></a>获准解密：从 key log 到服务器私钥</h2><p>在明确了“必须有密钥”之后，接下来的问题就是密钥从哪里来。工程上只有三类正当来源：自己客户端导出的会话密钥、自己服务器持有的静态 RSA 私钥、以及完全受控的测试环境。三者都建立在一个前提上：你对这段流量拥有所有权或明确授权。</p>
+<p>最常用的是 SSLKEYLOGFILE。它的原理很朴素：浏览器在完成密钥派生后，把会话密钥按固定格式追加写入一个文本文件，Wireshark 读取该文件，就能在不解密握手的情况下直接拿到密钥。Chrome 与 Firefox 都支持这一机制，格式由 NSS 定义，每行形如“标签 客户端随机数 密钥”，TLS 1.2 常见的是 CLIENT_RANDOM，TLS 1.3 则会写入 CLIENT_HANDSHAKE_TRAFFIC_SECRET、SERVER_HANDSHAKE_TRAFFIC_SECRET、CLIENT_TRAFFIC_SECRET_0 等多条记录。</p>
+<p>使用方式是在启动浏览器之前设置环境变量，再让 Wireshark 指向同一个文件。以 Firefox 为例：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">export</span> SSLKEYLOGFILE=<span class="string">&quot;<span class="variable">$HOME</span>/tls-keys/client.log&quot;</span></span><br><span class="line"><span class="built_in">chmod</span> 700 <span class="string">&quot;<span class="variable">$HOME</span>/tls-keys&quot;</span></span><br><span class="line"><span class="built_in">chmod</span> 600 <span class="string">&quot;<span class="variable">$HOME</span>/tls-keys/client.log&quot;</span></span><br><span class="line">firefox --no-remote --profile <span class="string">&quot;<span class="variable">$HOME</span>/tls-test-profile&quot;</span> &amp;</span><br></pre></td></tr></table></figure>
+
+<p>Chrome 在 Linux 与 macOS 上同样识别这个变量，但需要从命令行启动，已经运行的实例不会重新读取。写完密钥文件后，在 Wireshark 中依次打开 Preferences、Protocols、TLS，把“(Pre)-Master-Secret log filename”指向该文件。重新载入抓包，原本显示 Application Data 的记录就会变成可展开的 HTTP&#x2F;2 或 HTTP&#x2F;1.1。</p>
+<p>第二种来源是服务器私钥，但它的适用范围被严格限制在静态 RSA 密钥交换。配置位置在同一个 TLS 协议首选项页的 RSA keys list，需要填写服务器 IP、端口、协议与私钥文件路径。很多人照着教程配了私钥却毫无效果，原因通常是抓包用的是 ECDHE 套件，此时 Wireshark 会明确提示“无法用该私钥解密”，这不是配置错误，而是数学上不可能。</p>
+<p>第三种是受控测试环境。自己搭一套 Nginx 与自签 CA，客户端也由自己控制，此时既可以用 key log，也可以在测试构建里给服务端接入 keylog 回调。需要说明的是，Nginx 本身并不读取 SSLKEYLOGFILE，服务端导出密钥通常要改代码或使用带调试接口的构建，因此这只适合实验环境，不适合直接搬到生产。</p>
+<p>最后必须把边界说清楚。对自有流量、经授权的渗透测试目标、或本机实验环境做解密，是合法的技术分析；未经授权截获并解密他人的 HTTPS 流量，无论在技术上是否可行，都是不可接受的行为，也可能触犯法律。抓包本身就会接触到账号、Cookie 与个人信息，解密只是把风险放大，权限与目的必须事先明确。</p>
+<h2 id="解密之后：HTTP-2-帧、流与一次慢请求定位"><a href="#解密之后：HTTP-2-帧、流与一次慢请求定位" class="headerlink" title="解密之后：HTTP&#x2F;2 帧、流与一次慢请求定位"></a>解密之后：HTTP&#x2F;2 帧、流与一次慢请求定位</h2><p>有了密钥，Wireshark 会把 TLS 记录里的明文交给上层解析器。若 ALPN 协商结果是 h2，协议列会显示 HTTP2，原本连续的 Application Data 被还原成一个个帧。理解帧结构是读懂这类抓包的关键：每个帧有 9 字节头，包含长度、类型、标志与流标识符，负载则按类型解释。</p>
+<p>常见的帧类型不多。HEADERS 携带请求或响应的头部字段，经过 HPACK 压缩；DATA 携带实体内容；SETTINGS 用于交换连接级参数；WINDOW_UPDATE 做流量控制；RST_STREAM 终止单个流；GOAWAY 表示连接即将关闭；PING 用于探活。客户端发起的流使用奇数编号，服务端发起的是偶数，同一个连接上可以同时存在多个流，这正是 HTTP&#x2F;2 多路复用的由来。</p>
+<p>排障时最有用的过滤器是流标识符与帧类型：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">http2</span><br><span class="line">http2.streamid == 5</span><br><span class="line">http2.type == 1</span><br><span class="line">http2.type == 0</span><br><span class="line">tcp.stream eq 3</span><br></pre></td></tr></table></figure>
+
+<p>第一条筛出所有 HTTP&#x2F;2 帧，适合先看整体节奏；第二条锁定 5 号流，观察它的 HEADERS 与 DATA 如何交替；第三条只看 HEADERS，第四条只看 DATA，用来估算响应体量与传输耗时；最后一条把范围收窄到某条 TCP 连接，避免并行连接干扰。若想还原完整报文，右键选择 Follow，再选 HTTP&#x2F;2 Stream，就能看到重组后的请求与响应。</p>
+<p>下面用一次示意图性质的会话来串起整个流程。场景是浏览器访问由 Nginx 提供服务的测试站点，已通过 SSLKEYLOGFILE 提供密钥，抓包在客户端侧完成。所有数值仅用于说明分析方法，并非真实业务数据。</p>
+<p>第一步，定位连接。用 tls.handshake.type &#x3D;&#x3D; 1 找到 ClientHello，确认 SNI 为被测域名，supported_versions 中包含 0x0304，说明客户端优先尝试 TLS 1.3；ServerHello 回选了 0x0304 与 TLS_AES_128_GCM_SHA256，ALPN 在 Encrypted Extensions 中确认为 h2。到这里可以确认没有降级，也没有套件不匹配。</p>
+<p>第二步，确认解密生效。在 Protocol 列看到 HTTP2，说明密钥文件匹配成功；若仍是 Application Data，先检查客户端随机数是否与 key log 中的记录对应，再确认抓包是否在设置环境变量之前开始。</p>
+<p>第三步，找到目标请求。用 http2.streamid 逐条查看，或直接在过滤框输入 http2.headers.authority contains “example.test”，展开 HEADERS 帧可以看到 :method、:path、:authority 与 user-agent。假设关注的是 &#x2F;api&#x2F;report 这条请求，记下它所在的流号，例如 5。</p>
+<p>第四步，测量耗时。给抓包加上时间列，或者用 frame.time_delta_displayed 观察相邻帧间隔。把该流第一个 HEADERS 帧的时间记为 t0，第一个 DATA 帧记为 t1，最后一个 DATA 帧记为 t2。t1 减 t0 近似等于服务端处理时间加上一个单程网络时延，t2 减 t1 是响应体的传输时间。如果 t1 减 t0 达到 1.8 秒，而握手阶段的 RTT 只有 20 毫秒，那么瓶颈大概率在应用侧，而不是网络。</p>
+<p>第五步，交叉验证。Nginx 的访问日志里记录了 $request_time 与 $upstream_response_time，若二者与 t1 减 t0 吻合，就可以把结论落到具体上游服务；若日志显示很快而抓包很慢，则要怀疑客户端侧排队、TLS 记录分片或中间设备缓冲。抓包只能证明“链路上发生了什么”，不能单独证明“服务端内部为什么慢”，这一步的交叉验证不能省。</p>
+<h2 id="拿不到密钥时：从元数据做有限推断"><a href="#拿不到密钥时：从元数据做有限推断" class="headerlink" title="拿不到密钥时：从元数据做有限推断"></a>拿不到密钥时：从元数据做有限推断</h2><p>绝大多数生产抓包是没有密钥的，这时分析目标要从“读内容”切换为“读行为”。可行的推断集中在连接、时间、体量、命名与错误五个维度，每一条都要配上“能得出什么、不能得出什么”的边界。</p>
+<p>连接维度看复用。同一个五元组上如果只出现一次 ClientHello，之后长时间有双向数据，说明客户端在复用连接；如果每隔几百毫秒就新建一条连接，可能是连接池配置过小，也可能是服务端主动关闭。TLS 1.3 的会话恢复表现为 ServerHello 带 pre_shared_key、证书阶段消失，包数明显减少。</p>
+<p>时间维度看节奏。TCP 三次握手的完成时间给出一个 RTT 基线，ClientHello 到 ServerHello 的间隔反映服务端与网络的总延迟，请求之间的空闲间隔则接近用户思考时间。把这些时间画成时序，能区分“页面本身慢”和“用户在等待时没有发起请求”。</p>
+<p>体量维度看方向与突发。统计某条连接上客户端到服务端、服务端到客户端的字节数，可以判断这是一次上传还是下载；观察突发是否集中在握手后极短时间内，可以推测是否为静态资源批量加载。这里的结论只能是量级，不能精确到文件类型。</p>
+<p>命名维度看 SNI 与证书。SNI 暴露了用户访问的域名，TLS 1.2 的明文证书还能给出 SAN 列表、签发者与有效期，足以判断服务是否用了 CDN、是否走了内部域名。即使是 TLS 1.3，SNI 依然可见，因此“加密后域名也保密”的说法并不成立。</p>
+<p>错误维度看 TCP 与告警。RST 出现在握手后不久，可能是服务端拒绝了该请求或中间设备拦截；大量重传与零窗口说明链路质量或接收端处理能力有问题；握手阶段的 Alert 则直接指向版本、套件或证书。把这些信号与时间线对齐，往往比猜测内容更有价值。</p>
+<p>必须强调一点：元数据能支持“这是一次约 300 KB 的下载，服务端在 1.2 秒后才开始回数据”，但不能支持“用户下载了某份报表”。在没有密钥的情况下，任何关于具体内容的断言都是过度解读，写进报告会削弱整份分析的可信度。</p>
+<h2 id="排障案例矩阵：从证书链到-TLS-1-3-中间盒"><a href="#排障案例矩阵：从证书链到-TLS-1-3-中间盒" class="headerlink" title="排障案例矩阵：从证书链到 TLS 1.3 中间盒"></a>排障案例矩阵：从证书链到 TLS 1.3 中间盒</h2><p>HTTPS 的故障大多集中在握手阶段，而且症状相似、原因各异。下表把常见现象、抓包特征与定位手段放在一起，便于按图索骥。表中结论基于 TLS 1.2 与 1.3 的标准行为，具体环境仍需结合客户端与服务端日志。</p>
+<table>
+<thead>
+<tr>
+<th>现象</th>
+<th>抓包特征</th>
+<th>常见原因</th>
+<th>定位手段</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>浏览器报证书不受信任</td>
+<td>TLS 1.2 可见不完整链，或客户端发 Alert 48</td>
+<td>服务端只发叶子证书，缺中间 CA</td>
+<td>展开 Certificate 看链长度，用 openssl s_client 复核</td>
+</tr>
+<tr>
+<td>浏览器报名称不匹配</td>
+<td>证书 SAN 与 SNI 不一致</td>
+<td>虚拟主机配错证书或 SNI 分流错误</td>
+<td>对比 ClientHello 的 SNI 与证书 SAN</td>
+</tr>
+<tr>
+<td>协商结果总是 TLS 1.2</td>
+<td>ClientHello 含 1.3，ServerHello 回 1.2</td>
+<td>服务端未开 1.3，或中间盒拦截</td>
+<td>看 supported_versions 与 ServerHello 选定值</td>
+</tr>
+<tr>
+<td>握手在 ClientHello 后停滞</td>
+<td>无 ServerHello，多次重传 ClientHello</td>
+<td>中间设备丢弃带新扩展的包</td>
+<td>对比不同网络路径，检查 MTU 与设备策略</td>
+</tr>
+<tr>
+<td>直接 handshake_failure</td>
+<td>Alert 40 或 71</td>
+<td>套件不匹配、密钥长度不足</td>
+<td>比对双方套件列表与安全级别配置</td>
+</tr>
+<tr>
+<td>ALPN 协商失败</td>
+<td>Alert 120 或退化到 http&#x2F;1.1</td>
+<td>服务端只允许 h2，客户端未提供</td>
+<td>查 ClientHello 与 Encrypted Extensions 的 ALPN</td>
+</tr>
+<tr>
+<td>首屏明显变慢</td>
+<td>握手后出现额外的 OCSP 请求</td>
+<td>未启用 OCSP stapling</td>
+<td>看 ClientHello 是否带 status_request，服务端是否回装订响应</td>
+</tr>
+<tr>
+<td>频繁完整握手</td>
+<td>每次请求都有 Certificate 与密钥交换</td>
+<td>会话恢复未生效</td>
+<td>检查 ticket 下发与负载均衡是否一致</td>
+</tr>
+</tbody></table>
+<p>证书链问题是出现频率最高的一类。TLS 1.2 下可以直接在 Certificate 消息里数证书张数，只有一张叶子证书而缺少中间 CA 时，桌面浏览器可能因为缓存过中间证书而正常，移动端或新环境却直接失败。这类“同一站点在不同设备表现不同”的现象，用抓包对比两端最有效。</p>
+<p>主机名不匹配则要看 SNI 与 SAN 的对应关系。常见于 Nginx 上多个 server 块共用 443，默认 server 的证书被错误地返回给其他域名。抓包里 ClientHello 的 SNI 是 A，证书 SAN 却只有 B，问题一目了然。TLS 1.3 下证书被加密，只能借助客户端错误码、服务端日志或在本机用 openssl s_client 复现。</p>
+<p>协议降级需要区分“正常回退”与“被中间盒压低”。前者是服务端确实没开 1.3，ServerHello 的 supported_versions 明确回 0x0303；后者常见于某些老旧的负载均衡或安全设备，它们对 ClientHello 里的新扩展处理不当，导致握手卡住或被迫重试。TLS 1.3 定义了降级哨兵值，支持 1.3 的服务端在最终协商为 1.2 时，会把特定字节写入 ServerHello 随机数的末尾，客户端据此判断自己是否被降级，Wireshark 也会在解析时给出提示，这是判断是否存在中间人干预的重要线索。</p>
+<p>TLS 1.3 与中间盒的兼容问题在 2020 年仍不少见。为了照顾只认 TLS 1.2 结构的设备，客户端会在 ClientHello 中带上非空的 legacy_session_id，并在握手中插入 ChangeCipherSpec 记录，服务端也会照做。若抓包里看到 CCS 出现在 ServerHello 之后、且被标记为忽略，这是兼容机制在起作用；若看到 ClientHello 发出后长时间没有响应、随后客户端重试，则要怀疑路径上有设备直接丢弃了这些包。</p>
+<p>OCSP stapling 影响的是首屏时间而非连通性。启用装订后，服务端在握手时一并送上 OCSP 响应，客户端不必再单独查询 CA。TLS 1.2 下表现为 Certificate 之后的 CertificateStatus 消息；TLS 1.3 下该信息被放进加密的证书条目扩展，抓包里看不到明文，只能通过“握手后是否还有发往 OCSP 域名的请求”间接判断。若看到握手完成后紧接着一条到 CA 的查询，基本可以认定装订没有生效。</p>
+<p>会话恢复的问题往往表现为“性能忽然变差”。正常情况下，TLS 1.2 的恢复握手只有 ServerHello、CCS、Finished 几个包，TLS 1.3 则直接走 PSK。如果每次请求都完整走一遍证书与密钥交换，需要检查服务端是否下发 ticket、多台后端之间的 ticket 密钥是否一致。TLS 1.3 的 0-RTT 还能进一步省掉一次往返，但它有重放风险，只应允许幂等请求使用，这一点在分析抓包时也要留意，看到 early data 不等于配置正确。</p>
+<h2 id="抓包卫生、QUIC-边界与收尾建议"><a href="#抓包卫生、QUIC-边界与收尾建议" class="headerlink" title="抓包卫生、QUIC 边界与收尾建议"></a>抓包卫生、QUIC 边界与收尾建议</h2><p>HTTPS 抓包天然携带敏感信息，解密之后更是如此。key log 文件等同于一段时间内的全部会话密钥，必须按密钥材料管理：目录权限收紧到仅本人可读，文件名带日期，分析结束立即删除，绝不提交到代码仓库，也不要与抓包文件放在同一台共享机器上。团队协作时，密钥应由抓包者本人在本地加载，而不是随 pcap 一起传递。</p>
+<p>pcap 的共享同样需要处理。即使没有解密，包里也有 IP、SNI、证书、DNS 查询与时间规律，足以勾勒出用户行为。对外提供样本前，应截断负载、移除与本问题无关的会话，必要时替换地址。Wireshark 自带的 editcap 可以按条件裁剪或限制快照长度，例如只保留目标端口并截去应用层负载：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">editcap -r capture.pcap filtered.pcap <span class="string">&quot;tcp.port == 443&quot;</span></span><br><span class="line">editcap -s 96 filtered.pcap sanitized.pcap</span><br></pre></td></tr></table></figure>
+
+<p>第一条按显示过滤器保留 443 流量，第二条把每个包截断到 96 字节，TLS 记录头与部分握手字段仍在，应用层内容被丢弃。更彻底的做法是使用专门的匿名化工具替换 IP 与 MAC，但无论用哪种方式，发布前都要人工抽查，确认没有残留的账号、Cookie 或内部域名。留存时间遵循最小必要原则，分析完成后按组织要求归档或销毁，并记录访问者与时间。</p>
+<p>QUIC 是另一个必须交代的边界。QUIC 把传输层搬到 UDP 之上，默认使用 443 端口，握手内嵌 TLS 1.3，因此抓包里看到的是 UDP 而非 TCP。2020 年，HTTP&#x2F;3 仍处于草案阶段，IETF 的 QUIC 草案版本迭代频繁，Wireshark 3.2 能按草案版本解析 Initial、Handshake 与 Short Header 包，但字段名与支持程度随版本变化，遇到不认识的长包头版本时会直接退化为 Data，这是工具成熟度的限制，不是抓包失败。</p>
+<p>QUIC 的可见性比 TLS over TCP 更低。Initial 包的头部受一轮由连接 ID 派生的密钥保护，抓包工具可以解开头部以读取版本与连接 ID，但握手之后的负载全部加密。用 key log 解密 QUIC 在 Wireshark 3.2 中已经可用，前提是客户端同样导出密钥，而且版本与解析器匹配；实践中成功率不如 TCP 上的 TLS 稳定。因此排查 HTTP&#x2F;3 问题时，浏览器导出的 netlog、服务端的 qlog 往往比 pcap 更有信息量。</p>
+<p>回到方法层面，HTTPS 流量分析可以归纳为三步：先判断有没有密钥，有则直接读 HTTP 层，没有则退到元数据；再用握手包确认版本、套件、SNI 与 ALPN，把“连不上”和“连上了但慢”分开；最后把抓包时间线与客户端、服务端日志对齐，让结论落在可验证的证据上。工具只是放大器，边界意识才决定分析是否可信。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>HTTPS 并不隐藏通信的存在，IP、端口、时间、包长、SNI、ALPN 始终可见，TLS 1.2 的证书也明文，TLS 1.3 则把证书与告警一起加密。能否解密取决于密钥而非工具：ECDHE 提供前向保密，会话密钥从不上链路，只有静态 RSA 套件才可能用服务器私钥解密。工程上可行的路径是自己客户端的 SSLKEYLOGFILE、受控测试环境，以及在明确授权前提下对自有流量的分析，未经授权解密他人流量不可接受。解密之后，重点转向 HTTP&#x2F;2 的流与帧，用流号、HEADERS 与 DATA 的时间差定位慢请求，并用服务端日志交叉验证。没有密钥时，应把结论限制在连接复用、时序、体量与错误特征上，避免对内容做过度断言。最后，key log 与 pcap 都应按敏感数据管理，QUIC 场景则要接受可见性更低的现实。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://wiki.wireshark.org/TLS">Wireshark Wiki: TLS</a></li>
+<li><a href="https://www.wireshark.org/docs/wsug_html_chunked/">Wireshark User’s Guide</a></li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc8446">RFC 8446: The Transport Layer Security (TLS) Protocol Version 1.3</a></li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc5246">RFC 5246: The Transport Layer Security (TLS) Protocol Version 1.2</a></li>
+<li><a href="https://developer.mozilla.org/en-US/docs/Mozilla/Projects/NSS/Key_Log_Format">Mozilla: NSS Key Log Format</a></li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc7540">RFC 7540: Hypertext Transfer Protocol Version 2 (HTTP&#x2F;2)</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Wireshark 分析 HTTPS 流量</p><p><a href="https://987763485.github.io/2020/08/29/Wireshark分析HTTPS流量/">https://987763485.github.io/2020/08/29/Wireshark分析HTTPS流量/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2020-08-29</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a><a class="link-muted mr-2" rel="tag" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/">计算机网络</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2020/08/31/%E9%9B%B6%E4%BF%A1%E4%BB%BB%E7%BD%91%E7%BB%9C%E6%9E%B6%E6%9E%84%E5%85%A5%E9%97%A8/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">零信任网络架构入门</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2020/08/24/PostgreSQL%E5%AE%89%E8%A3%85%E4%B8%8E%E5%9F%BA%E7%A1%80%E5%AE%9E%E8%B7%B5/"><span class="level-item">PostgreSQL 安装与基础实践</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

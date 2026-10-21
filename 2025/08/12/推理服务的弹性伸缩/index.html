@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>推理服务的弹性伸缩 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="本文面向已经用熟了 Kubernetes 水平伸缩、如今要为大模型推理服务做弹性伸缩（Auto Scaling）的工程师与平台团队。它要解决的问题只有一个：为什么把 CPU 或内存水位当成伸缩信号在推理服务上会失效，该换成什么信号，以及伸缩这个动作本身要付出哪些代价。读完之后，你会得到一套从就绪判定、指标选择、缩容排水到演练验证的落地视角，而不是一句”照抄 Web 服务的配置”。"><meta property="og:type" content="blog"><meta property="og:title" content="推理服务的弹性伸缩"><meta property="og:url" content="https://987763485.github.io/2025/08/12/%E6%8E%A8%E7%90%86%E6%9C%8D%E5%8A%A1%E7%9A%84%E5%BC%B9%E6%80%A7%E4%BC%B8%E7%BC%A9/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="本文面向已经用熟了 Kubernetes 水平伸缩、如今要为大模型推理服务做弹性伸缩（Auto Scaling）的工程师与平台团队。它要解决的问题只有一个：为什么把 CPU 或内存水位当成伸缩信号在推理服务上会失效，该换成什么信号，以及伸缩这个动作本身要付出哪些代价。读完之后，你会得到一套从就绪判定、指标选择、缩容排水到演练验证的落地视角，而不是一句”照抄 Web 服务的配置”。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2025-08-11T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-20T13:39:51.204Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="大模型"><meta property="article:tag" content="python"><meta property="article:tag" content="typescript"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2025/08/12/%E6%8E%A8%E7%90%86%E6%9C%8D%E5%8A%A1%E7%9A%84%E5%BC%B9%E6%80%A7%E4%BC%B8%E7%BC%A9/"},"headline":"推理服务的弹性伸缩","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2025-08-11T16:00:00.000Z","dateModified":"2026-10-20T13:39:51.204Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"本文面向已经用熟了 Kubernetes 水平伸缩、如今要为大模型推理服务做弹性伸缩（Auto Scaling）的工程师与平台团队。它要解决的问题只有一个：为什么把 CPU 或内存水位当成伸缩信号在推理服务上会失效，该换成什么信号，以及伸缩这个动作本身要付出哪些代价。读完之后，你会得到一套从就绪判定、指标选择、缩容排水到演练验证的落地视角，而不是一句”照抄 Web 服务的配置”。"}</script><link rel="canonical" href="https://987763485.github.io/2025/08/12/%E6%8E%A8%E7%90%86%E6%9C%8D%E5%8A%A1%E7%9A%84%E5%BC%B9%E6%80%A7%E4%BC%B8%E7%BC%A9/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2025-08-11T16:00:00.000Z" title="8/12/2025, 12:00:00 AM">2025-08-12</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></span><span class="level-item">1 小时读完 (大约11241个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">推理服务的弹性伸缩</h1><div class="content"><p>本文面向已经用熟了 Kubernetes 水平伸缩、如今要为大模型推理服务做弹性伸缩（Auto Scaling）的工程师与平台团队。它要解决的问题只有一个：为什么把 CPU 或内存水位当成伸缩信号在推理服务上会失效，该换成什么信号，以及伸缩这个动作本身要付出哪些代价。读完之后，你会得到一套从就绪判定、指标选择、缩容排水到演练验证的落地视角，而不是一句”照抄 Web 服务的配置”。</p>
+<h2 id="普通-HPA-的三个前提，为什么在推理服务上集体失效"><a href="#普通-HPA-的三个前提，为什么在推理服务上集体失效" class="headerlink" title="普通 HPA 的三个前提，为什么在推理服务上集体失效"></a>普通 HPA 的三个前提，为什么在推理服务上集体失效</h2><p>水平伸缩（Horizontal Pod Autoscaling，HPA）这套机制我们用了多年，默认它可靠，是因为它建立在三个几乎从不被拿出来审视的前提之上。通用的伸缩原理与 HPA、垂直伸缩（Vertical Pod Autoscaling，VPA）的机制在往期《HPA 与 VPA 实战》一文里已经讲透，本文只讨论大模型推理服务给这三条前提带来的冲击。</p>
+<p>第一个前提：负载指标与容量近似线性。Web 服务里，一个实例每秒处理的请求数大致是个常数，中央处理器（Central Processing Unit，CPU）打到某个水位就代表快满了，于是”利用率翻倍、实例数翻倍”是成立的。推理服务的处理时间却由输出长度主导：同样一条请求，生成几十个 token 和生成上千个 token 占用的时长能差一个数量级，而且这个差别在伸缩那一刻是不可知的。请求数与容量之间不是一条直线，而是一团跟着长度分布来回摆动的云。</p>
+<p>第二个前提：扩容出来的新实例几乎立刻可以服务。Web 进程从启动到接流量通常以秒计，就绪探针（readiness probe）亮绿灯的速度远快于伸缩循环的周期。推理服务要把体量巨大的权重从存储读进来、把显存（GPU memory &#x2F; VRAM）分配到位、把计算图编译并预热，然后才谈得上接第一个真实请求。伸缩”决定扩容”和”新实例真正可用”之间，隔着一段不可忽略的冷启动（cold start）过程。</p>
+<p>第三个前提：缩容丢掉的只是少量在途请求，无关紧要。Web 请求短，删一个容器组（Pod）顶多掐断几个正在处理的连接，客户端重试即可。推理服务的一个请求可能是一条持续很久的流式生成，直接删 Pod 会把这条已经吐了一半的流生生切断，用户侧看到的是回答戛然而止。缩容的代价因此从”丢几个请求”升级成”打断一批长连接”。</p>
+<p>把这三条失效摆在一起，就得到本文要一路回答的问题清单。</p>
+<table>
+<thead>
+<tr>
+<th>前提</th>
+<th>普通 Web 服务</th>
+<th>推理服务现实</th>
+<th>本文对应问题</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>指标与容量线性</td>
+<td>每实例吞吐近似常数</td>
+<td>吞吐随输出长度剧烈波动</td>
+<td>用什么信号代表容量</td>
+</tr>
+<tr>
+<td>新实例即刻可服务</td>
+<td>秒级就绪</td>
+<td>加载与预热耗时显著</td>
+<td>就绪如何判定、预热做什么</td>
+</tr>
+<tr>
+<td>缩容只丢少量请求</td>
+<td>掐断少量短连接</td>
+<td>打断长流式生成</td>
+<td>如何无损排水</td>
+</tr>
+</tbody></table>
+<p>这张表是全文的主线：后面每一节，都是在为其中一行给出可操作的解法。还有一条贯穿性的约束——伸缩动作本身有代价，一次扩容要付预热，一次缩容要付排空，这个代价必须在策略里显式计账，否则自动伸缩会把系统推向频繁抖动的方向。本文接下来就围绕”该用什么信号、伸缩动作要付什么代价”这两件事展开。</p>
+<h2 id="冷启动：起一个-Pod-不等于能接流量"><a href="#冷启动：起一个-Pod-不等于能接流量" class="headerlink" title="冷启动：起一个 Pod 不等于能接流量"></a>冷启动：起一个 Pod 不等于能接流量</h2><p>编排器把一个 Pod 调度到节点上、进程跑起来、健康检查（liveness probe）通过，这些都只说明”进程活着”，离”能接流量”还差着一整段路。对推理服务来说，这段路主要由四件事构成。</p>
+<p>其一是权重读取。模型参数通常体量很大，从本地盘、对象存储或分布式缓存里把它拉到内存、再搬到显存，是整个冷启动里最重的一块，快慢取决于权重体积、存储带宽和节点缓存是否命中。同一个节点第二次加载往往快得多，因为权重已在本地缓存——这一点会直接影响伸缩时把新实例往哪些节点放。</p>
+<p>其二是显存分配与常驻结构搭建。推理引擎要在显存里为模型参数、运行时缓冲和 KV 缓存（KV Cache）预留空间；预留是一次性完成还是按需增长、按什么策略增长，决定了实例是”开起来就能满负荷”，还是”边服务边扩张、扩张时抖动”。</p>
+<p>其三是图编译与内核准备。不少引擎在真正服务前要做算子融合、编译或内核选择。这一步不做完，第一批请求会又慢又不稳，把它们放到流量里，等于让线上最早的用户替我们编译。</p>
+<p>其四是预热本身。即便前三步完成，第一批真实请求仍然偏慢：形状各异的输入第一次走到某条执行路径上，会触发惰性初始化。预热的意义，就是把这些”第一次”的代价用可控的假请求提前付掉。</p>
+<p>所以一个负责任的预热要主动走完服务里会出现的主要输入形状：覆盖几档典型长度、跑够足以触发各分支的条数、把编译产物与缓存填满，并观察内部指标稳定下来之后，才对外亮绿灯。下面这份就绪条件清单，把”进程活着”到”可接流量”拆成四个必须分别判定的状态。</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">readinessGates:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">ProcessAlive</span>      <span class="comment"># 进程活着：容器启动，主循环进入服务态</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">WeightsLoaded</span>     <span class="comment"># 显存就位：权重读取完成，常驻结构分配到位</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">WarmupDone</span>        <span class="comment"># 预热完成：主要输入形状各跑过若干假请求，编译与缓存已建立</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">ReadyToServe</span>      <span class="comment"># 可接流量：内部水位稳定，愿意接收真实请求</span></span><br></pre></td></tr></table></figure>
+
+<p>把这四个态分开，价值在于伸缩决策可以只对接流量这一态负责：伸缩在统计可用副本时，应当只计入 ReadyToServe 通过的实例，否则会把还在预热的实例误算进容量，得出”已经够了”的错误结论，进而少扩。反过来，预热完成前的实例必须被流量入口挡在外面，避免刚起来的慢请求污染首 token 等待时间这类尾部指标。这里要提醒的是，”起新实例”这件事在多机分片场景里会进一步复杂化——一个实例可能不再是一个 Pod，而是一组 Pod 整体就绪，这一点放到后面单独讲。</p>
+<h2 id="容量不由-CPU-决定：显存、并发与长度分布"><a href="#容量不由-CPU-决定：显存、并发与长度分布" class="headerlink" title="容量不由 CPU 决定：显存、并发与长度分布"></a>容量不由 CPU 决定：显存、并发与长度分布</h2><p>推理服务能同时接多少请求，不由 CPU 或内存水位说了算。真正决定容量的是两个量的乘积：同时驻留在实例里的序列数，乘以每条序列占用的状态。前者是并发在跑的请求个数，后者主要是 KV 缓存占用，而它随序列长度增长。把这两者相乘，得到的是一副”以显存为墙”的容量画像：墙不是固定的，序列越长、每块砖越大，能在墙里站下的人就越少。</p>
+<p>于是输入与输出长度分布，成了容量最大的扰动源。同样标称”能跑若干条并发”的实例，当来的是短问短答时可能绰绰有余，当来的是长上下文检索或长篇生成时，显存很快见底。这就解释了一个反直觉现象：两个时段观测到的请求数几乎相同，并发压力却天差地别——因为请求数只数了”进来几条”，没数”每条占多久的墙”。用请求数或每秒请求数（Queries Per Second，QPS）当伸缩信号，等于用”进了多少人”去判断”旅馆还住得住吗”，而真正要紧的是”有多少张床被长期占用”。</p>
+<p>正因为容量画像长这样，我们该盯的信号也从 CPU 转向三类：显存水位与 KV 占用率（墙还剩多少）、等待队列深度（门外排了多长一队）、以及抢占次数（为了腾地方，把在跑的序列中途踢出去了多少回）。抢占是一个特别值得单独告警的信号——它意味着系统已经在用牺牲已完成工作的代价换容量，是容量见底之后才会出现的现象。KV 缓存本身如何分页管理、占用率怎么算，是同期《大模型推理优化：KV Cache 与 PagedAttention》那篇的主题，本文只把它的占用率当作一个伸缩信号来用，不重讲机制。</p>
+<h2 id="伸缩信号的选择与防抖"><a href="#伸缩信号的选择与防抖" class="headerlink" title="伸缩信号的选择与防抖"></a>伸缩信号的选择与防抖</h2><p>选定了信号，还得规定每个信号在什么时候该升、升了怎么判、以及怎么防止它骗人。下面逐个说清楚”该升的时候升、误报来自哪里、要怎么平滑”。</p>
+<p>队列深度：该升的时候升，是当实例已经满负荷、新请求开始排队而不是被立即接受时，队列随负载增长是健康的扩容前兆。它的误报来自瞬时尖峰——一阵突发流量把队列顶起来又迅速回落，如果伸缩跟着这个尖峰扩容，多半会扩多。平滑办法是看一段时间的队列趋势或移动平均，而不是单点值。</p>
+<p>首 token 等待时间（Time To First Token，TTFT）：一个新请求从进入到吐出第一个 token 的等待。它升高，说明请求在系统里等待资源的时间变长，是容量吃紧的领先信号。误报来自个别超长输入的请求把单次测量拉高，以及冷启动实例还没预热就接到了流量。建议用分位数而非均值（下面单独讲），并且只统计已经过预热的实例。</p>
+<p>单位时间完成 token 数：整个服务在一秒里吐出的 token 总量，是真实的产出吞吐。当它逼近平台期、再加实例也不再上升，而延迟却持续恶化，说明瓶颈已经从容量转到了别处。误报来自输出长度分布漂移——完成 token 数上升，可能只是因为大家这次要的答案更长，并不代表实例更忙。用它当信号时，要和请求数、长度分布一起看。</p>
+<p>显存水位与 KV 占用率：衡量离容量之墙还有多远。它升高意味着快满，是扩容的直接依据；它的下限则指导缩容——占用长期很低才敢减副本。误报来自预留策略：一次性预留一大块的实例，空闲时水位看着也高。要在读数里区分”已用”和”已预留未用”两部分。</p>
+<p>超时率：请求因等待过久而被判定失败的比例。它升高是容量已经追不上需求的确认信号，属于该立刻响应的类型；但它同时是最该谨慎对待的信号——低超时不代表可以缩容，只代表还没到悬崖边。</p>
+<p>为什么一律用分位数而不是均值。均值会被长尾拉平：一批发短的请求可以把一个卡住的长请求的等待，从统计里稀释掉，让服务看起来”平均没问题”，而真实体验是尾部一片哀嚎。伸缩要看的是 P90、P95 这一档的恶化，因为容量吃紧最先体现在尾部。把均值当阈值，等于亲手把最该报警的信号抹平。</p>
+<p>下表把这些信号汇总成可执行的伸缩条件。这里的口径与埋点方式，和服务本身如何对外提供接口，属于同期《大模型推理服务化实践》那篇的落地范围，本文只借用它们产出的指标做伸缩判断。</p>
+<table>
+<thead>
+<tr>
+<th>信号</th>
+<th>扩容条件</th>
+<th>缩容条件</th>
+<th>防抖手段</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>队列深度</td>
+<td>移动平均持续高于上限</td>
+<td>长期接近于零</td>
+<td>移动平均 + 冷却窗口</td>
+</tr>
+<tr>
+<td>首 token 等待 P95</td>
+<td>分位数超阈值，且来自已预热实例</td>
+<td>分位数长时间远低于阈值</td>
+<td>取分位数 + 只计就绪实例</td>
+</tr>
+<tr>
+<td>完成 token 速率</td>
+<td>逼近平台期且延迟恶化</td>
+<td>远低于容量且水位低</td>
+<td>与长度分布联判</td>
+</tr>
+<tr>
+<td>显存 &#x2F; KV 占用率</td>
+<td>已用比例持续高于上限</td>
+<td>已用比例长期低于下限</td>
+<td>区分已用与预留</td>
+</tr>
+<tr>
+<td>超时率</td>
+<td>出现即视为容量告紧</td>
+<td>不作为缩容依据</td>
+<td>高优先级、短窗确认</td>
+</tr>
+</tbody></table>
+<h2 id="缩容排水：最容易被写坏的一步"><a href="#缩容排水：最容易被写坏的一步" class="headerlink" title="缩容排水：最容易被写坏的一步"></a>缩容排水：最容易被写坏的一步</h2><p>缩容是这篇里动作最危险的一步，也是最常被写成”直接删 Pod”的一步。前面说过，推理服务的一个请求可能是一条持续很久的流式生成，如果在它还在吐 token 时把承载它的实例删掉，用户侧看到的就是回答毫无征兆地断在半路。这不是丢一两个请求的问题，而是把”正在给你答案”变成”答案没了”，体验上是硬伤。所以缩容必须排水（draining），而且要按正确的顺序排。</p>
+<p>顺序是这样四步。第一步，先把这个实例从流量入口摘出去：关闭它的就绪状态，让路由层不再把新请求分给它。这里有个容易忽略的细节——摘出流量不是瞬时的，服务发现与转发规则的收敛有延迟，所以要在真正开始排空之前，留出一小段等待，让”不再进新请求”这件事在所有链路上生效。第二步，停止接受新请求，让已经在途的流式请求自然跑到结束，一条生成都别打断。第三步，给排水设一个最长等待上限：不能无限等，否则一两个超长生成会把整个缩容卡死，伸缩循环里堆积一堆”正在排空中”的实例，反而制造抖动。第四步，只有当在途清空、或触及最长上限之后，才允许发出终止信号。</p>
+<p>这里要把两个 Kubernetes 语义说清楚。<code>preStop</code> 钩子是在容器被终止之前执行的一段逻辑，前面这套”摘流量、等路由收敛、排空在途”的动作就应当放在它里面做，让编排器替我们把”终止前先排水”这件事变成声明式。优雅终止时长（terminationGracePeriodSeconds）则是一个实例从收到终止信号到被强制终止之间的宽限上限。二者的关系要配套：优雅终止时长必须比我们的排水上限留得更宽裕一些，否则编排器会在我们还没排完在途请求时，就先越过排水逻辑把进程强制收掉，前面一切都白做。</p>
+<p>现实里最棘手的是”长生成请求让排水迟迟不结束”。有些请求就是会跑到很久，如果坚持”等它自然结束”，缩容可能永远收不了尾。可行的处理是给上限设一个足够覆盖典型生成分布、但又不至于无限的值；到点仍有残留时，不是放任，而是主动做一次优雅收尾——通知客户端、把可续的状态落到检查点或降级返回，然后才终止。核心取舍是：宁可牺牲极少数超长请求的完整性，也不能让整个缩容停摆。下面这段伪代码把上面的顺序固化下来。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">drain</span>(<span class="params">replica, grace_limit</span>):</span><br><span class="line">    <span class="comment"># 1. 先摘出流量入口，等路由收敛后再开始排空</span></span><br><span class="line">    replica.set_ready(<span class="literal">False</span>)</span><br><span class="line">    wait_for_route_propagation()</span><br><span class="line">    <span class="comment"># 2. 停止接受新请求，让在途流式请求自然跑完</span></span><br><span class="line">    replica.stop_accepting()</span><br><span class="line">    deadline = now() + grace_limit</span><br><span class="line">    <span class="comment"># 3. 轮询在途，直到清空或触及最长等待上限</span></span><br><span class="line">    <span class="keyword">while</span> replica.inflight() &gt; <span class="number">0</span> <span class="keyword">and</span> now() &lt; deadline:</span><br><span class="line">        sleep(poll_interval)</span><br><span class="line">    <span class="comment"># 4. 到点仍有残留：优雅收尾，而非放任无限等待</span></span><br><span class="line">    <span class="keyword">if</span> replica.inflight() &gt; <span class="number">0</span>:</span><br><span class="line">        replica.finish_streaming_gracefully()</span><br><span class="line">    <span class="comment"># 5. 最后才允许终止</span></span><br><span class="line">    replica.terminate()</span><br></pre></td></tr></table></figure>
+
+<h2 id="伸缩粒度、最小副本与”0-副本”陷阱"><a href="#伸缩粒度、最小副本与”0-副本”陷阱" class="headerlink" title="伸缩粒度、最小副本与”0 副本”陷阱"></a>伸缩粒度、最小副本与”0 副本”陷阱</h2><p>伸缩的第一个设计决定是”一次动几个副本”和”最少留几个副本”。很多从 Web 服务迁移过来的团队会顺手把最小副本设成 0，指望靠缩到零来省成本。对推理服务来说，这几乎总是坏主意，原因有二。其一是冷启动代价：缩到零意味着下一个请求要重新付一遍权重读取、显存分配与预热的钱，第一个用户等的是一个完整的冷启动，这在延迟上是不可接受的。其二是依赖抖动放大：冷启动期实例既占存储带宽又占节点资源，一旦流量稍有起伏就反复”缩到零—再拉起”，会把这种重加载的抖动放大到整个集群，反而制造更差的可观测曲线。</p>
+<p>至于模型该落在哪种机房、哪类硬件上，属于同期《大模型私有化部署方案》那篇的部署议题，本文只在伸缩信号层面承接它给出的结果，不展开机房选型。</p>
+<p>最小副本该定多少，正确的思路不是”最少要几个才够跑”，而是”我愿意承担多大的冷启动风险”。最小副本本质上是一份”随时待命的容量保险”：留得越少越省，但遭遇突发时要付出冷启动的等待。这里给一份团队约定示例，数值需按自己的冷启动时长与流量波动实测确定。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">最小副本约定（团队约定示例，非普适值）</span><br><span class="line">- 常态服务：最小副本 = 覆盖&quot;可容忍冷启动风险&quot;的常驻数，保证峰值前已有热实例</span><br><span class="line">- 关键路径（对首 token 延迟敏感的服务）：最小副本取到让冷启动几乎不被真实用户触发</span><br><span class="line">- 低峰或非核心模型：允许下调最小副本，但一般不降到 0</span><br><span class="line">- 多版本共存：新版本灰度期保留最小副本，回滚窗口结束前不缩到最小以下</span><br></pre></td></tr></table></figure>
+
+<p>多模型、多版本共存时，副本分配还要再加一层考虑。每个模型都有自己独立的显存墙和长度分布，把它们混在同一个伸缩池里用一个全局信号调节，会让最”重”的模型长期霸占容量、把轻模型饿死。合理做法是按模型或版本切分独立的伸缩单元，各自用自己的队列与水位做决策，再在顶层设一个共享资源上限，防止某一路把总盘子吃干。灰度发布时新旧版本并存的这段时间，两套副本都要保住排水能力，别让”给新版本腾地方”变成”把老版本的在途请求一刀切”。</p>
+<h2 id="预测式扩容与节奏控制"><a href="#预测式扩容与节奏控制" class="headerlink" title="预测式扩容与节奏控制"></a>预测式扩容与节奏控制</h2><p>被动地等信号超标再扩，对推理服务往往太晚——因为扩容要付预热这段时间。等到队列已经堆起来才触发扩容，新实例还在加载权重，等它能接流量时，那波请求早就超时了。于是我们需要预测式与定时手段，把扩容决策提前到负载真正到来之前。</p>
+<p>按业务日历做定时扩容，是最朴素也最可靠的一种。如果流量每天在固定时段抬升——比如工作日白天，或某个定时批处理任务之后——就让伸缩在抬升点之前提前把热实例备好。这类”形状可预知”的负载，定时扩容比任何算法都稳。</p>
+<p>纯预测则容易翻车。预测模型学的是历史规律，而推理服务的负载常被不可预期的因素打破：一次外部事件、一段突然流行的长文本、一个上游把调用方接了进来。预测一旦偏低，因为要付冷启动，实际容量会更长时间落后于需求；预测偏高，则长期空置、成本白白挂着。所以合理架构是定时或预测打底、实时信号纠偏——预测负责把基线抬高，实时队列与水位负责在预测出错时把多余的扩掉、把不足的补上，两者互为保险。</p>
+<p>节奏控制解决的是”抖动连环扩缩”问题。伸缩最怕在阈值附近反复横跳：负载在临界点上下小幅波动，就触发一次扩、回落触发一次缩、再波动再扩……每一次动作都要付预热的代价，最后系统忙于伸缩而无暇服务。两个手段专治此症。滞回（hysteresis）让扩容阈值和缩容阈值之间留一段空白带：越过上沿才扩，跌破下沿才缩，落在带里则保持不动，避免临界抖动被放大。冷却窗口（cooldown）规定两次同向动作之间的最小间隔，给刚扩出来的实例留出预热与观察的时间，不让策略在上一次动作还没见效时就急着做下一次。</p>
+<p>最后是把”伸缩动作代价”计入策略。既然一次扩容要付一段预热时间，那阈值就不能卡在”刚好满”的位置，而要提前——在容量真正见底之前若干身位就触发，给预热留出处置时间。同理，缩容也留缓冲，别贴着一瞬间的低谷就砍副本。一句话：推理服务的伸缩，是要把”动作本身有延迟”这件事，反推回阈值设定里的。</p>
+<h2 id="多机分片：伸缩单元从-Pod-变成一个组"><a href="#多机分片：伸缩单元从-Pod-变成一个组" class="headerlink" title="多机分片：伸缩单元从 Pod 变成一个组"></a>多机分片：伸缩单元从 Pod 变成一个组</h2><p>当单张设备装不下一个模型，就要把它切开分散到多张卡、甚至多台机器上。常见的两种切法：张量并行（Tensor Parallelism）把每一层的计算矩阵横向分给多张卡在同一步里协同完成，流水线并行（Pipeline Parallelism）把不同的层串成几段、像流水线一样接力。无论哪种，一个逻辑上的”推理实例”从此不再等于一个 Pod，而是一组必须协同工作的 Pod。伸缩单元从”个”变成”组”，带来一连串后果。</p>
+<p>第一是整体就绪。这一组里只要还有一块分片没加载完、没预热完，整个实例就不能接流量——它是”与”的关系，不是”或”。所以前面那套四态就绪判定，要在组的维度上再做一次”全组都 ReadyToServe 才算数”的汇总，任何一个分片拖后腿，整组都不许进流量。第二是整体排水。缩容时不能拆着排：只排掉某一分片，剩下的分片会立刻失去协作对象，崩断在途请求。排水要以组为单位，先把整组摘出流量，再等整组在途跑完。第三是故障域变大。一个 Pod 挂掉，过去只损失一个实例；现在损失的是它所属的整组，一个分片的故障会连累一组。副本的容错预算，因此要按”组”来算。</p>
+<p>分片还带来一个只需讲方向、不必给定值的开销：分得越细，单卡上的计算压力越小，但分片之间为同步与传递中间结果付出的通信越多。张量并行尤其敏感，因为它要求多卡在每一步里频繁交换数据，一旦交换的相对成本压过计算收益，继续加分片就是负收益。这也是为什么分片数不是越大越好，而要按自己的模型与硬件实测找拐点。</p>
+<p>跨机分片把这个矛盾进一步放大到网络层面。当分片分布在不同机器上，分片间通信就要走机间网络，此时伸缩的前提变成一组网络假设：带宽要足够、延迟要足够低且稳定、拓扑上要尽量让同一组的分片落在彼此靠近的位置。运维上这意味着跨机分片的实例更该绑在一起调度、共享同一条网络与故障边界，也要把机间链路当作伸缩里最该盯的隐性瓶颈——很多”容量明明够、延迟却恶化”的现象，根子就在分片通信上。</p>
+<h2 id="调度约束：把伸缩落到放得下的地方"><a href="#调度约束：把伸缩落到放得下的地方" class="headerlink" title="调度约束：把伸缩落到放得下的地方"></a>调度约束：把伸缩落到放得下的地方</h2><p>伸缩决定”要几个实例”，但能不能真的扩出来，还要看调度器有没有地方放它们。推理服务对”放在哪”远比 Web 服务挑剔，这构成对伸缩的一组硬约束；而调度器内部如何打分、如何绑定节点这些机制，属于往期《Kubernetes 调度器》那篇的主题，本文只讲伸缩侧需要向它提的要求与要做的取舍。</p>
+<p>第一类约束是设备类型。模型往往对加速器有硬性偏好：显存容量够不够装下这副权重与 KV 缓存、是不是所需的型号、有没有对应的运行时支持，都是”放不放得下”的前提。伸缩必须把这些当作筛选条件，否则会出现”副本数想扩、但集群里没有满足条件的空位”，扩了个寂寞。</p>
+<p>第二类约束是拓扑。多机分片的实例要求它的几块分片彼此靠近——同机、同交换机下或同可用区内，因为分片间通信对延迟和带宽敏感。NUMA 亲和（Non-Uniform Memory Access，非一致内存访问）则是机内层面的同类问题：让进程与其常驻内存落在靠近的处理单元上，能减少跨节点的访存代价。伸缩一旦把一组分片散放到拓扑远端，性能会悄悄劣化却不报错，是最难排查的一类问题。</p>
+<p>第三类是抢占与配额。加速器是稀缺资源，当高优先级服务容量告紧要扩容、而集群已满，就需要抢占：把低优先级负载腾出去给在线服务让路。抢占对伸缩是把双刃剑——它保证在线扩容能被满足，但也意味着你的实例可能被更高优先级的东西抢走。配额则划定了每个团队或每个模型最多能占用的资源上界，是伸缩不能突破的天花板，也是成本治理的抓手。</p>
+<p>还有一条容易被滥用的捷径是共享设备：把多张卡或一块卡切给多个实例共用，想靠它提高利用率。它适用的边界很窄——只适合负载轻、对延迟不敏感、彼此干扰可控的场景。一旦在线服务对尾延迟敏感，共享带来的隔离不足会让首 token 等待时间的尾部剧烈抖动，因为邻居实例的突发会挤占同一块设备的显存带宽与算力。这种”平时没事、一忙就崩”的行为，恰恰是伸缩最难调的信号来源。所以共享设备在推理服务的在线通路上要格外克制，宁可留独占，把共享留给确实能容忍干扰的负载。</p>
+<h2 id="混部与潮汐：用离线任务填谷"><a href="#混部与潮汐：用离线任务填谷" class="headerlink" title="混部与潮汐：用离线任务填谷"></a>混部与潮汐：用离线任务填谷</h2><p>加速器贵，而在线推理的负载是有峰谷的——白天挤、深夜闲。于是有了一个自然的想法：把离线批任务（比如批量重跑、数据生成、离线索引构建）和在线服务混布在同一批设备上，在线低谷时用闲着的容量跑离线，等在线起来再把容量还给在线。这就是所谓的填谷，或潮汐式混部。离线任务与在线服务在同一资源池里如何编排、离线队列如何调度，是同期《大模型批处理与调度》那篇的主题，本文只谈它对伸缩提出的三点风险。</p>
+<p>第一点是抢占代价要算清。填谷的前提是”在线一起来，离线就让路”，而让路靠抢占离线任务实现。可如果一个离线批任务跑了很久才被抢占、之前的算力全打了水漂，那填谷省下的那点容量，可能不够赔被浪费的离线工作。所以只有可中断、能断点续跑的离线任务才适合拿来填谷，一跑到底不能停的反而添乱。</p>
+<p>第二点是在线延迟保障。混部里最凶的坑，是离线任务在在线毫不知情时把设备带宽或显存吃满，让在线请求的首 token 等待悄悄恶化。要填谷，就得给在线留一条”无论离线多忙都抢得回来”的资源底线，并把在线信号（队列、水位、首 token 等待分位数）当成压制离线的闸门：在线一告紧，立刻限住或踢掉离线，而不是等在线超时了才反应。</p>
+<p>第三点是显存碎片。在线与离线交替占用同一块显存，容易把可用空间切得七零八落——总量看着够，却凑不出一块能服务下一个长序列的连续空间，触发不必要的抢占或扩容。混部的容量水位评估要把碎片算进去，别只看”已用总量”这一个数。填谷是好事，但它把两种截然不同的负载绑进了同一个伸缩决策，任何一路信号失真，都会让混部从”省钱”变成”互相拖累”。</p>
+<h2 id="成本与责任的治理"><a href="#成本与责任的治理" class="headerlink" title="成本与责任的治理"></a>成本与责任的治理</h2><p>弹性伸缩最容易带来的副作用，是把成本问题藏起来。它给人一种”系统会自己调节、不必我操心”的安全感，于是没有人再去看账单背后的形状。但对推理服务来说，成本的大头往往不在单张设备的单价，而在峰谷的形状：为了扛住一天里那几个小时的峰值，你得让一整批实例要么热着待命、要么随时能在冷启动之后拉起；低谷时它们闲置，成本却持续发生。自动伸缩会把这种”为峰值买单”的结构忠实地放大——它按信号把副本数顶到峰值水位，却不负责回答”这个峰值值不值得为它常备这么多热实例”。</p>
+<p>所以伸缩策略必须和一套治理绑在一起，至少包含三件东西。其一是预算护栏：给伸缩能达到的资源上界设一条不能自动突破的红线，越过它就停止扩容并转为告警，而不是任由信号把集群一路撑大。这条红线通常由配额承载。其二是审批：当某个服务要调整最小副本、扩容上限或阈值这类会显著改变成本曲线的参数时，要有一个明确的人来批准，而不是谁都能随手改一行配置就把常驻容量翻倍。其三是触发上限：对单位时间内的伸缩动作次数设上限，防止失控的策略在故障或异常信号下连环扩容，把成本在一次抖动里推到离谱的位置。</p>
+<p>责任也要落到人。每个走自动伸缩的服务，都该有一个看得懂它的伸缩曲线、并对它的成本与延迟同时负责的归属方；否则就会出现”只管扩不管钱、只管省不管炸”的三不管地带。把护栏、审批、上限这三件连同归属一起写进策略，伸缩才既自动又可控。</p>
+<h2 id="上线之前：观测、回放与演练"><a href="#上线之前：观测、回放与演练" class="headerlink" title="上线之前：观测、回放与演练"></a>上线之前：观测、回放与演练</h2><p>一套伸缩策略在纸面上看着合理，上线却常常翻车，因为它的行为只在”负载×信号×动作延迟”三者耦合时才暴露。要验证它，不必拿真实流量冒险，可以分三层递进。</p>
+<p>第一层是离线回放。把历史的负载曲线——请求到达与长度分布随时间的变化——喂给一个能模拟副本数、冷启动延迟与排水过程的模型，看策略在这条曲线上会产生多少次伸缩、每次动作是否来得及、排水会不会拖太久。回放的目的是先排掉明显的”抖成一团”和”永远追不上”的策略，成本最低。</p>
+<p>第二层是影子环境。用与生产同构但相互隔离的环境，接上被镜像的真实流量做只读验证，观察伸缩决策与排水行为，而不影响线上用户。它能暴露回放模型没建模到的东西，比如调度器到底放不放得下、机间网络的真实抖动。</p>
+<p>第三层是主动演练。在可控窗口里人为触发一次扩容和一次缩容，专门检验”排水是不是真的无损”：缩容时在途流式请求有没有被硬切断、有没有请求触到排水上限被优雅收尾、冷启动的新实例有没有把首 token 等待拖高。演练是唯一能证实”无损排水”这件事真实存在的手段，不能省。</p>
+<p>下面是必须长期盯的四个伸缩侧指标，它们直接刻画策略健康度。伸缩动作次数：单位时间内扩与缩各发生了几回，次数异常偏高几乎总是抖动。误扩率：扩出来后很快又缩掉的占比，衡量信号有多少在骗你。排水超时次数：缩容时因触及最长等待上限而不得不优雅收尾的频次，偏高说明负载里长生成太多、排水窗口设得不合适。冷启动请求占比：有多少请求被还没预热的实例接到，它直接对应”用户替我们付冷启动代价”的比例。</p>
+<p>配合一张流程图，把从采集到终止的闭环画清楚，演练时照着它核对每一步是否被触发即可。</p>
+<pre class="mermaid">flowchart TD
+  A[指标采集] --> B[信号判定]
+  B --> C{扩容还是缩容}
+  C -->|扩容| D[申请新实例]
+  D --> E[加载与预热]
+  E --> F[置为可接流量]
+  C -->|缩容| G[摘出流量入口]
+  G --> H[排空在途请求]
+  H --> I[到上限才允许终止]
+  F --> B
+  I --> B</pre>
+
+<p>演练前用一份 checklist 逐项确认，能避免”演练当天才发现缺东西”。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">伸缩演练 checklist（团队约定示例）</span><br><span class="line">- 回放就绪：历史负载曲线已导入，策略能跑出一个伸缩时间线</span><br><span class="line">- 影子验证：镜像流量环境下决策合理，无误扩/漏扩</span><br><span class="line">- 扩容演练：新实例走完四态就绪，冷启动请求占比可接受</span><br><span class="line">- 缩容演练：在途流式请求未被硬切断，排水超时次数在预期内</span><br><span class="line">- 防抖确认：滞回与冷却窗口生效，阈值附近无连环扩缩</span><br><span class="line">- 护栏确认：预算红线与触发上限能拦截异常扩容</span><br><span class="line">- 回滚预案：策略参数可快速回退，演练能随时中止</span><br></pre></td></tr></table></figure>
+
+<h2 id="信号适用性对照总表"><a href="#信号适用性对照总表" class="headerlink" title="信号适用性对照总表"></a>信号适用性对照总表</h2><p>把前面散落的判断收成一张表，方便选型时一眼对照。它回答三个问题：这个信号能不能用作推理服务的伸缩依据、它在什么时候会骗人、以及用它的同时必须配哪道防抖。</p>
+<table>
+<thead>
+<tr>
+<th>信号</th>
+<th>是否适用于推理服务</th>
+<th>误报来源</th>
+<th>建议用法</th>
+<th>必须配套的防抖</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CPU &#x2F; 内存</td>
+<td>基本不适用，仅旁证</td>
+<td>计算压在加速器上时 CPU 很低，内存反映不了显存墙</td>
+<td>只用来排除”卡在 CPU 或主存”这类非容量问题</td>
+<td>不进伸缩主决策</td>
+</tr>
+<tr>
+<td>请求数 &#x2F; QPS</td>
+<td>有限适用</td>
+<td>不反映输出长度与并发占用</td>
+<td>结合长度分布做粗判</td>
+<td>分位数化 + 移动平均</td>
+</tr>
+<tr>
+<td>队列深度</td>
+<td>适用，扩容领先信号</td>
+<td>瞬时突发顶起又迅速回落</td>
+<td>看移动平均趋势而非单点</td>
+<td>移动平均 + 冷却窗口</td>
+</tr>
+<tr>
+<td>首 token 等待</td>
+<td>适用，容量吃紧领先信号</td>
+<td>个别超长请求、未预热实例污染</td>
+<td>取 P95，只统计已就绪实例</td>
+<td>只计就绪 + 窗口平滑</td>
+</tr>
+<tr>
+<td>显存水位 &#x2F; KV 占用</td>
+<td>适用，直指容量墙</td>
+<td>一次性预留把空闲也显高</td>
+<td>区分已用与预留，用上下限定缩容</td>
+<td>口径区分 + 滞回</td>
+</tr>
+<tr>
+<td>完成 token 速率</td>
+<td>适用，产出吞吐</td>
+<td>长度分布漂移导致虚高虚低</td>
+<td>与请求数联判是否进入平台期</td>
+<td>与长度分布联判</td>
+</tr>
+</tbody></table>
+<p>读这张表要抓一个要点：真正适合当主信号的是队列深度、首 token 等待、显存&#x2F;KV 占用、完成 token 速率这一组”贴着容量走”的指标；CPU、内存和裸请求数只能退居旁证。而每一个主信号都必须自带防抖，否则推理服务特有的长尾与尖峰，会把自动伸缩变成一台抖动发生器。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>本文的出发点是：大模型推理服务的伸缩和普通 Web 服务不是一回事。水平伸缩赖以成立的三条前提——指标与容量线性、新实例即刻可服务、缩容只丢少量请求——在推理服务上集体失效，因为容量由”同时驻留序列数×每序列状态占用”决定、起一个 Pod 离能接流量之间隔着权重加载与预热、而一次缩容打断的是一条条长流式生成。这三条失效，就是全文一路回答的问题清单。</p>
+<p>沿着这张清单，我们给出了对应的落地姿态：用四态就绪把”能接流量”和”进程活着”分开，只让已过预热的实例计入可用容量；用队列深度、首 token 等待分位数、显存&#x2F;KV 占用、完成 token 速率替代 CPU 水位做信号，并给每个信号配好误报来源与防抖；缩容务必先摘流量、再等排空、设最长上限、才允许终止，并把 <code>preStop</code> 与优雅终止时长配套；最小副本按”可容忍的冷启动风险”来定、慎用缩到零；用定时与预测打底、滞回与冷却窗口控节奏，并把”动作本身要付预热”这件事反推回阈值。多机分片让伸缩单元从 Pod 变成一个组，要整体就绪、整体排水；调度、配额与共享设备划定了伸缩能否落地的边界；混部填谷能省钱，却把两路负载绑进同一个决策，任何一路信号失真都会互相拖累。</p>
+<p>还有两件事贯穿始终。其一，伸缩不是纯技术动作，它需要预算护栏、审批与触发上限的治理来兜底，把成本从被藏起来的状态拽回台面——真正要治理的不是单价，而是峰谷形状。其二，任何策略上线前都应经过离线回放、影子环境和主动演练三层验证，再用伸缩动作次数、误扩率、排水超时次数、冷启动请求占比这四个指标去证伪它。本文所有量级都写成示意值或”你要自己测的口径”，因为推理服务的伸缩参数没有普适数字，只能在你的负载形状上标定。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li>Kubernetes 官方文档 · Horizontal Pod Autoscaling（水平伸缩）主题</li>
+<li>Kubernetes 官方文档 · Pod 生命周期与优雅终止（terminationGracePeriodSeconds、preStop 钩子）主题</li>
+<li>Kubernetes 官方文档 · 基于自定义指标与外部指标的伸缩主题</li>
+<li>metrics-server（Kubernetes SIGs 的资源指标组件）：<a href="https://github.com/kubernetes-sigs/metrics-server">https://github.com/kubernetes-sigs/metrics-server</a></li>
+<li>prometheus-adapter（把 Prometheus 指标接入自定义指标伸缩）：<a href="https://github.com/kubernetes-sigs/prometheus-adapter">https://github.com/kubernetes-sigs/prometheus-adapter</a></li>
+<li>KEDA（面向事件与外部指标驱动的自动伸缩项目）：<a href="https://github.com/kedacore/keda">https://github.com/kedacore/keda</a></li>
+<li>AIBrix（面向大规模 LLM 推理的云原生基础设施与控制平面开源项目，此处仅述定位）：<a href="https://github.com/vllm-project/aibrix">https://github.com/vllm-project/aibrix</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>推理服务的弹性伸缩</p><p><a href="https://987763485.github.io/2025/08/12/推理服务的弹性伸缩/">https://987763485.github.io/2025/08/12/推理服务的弹性伸缩/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2025-08-12</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-20</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="link-muted mr-2" rel="tag" href="/tags/python/">python</a><a class="link-muted mr-2" rel="tag" href="/tags/typescript/">typescript</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2025/08/19/%E6%8F%90%E7%A4%BA%E8%AF%8D%E5%B7%A5%E7%A8%8B%E8%BF%9B%E9%98%B6%E6%8A%80%E5%B7%A7/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">提示词工程进阶技巧</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2025/08/07/AutoGPT%E8%87%AA%E4%B8%BB%E6%99%BA%E8%83%BD%E4%BD%93%E8%A7%A3%E6%9E%90/"><span class="level-item">AutoGPT 自主智能体解析</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

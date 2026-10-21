@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>前端状态管理方案选型 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="状态管理几乎是每个中型前端项目都会遇到的问题。2018 年上半年，Redux 4.0 刚刚发布，MobX 在 3.x 与 4.x 之间过渡，Vuex 3 随 Vue 2.5 稳定下来，React 16.3（2018 年 3 月发布）又把新的 Context API 推到台前，可选项比两年前更多，争论却没有变少。本文不再教某个库的 API，而是回到更靠前的问题：状态应当怎样分类，什么情况下根本不需要"><meta property="og:type" content="blog"><meta property="og:title" content="前端状态管理方案选型"><meta property="og:url" content="https://987763485.github.io/2018/05/31/%E5%89%8D%E7%AB%AF%E7%8A%B6%E6%80%81%E7%AE%A1%E7%90%86%E6%96%B9%E6%A1%88%E9%80%89%E5%9E%8B/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="状态管理几乎是每个中型前端项目都会遇到的问题。2018 年上半年，Redux 4.0 刚刚发布，MobX 在 3.x 与 4.x 之间过渡，Vuex 3 随 Vue 2.5 稳定下来，React 16.3（2018 年 3 月发布）又把新的 Context API 推到台前，可选项比两年前更多，争论却没有变少。本文不再教某个库的 API，而是回到更靠前的问题：状态应当怎样分类，什么情况下根本不需要"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2018-05-31T11:13:09.000Z"><meta property="article:modified_time" content="2026-10-18T11:43:38.141Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="web前端"><meta property="article:tag" content="typescript"><meta property="article:tag" content="前端工程化"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2018/05/31/%E5%89%8D%E7%AB%AF%E7%8A%B6%E6%80%81%E7%AE%A1%E7%90%86%E6%96%B9%E6%A1%88%E9%80%89%E5%9E%8B/"},"headline":"前端状态管理方案选型","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2018-05-31T11:13:09.000Z","dateModified":"2026-10-18T11:43:38.141Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"状态管理几乎是每个中型前端项目都会遇到的问题。2018 年上半年，Redux 4.0 刚刚发布，MobX 在 3.x 与 4.x 之间过渡，Vuex 3 随 Vue 2.5 稳定下来，React 16.3（2018 年 3 月发布）又把新的 Context API 推到台前，可选项比两年前更多，争论却没有变少。本文不再教某个库的 API，而是回到更靠前的问题：状态应当怎样分类，什么情况下根本不需要"}</script><link rel="canonical" href="https://987763485.github.io/2018/05/31/%E5%89%8D%E7%AB%AF%E7%8A%B6%E6%80%81%E7%AE%A1%E7%90%86%E6%96%B9%E6%A1%88%E9%80%89%E5%9E%8B/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2018-05-31T11:13:09.000Z" title="5/31/2018, 7:13:09 PM">2018-05-31</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/">前端开发</a></span><span class="level-item">1 小时读完 (大约8101个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">前端状态管理方案选型</h1><div class="content"><p>状态管理几乎是每个中型前端项目都会遇到的问题。2018 年上半年，Redux 4.0 刚刚发布，MobX 在 3.x 与 4.x 之间过渡，Vuex 3 随 Vue 2.5 稳定下来，React 16.3（2018 年 3 月发布）又把新的 Context API 推到台前，可选项比两年前更多，争论却没有变少。本文不再教某个库的 API，而是回到更靠前的问题：状态应当怎样分类，什么情况下根本不需要库，几种方案的心智模型与团队成本差在哪里，以及一个已经在跑的项目如何低成本迁移。读完之后，你应当能为自己的项目写出一页纸的选型理由，而不是凭“大家都在用”做决定。</p>
+<h2 id="一、先把状态分类，再谈方案"><a href="#一、先把状态分类，再谈方案" class="headerlink" title="一、先把状态分类，再谈方案"></a>一、先把状态分类，再谈方案</h2><p>很多关于状态管理的争论，其实在讨论不同的东西。一个人说“我们项目状态很乱”，可能指的是接口数据没有缓存；另一个人说的可能是弹窗开关散落在十几个组件里。不先把状态分类，选型就会变成拿锤子找钉子。</p>
+<p>笔者习惯按“生命周期”和“共享范围”两个维度切分，得到五类状态。</p>
+<h3 id="五类状态"><a href="#五类状态" class="headerlink" title="五类状态"></a>五类状态</h3><p>第一类是组件局部状态。输入框的当前值、下拉菜单是否展开、鼠标是否悬停，这些状态只服务一个组件，随组件挂载而生、卸载而灭。它们不需要被序列化，也不需要被其他组件读取。</p>
+<p>第二类是跨组件共享状态。当前登录用户、权限列表、主题、购物车条目，这些数据被多个页面或相隔很远的组件使用，生命周期比任何一个组件都长。</p>
+<p>第三类是服务端数据缓存。列表页的数据、详情页的数据、分页游标，本质上是服务端数据库的一份副本。它有失效时间，会过期，需要重新拉取。</p>
+<p>第四类是 URL 与路由状态。当前页码、筛选条件、标签页、搜索关键词。这类状态的特殊之处在于，它应当可以被收藏、分享，刷新后还能还原。</p>
+<p>第五类是表单状态。草稿值、校验错误、是否被修改过、是否正在提交。它变化频繁，且往往只在一次编辑会话内有效。</p>
+<pre class="mermaid">flowchart TD
+    A[应用中的状态] --> B[组件局部状态]
+    A --> C[跨组件共享状态]
+    A --> D[服务端数据缓存]
+    A --> E[URL 与路由状态]
+    A --> F[表单状态]
+    B --> B1[组件 state 与实例属性]
+    C --> C1[Context 或全局 store]
+    D --> D1[请求层缓存]
+    E --> E1[路由 query 与 params]
+    F --> F1[受控组件或表单库]</pre>
+
+<h3 id="分类决定载体"><a href="#分类决定载体" class="headerlink" title="分类决定载体"></a>分类决定载体</h3><p>把五类状态分开之后，很多问题会自动消失。服务端数据不该和 UI 状态混在一个 store 里，因为它们的失效策略完全不同；URL 状态不该只存在内存里，否则用户刷新页面就丢了筛选条件；表单草稿也不该进全局 store，否则一次未提交的编辑会污染整个应用。</p>
+<p>可以用一张表把判断固定下来。</p>
+<table>
+<thead>
+<tr>
+<th>类别</th>
+<th>典型例子</th>
+<th>生命周期</th>
+<th>推荐载体</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>组件局部状态</td>
+<td>展开、悬停、输入值</td>
+<td>随组件</td>
+<td>组件自身 state</td>
+</tr>
+<tr>
+<td>跨组件共享</td>
+<td>登录用户、主题</td>
+<td>整个会话</td>
+<td>Context 或 store</td>
+</tr>
+<tr>
+<td>服务端数据</td>
+<td>列表、详情</td>
+<td>有缓存期限</td>
+<td>请求层缓存</td>
+</tr>
+<tr>
+<td>URL 状态</td>
+<td>页码、筛选</td>
+<td>可分享</td>
+<td>路由 query</td>
+</tr>
+<tr>
+<td>表单状态</td>
+<td>草稿、校验</td>
+<td>一次编辑</td>
+<td>表单组件内部</td>
+</tr>
+</tbody></table>
+<p>这张表不是教条，而是一组提问的顺序。当你想把某类状态放进 Redux 之前，先问一句它属于哪一类。如果答案是服务端数据，那么真正需要的是缓存与失效策略，而不是 action 与 reducer；如果答案是 URL 状态，那么先看看路由能不能承担。分类做对了，后面的选型会简单很多。</p>
+<h2 id="二、什么时候不需要状态管理库"><a href="#二、什么时候不需要状态管理库" class="headerlink" title="二、什么时候不需要状态管理库"></a>二、什么时候不需要状态管理库</h2><h3 id="三个判断信号"><a href="#三个判断信号" class="headerlink" title="三个判断信号"></a>三个判断信号</h3><p>在引入任何库之前，可以先看三个信号：共享状态是否超过五个，组件层级是否超过三层，是否存在跨路由保持状态的需求。三个答案都是否，组件 state 加 props 就够了。</p>
+<p>React 的组件组合本身是一种被低估的方案。把子组件作为 children 传下去，中间层不必知道这些 props 的存在，也就避免了逐层透传。很多“需要全局状态”的场景，用组合重写之后就不需要了。</p>
+<h3 id="过早引入的代价"><a href="#过早引入的代价" class="headerlink" title="过早引入的代价"></a>过早引入的代价</h3><p>过早引入状态管理库的代价，往往在半年后才显现。</p>
+<p>第一是概念税。团队里每个人都要理解 action、reducer、dispatch、middleware、selector 这一套词汇，新人的第一个需求还没写完，先要读三篇文档。</p>
+<p>第二是改动成本。改一个字段，要在 types、actions、reducers、组件四处跳转；一个简单的布尔开关，被拆成四个文件里的五处修改。</p>
+<p>第三是抽象泄漏。当库的约定没有覆盖某个场景，开发者会在 store 之外再放一份状态，于是同一份数据有了两个来源，这比一开始不用库更糟。</p>
+<p>第四是调试路径变长。出问题时，你首先要判断是组件状态不对，还是 store 里的状态不对，还是两者之间的同步逻辑没跑。</p>
+<h3 id="Context-的边界"><a href="#Context-的边界" class="headerlink" title="Context 的边界"></a>Context 的边界</h3><p>React 16.3（2018 年 3 月发布）提供了新的 Context API，<code>React.createContext</code> 返回 Provider 与 Consumer，跨层级注入变得正式而简单。它足以承担“低频变化的全局配置”，例如主题、当前语言、登录用户。</p>
+<p>但 Context 不是 store。Provider 的 value 一旦变化，所有消费者都会重新渲染；它没有选择器，也没有按字段订阅的机制。把高频变化的状态放进 Context，会让整棵子树跟着抖动。常见的做法是按关注点拆成多个 Provider，或者把 value 做成稳定的对象，只在内部字段变化时通过订阅通知。</p>
+<p>笔者的经验是：Context 适合“读多写少”的共享状态，不适合“写多读多”的交互状态。越过这条线，就该考虑真正的 store 了。</p>
+<h2 id="三、候选方案全景"><a href="#三、候选方案全景" class="headerlink" title="三、候选方案全景"></a>三、候选方案全景</h2><p>2018 年年中，React 生态里能上台面的选择大致有四种，Vue 生态则基本由 Vuex 统一。把它们放在一张桌子上，先看各自的位置，再看细节。</p>
+<h3 id="Redux-3-7-与-4-0"><a href="#Redux-3-7-与-4-0" class="headerlink" title="Redux 3.7 与 4.0"></a>Redux 3.7 与 4.0</h3><p>Redux 3.7 仍是大量项目的实际版本，4.0 在 2018 年 4 月发布，主要变化是用 TypeScript 重写了类型定义、清理了废弃 API、缩小了包体，核心 API 没有大的改动。它把状态放进单一 store，只允许通过 dispatch action 修改，reducer 必须是纯函数。中间件机制让异步、日志、持久化都可以插拔。</p>
+<h3 id="MobX-3-与-4"><a href="#MobX-3-与-4" class="headerlink" title="MobX 3 与 4"></a>MobX 3 与 4</h3><p>MobX 3.x 与 4.x 在 2018 年交替存在。4.x 在有 Proxy 的环境使用 Proxy，没有时退回 ES5 的 defineProperty 实现，因此 IE11 仍可用。它的核心是 observable、computed、action、reaction 四个概念：状态是可变的，依赖由运行时自动追踪，读取即订阅。</p>
+<h3 id="Vuex-3"><a href="#Vuex-3" class="headerlink" title="Vuex 3"></a>Vuex 3</h3><p>Vuex 3 是 Vue 2 的官方方案，state、getters、mutations、actions、modules 的分工很清晰，和 Vue 的响应式系统天然贴合。它的适用范围基本被 Vue 生态限定，跨框架复用不是它的目标。</p>
+<h3 id="Context-加手写-reducer"><a href="#Context-加手写-reducer" class="headerlink" title="Context 加手写 reducer"></a>Context 加手写 reducer</h3><p>不引入任何库也能得到一个迷你 store：容器组件持有 state，写一个纯 reducer 函数，dispatch 时先算出新状态再 setState，最后通过 Context 把 state 与 dispatch 下发。它没有中间件、没有 devtools、没有选择器缓存，但对中小型页面已经够用。需要说明的是，这种写法通常落在一个类组件容器里，函数组件此时只负责展示。</p>
+<h3 id="把服务端数据交给请求层"><a href="#把服务端数据交给请求层" class="headerlink" title="把服务端数据交给请求层"></a>把服务端数据交给请求层</h3><p>还有一条常被忽略的路线：根本不把服务端数据放进全局 store，而是让请求层负责缓存、去重、失效与重试。组件按需请求，请求层返回缓存或发起新请求。2018 年已经有不少团队这样做，GraphQL 场景下的 Apollo Client 把这条路走得最完整。它的好处是服务端数据的生命周期由请求层统一管理，UI 状态与服务端状态不再互相牵连。</p>
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>心智模型</th>
+<th>生态</th>
+<th>典型适用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Redux</td>
+<td>单一 store、纯 reducer</td>
+<td>中间件与 devtools 丰富</td>
+<td>多人协作、需要回放</td>
+</tr>
+<tr>
+<td>MobX</td>
+<td>可观察对象、自动追踪</td>
+<td>工具链较轻</td>
+<td>交互复杂、交付要快</td>
+</tr>
+<tr>
+<td>Vuex</td>
+<td>响应式 store、mutations</td>
+<td>与 Vue 生态一体</td>
+<td>Vue 2 项目</td>
+</tr>
+<tr>
+<td>Context</td>
+<td>注入加手写 reducer</td>
+<td>React 内置</td>
+<td>低频共享、中小页面</td>
+</tr>
+<tr>
+<td>请求层缓存</td>
+<td>数据即缓存</td>
+<td>取决于请求库</td>
+<td>以服务端数据为主</td>
+</tr>
+</tbody></table>
+<h2 id="四、心智模型对比：纯-reducer-与可观察对象"><a href="#四、心智模型对比：纯-reducer-与可观察对象" class="headerlink" title="四、心智模型对比：纯 reducer 与可观察对象"></a>四、心智模型对比：纯 reducer 与可观察对象</h2><p>选型时最值得比较的不是 API，而是心智模型。同样一个购物车，两种方案写出来的代码，暴露的是两种世界观。</p>
+<h3 id="Redux：把“发生了什么”变成数据"><a href="#Redux：把“发生了什么”变成数据" class="headerlink" title="Redux：把“发生了什么”变成数据"></a>Redux：把“发生了什么”变成数据</h3><p>Redux 的出发点是：UI 是状态的函数，状态只能由 action 描述的变化推导出来。所有修改都经过 reducer，reducer 是纯函数，输入旧状态与 action，输出新状态。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// cart/actions.js</span></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">const</span> <span class="variable constant_">ADD_ITEM</span> = <span class="string">&#x27;cart/ADD_ITEM&#x27;</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">function</span> <span class="title function_">addItem</span>(<span class="params">sku, price, qty</span>) &#123;</span><br><span class="line">  <span class="keyword">return</span> &#123; <span class="attr">type</span>: <span class="variable constant_">ADD_ITEM</span>, <span class="attr">payload</span>: &#123; <span class="attr">sku</span>: sku, <span class="attr">price</span>: price, <span class="attr">qty</span>: qty || <span class="number">1</span> &#125; &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// cart/reducer.js</span></span><br><span class="line"><span class="keyword">import</span> &#123; <span class="variable constant_">ADD_ITEM</span> &#125; <span class="keyword">from</span> <span class="string">&#x27;./actions&#x27;</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">var</span> initialState = &#123; <span class="attr">items</span>: [] &#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">function</span> <span class="title function_">cartReducer</span>(<span class="params">state, action</span>) &#123;</span><br><span class="line">  <span class="keyword">if</span> (<span class="keyword">typeof</span> state === <span class="string">&#x27;undefined&#x27;</span>) &#123;</span><br><span class="line">    state = initialState</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">switch</span> (action.<span class="property">type</span>) &#123;</span><br><span class="line">    <span class="keyword">case</span> <span class="attr">ADD_ITEM</span>: &#123;</span><br><span class="line">      <span class="keyword">var</span> payload = action.<span class="property">payload</span></span><br><span class="line">      <span class="keyword">var</span> exists = state.<span class="property">items</span>.<span class="title function_">some</span>(<span class="keyword">function</span> (<span class="params">item</span>) &#123;</span><br><span class="line">        <span class="keyword">return</span> item.<span class="property">sku</span> === payload.<span class="property">sku</span></span><br><span class="line">      &#125;)</span><br><span class="line">      <span class="comment">// 已有该商品则数量累加，否则追加一行</span></span><br><span class="line">      <span class="keyword">var</span> items = exists</span><br><span class="line">        ? state.<span class="property">items</span>.<span class="title function_">map</span>(<span class="keyword">function</span> (<span class="params">item</span>) &#123;</span><br><span class="line">            <span class="keyword">return</span> item.<span class="property">sku</span> === payload.<span class="property">sku</span></span><br><span class="line">              ? <span class="title class_">Object</span>.<span class="title function_">assign</span>(&#123;&#125;, item, &#123; <span class="attr">qty</span>: item.<span class="property">qty</span> + payload.<span class="property">qty</span> &#125;)</span><br><span class="line">              : item</span><br><span class="line">          &#125;)</span><br><span class="line">        : state.<span class="property">items</span>.<span class="title function_">concat</span>([payload])</span><br><span class="line">      <span class="keyword">return</span> <span class="title class_">Object</span>.<span class="title function_">assign</span>(&#123;&#125;, state, &#123; <span class="attr">items</span>: items &#125;)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="attr">default</span>:</span><br><span class="line">      <span class="keyword">return</span> state</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// cart/selectors.js</span></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">function</span> <span class="title function_">selectTotal</span>(<span class="params">state</span>) &#123;</span><br><span class="line">  <span class="keyword">return</span> state.<span class="property">cart</span>.<span class="property">items</span>.<span class="title function_">reduce</span>(<span class="keyword">function</span> (<span class="params">sum, item</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> sum + item.<span class="property">price</span> * item.<span class="property">qty</span></span><br><span class="line">  &#125;, <span class="number">0</span>)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>注意总价没有被存进 state。它是从 items 推导出来的，放在 selector 里按需计算，这是 Redux 社区反复强调的一条纪律。</p>
+<h3 id="MobX：描述状态是什么，修改就是方法调用"><a href="#MobX：描述状态是什么，修改就是方法调用" class="headerlink" title="MobX：描述状态是什么，修改就是方法调用"></a>MobX：描述状态是什么，修改就是方法调用</h3><p>MobX 的出发点是：状态是一个可观察的对象，任何读取它的地方都会被自动记录，修改之后相关方自动更新。开发者写的是“业务对象”，不是“状态转换”。</p>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> &#123; observable, computed, action &#125; <span class="keyword">from</span> <span class="string">&#x27;mobx&#x27;</span></span><br><span class="line"><span class="keyword">import</span> &#123; observer &#125; <span class="keyword">from</span> <span class="string">&#x27;mobx-react&#x27;</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">CartStore</span> &#123;</span><br><span class="line">  @observable items = []</span><br><span class="line"></span><br><span class="line">  @computed <span class="keyword">get</span> <span class="title function_">total</span>() &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="variable language_">this</span>.<span class="property">items</span>.<span class="title function_">reduce</span>(<span class="function">(<span class="params">sum, item</span>) =&gt;</span> sum + item.<span class="property">price</span> * item.<span class="property">qty</span>, <span class="number">0</span>)</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  @action <span class="title function_">addItem</span>(<span class="params">sku, price, qty</span>) &#123;</span><br><span class="line">    <span class="keyword">const</span> line = <span class="variable language_">this</span>.<span class="property">items</span>.<span class="title function_">find</span>(<span class="function"><span class="params">item</span> =&gt;</span> item.<span class="property">sku</span> === sku)</span><br><span class="line">    <span class="keyword">if</span> (line) &#123;</span><br><span class="line">      line.<span class="property">qty</span> += qty || <span class="number">1</span></span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">      <span class="variable language_">this</span>.<span class="property">items</span>.<span class="title function_">push</span>(&#123; <span class="attr">sku</span>: sku, <span class="attr">price</span>: price, <span class="attr">qty</span>: qty || <span class="number">1</span> &#125;)</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> <span class="title class_">CartPanel</span> = <span class="title function_">observer</span>(<span class="function">(<span class="params">&#123; store &#125;</span>) =&gt;</span> (</span><br><span class="line">  <span class="language-xml"><span class="tag">&lt;<span class="name">div</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">    <span class="tag">&lt;<span class="name">span</span>&gt;</span>共 &#123;store.items.length&#125; 种商品<span class="tag">&lt;/<span class="name">span</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">    <span class="tag">&lt;<span class="name">strong</span>&gt;</span>合计 &#123;store.total&#125; 元<span class="tag">&lt;/<span class="name">strong</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">  <span class="tag">&lt;/<span class="name">div</span>&gt;</span></span></span><br><span class="line">))</span><br></pre></td></tr></table></figure>
+
+<p>同一个需求，MobX 版本没有 action type，没有不可变更新，也没有独立的 selector 文件。合并逻辑就是几行普通的命令式代码，读起来接近业务描述。</p>
+<h3 id="差别在哪里"><a href="#差别在哪里" class="headerlink" title="差别在哪里"></a>差别在哪里</h3><p>Redux 用约束换可预测性：所有变化都有名字、都可序列化、都可重放。MobX 用自由换表达力：代码短、贴近业务，但变化的路径是隐式的。</p>
+<p>这也解释了两者在团队里的表现。Redux 项目里，任何人看 action 日志就能还原一次操作；MobX 项目里，改动一个属性可能触发五处更新，只有理解依赖图的人才说得清。选哪一种，取决于你更怕“状态不可预测”，还是更怕“代码写不动”。</p>
+<h2 id="五、可调试性：时间旅行与依赖追踪"><a href="#五、可调试性：时间旅行与依赖追踪" class="headerlink" title="五、可调试性：时间旅行与依赖追踪"></a>五、可调试性：时间旅行与依赖追踪</h2><p>调试体验是选型中最容易被低估的一项，却往往是项目上线后最需要的。</p>
+<h3 id="Redux-的优势在可回放"><a href="#Redux-的优势在可回放" class="headerlink" title="Redux 的优势在可回放"></a>Redux 的优势在可回放</h3><p>Redux DevTools 可以把每一次 dispatch 记录下来，展示 action 名称、payload 与前后状态差异，并支持时间旅行：拖动滑块回到任意一步，界面随之还原。要做到这一点，前提是 reducer 纯、action 可序列化、状态不可变。异步请求通过 middleware 把“开始、成功、失败”拆成三个 action，日志里能完整看到一次请求的生命周期。</p>
+<p>这套能力在排查“用户点了三下按钮之后页面为什么变成这样”时非常有效。代价是纪律：一旦有人在 reducer 里写了 <code>Date.now()</code>，或者直接修改了 state，时间旅行就会失真。</p>
+<h3 id="MobX-的优势在看清依赖"><a href="#MobX-的优势在看清依赖" class="headerlink" title="MobX 的优势在看清依赖"></a>MobX 的优势在看清依赖</h3><p>MobX 的调试思路不同。它不记录变化序列，而是回答“这个值为什么变了”。<code>trace</code> 可以打印出某个 computed 被谁读取、又被谁修改；<code>spy</code> 可以监听所有 action 与 reaction；mobx-react-devtools 能在页面上高亮正在渲染的组件，并列出本次渲染读取了哪些 observable。</p>
+<p>它的短板是回放。因为状态是原地修改的，没有历史快照，时间旅行无从谈起。需要撤销重做时，通常要引入 mobx-state-tree，用它的快照与 action 记录补上这一块。MST 在 2018 年已经是可用方案，但学习成本不低，且会把写法重新拉回“动作 + 快照”的范式。</p>
+<h3 id="调试诉求如何影响选择"><a href="#调试诉求如何影响选择" class="headerlink" title="调试诉求如何影响选择"></a>调试诉求如何影响选择</h3><p>如果项目对可审计、可回放、可复现有硬要求，例如涉及金额、权限、审批流，Redux 的日志模型几乎是天然匹配。如果项目的主要难点是交互复杂、状态变化频繁，开发者更需要知道“谁触发了更新”，MobX 的追踪工具反而更顺手。</p>
+<h2 id="六、样板代码与团队成本"><a href="#六、样板代码与团队成本" class="headerlink" title="六、样板代码与团队成本"></a>六、样板代码与团队成本</h2><h3 id="Redux-的三件套"><a href="#Redux-的三件套" class="headerlink" title="Redux 的三件套"></a>Redux 的三件套</h3><p>一个字段的改动，在 Redux 里通常要碰三处：action type 常量、action creator、reducer。社区为此提出 ducks 模式，把同一个模块的 type、creator、reducer 收进一个文件，减少目录跳转。ducks 改善了组织方式，但没有消除概念数量。</p>
+<p>样板代码的真正成本不在字数，而在“改一处要理解四处”。对熟悉的人，这是清晰的分层；对新人，这是一条必须走完的流程。</p>
+<h3 id="MobX-的装饰器与严格模式"><a href="#MobX-的装饰器与严格模式" class="headerlink" title="MobX 的装饰器与严格模式"></a>MobX 的装饰器与严格模式</h3><p>MobX 的代码量明显少，但有两处需要提前约定。</p>
+<p>一是装饰器。2018 年，Babel 6 需要 <code>babel-plugin-transform-decorators-legacy</code>，TypeScript 需要开启 <code>experimentalDecorators</code>，两者对装饰器的实现细节并不完全一致。团队最好在项目模板里统一，而不是让每个人自己配。</p>
+<p>二是严格模式。<code>useStrict(true)</code> 之后，所有修改必须发生在 action 里，否则直接报错。不开严格模式，任何组件都能随手改 store，短期很省事，长期会出现“不知道谁改的”的问题。笔者的建议是：新项目一律开严格模式，老项目在补 action 的过程中逐步打开。</p>
+<h3 id="新人上手曲线"><a href="#新人上手曲线" class="headerlink" title="新人上手曲线"></a>新人上手曲线</h3><p>Redux 的曲线是“先陡后平”：概念多，但路径固定，照着模式写不容易出错。MobX 的曲线是“先平后陡”：半天就能改出东西，但要过一两个月才明白什么时候该用 computed、什么时候该拆 store。</p>
+<p>团队人数少、流动低，MobX 的效率优势明显；团队人数多、外包多、交接频繁，Redux 的约束更像一种保险。</p>
+<h2 id="七、TypeScript-友好度"><a href="#七、TypeScript-友好度" class="headerlink" title="七、TypeScript 友好度"></a>七、TypeScript 友好度</h2><p>2018 年上半年，TypeScript 2.8 已经带来条件类型，2.9 在 5 月中旬发布，类型表达能力比一年前强了不少。三个方案在类型上的体验差异，主要来自它们的 API 形状。</p>
+<h3 id="Redux：联合类型是天然契合"><a href="#Redux：联合类型是天然契合" class="headerlink" title="Redux：联合类型是天然契合"></a>Redux：联合类型是天然契合</h3><p>Redux 的 action 是一个个普通对象，最适合用可辨识联合（discriminated union）描述。reducer 的 switch 在收窄之后，payload 的类型会自动确定。</p>
+<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">interface</span> <span class="title class_">AddItemAction</span> &#123;</span><br><span class="line">  <span class="attr">type</span>: <span class="string">&#x27;cart/ADD_ITEM&#x27;</span></span><br><span class="line">  <span class="attr">payload</span>: &#123; <span class="attr">sku</span>: <span class="built_in">string</span>; <span class="attr">price</span>: <span class="built_in">number</span>; <span class="attr">qty</span>: <span class="built_in">number</span> &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">interface</span> <span class="title class_">RemoveItemAction</span> &#123;</span><br><span class="line">  <span class="attr">type</span>: <span class="string">&#x27;cart/REMOVE_ITEM&#x27;</span></span><br><span class="line">  <span class="attr">payload</span>: &#123; <span class="attr">sku</span>: <span class="built_in">string</span> &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">type</span> <span class="title class_">CartAction</span> = <span class="title class_">AddItemAction</span> | <span class="title class_">RemoveItemAction</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">function</span> <span class="title function_">cartReducer</span>(<span class="params"><span class="attr">state</span>: <span class="title class_">CartState</span>, <span class="attr">action</span>: <span class="title class_">CartAction</span></span>): <span class="title class_">CartState</span> &#123;</span><br><span class="line">  <span class="keyword">switch</span> (action.<span class="property">type</span>) &#123;</span><br><span class="line">    <span class="keyword">case</span> <span class="string">&#x27;cart/ADD_ITEM&#x27;</span>:</span><br><span class="line">      <span class="comment">// 此处 action.payload 已被收窄为 AddItemAction 的 payload</span></span><br><span class="line">      <span class="keyword">return</span> <span class="title function_">addItem</span>(state, action.<span class="property">payload</span>)</span><br><span class="line">    <span class="keyword">case</span> <span class="string">&#x27;cart/REMOVE_ITEM&#x27;</span>:</span><br><span class="line">      <span class="keyword">return</span> <span class="title function_">removeItem</span>(state, action.<span class="property">payload</span>.<span class="property">sku</span>)</span><br><span class="line">    <span class="attr">default</span>:</span><br><span class="line">      <span class="keyword">return</span> state</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>痛点也有：<code>connect</code> 的泛型参数需要手写，<code>mapStateToProps</code> 与 <code>mapDispatchToProps</code> 的类型推导在 react-redux 5 里并不总是准确，通常要显式标注组件的 props。另一个坑是 <code>combineReducers</code> 推导出的根状态类型，早期写法里需要手动声明一个 <code>RootState</code> 别名，否则选择器拿不到完整类型。</p>
+<h3 id="MobX：装饰器能推断，但边界要标清"><a href="#MobX：装饰器能推断，但边界要标清" class="headerlink" title="MobX：装饰器能推断，但边界要标清"></a>MobX：装饰器能推断，但边界要标清</h3><p><code>@observable</code> 修饰的属性，类型由初始值或显式标注决定，读取处的推断基本顺畅。麻烦集中在三处：<code>@computed</code> 的返回类型在复杂表达式下需要显式写出；<code>observer</code> 包裹之后，组件的 props 类型要单独声明；装饰器与严格属性初始化同时开启时，属性初始化顺序会带来额外的断言。</p>
+<h3 id="Vuex：类型是短板"><a href="#Vuex：类型是短板" class="headerlink" title="Vuex：类型是短板"></a>Vuex：类型是短板</h3><p>Vuex 的 store 是一个普通对象，组件里的 <code>this.$store.state</code> 几乎拿不到精确类型。2018 年常见的补救办法是用 vuex-class 之类的装饰器封装，或者为每个 module 手写接口再在组件里断言。Vue 2.5 改善了与 TypeScript 的集成，但 Vuex 这一层仍然需要额外约定。</p>
+<p>结论很直接：以 TypeScript 为主的项目，Redux 的类型路径最顺；MobX 次之，需要团队自己补类型工具；Vuex 需要接受一定程度的类型损耗。</p>
+<h2 id="八、性能：重渲染范围与依赖粒度"><a href="#八、性能：重渲染范围与依赖粒度" class="headerlink" title="八、性能：重渲染范围与依赖粒度"></a>八、性能：重渲染范围与依赖粒度</h2><p>性能讨论最容易变成阵营之争。这里只谈机制，不给没有出处的数字。</p>
+<h3 id="React-的渲染前提"><a href="#React-的渲染前提" class="headerlink" title="React 的渲染前提"></a>React 的渲染前提</h3><p>React 的更新从 setState 的组件开始，向下协调整棵子树。是否真正操作 DOM 由 diff 决定，但 render 函数会执行。所以“重渲染”不等于“慢”，可当组件树很大、render 里有昂贵计算时，重复执行就是浪费。</p>
+<p>优化的手段是让不该更新的子树提前停下：PureComponent 与 shouldComponentUpdate 做浅比较，或者用一个只比较 props 的高阶组件包住函数组件。浅比较要生效，状态更新必须是不可变的：返回新对象，旧对象不动。这正是 Redux 与不可变数据契合的地方。</p>
+<h3 id="选择器与-computed"><a href="#选择器与-computed" class="headerlink" title="选择器与 computed"></a>选择器与 computed</h3><p>Redux 侧常用 reselect 创建记忆化的选择器，输入不变时直接返回上次结果，避免在 mapStateToProps 里每次生成新数组导致无谓渲染。Vuex 侧的 getters 与 Vue 的 computed 由框架缓存，依赖不变就不会重算。MobX 的 computed 也是缓存加自动失效，区别在于依赖是运行时收集的，不需要手写输入声明。</p>
+<h3 id="MobX-的细粒度依赖"><a href="#MobX-的细粒度依赖" class="headerlink" title="MobX 的细粒度依赖"></a>MobX 的细粒度依赖</h3><p>MobX 的 observer 组件只在自己读取过的 observable 变化时重渲染。一个列表里改了一行的数量，理论上只有读了这个字段的单元格会更新。这种粒度在复杂交互界面里很有吸引力。</p>
+<p>但它有两个前提：组件要正确使用 observer，读取要发生在 render 期间。把 observable 的值提前解构到普通变量，或者在 observer 外层读取，都会让依赖追踪失效，更新就不再发生。这类 bug 往往表现为“数据变了界面没变”，排查起来比性能问题更费时间。</p>
+<h3 id="一句提醒"><a href="#一句提醒" class="headerlink" title="一句提醒"></a>一句提醒</h3><p>无论选哪种方案，先测量再优化。用 React DevTools 观察组件更新次数，或者直接在 render 里打点，比争论“谁更快”有用得多。多数项目的性能问题来自一次渲染上万行列表，或者在选择器里做了重计算，而不是 dispatch 本身的开销。</p>
+<h2 id="九、选型矩阵"><a href="#九、选型矩阵" class="headerlink" title="九、选型矩阵"></a>九、选型矩阵</h2><p>把前面几节的差异收敛成一张表，再落到三个具体场景。需要提前说明的是，Angular 把依赖注入与 RxJS 作为框架内置能力，状态方案的可选空间很小，本文不展开。</p>
+<h3 id="五个维度"><a href="#五个维度" class="headerlink" title="五个维度"></a>五个维度</h3><table>
+<thead>
+<tr>
+<th>维度</th>
+<th>Redux</th>
+<th>MobX</th>
+<th>Vuex</th>
+<th>Context</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>约束强度</td>
+<td>强</td>
+<td>弱</td>
+<td>中</td>
+<td>无</td>
+</tr>
+<tr>
+<td>样板代码</td>
+<td>多</td>
+<td>少</td>
+<td>中</td>
+<td>少</td>
+</tr>
+<tr>
+<td>调试与回放</td>
+<td>强</td>
+<td>弱</td>
+<td>中</td>
+<td>无</td>
+</tr>
+<tr>
+<td>TypeScript</td>
+<td>好</td>
+<td>中</td>
+<td>弱</td>
+<td>好</td>
+</tr>
+<tr>
+<td>跨框架复用</td>
+<td>好</td>
+<td>好</td>
+<td>仅 Vue</td>
+<td>仅 React</td>
+</tr>
+</tbody></table>
+<h3 id="决策表"><a href="#决策表" class="headerlink" title="决策表"></a>决策表</h3><table>
+<thead>
+<tr>
+<th>项目特征</th>
+<th>倾向选择</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>团队小于五人，迭代快</td>
+<td>MobX 或 Context</td>
+<td>少写样板，先跑起来</td>
+</tr>
+<tr>
+<td>团队大于十人，交接频繁</td>
+<td>Redux</td>
+<td>约束统一，日志可查</td>
+</tr>
+<tr>
+<td>状态以服务端数据为主</td>
+<td>请求层缓存</td>
+<td>不需要全局 store</td>
+</tr>
+<tr>
+<td>复杂表单与草稿</td>
+<td>表单组件内部</td>
+<td>避免污染全局</td>
+</tr>
+<tr>
+<td>需要撤销重做</td>
+<td>Redux 或 MST</td>
+<td>依赖可回放的历史</td>
+</tr>
+<tr>
+<td>Vue 技术栈</td>
+<td>Vuex</td>
+<td>与响应式系统一体</td>
+</tr>
+</tbody></table>
+<h3 id="三个典型场景"><a href="#三个典型场景" class="headerlink" title="三个典型场景"></a>三个典型场景</h3><p>后台管理系统。页面多、表单多、权限与路由耦合紧，状态数量中等但要求可追溯。团队规模超过十人时，Redux 配中间件处理审批流与批量操作更稳；小团队可以用 MobX 加快交付，但要提前约定严格模式与目录结构。这里的判断依据不是页面数量，而是“一次错误操作的代价有多大”。</p>
+<p>内容型站点。大部分数据来自服务端，页面以展示为主，交互集中在筛选与分页。这类项目通常不需要全局 store：筛选条件放进 URL，数据交给请求层缓存，登录用户用 Context 注入即可。引入 Redux 往往只会增加一层转发，收益接近于零。</p>
+<p>复杂交互编辑器。画布、图层、属性面板之间存在高频双向联动，还要支持撤销重做。MobX 的细粒度更新在这里很舒服，但撤销需要额外设计；Redux 的 action 日志天然适合实现 undo&#x2F;redo，代价是每个操作都要写完整的 action 与 reducer。折中的选择是 mobx-state-tree，用快照换回放能力。</p>
+<h2 id="十、渐进式迁移"><a href="#十、渐进式迁移" class="headerlink" title="十、渐进式迁移"></a>十、渐进式迁移</h2><p>迁移比选型更容易出事。常见的失败模式是“一次性重构”：改了两周，功能冻结，最后回滚，团队从此对状态管理心存恐惧。</p>
+<h3 id="三个阶段"><a href="#三个阶段" class="headerlink" title="三个阶段"></a>三个阶段</h3><p>第一阶段，把散落的组件状态收拢。同一份数据被多个组件读取时，先提升到最近的公共父组件，用 props 传递。这一步不引入任何库，却能消掉大量重复状态。</p>
+<p>第二阶段，用 Context 处理跨层级注入。登录用户、主题、权限这类低频数据先走 Context，配合手写 reducer 管好写入路径。</p>
+<p>第三阶段，当共享状态超过一定数量、或者需要中间件与时间旅行时，再引入 Redux 或 MobX。此时状态清单已经清楚，迁移只是换载体，而不是重新设计应用。</p>
+<pre class="mermaid">flowchart TD
+    A[组件内部 state] --> B[提升到公共父组件]
+    B --> C{跨三层以上或跨路由}
+    C -- 否 --> B
+    C -- 是 --> D[Context 加手写 reducer]
+    D --> E{需要中间件、时间旅行或多人协作}
+    E -- 否 --> D
+    E -- 是 --> F[Redux 或 MobX]
+    F --> G[按模块迁移写入路径]
+    G --> H[删除旧同步代码]</pre>
+
+<h3 id="避免“半套-Redux”"><a href="#避免“半套-Redux”" class="headerlink" title="避免“半套 Redux”"></a>避免“半套 Redux”</h3><p>半套 Redux 指的是一种中间状态：一部分数据在 store 里，一部分在组件里，两边靠 componentWillReceiveProps 里的 setState 同步。它的危害比纯组件状态大得多，因为数据有了两个写入点，任何一次遗漏都会造成界面与数据不一致。</p>
+<p>避免的方法是一条规则：同一份状态只有一个写入点。迁移期间，可以先让组件从 store 读，但写入仍旧走老路径；等读的路径稳定，再把写入切过去，最后删掉老代码。顺序不能反，反了就会出现两套状态互相覆盖。</p>
+<h3 id="旧项目的迁移步骤"><a href="#旧项目的迁移步骤" class="headerlink" title="旧项目的迁移步骤"></a>旧项目的迁移步骤</h3><p>第一步，列状态清单。把每个状态的名字、读取方、写入方、生命周期写在一张表里，标出重复项与派生项。这张表通常能暴露三成的问题，也能让后续的争论有据可依。</p>
+<p>第二步，建立只读通道。引入 Provider 与选择器，让组件从新通道读数据，但写操作保持不变。此时两套数据同时存在，必须确保新通道是旧状态的投影，而不是另起一份。</p>
+<p>第三步，逐个模块切换写入。一次只改一个模块，改完跑一遍该模块的回归用例。切换时保留旧实现一个迭代，用配置开关控制，出问题能立刻切回。</p>
+<p>第四步，清理与加固。删除同步代码，补上 action 日志或 MobX 的严格模式，给关键选择器加单元测试。清理这一步最容易被跳过，也最容易留下隐患。</p>
+<h3 id="回滚策略"><a href="#回滚策略" class="headerlink" title="回滚策略"></a>回滚策略</h3><p>回滚的关键是让新旧路径可以共存。按路由或按模块做开关，出问题时切回旧实现；后端接口不做配合改动；每个迁移提交保持可独立回退。最忌讳的是在一个提交里同时改状态结构、组件结构与接口协议，一旦出问题，根本不知道该回退哪一层。</p>
+<h2 id="十一、五个常见反模式"><a href="#十一、五个常见反模式" class="headerlink" title="十一、五个常见反模式"></a>十一、五个常见反模式</h2><h3 id="把所有状态塞进全局"><a href="#把所有状态塞进全局" class="headerlink" title="把所有状态塞进全局"></a>把所有状态塞进全局</h3><p>store 变成一个没有边界的垃圾桶：弹窗开关、临时输入、滚动位置全在里面。后果是命名冲突、清理困难、任何改动都可能影响别处。判断标准很简单：这个状态在组件卸载之后还有意义吗？没有，就不该进全局。</p>
+<h3 id="用-store-代替组件通信"><a href="#用-store-代替组件通信" class="headerlink" title="用 store 代替组件通信"></a>用 store 代替组件通信</h3><p>两个兄弟组件要传一个值，正确的做法是提升到父组件；跨三层才考虑 Context 或 store。把 store 当事件总线用，会让组件之间产生隐式耦合，删掉一个组件时不知道还有谁在依赖它写入的状态。</p>
+<h3 id="在-reducer-里做副作用"><a href="#在-reducer-里做副作用" class="headerlink" title="在 reducer 里做副作用"></a>在 reducer 里做副作用</h3><p>在 reducer 里发请求、读 localStorage、调用 Math.random 或 Date.now，都会破坏纯函数的前提。表现是时间旅行失真、测试需要 mock 全局对象、同一个 action 重放得到不同结果。副作用应当放在 action creator、middleware 或 MobX 的 action 之后的 reaction 里。</p>
+<h3 id="派生状态重复存储"><a href="#派生状态重复存储" class="headerlink" title="派生状态重复存储"></a>派生状态重复存储</h3><p>把总价、过滤后的列表、未读数量存进 state，再写一段逻辑去同步，是 bug 的高发区。派生状态应当由选择器、getter 或 computed 现算，必要时加缓存。判断标准：这个值能否由其他状态完全推导出来？能，就不要存。</p>
+<h3 id="把服务端数据原样塞进-store"><a href="#把服务端数据原样塞进-store" class="headerlink" title="把服务端数据原样塞进 store"></a>把服务端数据原样塞进 store</h3><p>把服务端返回的整个对象原样塞进 store，不做规范化，也不设失效时间。列表页和详情页各存一份，改了一处另一处不同步。服务端数据应当由请求层统一管理，或者在进入 store 之前完成规范化，并标记失效条件。</p>
+<h2 id="十二、一页纸决策清单"><a href="#十二、一页纸决策清单" class="headerlink" title="十二、一页纸决策清单"></a>十二、一页纸决策清单</h2><p>把上面的内容压缩成一份可以直接贴进团队文档的清单。</p>
+<ol>
+<li>先列状态清单，按五类归档，标出重复项与派生项。</li>
+<li>共享状态少于五个、层级不超过三层，不引入库。</li>
+<li>跨层级但低频，用 Context；按关注点拆分 Provider。</li>
+<li>服务端数据交给请求层缓存，设定失效与重试策略。</li>
+<li>可分享的状态放进 URL，保证刷新后能还原。</li>
+<li>表单草稿留在表单内部，提交成功后再写入全局。</li>
+<li>需要审计、回放、多人协作，选 Redux，并坚持纯 reducer。</li>
+<li>交互密集、状态图复杂、团队小，选 MobX，并开启严格模式。</li>
+<li>Vue 技术栈直接用 Vuex，跨框架复用不在考虑范围内。</li>
+<li>迁移按模块进行，保持单一写入点，保留一个迭代的回滚窗口。</li>
+</ol>
+<p>如果只能记住一句：状态管理的第一原则是分类，第二原则是克制。库是最后一步，不是第一步。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>状态管理没有唯一正确答案，只有与团队、场景匹配的答案。先把状态分成局部、共享、服务端缓存、URL、表单五类，大部分“需要全局状态”的冲动会自然消退；确实需要时，再按约束强度、调试诉求、类型支持与团队规模，在 Redux、MobX、Vuex、Context 之间选择。Redux 用样板换可回放，MobX 用自由换表达力，Vuex 与 Vue 生态绑定，Context 适合低频注入。迁移要渐进，守住单一写入点，给回滚留出窗口。把这些判断写成团队约定，比在技术群里争论哪个库更好更有价值。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://redux.js.org/">Redux 官方文档</a></li>
+<li><a href="https://github.com/reduxjs/redux/releases/tag/v4.0.0">Redux 4.0.0 发布说明</a></li>
+<li><a href="https://redux.js.org/faq/general#when-should-i-use-redux">Redux FAQ：何时应该使用 Redux</a></li>
+<li><a href="https://mobx.js.org/">MobX 官方文档</a></li>
+<li><a href="https://github.com/mobxjs/mobx-state-tree">mobx-state-tree 文档</a></li>
+<li><a href="https://vuex.vuejs.org/">Vuex 官方文档</a></li>
+<li><a href="https://reactjs.org/docs/context.html">React Context 文档</a></li>
+<li><a href="https://reactjs.org/blog/2018/03/29/react-v-16-3.html">React 16.3 发布公告（2018 年 3 月）</a></li>
+<li><a href="https://medium.com/@dan_abramov/you-might-not-need-redux-be46360cf367">You Might Not Need Redux</a></li>
+<li><a href="https://github.com/reduxjs/reselect">reselect 文档</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>前端状态管理方案选型</p><p><a href="https://987763485.github.io/2018/05/31/前端状态管理方案选型/">https://987763485.github.io/2018/05/31/前端状态管理方案选型/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2018-05-31</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/web%E5%89%8D%E7%AB%AF/">web前端</a><a class="link-muted mr-2" rel="tag" href="/tags/typescript/">typescript</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/">前端工程化</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2018/06/02/%E5%89%8D%E7%AB%AF%E6%B5%8B%E8%AF%95Jest%E5%85%A5%E9%97%A8/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">前端测试：Jest 入门</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2018/05/29/ElementUI%E4%B8%8EiView%E7%BB%84%E4%BB%B6%E5%BA%93%E5%AE%9E%E8%B7%B5/"><span class="level-item">Element UI 与 iView 组件库实践</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

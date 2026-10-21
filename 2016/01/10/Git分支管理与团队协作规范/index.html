@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Git 分支管理与团队协作规范 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="为什么分支规矩是沟通契约"><meta property="og:type" content="blog"><meta property="og:title" content="Git 分支管理与团队协作规范"><meta property="og:url" content="https://987763485.github.io/2016/01/10/Git%E5%88%86%E6%94%AF%E7%AE%A1%E7%90%86%E4%B8%8E%E5%9B%A2%E9%98%9F%E5%8D%8F%E4%BD%9C%E8%A7%84%E8%8C%83/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="为什么分支规矩是沟通契约"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2016-01-10T03:23:02.000Z"><meta property="article:modified_time" content="2026-10-18T03:34:21.735Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="web前端"><meta property="article:tag" content="前端工程化"><meta property="article:tag" content="nodejs"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2016/01/10/Git%E5%88%86%E6%94%AF%E7%AE%A1%E7%90%86%E4%B8%8E%E5%9B%A2%E9%98%9F%E5%8D%8F%E4%BD%9C%E8%A7%84%E8%8C%83/"},"headline":"Git 分支管理与团队协作规范","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2016-01-10T03:23:02.000Z","dateModified":"2026-10-18T03:34:21.735Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"为什么分支规矩是沟通契约"}</script><link rel="canonical" href="https://987763485.github.io/2016/01/10/Git%E5%88%86%E6%94%AF%E7%AE%A1%E7%90%86%E4%B8%8E%E5%9B%A2%E9%98%9F%E5%8D%8F%E4%BD%9C%E8%A7%84%E8%8C%83/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2016-01-10T03:23:02.000Z" title="1/10/2016, 11:23:02 AM">2016-01-10</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/">前端开发</a></span><span class="level-item">27 分钟读完 (大约4016个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Git 分支管理与团队协作规范</h1><div class="content"><h2 id="为什么分支规矩是沟通契约"><a href="#为什么分支规矩是沟通契约" class="headerlink" title="为什么分支规矩是沟通契约"></a>为什么分支规矩是沟通契约</h2><p>团队里只有三个人的时候，分支怎么切都无所谓，反正喊一声就知道谁在动哪份代码。人到了七八个，同一个仓库里同时躺着十几条分支，问题就来了：没有人答得出这条分支是给哪个需求开的、基线是从哪次提交拉的、什么时候该合回去、谁负责删掉它。吃亏多次之后我才想明白，分支名和它的基点本质上是一种契约——你开一条分支，就等于向全组宣告”这块代码未来两周由我按这个范围改”。契约写得含混，后面所有合并、发布、回滚都在为这句话还债。</p>
+<p>前端仓库比后端多了两层约束。一是发布窗口固定，多数业务每周只有一个上线时段，晚合上去的改动就顺延一周；二是线上出问题时热修复不能等窗口，而与此同时新需求还不能停。同一份代码要同时服务”正在开发的””等着发布的””线上跑着的”三种状态，这正是各种分支模型想解决的问题。所以挑模型之前，先把这三个状态在我们的流程里各自对应哪条分支说清楚，比背命令重要得多。</p>
+<h2 id="三种当时常见的模型摆开比"><a href="#三种当时常见的模型摆开比" class="headerlink" title="三种当时常见的模型摆开比"></a>三种当时常见的模型摆开比</h2><p>先给一张机制对照表，四列回答”历史长什么样、怎么发版、怎么回滚、对构建流水线提什么要求”，这才是选型时要看的东西。</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>Git Flow</th>
+<th>GitHub Flow</th>
+<th>简化版三分支</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>历史形状</td>
+<td>master 与 develop 两条长线，feature&#x2F;release&#x2F;hotfix 短分支进出</td>
+<td>只有 master 一条线加一堆短命分支</td>
+<td>master 与 develop 两条长线，release 按需临时切</td>
+</tr>
+<tr>
+<td>发布方式</td>
+<td>release 分支验收完合 master 打标签</td>
+<td>合入即可发，随时部署</td>
+<td>develop 上完版本检查临时切 release，合 master 打标签</td>
+</tr>
+<tr>
+<td>回滚方式</td>
+<td>master 历史干净，找到上个合并节点恢复旧标签版本重新发布</td>
+<td>快速做一条反向改动的分支再发一版</td>
+<td>同 Git Flow，但记录少更依赖标签齐全</td>
+</tr>
+<tr>
+<td>对 CI 的要求</td>
+<td>develop 和 master 两条线都能触发构建，release 切出后要有预检</td>
+<td>合入前必须全绿，发布要能一键化，门槛最高</td>
+<td>至少 develop 常驻构建，master 发布构建</td>
+</tr>
+</tbody></table>
+<h3 id="Git-Flow"><a href="#Git-Flow" class="headerlink" title="Git Flow"></a>Git Flow</h3><p>教科书里最常画的那套：日常开发在 develop 上汇合，发布前从 develop 切出 release 分支只做版本检查不改功能，验收通过合回 master 打标签，再倒回 develop；线上急修从 master 切 hotfix。它把三种状态明确摊给三条分支，和我们的固定发布窗口对得上。代价是命令多、仪式重。扩展脚本本身有两个时代的用法：早一些的 0.5.x 一代把 feature、hotfix 做成独立命令，后来 1.9.x 一代统一成 <code>git flow</code> 加子命令的样式，旧新混装在内网机器上，光敲命令就能敲错。后来只允许发布负责人用扩展，其他人按原生命令手工切分支——分支模型归根结底是命名和基点的约定，不是工具。</p>
+<h3 id="GitHub-Flow"><a href="#GitHub-Flow" class="headerlink" title="GitHub Flow"></a>GitHub Flow</h3><p>只有 master，永远处于可发布状态，改动全走短分支加合并请求，流水线绿了就许合，合完随时部署。它省掉了”等窗口”这件事，但前提是有足够可靠的自动构建与冒烟检查，让任何人任何时刻上线都不心惊胆战。我们当时不具备，发布又必须和后端一起发车，随时可发反而变成随时可出事。值得偷师的是它对分支存活的态度：以天计，不留两周孤儿分支。</p>
+<h3 id="简化版三分支"><a href="#简化版三分支" class="headerlink" title="简化版三分支"></a>简化版三分支</h3><p>最后落地的形态：master、develop、feature 是常驻约定，release 和 hotfix 按需切、用完即删。不养长期 release 分支，发布日在 develop 上走版本检查清单，确认要发了才切一条短命分支冻结改动。取舍很清楚，命令少了、新人上手快，但丢掉了工具强制的仪式感，基点对不对、标签补没补全靠评审人肉把关，后面的检查项全是给这里打的补丁。</p>
+<pre class="mermaid">flowchart TD
+    develop[develop 长期 开发汇合线] --> feature[feature 短分支 一个需求一条]
+    feature --> develop
+    develop --> release[release 短分支 版本检查]
+    release --> master[master 长期 只存已发布版本]
+    master --> hotfix[hotfix 短分支 线上急修]
+    hotfix --> master
+    hotfix --> develop
+    master -->|发布时打标签| tag[带注释标签 v1.3.3]</pre>
+
+<h2 id="分支命名与生命周期"><a href="#分支命名与生命周期" class="headerlink" title="分支命名与生命周期"></a>分支命名与生命周期</h2><p>命名模板定死四种前缀：<code>feature/需求单号-简述</code>、<code>bugfix/需求单号-简述</code>、<code>hotfix/缺陷单号-简述</code>、<code>release/版本号</code>。单号一律取工单系统里的编号，作用是让任何一条分支都能反查到需求与排期，简述用一两个英文词，比如 <code>feature/FE-1024-order-list</code> 这种粒度。</p>
+<p>禁止中文和空格不是洁癖。分支名会出现在构建脚本、流水线的工作目录路径、构建产物的下载地址里，中文和空格意味着这些环节处处要加引号和转码，而每台机器的默认编码还不一定一致。写的人只多打几个字符，麻烦却让后面每个工具分摊，这种成本最容易在文档里被忽略。</p>
+<p>禁止用人名当唯一标识，是因为 <code>feature/zhangsan</code> 这种分支反查不到需求，也看不出什么时候该删；人一换组或离职，分支就没了主人，谁都不敢碰，仓库里堆满僵尸分支。负责人该记录在工单里，而不是编码进名字里。</p>
+<p>生命周期是我们卡得最硬的一条：feature 分支存活上限两周，超了就先合回。现实里确实有大需求两周做不完，解法是拆而不是拖——把已完成且不影响入口的部分先回合 develop，功能入口先不放开，剩下的继续做；实在拆不动的，从原分支再切子分支接力，原分支当场删掉。拖着的分支每天都在和 develop 拉远距离，最后受苦的是合并那天的自己和评审的人。</p>
+<h2 id="保护分支与合入路径"><a href="#保护分支与合入路径" class="headerlink" title="保护分支与合入路径"></a>保护分支与合入路径</h2><p>master 和 develop 设为受保护分支，这是内网自建 GitLab 上项目设置里的分支保护项，能限制普通开发者直接推送和合并，权限收紧到发布负责人一个人。推不上去，是所有规矩里最有效的那条，因为其余条款违反时还有商量余地，这条在服务器上直接拦。</p>
+<p>合入一律走页面请求：GitHub 上叫 Pull Request，我们内网那套 GitLab 当时叫 Merge Request，同一类东西两种叫法，文档里统一用后者，免得新人对着界面找错按钮。评审门槛定两条：任何合入至少一个非作者的评审人签字；动到公共组件或构建脚本的，两人。流水线通过是合入的前置条件，红的构建不接受”先合进去我再修”这种话，说过一次之后这个口子就再也关不上了。</p>
+<p>禁止直接在 master 上改东西，哪怕是一行文案。hotfix 也必须从 master 基点切出专用分支再合回，理由不是代码质量，而是 master 的历史必须每条都有出处：突然多出一个没有合并记录的提交，下一个人就说不清这个线上版本包含哪些改动，回滚时连基准都找不准。</p>
+<h2 id="需求与分支的对应"><a href="#需求与分支的对应" class="headerlink" title="需求与分支的对应"></a>需求与分支的对应</h2><p>原则是一条需求一条分支，站会上报单号就够了。但需求经常大到一个人两周吃不下，我们的办法是需求下再切主题分支：主 feature 分支作为该需求的汇合点，子主题各切各的，做完一个先合进主 feature，需求整体再合 develop。子分支不直接对 develop，避免同一条需求的半成品互相踩。</p>
+<p>另一类是公共基础改动，比如抽一个通用组件、改埋点封装。这类改动单独开分支、单独评审、优先合回，不挂任何业务需求。挂在业务需求下的后果是它跟着需求一起被搁置，而另一个急需它的团队只能在 develop 外面干等，等出来的往往是第二份重复实现。</p>
+<h2 id="hotfix-流程完整走一遍"><a href="#hotfix-流程完整走一遍" class="headerlink" title="hotfix 流程完整走一遍"></a>hotfix 流程完整走一遍</h2><p>线上白屏这类急修，第一步不是改代码，是定位”线上跑的到底是哪个版本”：从页面加载的静态资源版本号反查发布记录，找到对应标签，比如 <code>v1.3.2</code>。基点必须选标签而不是 master 最新提交，因为 master 上可能已经合进了尚未发布的版本检查收尾提交，从那里切出去修，等于把没验收过的改动带上线上。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">git checkout -b hotfix/FE-1088-blank-screen v1.3.2</span><br><span class="line"><span class="comment"># 修复、本地构建自查之后</span></span><br><span class="line">git checkout master</span><br><span class="line">git merge --no-ff hotfix/FE-1088-blank-screen</span><br><span class="line">git tag -a v1.3.3 -m <span class="string">&quot;order page blank screen fix&quot;</span></span><br><span class="line">git push origin master --tags</span><br><span class="line">git checkout develop</span><br><span class="line">git merge --no-ff hotfix/FE-1088-blank-screen</span><br><span class="line">git push origin develop</span><br><span class="line">git branch -d hotfix/FE-1088-blank-screen</span><br></pre></td></tr></table></figure>
+
+<p>流程上有两个硬规定。第一，同一条 hotfix 分支要走两条合并请求，一条进 master、一条回 develop，工单上两条记录都勾掉才算修完，评审人看不到第二条就不签字。第二，修完当天删分支，不让它过夜变成第二个基线。”回合漏掉”这件事后面复盘会单独讲，它造成的不是冲突，而是下个版本上线时线上修复被静默覆盖，用户以为老毛病复发，其实代码根本没带上新补丁。</p>
+<h2 id="打标签与版本口径"><a href="#打标签与版本口径" class="headerlink" title="打标签与版本口径"></a>打标签与版本口径</h2><p>发布用附注标签，不用轻量标签：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">git tag -a v1.4.0 -m <span class="string">&quot;release 1.4.0&quot;</span> </span><br><span class="line">git show v1.4.0</span><br></pre></td></tr></table></figure>
+
+<p>两者的区别在于附注标签是仓库里一个独立对象，带说明、带打标签的人和日期，能被校验；轻量标签只是一个指针，谁随手一指都看不出来，版本检查的中间提交被误标成正式版本的事故，多半坏在这上面。</p>
+<p>版本号的口径要两处一致：标签是对外发布名，<code>package.json</code> 里的 version 字段是包内可见名，发布提交里两者同时升、一起合进 master，评审检查项里专门有一条对不上就不许合。已经发出去的标签从此不再动——编号发现写错了也只能升一个新版本重新发，因为线上日志、构建产物、别人的问题报告里都可能已经引用了它。</p>
+<h2 id="环境分支的陷阱"><a href="#环境分支的陷阱" class="headerlink" title="环境分支的陷阱"></a>环境分支的陷阱</h2><p>很多团队会顺手把部署环境做成常驻分支：<code>daily</code> 给日常测试、<code>pre</code> 给预发、<code>prod</code> 对应线上，看似每个环境都有一份确定的代码。实际运行半年，三条线各自漂移，配置差异越攒越厚，攒到想统一版本时差距已经大到没人敢一次合完；更隐蔽的伤害是线上修的问题进不了 daily，测试环境长期验证不了修复，下一轮又”复发”一次。</p>
+<p>后来我们的结论只有一句话：分支层面只保留代码主干，环境与代码无关——配置和代码分离，环境差异在构建或运行时用环境变量注入。具体怎么拆配置、怎么注入，是构建体系那类文章的事，本篇只负责把”环境不该有常驻分支”这条立住。</p>
+<h2 id="规范怎么落地而不沦为文档"><a href="#规范怎么落地而不沦为文档" class="headerlink" title="规范怎么落地而不沦为文档"></a>规范怎么落地而不沦为文档</h2><p>约定全部写进仓库根目录的 CONTRIBUTING.md，控制在一屏内：四种前缀、基点表、合入路径、hotfix 双合并、标签口径，别的都不写，写得比这长的文档没人读。</p>
+<p>评审人拿三句固定问话过每笔合并请求：分支名对不对得上工单，基点切没切对，该不该回合 develop。违规的成本设计成由当事人自己承担：基点切错就删掉分支重切一遍，听着苛刻，但分支里本来就不该有珍贵历史，重来只是几条命令，比发布事故后全体人陪跑便宜太多。</p>
+<p>新人入职第一天的练习也照着这份文档走一遍闭环：切一条练习分支、发一笔合并请求、导师签字合入、删分支。十分钟，先让规矩在手上过一遍，比开会念一遍有效。</p>
+<h2 id="复盘：那次没回合-develop-的-hotfix"><a href="#复盘：那次没回合-develop-的-hotfix" class="headerlink" title="复盘：那次没回合 develop 的 hotfix"></a>复盘：那次没回合 develop 的 hotfix</h2><p>有一轮线上订单页白屏，hotfix 当天修完、合了 master、打了新标签，唯独漏了回合 develop。两周后新版本上线，白屏”复发”，产品第一反应是当初就没修对。排查只花了几分钟：拿那条修复提交用 <code>git branch --contains</code> 一看，develop 上根本没有。补一条把修复带回 develop 的合并提交、重新发布，当天恢复。</p>
+<p>真正花功夫的是改流程，加了两道闸。工单模板里 hotfix 类型强制两条合并记录的链接都填上才能关单；发布脚本在构建前多查一步，develop 若不包含 master 最新标签的提交就直接中止。前者靠人、后者靠机器，缺一道都会漏。这件事之后，组里再没人觉得”回合”是可选动作。</p>
+<h2 id="分支职责表"><a href="#分支职责表" class="headerlink" title="分支职责表"></a>分支职责表</h2><table>
+<thead>
+<tr>
+<th>分支</th>
+<th>允许谁推</th>
+<th>从哪切</th>
+<th>合到哪</th>
+<th>生命周期</th>
+<th>可否强推</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>master</td>
+<td>仅发布负责人，走合并请求</td>
+<td>release&#x2F; 或 hotfix&#x2F; 合入</td>
+<td>不外发</td>
+<td>常驻</td>
+<td>否</td>
+</tr>
+<tr>
+<td>develop</td>
+<td>任何人，一律走合并请求</td>
+<td>feature&#x2F; 或 hotfix&#x2F; 合入</td>
+<td>master（发布时）</td>
+<td>常驻</td>
+<td>否</td>
+</tr>
+<tr>
+<td>release&#x2F;版本号</td>
+<td>版本检查负责人</td>
+<td>develop</td>
+<td>master 与 develop 双回合</td>
+<td>数天，发布即删</td>
+<td>组内约定不可</td>
+</tr>
+<tr>
+<td>feature&#x2F;单号-简述</td>
+<td>需求负责人及参与者</td>
+<td>develop</td>
+<td>develop</td>
+<td>上限两周，超先合回</td>
+<td>他人拉取后不可</td>
+</tr>
+<tr>
+<td>hotfix&#x2F;单号</td>
+<td>修复者</td>
+<td>线上版本对应的标签</td>
+<td>master 与 develop 都要</td>
+<td>当天完成即删</td>
+<td>否</td>
+</tr>
+<tr>
+<td>bugfix&#x2F;单号</td>
+<td>修复者</td>
+<td>develop</td>
+<td>develop</td>
+<td>一周内</td>
+<td>他人拉取后不可</td>
+</tr>
+</tbody></table>
+<p>单独说一句”可否强推”：分支被人拉取过之后改写历史再强推，就是在别人本地制造凭空分裂，宁可删分支重切也不强推救场。规矩不产生秩序，被检查、被计价的那部分才产生。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Git 分支管理与团队协作规范</p><p><a href="https://987763485.github.io/2016/01/10/Git分支管理与团队协作规范/">https://987763485.github.io/2016/01/10/Git分支管理与团队协作规范/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2016-01-10</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/web%E5%89%8D%E7%AB%AF/">web前端</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/">前端工程化</a><a class="link-muted mr-2" rel="tag" href="/tags/nodejs/">nodejs</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2016/01/12/Markdown%E5%86%99%E4%BD%9C%E8%A7%84%E8%8C%83%E4%B8%8E%E5%AE%9E%E8%B7%B5/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Markdown 写作规范与实践</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2016/01/08/FIS%E6%9E%84%E5%BB%BA%E5%B7%A5%E5%85%B7%E7%9A%84%E7%89%B9%E8%89%B2%E4%B8%8E%E5%AE%9E%E8%B7%B5/"><span class="level-item">FIS 构建工具的特色与实践</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

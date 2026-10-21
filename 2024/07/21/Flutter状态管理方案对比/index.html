@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Flutter 状态管理方案对比 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="Flutter 项目里关于状态管理的争论几乎每年都要吵一遍，但很多争论从提问方式上就偏了：它们在比“哪个库更好”，却没有先问“这段状态属于哪一层”。本文不给任何跑分，先把 setState、ValueNotifier、InheritedWidget 这些语言层手段讲透，再从可测试性、依赖注入、与 BuildContext 的耦合、编译期安全、样板量、心智模型、上手成本与可调试性这些结构性维度，比较"><meta property="og:type" content="blog"><meta property="og:title" content="Flutter 状态管理方案对比"><meta property="og:url" content="https://987763485.github.io/2024/07/21/Flutter%E7%8A%B6%E6%80%81%E7%AE%A1%E7%90%86%E6%96%B9%E6%A1%88%E5%AF%B9%E6%AF%94/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="Flutter 项目里关于状态管理的争论几乎每年都要吵一遍，但很多争论从提问方式上就偏了：它们在比“哪个库更好”，却没有先问“这段状态属于哪一层”。本文不给任何跑分，先把 setState、ValueNotifier、InheritedWidget 这些语言层手段讲透，再从可测试性、依赖注入、与 BuildContext 的耦合、编译期安全、样板量、心智模型、上手成本与可调试性这些结构性维度，比较"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2024-07-20T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-19T11:24:39.241Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="java"><meta property="article:tag" content="kotlin"><meta property="article:tag" content="flutter"><meta property="article:tag" content="csharp"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2024/07/21/Flutter%E7%8A%B6%E6%80%81%E7%AE%A1%E7%90%86%E6%96%B9%E6%A1%88%E5%AF%B9%E6%AF%94/"},"headline":"Flutter 状态管理方案对比","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2024-07-20T16:00:00.000Z","dateModified":"2026-10-19T11:24:39.241Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"Flutter 项目里关于状态管理的争论几乎每年都要吵一遍，但很多争论从提问方式上就偏了：它们在比“哪个库更好”，却没有先问“这段状态属于哪一层”。本文不给任何跑分，先把 setState、ValueNotifier、InheritedWidget 这些语言层手段讲透，再从可测试性、依赖注入、与 BuildContext 的耦合、编译期安全、样板量、心智模型、上手成本与可调试性这些结构性维度，比较"}</script><link rel="canonical" href="https://987763485.github.io/2024/07/21/Flutter%E7%8A%B6%E6%80%81%E7%AE%A1%E7%90%86%E6%96%B9%E6%A1%88%E5%AF%B9%E6%AF%94/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2024-07-20T16:00:00.000Z" title="7/21/2024, 12:00:00 AM">2024-07-21</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/">全栈开发</a></span><span class="level-item">1 小时读完 (大约8170个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Flutter 状态管理方案对比</h1><div class="content"><p>Flutter 项目里关于状态管理的争论几乎每年都要吵一遍，但很多争论从提问方式上就偏了：它们在比“哪个库更好”，却没有先问“这段状态属于哪一层”。本文不给任何跑分，先把 <code>setState</code>、<code>ValueNotifier</code>、<code>InheritedWidget</code> 这些语言层手段讲透，再从可测试性、依赖注入、与 BuildContext 的耦合、编译期安全、样板量、心智模型、上手成本与可调试性这些结构性维度，比较 Provider、Riverpod、Bloc&#x2F;Cubit 及其他方案的适用边界。读完你应该能为自己的项目定出一条“默认方案加例外条件”的规则，并知道万一选错，退出代价由什么决定。</p>
+<h2 id="状态的二分：先把问题问对"><a href="#状态的二分：先把问题问对" class="headerlink" title="状态的二分：先把问题问对"></a>状态的二分：先把问题问对</h2><p>Flutter 语境下的“状态”混着两类东西。第一类是 ephemeral state，即页面内状态：只属于某个 Widget 内部，页面销毁就消失，不跨页面共享也不需要持久化，典型如 TextField 正在输入的文本、TabBar 选中第几页、卡片展开还是收起、列表滚动偏移、表单当下的校验提示、一段动画的进度。第二类是 app state，即应用级状态：登录态、购物车、用户偏好与配置、待同步到服务端的操作队列、多页面共享的筛选条件，特征是跨页面可见、生命周期比创建它的 Widget 长、往往还要落盘。</p>
+<p>区分两者有个可操作的问法：这段状态被谁读。一个 Widget 自己或它的直接子树读完就够，放 Widget 内部；两个互不嵌套的 Widget 都要读，才考虑往树的上层提一层；跨页面都要读，或应用重启后还得存在，才是 app state。三档分清，方案选择通常自己就收敛了。</p>
+<p>本文的基本判断是：绝大多数方案之争，根源是没先做这个二分（经验判断，不是统计结论）。把 Tab 索引塞进全局 store，等于让局部状态背上全局通知的成本，还把读它的页面统统拖进重建列表；把登录态藏在某个 StatefulWidget 里靠回调往上抛，就会引出“这库不好用”的抱怨。两种情况下真正的问题都在分层，不在库。State 与 Widget 体系基础见同批环境搭建一文。</p>
+<p>由此得到第一条纪律：<strong>能用 <code>setState</code> 解决就不要引库</strong>。<code>setState</code> 的重建范围天然被 State 所在子树框住，没有第三方生命周期要理解，测试时挂载 Widget 就能断言；引入一个库等于给全项目加一条“所有人都得遵守”的规则，收益必须大于学习与维护成本才划算。反向含义同样成立：状态确实要跨页面共享时，硬用 <code>setState</code> 加回调链去凑也是债。</p>
+<p>顺带划界：Web 侧状态库的范式差异见同批 Pinia 一文，单向数据流的思想源头另有旧文，本文不以它们的结论替代 Flutter 侧分析；渲染流水线、三棵树与重建的优化手段都不在这里重讲，本文只把“方案如何影响重建范围”当判断入口。</p>
+<h2 id="语言层面的原生手段"><a href="#语言层面的原生手段" class="headerlink" title="语言层面的原生手段"></a>语言层面的原生手段</h2><p>先把 Dart 与 Flutter 自带的三件东西讲清楚，它们既是很多场景的完整答案，也是所有第三方库的地基。</p>
+<h3 id="setState：标记脏，重建当前-State-的子树"><a href="#setState：标记脏，重建当前-State-的子树" class="headerlink" title="setState：标记脏，重建当前 State 的子树"></a>setState：标记脏，重建当前 State 的子树</h3><figure class="highlight dart"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Counter</span> <span class="keyword">extends</span> <span class="title">StatefulWidget</span> </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> <span class="title class_">Counter</span>(&#123;<span class="keyword">super</span>.key&#125;);</span><br><span class="line">  <span class="meta">@override</span></span><br><span class="line">  <span class="title class_">State</span>&lt;<span class="title class_">Counter</span>&gt; <span class="title function_">createState</span>() =&gt; <span class="title class_">_CounterState</span>();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">_CounterState</span> <span class="keyword">extends</span> <span class="title">State</span>&lt;<span class="title">Counter</span>&gt; </span>&#123;</span><br><span class="line">  <span class="built_in">int</span> _count = <span class="number">0</span>; <span class="comment">// 局部状态：只有本 Widget 读</span></span><br><span class="line"></span><br><span class="line">  <span class="keyword">void</span> <span class="title function_">_increment</span>() &#123;</span><br><span class="line">    <span class="title function_">setState</span>(() &#123;</span><br><span class="line">      _count += <span class="number">1</span>; <span class="comment">// 在回调里改，同时把当前 State 标记为脏</span></span><br><span class="line">    &#125;);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="meta">@override</span></span><br><span class="line">  <span class="title class_">Widget</span> <span class="title function_">build</span>(<span class="title class_">BuildContext</span> context) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="title class_">Text</span>(<span class="string">&#x27;当前计数：<span class="subst">$_count</span>&#x27;</span>);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>setState</code> 的语义不是“修补视图数据”，而是两件事：把当前 State 标脏，并安排一次调度，让框架下次构建时重新执行这个 State 的 <code>build</code>。所以它的重建范围就是“当前 State 的整棵子树”，兄弟与父节点不受影响。两个常见误解值得点出来：它只在 Widget 仍挂在树上时合法，异步回调里对象已销毁再调用会报错；在 <code>build</code> 过程中调用会立刻触发同一帧再次构建，等于自找重入，任何“构建时改状态”都应视为设计信号而不是技巧。</p>
+<h3 id="ValueNotifier-与-ValueListenableBuilder：把监听下沉到叶子"><a href="#ValueNotifier-与-ValueListenableBuilder：把监听下沉到叶子" class="headerlink" title="ValueNotifier 与 ValueListenableBuilder：把监听下沉到叶子"></a>ValueNotifier 与 ValueListenableBuilder：把监听下沉到叶子</h3><figure class="highlight dart"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">_SearchBoxState</span> <span class="keyword">extends</span> <span class="title">State</span>&lt;<span class="title">SearchBox</span>&gt; </span>&#123;</span><br><span class="line">  <span class="keyword">final</span> <span class="title class_">ValueNotifier</span>&lt;<span class="title class_">String</span>&gt; _query = <span class="title class_">ValueNotifier</span>&lt;<span class="title class_">String</span>&gt;(<span class="string">&#x27;&#x27;</span>);</span><br><span class="line"></span><br><span class="line">  <span class="meta">@override</span></span><br><span class="line">  <span class="keyword">void</span> <span class="title function_">dispose</span>() &#123;</span><br><span class="line">    _query.<span class="title function_">dispose</span>(); <span class="comment">// 不释放就是典型的隐性泄漏</span></span><br><span class="line">    <span class="keyword">super</span>.<span class="title function_">dispose</span>();</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="meta">@override</span></span><br><span class="line">  <span class="title class_">Widget</span> <span class="title function_">build</span>(<span class="title class_">BuildContext</span> context) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="title class_">ValueListenableBuilder</span>&lt;<span class="title class_">String</span>&gt;(</span><br><span class="line">      valueListenable: _query,</span><br><span class="line">      <span class="comment">// child 是不依赖 value 的固定部分，不会因通知重建</span></span><br><span class="line">      builder: (context, value, child) =&gt; <span class="title class_">Text</span>(<span class="string">&#x27;关键词：<span class="subst">$value</span>&#x27;</span>),</span><br><span class="line">    );</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>ValueNotifier</code> 是带单一值的通知源，给 <code>value</code> 赋值就通知监听者；<code>ValueListenableBuilder</code> 在它下面单独开一个构建点，只有这个构建点的子树随通知重建。价值在于监听粒度可选：状态不必属于当前 State，兄弟节点也能共享同一个 notifier，外层 <code>build</code> 完全不参与。页面内多个控件共享一段状态时，把它挂在页面 State 上就比引库轻、比回调链清楚。代价是 notifier 由谁创建、谁释放全凭约定，没有编译期检查；它只表示一个值，派生状态要么手算要么再挂一个 notifier，链条一长就成了手写的响应式系统。</p>
+<h3 id="InheritedWidget：所有方案的共同地基"><a href="#InheritedWidget：所有方案的共同地基" class="headerlink" title="InheritedWidget：所有方案的共同地基"></a>InheritedWidget：所有方案的共同地基</h3><figure class="highlight dart"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">SessionScope</span> <span class="keyword">extends</span> <span class="title">InheritedWidget</span> </span>&#123;</span><br><span class="line">  <span class="keyword">const</span> <span class="title class_">SessionScope</span>(&#123;<span class="keyword">super</span>.key, <span class="keyword">required</span> <span class="keyword">this</span>.user, <span class="keyword">required</span> <span class="keyword">super</span>.child&#125;);</span><br><span class="line">  <span class="keyword">final</span> <span class="title class_">String</span> user;</span><br><span class="line"></span><br><span class="line">  <span class="meta">@override</span></span><br><span class="line">  <span class="built_in">bool</span> <span class="title function_">updateShouldNotify</span>(<span class="title class_">SessionScope</span> old) =&gt; user != old.user;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">static</span> <span class="title class_">SessionScope</span>? <span class="title function_">of</span>(<span class="title class_">BuildContext</span> context) =&gt;</span><br><span class="line">      context.dependOnInheritedWidgetOfExactType&lt;<span class="title class_">SessionScope</span>&gt;();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 任意后代节点里：</span></span><br><span class="line"><span class="keyword">final</span> scope = <span class="title class_">SessionScope</span>.<span class="title function_">of</span>(context); <span class="comment">// 读的同时登记依赖</span></span><br></pre></td></tr></table></figure>
+
+<p><code>InheritedWidget</code> 做的是“沿 Widget 树向下传递一个值，并让读取者自动订阅”。<code>dependOnInheritedWidgetOfExactType</code> 一次完成两件事：向上找最近的同类型实例取值，同时把当前 Element 登记为该实例的依赖者。当祖先位置换上新实例，框架按 <code>updateShouldNotify</code> 的返回值决定是否通知，返回 true 时所有依赖它的 Element 被标脏重建。这就是它能替代外部库的原因：跨层共享加变更通知这两个需求，框架已经给出最小完备机制，库的工作大多只是把它包装得更好用。</p>
+<p>限制也来自机制方向：只能向上找、只能向下通知。兄弟节点要互通，必须让共同祖先持有；想在树之外读写这个值，就得另建一个持有者对象。手写成本也不低，Scope Widget、<code>of</code> 静态方法、<code>updateShouldNotify</code> 判断这套三件套，每类共享状态都要重复一遍。Provider 受欢迎正是因为它替你写完了这遍样板，Bloc 的 provider 包与 Riverpod 的 <code>ProviderScope</code> 也都在树上放一个继承性节点，把外部容器接进依赖系统。所以“要不要引库”的实质问题是：要不要让别人替你维护这层 <code>InheritedWidget</code>。</p>
+<h2 id="重建范围：评价任何方案的入口"><a href="#重建范围：评价任何方案的入口" class="headerlink" title="重建范围：评价任何方案的入口"></a>重建范围：评价任何方案的入口</h2><p>有一个说法比“哪个库更快”有意义得多：<strong>状态放得越高，重建越多</strong>。读取者会登记为依赖者，值一变，所有登记过的 Element 都要重建；把状态放到树根附近意味着潜在读取者覆盖面极大，你很难保证某个中间层的 <code>build</code> 没跟着做无用功。这不是某个库的缺陷，而是依赖订阅模型的固有代价，所以它成了横向比较各方案最好的入口。</p>
+<p>判据只有一条：同一份状态，两种写法谁更容易把重建范围写小。收窄重建有三条通用手法。一是让不依赖状态的部分成为 <code>const</code> 构造，参数全为编译期常量时实例可复用，框架发现实例未变就不必重建对应子树。二是把监听下沉到叶子：外层只管布局，真正读状态的那个小组件单独包一层构建点。三是派生选择：不订阅整个对象，只订阅比较出来的标量或不可变片段，值没变就不通知。Provider 的 <code>context.select</code>、Riverpod 的选择器式读法、Bloc 里按状态字段做 <code>buildWhen</code> 之类的判断，本质都是第三条。</p>
+<figure class="highlight dart"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 只订阅需要的字段，头像换了但昵称没换时不重建这行文本</span></span><br><span class="line"><span class="keyword">final</span> name = context.select&lt;<span class="title class_">UserModel</span>, <span class="title class_">String</span>&gt;((u) =&gt; u.displayName);</span><br><span class="line"><span class="keyword">return</span> <span class="title class_">Text</span>(name);</span><br></pre></td></tr></table></figure>
+
+<p>于是本文对“性能”的态度很明确：不比库之间的跑分，也不给基准数字，差异主要由“你写出的重建范围”决定——一个把全部页面状态塞进全局 store 的项目，用哪个库都会卡。看方案时该问的是：这套 API 鼓励我把监听下沉、把状态切片，还是诱导我反手取整个 store。至于把重建当头号成本之后怎么优化，同批性能优化一文已经承担。</p>
+<h2 id="Provider：官方封装的能力与边界"><a href="#Provider：官方封装的能力与边界" class="headerlink" title="Provider：官方封装的能力与边界"></a>Provider：官方封装的能力与边界</h2><p>Provider 的定位要先说准：它不是新的状态模型，而是 <code>InheritedWidget</code> 的官方推荐封装，加上对 <code>ChangeNotifier</code> 这类通知源的订阅管理。它解决的具体问题就三个：手写 Scope 的样板、类型查找的繁琐、通知源生命周期没人管。这三点做得干净，是它长期成为默认选择的原因。</p>
+<p>创建方式按用途分四类。<code>Provider</code> 只往树里放一个对象、不负责通知，适合 Repository 这类“放进去就够了”的依赖。<code>ChangeNotifierProvider</code> 放一个 <code>ChangeNotifier</code>，负责在子树移除时释放它，并在 <code>notifyListeners</code> 时通知订阅者。<code>FutureProvider</code> 把异步计算结果放进树，读到的是进行中、成功、失败的统一表示。<code>ProxyProvider</code> 声明“我的值依赖树上其他 provider”，依赖变化时重算，是把多个来源合成一个视图的正规做法，风险是链子一长就成了看不见的依赖图。</p>
+<p>读取方式三种，误用后果不同。<code>context.read</code> 只取一次值、不登记依赖，在 <code>build</code> 里用它改状态就是构建期副作用。<code>context.watch</code> 登记依赖、值变则重建，是 <code>build</code> 里表达依赖的正规写法；一处 <code>build</code> 里 watch 多个对象，等于把这些对象的变化全部算进当前子树的重建成本。<code>context.select</code> 只订阅派生值，是收窄重建的首选。<code>Consumer</code> 与 <code>Selector</code> 只在 <code>build</code> 整体很大、你只想让一小块响应时才需要，日常用得比文档暗示的少，因为 <code>context.select</code> 更直接。</p>
+<p>缺点要如实写。第一，<code>ChangeNotifier</code> 是运行时通知：谁订阅了什么、变更波及哪里，编译期没有任何信息。第二，它通知全部订阅者，Provider 自身不做值比较，改一个字段就让订阅整块的人全部重建，除非自己切片。第三，忘记 dispose 是常见隐性泄漏，特别是自己创建却未交给 <code>ChangeNotifierProvider</code> 管理的对象。第四，最容易走偏的是把它当完整的依赖注入容器，逐层叠十几个节点成一座塔，读一次值要穿过很长的链。第五，可达性由树位置决定，动态插入子树时容易遇到“找不到 provider”的运行时报错。</p>
+<h2 id="Riverpod：把依赖关系前移到声明里"><a href="#Riverpod：把依赖关系前移到声明里" class="headerlink" title="Riverpod：把依赖关系前移到声明里"></a>Riverpod：把依赖关系前移到声明里</h2><p>先给定位，这点容易被讲错：Riverpod 是 Provider 作者对同一问题的重新设计，不是 Flutter 官方内置能力。差异有两条。一是 provider 不依赖 BuildContext：它是顶层的普通声明，谁依赖谁写在声明里，而不是看它在树上的位置，于是读一个不存在的 provider 成了编译期就能暴露的错误，也不会因放置位置不同而表现不同。二是 provider 本身就是依赖声明：构造里用 <code>ref.watch</code> 写明自己读谁，整张依赖图由库掌握。</p>
+<figure class="highlight dart"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">final</span> userRepoProvider = <span class="title class_">Provider</span>&lt;<span class="title class_">UserRepo</span>&gt;((ref) =&gt; <span class="title class_">UserRepo</span>(api: ref.<span class="title function_">watch</span>(apiProvider)));</span><br><span class="line"></span><br><span class="line"><span class="keyword">final</span> cartProvider = <span class="title class_">StateNotifierProvider</span>&lt;<span class="title class_">CartNotifier</span>, <span class="title class_">List</span>&lt;<span class="title class_">Item</span>&gt;&gt;(</span><br><span class="line">  (ref) =&gt; <span class="title class_">CartNotifier</span>(ref.<span class="title function_">watch</span>(userRepoProvider)),</span><br><span class="line">);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 派生：总额跟着购物车变，不用手写通知</span></span><br><span class="line"><span class="keyword">final</span> totalProvider = <span class="title class_">Provider</span>&lt;<span class="built_in">double</span>&gt;((ref) =&gt;</span><br><span class="line">    ref.<span class="title function_">watch</span>(cartProvider).<span class="title function_">fold</span>(<span class="number">0.0</span>, (s, i) =&gt; s + i.price));</span><br></pre></td></tr></table></figure>
+
+<p><code>StateNotifier</code> 与较新的 <code>Notifier</code> 都承担“状态转换写在这个对象里”，后者不必自己构造持有者、更像普通类，两者对外都只给一个不可变状态值。真正的价值在派生链：<code>totalProvider</code> 不需要知道购物车怎么通知它，只声明读 <code>cartProvider</code>，变化由库顺着依赖图传播，这类派生恰是 Provider 里最难干净表达的部分。</p>
+<p>生命周期是第三个卖点。默认 provider 只在被监听时存在，最后一个监听者消失就可以回收（autoDispose 语义），正好对上“页面关掉这块状态就该消失”的直觉；要跨页面存活时用 keepAlive 常驻。它把忘记释放那类问题从靠纪律变成靠机制。</p>
+<p>测试能力最被称道。<code>ProviderScope</code> 接受一组覆盖项，测试时只把数据源 provider 换成假实现，其余代码一行不改；不挂 Widget 时还能直接构造一个根容器，让纯逻辑状态在没有树的情况下跑测试。两种覆盖的差别在作用域：挂在某个 <code>ProviderScope</code> 上只影响这棵树的读取，落在根容器上则影响该容器的全部读取。集成测试里选错作用域，会出现“这个用例生效、那个不生效”的怪事。</p>
+<p>代价也必须写清。第一是概念量：family（按参数生成 provider 实例）、autoDispose 与 keepAlive（生命周期策略）、override（覆盖机制）三层各自不难，但要一起理解才能预测行为，新人第一周常问的是“为什么这个 provider 又重建了”。第二是口径变化：它在当前这一代里把写法从函数式 StateNotifier 逐步挪向 Notifier 与代码生成方向，教程里新旧混着，搜到的例子未必适合当前主线，团队需要一份内部写法约定。第三，上手曲线确实比 Provider 陡。第四，它的依赖图仍是运行时传播，编译期安全主要体现在引用是否声明存在、读取时机是否合法，别误解成类型层面的依赖检查。</p>
+<h2 id="Bloc-与-Cubit：显式状态机的回报和代价"><a href="#Bloc-与-Cubit：显式状态机的回报和代价" class="headerlink" title="Bloc 与 Cubit：显式状态机的回报和代价"></a>Bloc 与 Cubit：显式状态机的回报和代价</h2><p>Bloc 的定位不是状态容器，而是把业务状态做成显式状态机：外界投递事件，状态机消化事件产出新状态，Widget 只渲染状态。链上每个环节都显式——事件是类型，状态是不可变类，转换是集中一处的逻辑，输入输出可以一一对应地测。Cubit 是同一套东西的简化档：不定义事件类型，直接在对象上暴露方法，方法内部 <code>emit</code> 新状态；省掉事件这层仪式，保留状态转移集中一处、对外只发不可变状态这两个核心。</p>
+<figure class="highlight dart"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 事件进、状态出：转换集中在一处，可逐个输入断言输出</span></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">CartBloc</span> <span class="keyword">extends</span> <span class="title">Bloc</span>&lt;<span class="title">CartEvent</span>, <span class="title">CartState</span>&gt; </span>&#123;</span><br><span class="line">  <span class="title class_">CartBloc</span>(<span class="keyword">this</span>._repo) : <span class="title function_">super</span>(<span class="title class_">CartState</span>.<span class="title function_">empty</span>()) &#123;</span><br><span class="line">    <span class="keyword">on</span>&lt;<span class="title class_">CheckoutRequested</span>&gt;((event, emit) <span class="keyword">async</span> &#123;</span><br><span class="line">      <span class="title function_">emit</span>(state.<span class="title function_">copyWith</span>(status: <span class="title class_">Status</span>.loading));</span><br><span class="line">      <span class="keyword">final</span> r = <span class="keyword">await</span> _repo.<span class="title function_">checkout</span>(event.cartId);</span><br><span class="line">      <span class="title function_">emit</span>(r.ok</span><br><span class="line">          ? state.<span class="title function_">copyWith</span>(status: <span class="title class_">Status</span>.done, orderId: r.id)</span><br><span class="line">          : state.<span class="title function_">copyWith</span>(status: <span class="title class_">Status</span>.failed, error: r.message));</span><br><span class="line">    &#125;);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">final</span> <span class="title class_">CartRepository</span> _repo;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>BlocBuilder</code> 与 <code>BlocListener</code> 的分工要讲准。前者管“状态变了要重画什么”，可以带一个条件在新旧状态上决定是否重建，这正好对上派生选择；后者管“状态变了要做的一次性动作”，比如弹提示、关闭键盘，回调不参与构建树。把副作用放进 listener 而不是 builder，是 Bloc 项目在纪律上容易守住的结构性原因：API 形状本身在提醒你构建里别做事。</p>
+<p>为什么业务流程复杂、状态转移要审计的项目里显式性有回报？因为这类项目的难点不是显示值，而是回答“现在为什么是这个界面、上一步是什么、还有没有请求在飞”。显式事件流让这些都有唯一去处：变更入口是事件类型，可逐个列出逐个测；出问题时看事件序列就能复盘；“不许在 Widget 里直接改状态”是硬约束而不是约定。示意地讲，一个有确认、校验、支付、重试四段的下单流程，用事件枚举写出来本身就是一份可评审的流程文档。</p>
+<p>缺点同样明确。一是样板量：简单开关页也要状态类、事件类、bloc 类、挂载四件套，行数远超裸 <code>ValueNotifier</code>。二是简单页面被仪式化：Tab 索引这类局部状态一旦顺手搬进 bloc，就是拿状态机做布尔变量。三是团队接受度：不接受事件流范式的团队会把 bloc 写成 setter，反而比 Provider 更难读。四是它同样是运行时通知，依赖靠构造传入（比全局单例干净），但谁在读这个 bloc，编译期不知道。</p>
+<p>本文不把 Bloc 当成最推荐的架构：它的收益取决于状态转移是否真的复杂、团队是否愿意把纪律写成结构，流程薄的后台硬套它，只会得到一堆除了一处赋值什么都没做的空壳事件。</p>
+<h2 id="其他方案的诚实定位"><a href="#其他方案的诚实定位" class="headerlink" title="其他方案的诚实定位"></a>其他方案的诚实定位</h2><p><code>mobx_flutter</code> 走响应式模型：状态字段声明为可观察量，逻辑写在 action 里，界面包一层 Observer，读时自动建立依赖、写时自动通知。好处是代码形态自然，接近“直接赋值、界面跟着变”，样板比 Bloc 少很多。代价来自依赖追踪是隐式的：界面到底读了哪些可观察量要运行时才知道，重建范围比显式订阅的方案更难预测，调试“这一帧为什么重建”要顺着隐式依赖反查；这类追踪与需要脱离 Widget 环境的场景（服务端渲染、纯隔离单元测试）配合也更麻烦。</p>
+<p><code>get_x</code> 提供的是“控制器加全局依赖加响应式变量”的一体化方案：控制器基类承载页面状态，靠全局注册表按需取实例，配一套 obs 风格的响应式变量与局部重建 Widget，还带自己的路由与消息机制。优点是快，建页面到能跑几乎不用铺垫，赶工期的原型、单人维护的工具类 App 里很有效。缺点也直说：与框架强绑定，路由、依赖、状态三件事都被约定接管，脱离约定就讲不清状态从哪来；全局单例式取依赖让可测试性变差；实例创建与释放由注册表决定，忘记删除就长驻，跨页面复用同名控制器还需额外规范。把它定位成“高效率的框架化方案”最准确，而不是通用状态管理库。</p>
+<p>信号（signal）一类的细粒度响应式范式，在 2024 年年中仍属社区探索：核心是“读时订阅单个信号、写时只通知这个信号”，把重建粒度推到比整个状态对象更细的一层，思路对收窄重建确实直接。但当时它在 Flutter 侧只是若干实验性包的形态，没有稳定的公开 API，没有成规模的生产案例，也没进入官方口径，选型不该把项目押在仍在验证范式的方案上。</p>
+<h2 id="依赖注入维度：可测试性的差异从哪来"><a href="#依赖注入维度：可测试性的差异从哪来" class="headerlink" title="依赖注入维度：可测试性的差异从哪来"></a>依赖注入维度：可测试性的差异从哪来</h2><p>各方案在“外部依赖怎么进来”上差别很大，而这一条几乎决定了可测试性的高低。</p>
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>依赖注入方式</th>
+<th>测试时替换数据源</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Provider</td>
+<td>沿 Widget 树注入</td>
+<td>测试顶层套一层替换数据源</td>
+</tr>
+<tr>
+<td>Riverpod</td>
+<td>声明即依赖图</td>
+<td>覆盖数据源或直接建根容器</td>
+</tr>
+<tr>
+<td>Bloc 与 Cubit</td>
+<td>构造函数注入</td>
+<td>直接 new，无需 Widget 树</td>
+</tr>
+<tr>
+<td>mobx_flutter</td>
+<td>自建 Store 配定位器</td>
+<td>手换依赖再挂观察器</td>
+</tr>
+<tr>
+<td>get_x</td>
+<td>全局注册表取实例</td>
+<td>先清全局实例防互串</td>
+</tr>
+<tr>
+<td>裸 ValueNotifier</td>
+<td>没有注入机制</td>
+<td>靠构造参数手工传</td>
+</tr>
+</tbody></table>
+<p>对照写法各给一段最小的：</p>
+<figure class="highlight dart"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Provider：给一棵被测树换掉数据源</span></span><br><span class="line"><span class="title class_">Widget</span> <span class="title function_">wrap</span>(<span class="title class_">Widget</span> child, <span class="title class_">Repo</span> repo) =&gt; <span class="title class_">Provider</span>&lt;<span class="title class_">Repo</span>&gt;(</span><br><span class="line">      create: (_) =&gt; repo, child: child);</span><br><span class="line"><span class="title function_">testWidgets</span>(<span class="string">&#x27;展示空购物车&#x27;</span>, (t) =&gt;</span><br><span class="line">    t.<span class="title function_">pumpWidget</span>(<span class="title function_">wrap</span>(<span class="title class_">MyApp</span>(), <span class="title class_">FakeRepo</span>(emptyCart: <span class="keyword">true</span>))));</span><br><span class="line"></span><br><span class="line"><span class="comment">// Riverpod：只覆盖这一个 provider</span></span><br><span class="line"><span class="keyword">await</span> tester.<span class="title function_">pumpWidget</span>(<span class="title class_">ProviderScope</span>(</span><br><span class="line">  overrides: [repoProvider.<span class="title function_">overrideWithValue</span>(<span class="title class_">FakeRepo</span>())],</span><br><span class="line">  child: <span class="title class_">MyApp</span>(),</span><br><span class="line">));</span><br><span class="line"></span><br><span class="line"><span class="comment">// Bloc：状态机不依赖树，纯单元测试</span></span><br><span class="line"><span class="keyword">final</span> bloc = <span class="title class_">CartBloc</span>(<span class="title class_">FakeRepo</span>(checkoutOk: <span class="keyword">false</span>));</span><br><span class="line">bloc.<span class="title function_">add</span>(<span class="title class_">CheckoutRequested</span>(<span class="string">&#x27;c1&#x27;</span>)); <span class="comment">// 事件进</span></span><br><span class="line"><span class="comment">// 断言状态序列出现失败，不需要 pumpWidget</span></span><br></pre></td></tr></table></figure>
+
+<p>判断要落在这一点上：<strong>可测试性的差异主要来自外部依赖能否被替换，而不是运行性能</strong>。能被替换的方案，测试只搭最小环境；靠全局单例的方案要么先污染全局再清理，要么根本只能跑集成测试。跨页面共享登录态这类场景还有一层约束：替换能力不够时测试得连路由一起搭，导航与页面生命周期见同批路由与导航一文，这里不展开。</p>
+<h2 id="分层与模块化的工程结论"><a href="#分层与模块化的工程结论" class="headerlink" title="分层与模块化的工程结论"></a>分层与模块化的工程结论</h2><p>不管选哪个库，能长期维持的项目基本都是同三层。Repository 层负责数据来源：网络、磁盘、缓存、字段合并，只吐数据模型，不知道 Widget 存在。状态转换层（Notifier、Cubit、Bloc 都算）把数据与用户动作合成一份可渲染的不可变状态，是唯一允许改状态的地方。Widget 层只读状态、只发意图，不做业务判断。三层边界守住，换库成本可控；守不住，用哪个库都会烂。</p>
+<p>最典型的反模式是“巨型全局状态”：一个 store 装着登录信息、购物车、主题、草稿、埋点开关，所有页面都从根上取整个对象，新人问“这个字段谁在改”没人答得上来。后果有三条：任何页面都要知道整个 store 的形状，改一处要全库搜引用；变更判定只能比较整个对象，字段级切片形同虚设，重建范围被迫放大；测一个只读主题的小组件也得把整个 store 搭起来。重构路径也是三步：按功能切片，把 cart、session、settings 拆成独立提供者；在切片上加派生选择，组件只订阅算出来的小值；最后把 app state 降格成若干 feature state，跨功能交换交给 Repository 层而不是状态层互读。</p>
+<h2 id="迁移与共存"><a href="#迁移与共存" class="headerlink" title="迁移与共存"></a>迁移与共存</h2><p>从 Provider 迁到 Riverpod 的步骤是四步，而不是一次重写。第一步只做读取层抽象：把状态对象与业务逻辑从 Widget 里抽出来，让它们不依赖 context，这一步不动任何库。第二步建桥：用一层 provider 包住既有的通知源，新代码读桥，旧代码按原方式读。第三步按 feature 迁：一次只换一个模块的读取入口，模块内全走新写法，模块外一律不动，并给迁移期定一条门禁（团队约定示例：新写的共享状态不许再用旧方式接入）。第四步收尾，桥上的引用清零后删掉旧挂载点。之所以禁止一次性重写，是因为状态层是全局骨架，同时改骨架和业务逻辑，出问题时无从归因。</p>
+<p>共存边界同样要说清。Provider 与 Bloc 并存可以解释：页面内流程状态交给 Bloc，跨页面注入的东西用 Provider 传，但注入的应当是数据来源而不是可变状态，否则会出现这页的 Bloc 在改同一个对象、那页又在 watch 它的局面，两条通知链互相覆盖，谁先到达没有语义保证。跨页面共享登录态时，让 Repository 持有唯一的会话对象，各页面状态机各自监听这个来源同步自己，比让两个状态层互写安全。硬规则是：<strong>并存方案超过两种就是债</strong>（团队约定示例），因为新人要学两套纪律，状态流向要在两张图上追。</p>
+<h2 id="选型决策树"><a href="#选型决策树" class="headerlink" title="选型决策树"></a>选型决策树</h2><p>把前面的判断串成一棵树，顺序很关键：先问是不是跨页面共享，再问状态转移是否需要审计与可回溯，再问团队是否接受响应式范式，再问是否要求编译期依赖安全，最后才看新人上手窗口。</p>
+<pre class="mermaid">flowchart TD
+  A[这段状态要跨页面共享吗] -->|不要| B[能否用 setState 或 ValueNotifier]
+  B -->|能| C[就用它，不引库]
+  B -->|不能| D[Provider 挂到合适层级]
+  A -->|要| E[状态转移要审计与复盘吗]
+  E -->|要| F[Bloc 或 Cubit]
+  E -->|不要| G[团队接受响应式写法吗]
+  G -->|接受且测试要求高| H[Riverpod]
+  G -->|不接受| I[Provider 加内部约定]
+  H --> J[要求编译期依赖安全吗]
+  J -->|要求| K[以声明式 provider 为准并统一写法]
+  J -->|不要求| L[按上手窗口收口]</pre>
+
+<p>落到默认建议：小项目、以页面内共享为主，用 <code>ValueNotifier</code> 或 Provider；中大型且流程复杂、需要看得见状态转移轨迹，用 Bloc 或 Cubit；中大型但状态以派生与缓存为主、测试要求高，用 Riverpod；只有局部状态这种需求的原型，就停在 <code>setState</code>。至于选错会不会推倒重来，判断依据不在库而在分层：三层边界守住，替换实现只是逐模块重构；三层混成一团，哪怕不换库，第一次需求变更就已经在重写了。</p>
+<h2 id="五条反模式与修法"><a href="#五条反模式与修法" class="headerlink" title="五条反模式与修法"></a>五条反模式与修法</h2><p>第一条，把 UI 局部状态提到全局。Tab 索引、折叠开关进了全局 store，代价是所有相关页面一起参与重建，收益为零。修法回到二分：出现两个互不嵌套的读取者才往上提一层，能挂在页面 State 上就别往容器里放。</p>
+<p>第二条，在 <code>build</code> 里写副作用改状态。构建过程中调用会改状态的方法，轻则同一帧重复构建，重则死循环。修法是把副作用挪到明确的事件回调，或挪到库里“只做事不构建”的监听入口。</p>
+<p>第三条，状态里塞不可序列化的对象，例如 BuildContext、滚动控制器、动画控制器。后果是这份状态无法复制、无法持久化、无法在 Widget 销毁后安全持有。修法是状态里只放数据，控制器留在 State 层持有并在销毁时释放。</p>
+<p>第四条，用状态库当事件总线。往 store 里塞一次性消息，通知语义就被当成消息队列用，测试要构造整个状态才能触发一次动作。修法是分清值与事：值放状态，一次性动作显式表达、消费完就消失。</p>
+<p>第五条，任何改动都触发根重建。原因是订阅了整块状态、外层 Widget 太大、构造里缺 <code>const</code>。修法是三条通用手法轮着上：派生选择、监听下沉到叶子、常量构造。</p>
+<h2 id="两张对照表"><a href="#两张对照表" class="headerlink" title="两张对照表"></a>两张对照表</h2><table>
+<thead>
+<tr>
+<th>方案</th>
+<th>心智模型</th>
+<th>与 BuildContext 耦合</th>
+<th>编译期安全</th>
+<th>样板量</th>
+<th>适合团队</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>setState、ValueNotifier</td>
+<td>值变化通知订阅者</td>
+<td>强，绑在当前 State</td>
+<td>一般</td>
+<td>很少</td>
+<td>小项目</td>
+</tr>
+<tr>
+<td>Provider</td>
+<td>树上放依赖并订阅通知</td>
+<td>强，靠沿树查找</td>
+<td>低</td>
+<td>少</td>
+<td>追求低概念量</td>
+</tr>
+<tr>
+<td>Riverpod</td>
+<td>声明式依赖图</td>
+<td>弱，不依赖树位置</td>
+<td>中高</td>
+<td>中</td>
+<td>重测试</td>
+</tr>
+<tr>
+<td>Bloc、Cubit</td>
+<td>事件驱动的显式状态机</td>
+<td>中，靠挂载点</td>
+<td>中</td>
+<td>多</td>
+<td>流程复杂、要审计</td>
+</tr>
+<tr>
+<td>mobx_flutter</td>
+<td>可观察量加隐式追踪</td>
+<td>中，界面要包观察器</td>
+<td>低</td>
+<td>少</td>
+<td>熟悉响应式</td>
+</tr>
+<tr>
+<td>get_x</td>
+<td>控制器加全局注册表</td>
+<td>强，框架接管多</td>
+<td>低</td>
+<td>很少</td>
+<td>赶工期</td>
+</tr>
+<tr>
+<td>信号类范式</td>
+<td>细粒度订阅单个来源</td>
+<td>弱</td>
+<td>中高</td>
+<td>少</td>
+<td>仅内部预研</td>
+</tr>
+</tbody></table>
+<table>
+<thead>
+<tr>
+<th>症状</th>
+<th>原因</th>
+<th>修法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>改一个输入框整页重建</td>
+<td>订阅了整个状态对象</td>
+<td>派生选择并下沉监听</td>
+</tr>
+<tr>
+<td>运行时报找不到依赖</td>
+<td>挂载与读取不同子树</td>
+<td>提到共同祖先</td>
+</tr>
+<tr>
+<td>某字段谁在改说不清</td>
+<td>巨型全局状态</td>
+<td>按功能切片</td>
+</tr>
+<tr>
+<td>测试要搭半个应用</td>
+<td>依赖只能从全局单例取</td>
+<td>换成可覆盖入口</td>
+</tr>
+<tr>
+<td>通知源迟迟不释放</td>
+<td>手工创建没交给容器</td>
+<td>交给生命周期管理</td>
+</tr>
+<tr>
+<td>升级库要大改写法</td>
+<td>没有内部写法约定</td>
+<td>先定规范</td>
+</tr>
+</tbody></table>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>状态管理的第一步不是选库，而是把 ephemeral state 与 app state 分开：能用 <code>setState</code> 解决就不要引库。所有方案的共同地基是 <code>InheritedWidget</code> 那套沿树传递并通知订阅者的机制，库之间的差别在样板、生命周期、依赖表达与可测试性，不在谁更快。评价时该问三个问题：谁更容易把重建范围写小，谁的外部依赖在测试里换得掉，谁的状态转移在半年后还看得见。Provider 胜在概念量低，Riverpod 胜在依赖声明与可覆盖，Bloc 胜在显式与可复盘，get_x 胜在快，代价都写在各自强项的背面。最后仍回到分层：三层守住，选型只是工程偏好；三层不守，换哪个库都只是暂时的。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://docs.flutter.dev/">Flutter 官方文档</a></li>
+<li><a href="https://pub.dev/packages/provider">provider 包主页</a></li>
+<li><a href="https://riverpod.dev/">Riverpod 官方文档站</a></li>
+<li><a href="https://bloclibrary.dev/">Bloc 官方文档站</a></li>
+<li><a href="https://pub.dev/packages/flutter_bloc">flutter_bloc 包主页</a></li>
+<li><a href="https://pub.dev/packages/mobx">mobx 包主页</a></li>
+<li><a href="https://pub.dev/packages/get">get 包主页</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Flutter 状态管理方案对比</p><p><a href="https://987763485.github.io/2024/07/21/Flutter状态管理方案对比/">https://987763485.github.io/2024/07/21/Flutter状态管理方案对比/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2024-07-21</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-19</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/java/">java</a><a class="link-muted mr-2" rel="tag" href="/tags/kotlin/">kotlin</a><a class="link-muted mr-2" rel="tag" href="/tags/flutter/">flutter</a><a class="link-muted mr-2" rel="tag" href="/tags/csharp/">csharp</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2024/07/26/C%E5%90%8E%E5%8F%B0%E6%9C%8D%E5%8A%A1%E5%AE%9E%E8%B7%B5/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">C# 后台服务实践</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2024/07/19/SpringCloud%E5%BE%AE%E6%9C%8D%E5%8A%A1%E5%AE%9E%E6%88%98/"><span class="level-item">Spring Cloud 微服务实战</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

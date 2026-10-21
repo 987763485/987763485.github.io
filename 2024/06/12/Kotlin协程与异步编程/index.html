@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Kotlin 协程与异步编程 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="本文面向已经会写 Kotlin、但还没把协程放进真实工程的读者，只讲用法与工程实践：该用哪个 API、代码骨架长什么样、哪些写法迟早变成线上问题。主线口径是 Kotlin 1.9.x 与 kotlinx-coroutines 1.7&amp;#x2F;1.8 线；实现机制不在本文展开，需要追问“为什么”时，实现原理见同批《Kotlin 协程源码解析》。读完你应能判断一段异步代码该不该协程化、作用域从哪来、"><meta property="og:type" content="blog"><meta property="og:title" content="Kotlin 协程与异步编程"><meta property="og:url" content="https://987763485.github.io/2024/06/12/Kotlin%E5%8D%8F%E7%A8%8B%E4%B8%8E%E5%BC%82%E6%AD%A5%E7%BC%96%E7%A8%8B/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="本文面向已经会写 Kotlin、但还没把协程放进真实工程的读者，只讲用法与工程实践：该用哪个 API、代码骨架长什么样、哪些写法迟早变成线上问题。主线口径是 Kotlin 1.9.x 与 kotlinx-coroutines 1.7&amp;#x2F;1.8 线；实现机制不在本文展开，需要追问“为什么”时，实现原理见同批《Kotlin 协程源码解析》。读完你应能判断一段异步代码该不该协程化、作用域从哪来、"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2024-06-11T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-19T11:08:01.243Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="java"><meta property="article:tag" content="kotlin"><meta property="article:tag" content="flutter"><meta property="article:tag" content="csharp"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2024/06/12/Kotlin%E5%8D%8F%E7%A8%8B%E4%B8%8E%E5%BC%82%E6%AD%A5%E7%BC%96%E7%A8%8B/"},"headline":"Kotlin 协程与异步编程","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2024-06-11T16:00:00.000Z","dateModified":"2026-10-19T11:08:01.243Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"本文面向已经会写 Kotlin、但还没把协程放进真实工程的读者，只讲用法与工程实践：该用哪个 API、代码骨架长什么样、哪些写法迟早变成线上问题。主线口径是 Kotlin 1.9.x 与 kotlinx-coroutines 1.7&#x2F;1.8 线；实现机制不在本文展开，需要追问“为什么”时，实现原理见同批《Kotlin 协程源码解析》。读完你应能判断一段异步代码该不该协程化、作用域从哪来、"}</script><link rel="canonical" href="https://987763485.github.io/2024/06/12/Kotlin%E5%8D%8F%E7%A8%8B%E4%B8%8E%E5%BC%82%E6%AD%A5%E7%BC%96%E7%A8%8B/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2024-06-11T16:00:00.000Z" title="6/12/2024, 12:00:00 AM">2024-06-12</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/">全栈开发</a></span><span class="level-item">34 分钟读完 (大约5086个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Kotlin 协程与异步编程</h1><div class="content"><p>本文面向已经会写 Kotlin、但还没把协程放进真实工程的读者，只讲用法与工程实践：该用哪个 API、代码骨架长什么样、哪些写法迟早变成线上问题。主线口径是 Kotlin 1.9.x 与 kotlinx-coroutines 1.7&#x2F;1.8 线；实现机制不在本文展开，需要追问“为什么”时，实现原理见同批《Kotlin 协程源码解析》。读完你应能判断一段异步代码该不该协程化、作用域从哪来、超时与异常放在哪一层。</p>
+<h2 id="为什么需要协程"><a href="#为什么需要协程" class="headerlink" title="为什么需要协程"></a>为什么需要协程</h2><p>协程要替换掉的是两种写法，痛点不同。第一种是阻塞线程：线程不免费，一条线程要预留栈空间（1 MB 量级，示意值），创建与切换也有成本；更要命的是容量，等待期间线程被占住，线程池大小就成了并发上限——CPU 空闲、请求全在排队。</p>
+<p>第二种是回调，它不占线程，代价是控制流被切碎：</p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 回调风格：嵌套、错误分支与取消都要手工一层层传递</span></span><br><span class="line"><span class="function"><span class="keyword">fun</span> <span class="title">loadPage</span><span class="params">(id: <span class="type">String</span>, onDone: (<span class="type">Page</span>) -&gt; <span class="type">Unit</span>, onError: (<span class="type">Throwable</span>) -&gt; <span class="type">Unit</span>)</span></span> &#123;</span><br><span class="line">    api.fetchMeta(id) &#123; meta -&gt;</span><br><span class="line">        api.fetchBody(meta.bodyUrl) &#123; body -&gt;            <span class="comment">// 嵌套开始</span></span><br><span class="line">            api.fetchImages(body.imageIds) &#123; images -&gt;    <span class="comment">// 再嵌套，异常已经不好传了</span></span><br><span class="line">                runCatching &#123; Page(meta, body, images) &#125;</span><br><span class="line">                    .onSuccess(onDone)</span><br><span class="line">                    .onFailure(onError)</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>难处理的不是缩进，而是三件事：中途加一步串行就得再挖一层；想随用户退出而停止就得给每个回调存可撤销句柄；想整体 catch 就得手写转发链路。</p>
+<p>协程的目标就一句话：<strong>看起来同步的代码，加上不占线程的等待</strong>。</p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 同样的流程，等待不占线程，代码依然是自上而下可读的</span></span><br><span class="line"><span class="keyword">suspend</span> <span class="function"><span class="keyword">fun</span> <span class="title">loadPage</span><span class="params">(id: <span class="type">String</span>)</span></span>: Page &#123;</span><br><span class="line">    <span class="keyword">val</span> meta = api.fetchMeta(id)</span><br><span class="line">    <span class="keyword">val</span> body = api.fetchBody(meta.bodyUrl)</span><br><span class="line">    <span class="keyword">val</span> images = api.fetchImages(body.imageIds)</span><br><span class="line">    <span class="keyword">return</span> Page(meta, body, images)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>还有一个必须先钉住的误解：<strong>协程不是并行工具</strong>。开 100 个协程不等于用 100 个核：协程管“等待怎么组织”，并行度来自线程数，线程数由调度器给、被核数封顶。计算要真并行靠多核线程池，等待要省钱才轮到协程。</p>
+<h2 id="挂起函数的写法与读法"><a href="#挂起函数的写法与读法" class="headerlink" title="挂起函数的写法与读法"></a>挂起函数的写法与读法</h2><p>挂起函数就是标了 <code>suspend</code> 的函数，读法比写法重要。</p>
+<p>第一层语义是调用位置的限制：<code>suspend</code> 表示“这里可能等待”，因此只能在协程或另一个 <code>suspend</code> 函数里调用，编译器会直接拦下来。</p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">suspend</span> <span class="function"><span class="keyword">fun</span> <span class="title">currentPrice</span><span class="params">()</span></span>: <span class="built_in">Double</span> = api.price()</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">fun</span> <span class="title">onButtonClicked</span><span class="params">()</span></span> &#123;</span><br><span class="line">    <span class="keyword">val</span> p = currentPrice()          <span class="comment">// 编译失败：挂起函数不能在普通函数里调用</span></span><br><span class="line">    log(p)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">fun</span> <span class="title">onButtonClicked</span><span class="params">(scope: <span class="type">CoroutineScope</span>)</span></span> &#123;</span><br><span class="line">    scope.launch &#123; log(currentPrice()) &#125;   <span class="comment">// 正确：先有一个作用域，再进去等</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>于是出现“染色”：调用链上游都得能提供作用域，但返回类型不用变，不像 <code>Deferred&lt;Double&gt;</code> 或 <code>Publisher&lt;Double&gt;</code> 那样污染签名。</p>
+<p>第二层语义是与“返回 <code>Deferred</code> 的函数”的区别，这是最容易选错的一处：</p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 写法 A：调用方在我这里等；启动时机、取消归属都由调用方的作用域决定</span></span><br><span class="line"><span class="keyword">suspend</span> <span class="function"><span class="keyword">fun</span> <span class="title">loadUser</span><span class="params">(id: <span class="type">String</span>)</span></span>: User = api.getUser(id)</span><br><span class="line"></span><br><span class="line"><span class="comment">// 写法 B：立刻启动、稍后取结果；句柄可以跨越函数边界到处传</span></span><br><span class="line"><span class="function"><span class="keyword">fun</span> <span class="title">loadUserAsync</span><span class="params">(scope: <span class="type">CoroutineScope</span>, id: <span class="type">String</span>)</span></span>: Deferred&lt;User&gt; =</span><br><span class="line">    scope.async &#123; api.getUser(id) &#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 两种写法落到调用点上的差别</span></span><br><span class="line"><span class="keyword">suspend</span> <span class="function"><span class="keyword">fun</span> <span class="title">renderPage</span><span class="params">(scope: <span class="type">CoroutineScope</span>)</span></span> &#123;</span><br><span class="line">    <span class="keyword">val</span> user = loadUser(<span class="string">&quot;42&quot;</span>)                    <span class="comment">// A：顺序执行，后一步等前一步</span></span><br><span class="line">    <span class="keyword">val</span> orders = loadOrders(user.id)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">val</span> a = scope.async &#123; loadUser(<span class="string">&quot;42&quot;</span>) &#125;       <span class="comment">// B：先启动，两个请求同时在飞</span></span><br><span class="line">    <span class="keyword">val</span> b = scope.async &#123; loadOrders(<span class="string">&quot;42&quot;</span>) &#125;</span><br><span class="line">    show(a.await(), b.await())                   <span class="comment">// B：到这里才真正等待</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>规则很直白：结果接下来就要用，写 <code>suspend</code>；只有要把两件互不依赖的事同时发出去，才换成 <code>Deferred</code>。它是延迟结果的句柄，一旦当参数或字段传来传去，“谁等它、谁取消它、谁管它的异常”就没人认领，症状是跑完没人取结果、页面销毁后请求还在发。可组合性同理：<code>suspend</code> 函数能层层复用，<code>Deferred</code> 只能在外层手工拼装；挂起本身怎么实现，见同批《Kotlin 协程源码解析》。</p>
+<h2 id="启动方式与作用域从哪里来"><a href="#启动方式与作用域从哪里来" class="headerlink" title="启动方式与作用域从哪里来"></a>启动方式与作用域从哪里来</h2><p>三个启动方式的选择，只回答两个问题：要不要结果，要不要等。</p>
+<table>
+<thead>
+<tr>
+<th>方式</th>
+<th>适用场景</th>
+<th>返回什么</th>
+<th>最常见的错误</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>runBlocking</code></td>
+<td><code>main</code> 函数、单元测试、把同步接口桥到协程</td>
+<td>最终结果</td>
+<td>在协程里、在 Android 主线程里随手用它</td>
+</tr>
+<tr>
+<td><code>launch</code></td>
+<td>不要结果，只要副作用（发请求、写日志、更新状态）</td>
+<td><code>Job</code>，只能用来取消</td>
+<td>拿它当“后台线程”，任务失败没人管</td>
+</tr>
+<tr>
+<td><code>async</code></td>
+<td>要结果，且需要先把多个任务同时发出去</td>
+<td><code>Deferred</code>，配合 <code>await</code></td>
+<td>起了 <code>async</code> 却忘了 <code>await</code>，异常与耗时都被推后</td>
+</tr>
+</tbody></table>
+<p><code>runBlocking</code> 的定位要背下来：它是<strong>边界</strong>，不是工具。它把当前线程钉住直到内部协程树跑完，所以在协程里随手写它，等于把承载自己的线程变回同步阻塞，前面省下的成本一次还清。主线程上更糟：主线程被占住，内部那个 <code>withContext(Dispatchers.Main)</code> 出不来也回不去，界面直接卡死；服务端请求路径上写它，等于自己造一个线程瓶颈。确需在同步方法里等一次结果时，写成显式适配层，别散落在业务方法中间。</p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">fun</span> <span class="title">main</span><span class="params">()</span></span> = runBlocking &#123;           <span class="comment">// 这里用是对的：进程入口，本来就得等</span></span><br><span class="line">    <span class="keyword">val</span> repo = OrderRepository(<span class="keyword">this</span>)</span><br><span class="line">    println(repo.syncToday())</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>作用域回答的是“这批任务属于谁、谁负责收尾”。获取方式只有三种，按优先级排：</p>
+<p>第一种，用生命周期对象自带的 scope。Android 的 <code>lifecycleScope</code>、<code>viewModelScope</code> 取消时机由组件状态决定，最省心；先问“有没有现成的 scope”，再考虑自己造。</p>
+<p>第二种，自己造并明确寿命：一个长寿命的容器级 scope，加每条请求或每个作业临时的子 scope：</p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 团队约定示例：容器启动时建，关闭时统一取消，超时与重试策略集中配置</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">AppScope</span>(<span class="meta">@Volatile</span> <span class="keyword">var</span> shuttingDown: <span class="built_in">Boolean</span> = <span class="literal">false</span>) &#123;</span><br><span class="line">    <span class="keyword">val</span> scope = CoroutineScope(SupervisorJob() + CoroutineName(<span class="string">&quot;app&quot;</span>) +</span><br><span class="line">        CoroutineExceptionHandler &#123; ctx, e -&gt; logger.error(<span class="string">&quot;未处理异常 in <span class="variable">$ctx</span>&quot;</span>, e) &#125;)</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">fun</span> <span class="title">shutdown</span><span class="params">()</span></span> &#123;</span><br><span class="line">        shuttingDown = <span class="literal">true</span></span><br><span class="line">        scope.coroutineContext.cancelChildren()   <span class="comment">// 让所有业务任务优雅收尾</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>第三种是两个构建器。共同点是开一个“等完所有子任务才返回”的窗口；区别只在失败处理：<code>coroutineScope</code> 里一个子任务失败会连带取消兄弟并上抛异常，<code>supervisorScope</code> 里兄弟互不牵连。还有命名坑：<code>coroutineScope</code> 是构建器，<code>CoroutineScope()</code> 是工厂函数，后者造出来的作用域没人等，写错就变成“任务发出去就失联”。</p>
+<p><code>GlobalScope</code> 请在团队里明确禁用。它不属于任何一棵有寿命的协程树：页面关了、请求超时了、服务下线了，任务照样跑，异常也没有父级接收，“什么时候该停”彻底失去答案。</p>
+<h2 id="调度器选型与-withContext-的边界"><a href="#调度器选型与-withContext-的边界" class="headerlink" title="调度器选型与 withContext 的边界"></a>调度器选型与 withContext 的边界</h2><p>只讲用法与判断；内部线程怎么排、队列怎么长，实现原理见同批《Kotlin 协程源码解析》。</p>
+<table>
+<thead>
+<tr>
+<th>调度器</th>
+<th>适合的调用</th>
+<th>不适合的调用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Dispatchers.Main</code></td>
+<td>更新界面、读视图状态、和框架的回调线程打交道</td>
+<td>任何耗时的读写与计算</td>
+</tr>
+<tr>
+<td><code>Dispatchers.IO</code></td>
+<td>磁盘读写、网络请求、数据库、下游 RPC 等以等待为主的调用</td>
+<td>CPU 密集的计算</td>
+</tr>
+<tr>
+<td><code>Dispatchers.Default</code></td>
+<td>解析大 JSON、加解密、排序、图片解码等吃 CPU 的调用</td>
+<td>大量长时间的阻塞等待</td>
+</tr>
+<tr>
+<td><code>Dispatchers.Unconfined</code></td>
+<td>极窄的调试场景；注意库里并没有 <code>Unbounded</code> 这个名字</td>
+<td>任何业务代码</td>
+</tr>
+</tbody></table>
+<p>规则只有一句：<strong>按这段代码是在等什么、还是在算什么来选调度器</strong>。把 IO 放 <code>Default</code> 是最常见的错误——<code>Default</code> 线程数按核数配置，几条等待中的任务就把它占满，真正要 CPU 的任务反而排队，表现为吞吐下降而 CPU 利用率不高。<code>Main</code> 上做任何耗时操作，等于自己制造一次 ANR。</p>
+<p>两个误解要拆掉。第一，切调度器不是“开了一个线程池”，<code>IO</code> 与 <code>Default</code> 是共享线程资源，切过去只是把任务提交到那一侧队列。第二，切调度器不提升并行度：<code>withContext(Dispatchers.IO) { … }</code> 依然串行；并行度由同时跑多少个任务决定，跟调度器名字无关。</p>
+<p><code>withContext</code> 的正确用法就两件事：把一段代码整体挪到合适的调度器，再把结果带回调用方的上下文。</p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">suspend</span> <span class="function"><span class="keyword">fun</span> <span class="title">loadAvatar</span><span class="params">(url: <span class="type">String</span>)</span></span>: Bitmap =</span><br><span class="line">    withContext(Dispatchers.IO) &#123;                       <span class="comment">// 下载与解码走 IO</span></span><br><span class="line">        <span class="keyword">val</span> bytes = http.getBytes(url)</span><br><span class="line">        decode(bytes)                                   <span class="comment">// 返回值即最后一个表达式</span></span><br><span class="line">    &#125;                                                    <span class="comment">// 出了 withContext 自动回原线程</span></span><br></pre></td></tr></table></figure>
+
+<p>两种典型误用：</p>
+<p>误用一，拿它当超时用。<code>withContext</code> 没有超时语义，只保证块执行完才返回；里面的调用若不响应取消，它就一直等下去。超时是取消机制，要用 <code>withTimeout</code> 从外面包住，两者正交。</p>
+<p>误用二，拿它包裹 CPU 密集代码当并行。嵌套几层依然顺序执行，只是每层换一次线程；要真并行就写四次 <code>async</code> 再 <code>await</code>。</p>
+<h2 id="结构化并发的工程含义"><a href="#结构化并发的工程含义" class="headerlink" title="结构化并发的工程含义"></a>结构化并发的工程含义</h2><p>结构化并发落到代码上就一句话：<strong>子任务不会比父作用域活得久</strong>。<code>coroutineScope { }</code> 一返回，里面的任务就全部结束了。它治的是最难查的一类 bug——任务泄漏：只要作用域来自生命周期对象，忘记取消这件事就不会发生。</p>
+<p>代价要一起接受：同一个 <code>coroutineScope</code> 里一个子任务抛异常会取消所有兄弟，异常再上抛给调用者，它保证不留半成功的状态。但兄弟本来互不依赖时它就成问题：批处理里第 3 条失败不该让另外 50 条回滚，头像加载失败不该让订单列表一起空白，这时必须换成 <code>supervisorScope</code>。</p>
+<table>
+<thead>
+<tr>
+<th>作用域写法</th>
+<th>是否等子任务跑完</th>
+<th>失败怎么传播</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>runBlocking { }</code></td>
+<td>等</td>
+<td>整棵树取消，异常抛到调用线程</td>
+</tr>
+<tr>
+<td><code>coroutineScope { }</code></td>
+<td>等</td>
+<td>取消所有兄弟，异常上抛给调用者</td>
+</tr>
+<tr>
+<td><code>supervisorScope { }</code></td>
+<td>等</td>
+<td>不牵连兄弟，异常由该子任务自己处理</td>
+</tr>
+<tr>
+<td><code>CoroutineScope(SupervisorJob() + …)</code></td>
+<td>不等，需要外部显式取消</td>
+<td>交给 <code>CoroutineExceptionHandler</code></td>
+</tr>
+<tr>
+<td><code>GlobalScope.launch</code></td>
+<td>不等，也没人负责取消</td>
+<td>只能靠全局未捕获处理</td>
+</tr>
+</tbody></table>
+<p>团队约定：默认写 <code>coroutineScope</code>，确认任务彼此独立才升级为 <code>supervisorScope</code>，并在注释里写明理由；共享数据或事务边界的任务保持连带取消。</p>
+<h2 id="取消、超时与异常处理"><a href="#取消、超时与异常处理" class="headerlink" title="取消、超时与异常处理"></a>取消、超时与异常处理</h2><p>取消的入口是 <code>Job.cancel()</code>：Job 进入不可逆的“取消中”状态，<code>isActive</code> 变假，等待中的挂起调用抛 <code>CancellationException</code> 收尾。关键认知是<strong>取消只在挂起点生效</strong>，不挂起的循环与第三方阻塞调用不会因一次 <code>cancel()</code> 停下。</p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 轮询任务：既能被外部 cancel 停住，也能在超时后自己收场</span></span><br><span class="line"><span class="function"><span class="keyword">fun</span> <span class="title">startPolling</span><span class="params">(scope: <span class="type">CoroutineScope</span>, jobId: <span class="type">String</span>)</span></span>: Job = scope.launch &#123;</span><br><span class="line">    <span class="keyword">val</span> deadline = <span class="number">30_000L</span>                        <span class="comment">// 团队约定示例阈值</span></span><br><span class="line">    <span class="keyword">val</span> status = withTimeoutOrNull(deadline) &#123;</span><br><span class="line">        <span class="keyword">while</span> (isActive) &#123;                        <span class="comment">// 循环条件里主动看状态</span></span><br><span class="line">            <span class="keyword">val</span> st = api.status(jobId)            <span class="comment">// 挂起点，天然可取消</span></span><br><span class="line">            <span class="keyword">if</span> (st.isFinal) <span class="keyword">return</span><span class="symbol">@withTimeoutOrNull</span> st</span><br><span class="line">            delay(<span class="number">500</span>)                            <span class="comment">// 等待期间不占线程，也可取消</span></span><br><span class="line">        &#125;</span><br><span class="line">        <span class="literal">null</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> (status == <span class="literal">null</span>) log(<span class="string">&quot;轮询超时，已自行停止&quot;</span>)</span><br><span class="line">&#125;                                               <span class="comment">// 调用 job.cancel() 就能优雅停下</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 遇到不响应取消的阻塞库：自己插检查点，或者挪到 IO 上并给它超时</span></span><br><span class="line"><span class="keyword">suspend</span> <span class="function"><span class="keyword">fun</span> <span class="title">importRows</span><span class="params">(rows: <span class="type">List</span>&lt;<span class="type">Row</span>&gt;)</span></span>: <span class="built_in">Int</span> &#123;</span><br><span class="line">    <span class="keyword">var</span> ok = <span class="number">0</span></span><br><span class="line">    <span class="keyword">for</span> (row <span class="keyword">in</span> rows) &#123;</span><br><span class="line">        currentCoroutineContext().ensureActive()   <span class="comment">// 长循环里的显式取消检查点</span></span><br><span class="line">        ok += dao.insertBlocking(row)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> ok</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>超时有两个入口：<code>withTimeout</code> 抛 <code>TimeoutCancellationException</code>，<code>withTimeoutOrNull</code> 返回 <code>null</code>，按调用方要“感知异常”还是“走分支”来选。别在业务代码里 <code>catch (e: Throwable)</code>，那会把超时和取消一起吞掉，让上层以为任务正常结束；顺手 <code>catch (e: CancellationException)</code> 更糟，它直接破坏取消传播。要处理超时，只捕获 <code>TimeoutCancellationException</code> 并当成正常分支。</p>
+<p>异常处理的坑都和“谁接管”有关：</p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">val</span> handler = CoroutineExceptionHandler &#123; _, e -&gt; logger.error(<span class="string">&quot;未接管异常&quot;</span>, e) &#125;</span><br><span class="line"><span class="keyword">val</span> scope = CoroutineScope(SupervisorJob() + handler)</span><br><span class="line"></span><br><span class="line">scope.launch &#123; riskyA() &#125;        <span class="comment">// 父作用域不接管：handler 生效</span></span><br><span class="line">scope.launch &#123; riskyB() &#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">suspend</span> <span class="function"><span class="keyword">fun</span> <span class="title">outer</span><span class="params">()</span></span> = coroutineScope &#123;</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        launch &#123; riskyA() &#125;      <span class="comment">// 这里的异常不会被下面这个 try 抓到</span></span><br><span class="line">        <span class="keyword">val</span> v = async &#123; compute() &#125;.await()   <span class="comment">// async 的异常在 await 处才抛</span></span><br><span class="line">    &#125; <span class="keyword">catch</span> (e: Exception) &#123;</span><br><span class="line">        fallback()               <span class="comment">// 只能抓到 await 那一条链上的异常</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>第一段说明 <code>CoroutineExceptionHandler</code> 的边界：只有异常走到“没有父协程接管”的顶层时它才生效；在 <code>coroutineScope</code> 里父作用域接管并上抛，handler 一次也不会被调用。第二段是最常见的误读：以为 <code>try</code> 框住 <code>launch</code> 就能拿到它的异常，其实 <code>launch</code> 立刻返回，异常发生时那行早已执行完——想拿异常只有两条路，<code>async</code> 配 <code>await</code> 处捕获，或按作用域规则交给上层。<code>runBlocking</code> 则把异常原样抛到调用线程，所以测试里栈最完整。</p>
+<p>兜底按平台分开：Android 让任务挂在 <code>lifecycleScope</code>、<code>viewModelScope</code> 上，界面层集中一处捕获展示；服务端固定一个容器级 <code>SupervisorJob + CoroutineExceptionHandler</code> 统一记日志与指标，请求路径上的异常仍交给 <code>coroutineScope</code> 上抛。</p>
+<h2 id="Flow-的使用面"><a href="#Flow-的使用面" class="headerlink" title="Flow 的使用面"></a>Flow 的使用面</h2><p>Flow 首先是<strong>冷流</strong>：<code>flow { }</code> 构建出来时什么都不会发生，只有 <code>collect</code> 才真正开始，而且每 <code>collect</code> 一次就重新执行一遍。所以别把“创建了 Flow”当成“已经在拉数据”；要一次执行、多处消费，就得显式把它变热。</p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 搜索框场景：操作符选型就靠这一串</span></span><br><span class="line"><span class="function"><span class="keyword">fun</span> <span class="title">searchResults</span><span class="params">(queries: <span class="type">Flow</span>&lt;<span class="type">String</span>&gt;)</span></span>: Flow&lt;List&lt;Item&gt;&gt; = queries</span><br><span class="line">    .debounce(<span class="number">300</span>)                                  <span class="comment">// 输入太快，只留最后一个（示意值）</span></span><br><span class="line">    .distinctUntilChanged()                         <span class="comment">// 内容没变就别再发请求</span></span><br><span class="line">    .filter &#123; it.length &gt;= <span class="number">2</span> &#125;                      <span class="comment">// 无效输入直接丢掉</span></span><br><span class="line">    .map &#123; it.trim() &#125;                              <span class="comment">// 一对一改名</span></span><br><span class="line">    .flatMapLatest &#123; kw -&gt; api.search(kw) &#125;         <span class="comment">// 新关键词来了就取消旧请求</span></span><br><span class="line">    .onEach &#123; metrics.count(<span class="string">&quot;search.result&quot;</span>, it.size) &#125;</span><br><span class="line">    .flowOn(Dispatchers.IO)                         <span class="comment">// 只影响上游，下游仍在收集方线程</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 一次请求、多处消费：热流 + 明确共享寿命</span></span><br><span class="line"><span class="keyword">val</span> quotes: SharedFlow&lt;List&lt;Quote&gt;&gt; = api.quoteStream()</span><br><span class="line">    .shareIn(scope, SharingStarted.WhileSubscribed(<span class="number">5_000</span>), replay = <span class="number">1</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment">// 屏幕状态用 StateFlow：永远有一个当前值，相等值不重复发</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">CartViewModel</span>(repo: CartRepository) &#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">val</span> _state = MutableStateFlow(CartState.EMPTY)</span><br><span class="line">    <span class="keyword">val</span> state: StateFlow&lt;CartState&gt; = _state.asStateFlow()</span><br><span class="line">    <span class="function"><span class="keyword">fun</span> <span class="title">add</span><span class="params">(id: <span class="type">String</span>)</span></span> &#123; _state.update &#123; it.plus(id) &#125; &#125;   <span class="comment">// 更新要原子，别读写分离</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>一对一改名用 <code>map</code>；一条变多条且要保序用 <code>flatMapConcat</code>；多路并发再合并用 <code>flattenMerge</code>，它的并发度直接放大下游压力，团队约定示例是 4 以内。<code>StateFlow</code> 管“现在是什么样”，有初始值、会去重、新订阅者立刻拿到当前值；<code>SharedFlow</code> 管“刚刚发生了什么”，<code>replay</code> 与 <code>extraBufferCapacity</code> 要显式设定，否则事件要么丢要么被重放。<code>WhileSubscribed(5_000)</code> 解决的就是“没人看就别再拉数据”。</p>
+<p>背压只有三种策略，选错代价完全不同：</p>
+<table>
+<thead>
+<tr>
+<th>策略</th>
+<th>什么时候用</th>
+<th>代价</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>buffer</code></td>
+<td>一条都不能丢，下游偶尔慢</td>
+<td>用内存换时间，容量要设上限</td>
+</tr>
+<tr>
+<td><code>conflate</code></td>
+<td>只要最新值：进度、位置、行情</td>
+<td>中间值被丢弃，有业务含义时别用</td>
+</tr>
+<tr>
+<td><code>collectLatest</code></td>
+<td>处理新值前先取消上一条的处理</td>
+<td>上一条半途而废，有副作用时谨慎</td>
+</tr>
+</tbody></table>
+<h2 id="与既有异步方案的对照与迁移"><a href="#与既有异步方案的对照与迁移" class="headerlink" title="与既有异步方案的对照与迁移"></a>与既有异步方案的对照与迁移</h2><p>从 RxJava 迁过来，概念能一一对上：<code>AndroidSchedulers.mainThread</code> 对应 <code>Dispatchers.Main</code>，<code>Schedulers.io</code> 对应 <code>Dispatchers.IO</code>，<code>Schedulers.computation</code> 对应 <code>Dispatchers.Default</code>；<code>Observable</code>&#x2F;<code>Flowable</code> 对应 <code>Flow</code>，<code>Single</code> 对应返回一次结果的 <code>suspend</code> 函数，<code>Subject</code> 对应 <code>MutableSharedFlow</code>，<code>publish().refCount()</code> 对应 <code>sharedIn</code> 加 <code>WhileSubscribed</code>。迁移别做大爆炸重写：新旧代码只在边界处互转，新模块直接写协程。C# 的 <code>async/await</code> 没有作用域树这层约束，Dart 的 <code>Stream</code> 与 Flow 形似但计算并行要靠 Isolate。</p>
+<p><code>CompletableFuture</code> 该继续用的场合很具体：接口已定型返回它、调用方是纯 Java。桥接只用最基础的挂起原语：</p>
+<figure class="highlight kotlin"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// CompletableFuture -&gt; suspend：把回调式 API 变成能顺序等待的函数</span></span><br><span class="line"><span class="keyword">suspend</span> <span class="function"><span class="keyword">fun</span> <span class="type">&lt;T&gt;</span> CompletableFuture<span class="type">&lt;T&gt;</span>.<span class="title">awaitCancellable</span><span class="params">()</span></span>: T =</span><br><span class="line">    suspendCancellableCoroutine &#123; cont -&gt;</span><br><span class="line">        whenComplete &#123; value, err -&gt;</span><br><span class="line">            <span class="keyword">if</span> (!cont.isActive) <span class="keyword">return</span><span class="symbol">@whenComplete</span>        <span class="comment">// 协程已取消，不再恢复</span></span><br><span class="line">            <span class="keyword">if</span> (err != <span class="literal">null</span>) cont.resumeWithException(err.cause ?: err)</span><br><span class="line">            <span class="keyword">else</span> cont.resume(value)</span><br><span class="line">        &#125;</span><br><span class="line">        cont.invokeOnCancellation &#123; cancel(<span class="literal">true</span>) &#125;         <span class="comment">// 协程取消时顺手取消 future</span></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// suspend -&gt; CompletableFuture：交给只认 Java 接口的调用方</span></span><br><span class="line"><span class="function"><span class="keyword">fun</span> <span class="title">loadUserAsync</span><span class="params">(id: <span class="type">String</span>)</span></span>: CompletableFuture&lt;User&gt; =</span><br><span class="line">    CompletableFuture.supplyAsync(&#123; runBlocking &#123; loadUser(id) &#125; &#125;, ioExecutor)</span><br></pre></td></tr></table></figure>
+
+<p>协程库自带的 <code>await()</code> 与 <code>asCompletableFuture()</code> 能用就别手写；上面这段是为了说明边界上“谁取消谁、异常怎么带回”必须有人负责。Java 虚拟线程与协程解决相近问题但抽象层级不同，本批另有 JUC 专文。</p>
+<h2 id="团队约定与场景速查"><a href="#团队约定与场景速查" class="headerlink" title="团队约定与场景速查"></a>团队约定与场景速查</h2><ol>
+<li><strong>异步语义进类型，不进名字</strong>：<code>suspend</code> 说明“会等待”，<code>xxxAsync</code> 只留给真返回 <code>Deferred</code> 的函数。</li>
+<li><strong>挂起函数里不许阻塞</strong>：<code>Thread.sleep</code>、同步 socket 一律评审打回；躲不开就挪 <code>Dispatchers.IO</code> 并插 <code>ensureActive()</code>。</li>
+<li><strong>scope 来源写死</strong>：界面用组件自带的，服务端用容器级的，禁止新建顶层作用域。</li>
+<li><strong>超时是默认项</strong>：对外调用一律带超时（团队约定示例：连接 3 秒、整体 10 秒）。</li>
+<li><strong>测试用 <code>runTest</code></strong>：虚拟时间快进 <code>delay</code>，几小时的轮询几毫秒验完；推进用 <code>advanceTimeBy</code>。</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>我要做什么</th>
+<th>该用的 API</th>
+<th>最容易错在哪</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>顺序拿结果</td>
+<td>直接调 <code>suspend</code> 函数</td>
+<td><code>async</code> 后立刻 <code>await</code></td>
+</tr>
+<tr>
+<td>两件事同时做</td>
+<td><code>async</code> 配 <code>await</code></td>
+<td>忘了 <code>await</code></td>
+</tr>
+<tr>
+<td>只要副作用</td>
+<td><code>scope.launch</code></td>
+<td>失败后无声消失</td>
+</tr>
+<tr>
+<td>同步入口等结果</td>
+<td><code>runBlocking</code></td>
+<td>在协程或主线程里用</td>
+</tr>
+<tr>
+<td>换线程跑一段</td>
+<td><code>withContext</code></td>
+<td>当成超时或并行</td>
+</tr>
+<tr>
+<td>到点必须停</td>
+<td><code>withTimeout</code>、<code>withTimeoutOrNull</code></td>
+<td>顺手吞掉取消异常</td>
+</tr>
+<tr>
+<td>任务互不牵连</td>
+<td><code>supervisorScope</code></td>
+<td>该连带时误用</td>
+</tr>
+<tr>
+<td>长寿命任务集合</td>
+<td><code>CoroutineScope(SupervisorJob())</code></td>
+<td>图省事用 <code>GlobalScope</code></td>
+</tr>
+<tr>
+<td>界面当前状态</td>
+<td><code>StateFlow</code></td>
+<td>用 <code>SharedFlow</code> 丢最新值</td>
+</tr>
+<tr>
+<td>一次性事件</td>
+<td><code>SharedFlow</code></td>
+<td><code>replay</code> 配错被重复消费</td>
+</tr>
+<tr>
+<td>高频只取最新</td>
+<td><code>conflate</code>、<code>collectLatest</code></td>
+<td>用 <code>buffer</code> 堆满内存</td>
+</tr>
+<tr>
+<td>多处消费同一上游</td>
+<td><code>sharedIn</code> 配 <code>WhileSubscribed</code></td>
+<td>每个订阅者各自重拉</td>
+</tr>
+</tbody></table>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>协程改变的是等待的组织方式，不是算力：它让顺序可读的代码不再占着线程，又用作用域把取消、异常和收尾变成结构约束。要立的规矩只有四条：作用域有来源、调度器按在等什么还是在算什么选、每处对外调用带超时、异常按接管关系找归宿；Flow 再补两条，冷流靠 <code>collect</code> 触发，背压按能不能丢选。Kotlin 2.0 与 K2 编译器在 2024-05-21 刚进入稳定版，当时尚未成为默认口径，升级需评估编译器兼容；本文这套用法在 1.9.x 与 1.7&#x2F;1.8 线上稳定。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Kotlin 协程与异步编程</p><p><a href="https://987763485.github.io/2024/06/12/Kotlin协程与异步编程/">https://987763485.github.io/2024/06/12/Kotlin协程与异步编程/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2024-06-12</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-19</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/java/">java</a><a class="link-muted mr-2" rel="tag" href="/tags/kotlin/">kotlin</a><a class="link-muted mr-2" rel="tag" href="/tags/flutter/">flutter</a><a class="link-muted mr-2" rel="tag" href="/tags/csharp/">csharp</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2024/06/19/C%E4%B8%8EGo%E6%9C%8D%E5%8A%A1%E7%AB%AF%E7%BC%96%E7%A8%8B%E5%AF%B9%E6%AF%94/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">C# 与 Go 服务端编程对比</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2024/06/05/Flutter%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA%E4%B8%8EWidget%E4%BD%93%E7%B3%BB/"><span class="level-item">Flutter 环境搭建与 Widget 体系</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

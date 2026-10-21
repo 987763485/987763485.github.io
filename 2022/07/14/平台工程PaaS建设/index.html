@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>平台工程 PaaS 建设 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="不少团队在 Kubernetes 上跑了几年之后，会发现手里多了一套只有少数人敢于改动的系统：YAML 散落在几十个仓库，新服务上线要依次找五个人确认，每个团队的流水线都长得不一样，出问题时没人说得清哪一步才是标准做法。平台工程（Platform Engineering）要解决的就是这类问题。本文从组织与产品化的角度，讨论内部开发者平台的构成、黄金路径的设计、自服务与治理的平衡以及落地顺序。本文只"><meta property="og:type" content="blog"><meta property="og:title" content="平台工程 PaaS 建设"><meta property="og:url" content="https://987763485.github.io/2022/07/14/%E5%B9%B3%E5%8F%B0%E5%B7%A5%E7%A8%8BPaaS%E5%BB%BA%E8%AE%BE/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="不少团队在 Kubernetes 上跑了几年之后，会发现手里多了一套只有少数人敢于改动的系统：YAML 散落在几十个仓库，新服务上线要依次找五个人确认，每个团队的流水线都长得不一样，出问题时没人说得清哪一步才是标准做法。平台工程（Platform Engineering）要解决的就是这类问题。本文从组织与产品化的角度，讨论内部开发者平台的构成、黄金路径的设计、自服务与治理的平衡以及落地顺序。本文只"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2022-07-14T07:20:08.000Z"><meta property="article:modified_time" content="2026-10-18T16:44:25.602Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="devops"><meta property="article:tag" content="docker"><meta property="article:tag" content="kubernetes"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2022/07/14/%E5%B9%B3%E5%8F%B0%E5%B7%A5%E7%A8%8BPaaS%E5%BB%BA%E8%AE%BE/"},"headline":"平台工程 PaaS 建设","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2022-07-14T07:20:08.000Z","dateModified":"2026-10-18T16:44:25.602Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"不少团队在 Kubernetes 上跑了几年之后，会发现手里多了一套只有少数人敢于改动的系统：YAML 散落在几十个仓库，新服务上线要依次找五个人确认，每个团队的流水线都长得不一样，出问题时没人说得清哪一步才是标准做法。平台工程（Platform Engineering）要解决的就是这类问题。本文从组织与产品化的角度，讨论内部开发者平台的构成、黄金路径的设计、自服务与治理的平衡以及落地顺序。本文只"}</script><link rel="canonical" href="https://987763485.github.io/2022/07/14/%E5%B9%B3%E5%8F%B0%E5%B7%A5%E7%A8%8BPaaS%E5%BB%BA%E8%AE%BE/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-07-14T07:20:08.000Z" title="7/14/2022, 3:20:08 PM">2022-07-14</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/">容器与运维</a></span><span class="level-item">26 分钟读完 (大约3887个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">平台工程 PaaS 建设</h1><nav class="series-nav" aria-label="系列文章导航"><div class="series-nav-meta"><i class="fas fa-book-open" aria-hidden="true"></i><span>本文属于《<a class="series-nav-title" href="/series/docker-k8s/">Docker 与 Kubernetes</a>》第 46/51 篇</span></div><div class="series-nav-links"><a class="series-nav-link series-nav-prev" href="/2021/03/15/GitOps%E4%B8%8EArgoCD%E5%AE%9E%E8%B7%B5/"><i class="fas fa-chevron-left" aria-hidden="true"></i><span>上一篇</span></a><a class="series-nav-link series-nav-index" href="/series/docker-k8s/">系列目录</a><a class="series-nav-link series-nav-next" href="/2022/08/18/%E4%BA%91%E6%88%90%E6%9C%AC%E4%BC%98%E5%8C%96%E5%AE%9E%E8%B7%B5/"><span>下一篇</span><i class="fas fa-chevron-right" aria-hidden="true"></i></a></div></nav><div class="content"><p>不少团队在 Kubernetes 上跑了几年之后，会发现手里多了一套只有少数人敢于改动的系统：YAML 散落在几十个仓库，新服务上线要依次找五个人确认，每个团队的流水线都长得不一样，出问题时没人说得清哪一步才是标准做法。平台工程（Platform Engineering）要解决的就是这类问题。本文从组织与产品化的角度，讨论内部开发者平台的构成、黄金路径的设计、自服务与治理的平衡以及落地顺序。本文只谈能力类别，不绑定具体产品，读完后你应能判断下一步该做什么。</p>
+<h2 id="平台工程要解决什么问题"><a href="#平台工程要解决什么问题" class="headerlink" title="平台工程要解决什么问题"></a>平台工程要解决什么问题</h2><p>平台工程可以理解为：把基础设施与交付能力封装成产品，让研发以自助方式使用，并由一支专门团队对其体验负责。它要缓解三个痛点。</p>
+<p>第一是研发自助。申请一台数据库、开通一个测试环境、接入一条流水线，如果需要走工单、等排期、反复沟通，研发就会被基础设施的节奏拖住。自助不是放任，而是把原本靠人完成的动作变成可重复、可审计的接口。</p>
+<p>第二是认知负荷。容器、编排、网络、证书、可观测性，每一块都有独立的知识体系。要求每个业务团队都成为这些领域的专家，既不现实也不经济。平台的价值在于把复杂度收拢到少数人手里，让业务团队只面对少量稳定的概念。</p>
+<p>第三是交付一致性。十个团队十套发布方式，意味着十套排障方法与安全策略。一致性不是要求所有人写一样的代码，而是让构建、部署、观测这些横向环节遵循同一套约定，使审计、迁移和故障处理成为可预期的工作。</p>
+<p>要理解平台工程，最好把它和两种常见做法放在一起比较。</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>传统 PaaS</th>
+<th>直接使用 Kubernetes</th>
+<th>内部开发者平台</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>抽象层次</td>
+<td>应用为中心，屏蔽运行时细节</td>
+<td>暴露 Pod、Service 等原语</td>
+<td>在原语之上提供面向研发的抽象</td>
+</tr>
+<tr>
+<td>自助程度</td>
+<td>高，但仅限平台支持的形态</td>
+<td>低，需自行拼装工具链</td>
+<td>高，常见需求有默认入口</td>
+</tr>
+<tr>
+<td>灵活性</td>
+<td>低，受语言与中间件限制</td>
+<td>高，几乎不设边界</td>
+<td>中高，默认路径之外留有出口</td>
+</tr>
+<tr>
+<td>一致性</td>
+<td>强，由平台统一约束</td>
+<td>弱，各团队自行其是</td>
+<td>较强，通过模板与策略实现</td>
+</tr>
+<tr>
+<td>扩展成本</td>
+<td>由厂商决定，周期长</td>
+<td>由团队承担，重复投入</td>
+<td>由平台团队承担，可复用</td>
+</tr>
+</tbody></table>
+<p>传统 PaaS 的问题在于“只此一条路”：最佳实践固化得好，却难容纳非常规需求，业务一旦需要平台未支持的中间件或网络形态，团队只能绕开。直接使用 Kubernetes 则相反：原语齐全却没有默认答案，每个团队都要重新回答“镜像放哪、怎么做灰度、日志去哪看”。内部开发者平台取中间：提供有主见的默认值，同时保留可控的例外通道。</p>
+<h2 id="内部开发者平台由什么构成"><a href="#内部开发者平台由什么构成" class="headerlink" title="内部开发者平台由什么构成"></a>内部开发者平台由什么构成</h2><p>内部开发者平台（Internal Developer Platform，IDP）不是某一个软件，而是若干能力叠加成的一层：对外表现为几个稳定入口，对内由平台团队维护。按研发从零到上线的路径，通常包含六类能力。</p>
+<table>
+<thead>
+<tr>
+<th>能力</th>
+<th>解决的问题</th>
+<th>常见交付物</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>服务目录</td>
+<td>服务散落、归属不清</td>
+<td>服务元数据、负责人、依赖与等级</td>
+</tr>
+<tr>
+<td>脚手架模板</td>
+<td>新项目从零搭建、规范口口相传</td>
+<td>仓库骨架、构建配置、部署清单</td>
+</tr>
+<tr>
+<td>环境申请</td>
+<td>环境靠工单排队、长期不回收</td>
+<td>按需创建、有效期、资源上限</td>
+</tr>
+<tr>
+<td>流水线</td>
+<td>各团队重复造构建与发布流程</td>
+<td>共享模板、质量门禁、制品管理</td>
+</tr>
+<tr>
+<td>可观测性入口</td>
+<td>新服务缺少日志、指标与告警</td>
+<td>默认仪表盘、采集配置、SLO 视图</td>
+</tr>
+<tr>
+<td>权限与配额</td>
+<td>权限靠个人授予、成本无人认领</td>
+<td>统一身份、角色映射、配额与标签</td>
+</tr>
+</tbody></table>
+<p>这些能力本身并不新鲜，难点在于把它们连成闭环。服务目录若不与脚手架、流水线打通，就会退化成手工维护的清单；环境申请若不带配额与有效期，就会变成新的资源垃圾场。</p>
+<pre class="mermaid">flowchart TD
+    A[开发者] --> B[统一入口]
+    B --> C[服务目录登记]
+    C --> D[脚手架生成仓库]
+    D --> E[申请环境与配额]
+    E --> F[流水线构建与扫描]
+    F --> G[GitOps 同步到集群]
+    G --> H[可观测性入口]
+    H --> C</pre>
+
+<p>闭环有两层含义。数据闭环指目录里登记的服务自动获得流水线与监控，而不必去三个系统注册；反馈闭环指上线后的指标与告警回写到服务信息，排查时能顺着目录找到负责人和依赖。缺少任何一层，平台就只是工具集合，研发仍要自己记住串联方式。</p>
+<p>六类能力不必同时具备，也不该由同一个系统提供：门户可以只是入口，背后调用各自 API；目录可先从一份受控配置起步。判断标准不是能力齐全，而是研发完成常见任务时是否还需要求人。</p>
+<h2 id="黄金路径：把最佳实践做成默认选项"><a href="#黄金路径：把最佳实践做成默认选项" class="headerlink" title="黄金路径：把最佳实践做成默认选项"></a>黄金路径：把最佳实践做成默认选项</h2><p>黄金路径（Golden Path）是被平台团队验证、维护并默认铺好的路径，回答的是“想不出怎么做时，就按这个来”。它通常包含：可直接运行的模板、能通过质量门禁的流水线、默认的部署与观测配置，以及一份说明例外情形的文档。</p>
+<p>设计黄金路径有三条原则。</p>
+<p>第一，默认铺好，而不是额外申请。新仓库创建时就带上流水线与部署清单，研发不需要知道平台的存在；如果默认路径需要主动开启，采用率一定很低。</p>
+<p>第二，允许退出，但让退出有成本。黄金路径覆盖多数场景，不是全部。对确实不适用的服务，应提供明确的例外流程：登记原因、指定负责人、约定复核时间。例外不是失败，失控的例外才是。</p>
+<p>第三，把模板当作产品维护。模板一旦生成就不再变化，是很常见的错误。依赖在升级，基础镜像在打补丁，安全基线在收紧，模板必须随之演进。做法是给模板打语义化版本，生成仓库时固定版本；升级时由平台自动提交变更请求并附迁移说明，由服务负责人确认。这样既避免“模板一改，所有仓库漂移”，也避免“模板三年不更新”。</p>
+<p>模板腐烂（template rot）是黄金路径最大的敌人。判断方法很直接：用模板新建一个服务，从创建到部署成功需要多久，中间有没有手工补的步骤。如果平台团队自己都不愿意走一遍，模板就已经失效。因此模板必须纳入持续集成，每次变更都在临时环境中真实跑通，而不是只做静态检查。</p>
+<h2 id="自服务与治理的平衡"><a href="#自服务与治理的平衡" class="headerlink" title="自服务与治理的平衡"></a>自服务与治理的平衡</h2><p>平台最容易走向两个失败方向：一是为了“安全”把所有动作都加上审批，自助名存实亡；二是为了“体验”取消一切约束，半年后资源与权限一团乱麻。平衡点不在于审批数量，而在于把治理做进默认路径。</p>
+<p>一个实用的原则是：只在不可逆或高成本的动作上设卡。删除生产数据、暴露公网入口、跨租户访问、申请超规格资源，值得人工确认；创建命名空间、开通日志采集、新建测试环境，应默认放行，用配额和有效期兜底。环境可分沙箱、预发、生产三级：沙箱只受配额约束，预发轻量确认，生产的约束放在流水线门禁里而非工单环节。</p>
+<p>成本可见性也是治理的一部分。资源必须带团队与服务标签，账单按标签归集后回写到服务目录，让负责人在看服务状态时顺便看到花费。只做集中账单、不做事后分摊，成本就永远只是财务问题，不会变成工程决策。</p>
+<p>安全基线同理。镜像来源限制、非 root 运行、禁止特权容器、密钥不落仓库，应由准入策略统一执行，并在脚手架中预先满足。基线若靠上线后扫描和通报来维持，平台团队就会陷入无休止的追缴。</p>
+<p>这要求平台团队把自己当作产品团队，而不是运维窗口：明确用户是新服务团队、存量迁移团队还是数据团队，他们的路径并不相同；公开路线图，说明本季度做什么、不做什么；保留固定的答疑时间与反馈渠道；支持轮值，但把重复工单转化为产品改进项。否则平台会变成“谁声音大就先支持谁”的项目集合。</p>
+<h2 id="度量：不要只统计平台使用量"><a href="#度量：不要只统计平台使用量" class="headerlink" title="度量：不要只统计平台使用量"></a>度量：不要只统计平台使用量</h2><p>平台的价值最终体现在研发的交付效率与体验上，而不是平台自身的活跃度。建议围绕两组指标建立基线。</p>
+<p>第一组是交付表现，可以沿用业界常用的四项：变更前置时间、部署频率、变更失败率、故障恢复时间。对平台而言，还应单独统计“上线时间”，即新服务从创建仓库到第一次成功服务生产流量的时长。它最能反映自助程度，也最容易暴露流程中的隐性等待。</p>
+<p>第二组是开发者体验。每季度做一次简短调查，询问研发在环境申请、部署、排障三个环节的满意度与主要阻塞，样本不必大，但要覆盖不同团队；满意度低的地方，往往就是下一次该投入的地方。</p>
+<p>需要警惕把“平台使用量”当作核心目标。命名空间数、流水线执行次数、门户访问量都容易上涨，也容易被制造；一旦把点击量写进考核，团队就会优化点击而非交付。度量应分层：新服务与存量服务分开，各团队看分布而非平均值，并先测基线再改动，否则无法判断变化来自平台还是业务波动。</p>
+<h2 id="落地路径：先做一件事"><a href="#落地路径：先做一件事" class="headerlink" title="落地路径：先做一件事"></a>落地路径：先做一件事</h2><p>平台建设最常见的失败，是一开始就规划“大而全的门户”，用半年集成十几个系统，上线时业务已习惯绕开它。更稳妥的路径相反：先解决一个具体痛点，再逐步扩展。</p>
+<p>第一阶段，统一部署。选定一种部署方式（例如以 GitOps 为核心的声明式同步），把试点团队的应用从手工操作迁移过来。这个阶段的目标不是自助而是一致：所有部署都能从仓库追溯到集群状态，回滚有明确动作。范围要小，两三个团队即可，平台团队亲自参与迁移并记录每个卡点。</p>
+<p>第二阶段，补齐自助。把第一阶段反复出现的动作产品化：环境申请、流水线模板、脚手架、默认可观测性。每做一项，都用“研发是否还需要找人”来验收。此阶段可以引入配额与成本标签，但不要急着做统一门户，入口可以是命令行工具或现有的代码平台。</p>
+<p>第三阶段，再谈门户与目录。当服务数量达到几十个、入口分散到难以查找时，门户才有价值。此时服务目录已经有真实数据，门户只是把它们组织起来。反过来先建门户、再补数据，得到的通常是一个漂亮的空壳。</p>
+<pre class="mermaid">flowchart LR
+    A[统一部署] --> B[补齐自助]
+    B --> C[服务目录与门户]
+    C --> D[治理与度量闭环]</pre>
+
+<p>三个阶段没有严格的界限，但顺序不应颠倒：统一部署建立信任与底座，自助证明平台能减少摩擦，门户才有采用基础。每阶段都应设退出条件，例如“试点团队全部通过流水线发布”“新服务上线缩短到一天以内”，达不到就不进入下一阶段。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>平台工程的核心不是再建一个系统，而是把基础设施能力当作产品交付：用自助降低等待，用默认路径降低认知负荷，用统一约定保证一致性。内部开发者平台由服务目录、脚手架、环境申请、流水线、可观测性与权限配额构成，价值来自闭环而非单点能力。黄金路径应默认铺好、允许例外、持续版本化，模板腐烂比缺失更危险。治理要嵌进默认路径，只在不可逆动作上设卡；平台团队要像产品团队一样理解用户与路线图。度量应聚焦上线时间、变更失败率、恢复时间与开发者满意度，而非平台使用量。落地时先统一部署，再补自助，最后谈门户。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>平台工程 PaaS 建设</p><p><a href="https://987763485.github.io/2022/07/14/平台工程PaaS建设/">https://987763485.github.io/2022/07/14/平台工程PaaS建设/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2022-07-14</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-19</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/devops/">devops</a><a class="link-muted mr-2" rel="tag" href="/tags/docker/">docker</a><a class="link-muted mr-2" rel="tag" href="/tags/kubernetes/">kubernetes</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2022/07/21/eBPF%E5%8F%AF%E8%A7%82%E6%B5%8B%E6%80%A7%E4%B8%8E%E5%AE%89%E5%85%A8%E5%AE%9E%E8%B7%B5/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">eBPF 可观测性与安全实践</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2022/07/09/Rust%E9%A1%B9%E7%9B%AE%E5%B7%A5%E7%A8%8B%E7%BB%93%E6%9E%84%E8%A7%84%E8%8C%83/"><span class="level-item">Rust 项目工程结构规范</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

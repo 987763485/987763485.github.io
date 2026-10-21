@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Docker 原理：namespace 与 cgroup - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="2016 年年底，我们有一台 CentOS 7 的机器上跑着几个 Node 服务，全部用 Docker 1.12 起。某天值班时收到两条告警：一条说某个批处理容器的内存使用超过了 2 GB，另一条说这个容器的进程数掉了。登上去看，三件事让我停了很久。"><meta property="og:type" content="blog"><meta property="og:title" content="Docker 原理：namespace 与 cgroup"><meta property="og:url" content="https://987763485.github.io/2017/01/08/Docker%E5%8E%9F%E7%90%86namespace%E4%B8%8Ecgroup/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="2016 年年底，我们有一台 CentOS 7 的机器上跑着几个 Node 服务，全部用 Docker 1.12 起。某天值班时收到两条告警：一条说某个批处理容器的内存使用超过了 2 GB，另一条说这个容器的进程数掉了。登上去看，三件事让我停了很久。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2017-01-08T15:34:21.000Z"><meta property="article:modified_time" content="2026-10-18T12:31:33.251Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="docker"><meta property="article:tag" content="linux"><meta property="article:tag" content="容器技术"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2017/01/08/Docker%E5%8E%9F%E7%90%86namespace%E4%B8%8Ecgroup/"},"headline":"Docker 原理：namespace 与 cgroup","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2017-01-08T15:34:21.000Z","dateModified":"2026-10-18T12:31:33.251Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"2016 年年底，我们有一台 CentOS 7 的机器上跑着几个 Node 服务，全部用 Docker 1.12 起。某天值班时收到两条告警：一条说某个批处理容器的内存使用超过了 2 GB，另一条说这个容器的进程数掉了。登上去看，三件事让我停了很久。"}</script><link rel="canonical" href="https://987763485.github.io/2017/01/08/Docker%E5%8E%9F%E7%90%86namespace%E4%B8%8Ecgroup/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2017-01-08T15:34:21.000Z" title="1/8/2017, 11:34:21 PM">2017-01-08</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/">容器与运维</a></span><span class="level-item">1 小时读完 (大约8615个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Docker 原理：namespace 与 cgroup</h1><nav class="series-nav" aria-label="系列文章导航"><div class="series-nav-meta"><i class="fas fa-book-open" aria-hidden="true"></i><span>本文属于《<a class="series-nav-title" href="/series/docker-k8s/">Docker 与 Kubernetes</a>》第 3/51 篇</span></div><div class="series-nav-links"><a class="series-nav-link series-nav-prev" href="/2017/09/16/Docker%E5%AE%89%E8%A3%85%E4%B8%8E%E9%95%9C%E5%83%8F%E5%9F%BA%E6%9C%AC%E6%93%8D%E4%BD%9C/"><i class="fas fa-chevron-left" aria-hidden="true"></i><span>上一篇</span></a><a class="series-nav-link series-nav-index" href="/series/docker-k8s/">系列目录</a><a class="series-nav-link series-nav-next" href="/2017/06/30/Docker%E9%95%9C%E5%83%8F%E5%88%86%E5%B1%82%E4%B8%8E%E7%BC%93%E5%AD%98/"><span>下一篇</span><i class="fas fa-chevron-right" aria-hidden="true"></i></a></div></nav><div class="content"><p>2016 年年底，我们有一台 CentOS 7 的机器上跑着几个 Node 服务，全部用 Docker 1.12 起。某天值班时收到两条告警：一条说某个批处理容器的内存使用超过了 2 GB，另一条说这个容器的进程数掉了。登上去看，三件事让我停了很久。</p>
+<p>第一件，在容器里执行 top，看到的是宿主机上全部进程：sshd、dockerd、containerd-shim，还有隔壁容器的 node 进程，一个不少。第二件，这个容器最终被杀掉了，<code>docker inspect</code> 里 OOMKilled 是 true，退出码 137，但在宿主机上 free 一看还剩十几 GB 空闲。第三件，容器里 <code>ps aux | wc -l</code> 的结果和宿主机上几乎一样，我们那个按进程数判断服务是否健康的脚本因此一直在误报。</p>
+<p>三件事查下来，原因都不复杂。这个容器启动时带了 <code>--pid=host</code>，因为里面跑着一个采集宿主机指标的 agent，需要看见全部进程；<code>/proc</code> 又是从宿主机直接挂进去的，所以 ps、top 拿到的是宿主机那份进程表。至于 OOM，跟宿主机的空闲内存没有关系：启动参数里写了 <code>-m 2g</code>，内核对这个 cgroup 记账到 2 GB 就开始回收，回收不动就挑一个进程杀掉。宿主机内存再多，也不影响这个上限。</p>
+<p>这次排查之后，我把”容器”这个词在脑子里重新定义了一遍：它不是一台小虚拟机，而是一个被内核动了手脚的普通进程——看到的世界被裁过，能用的资源被记过账，能做的动作被列过白名单。本文就把这三件事拆开讲：namespace 负责”看得见什么”，cgroup 负责”能用多少”，capabilities 与 seccomp 负责”能做什么”。搞清这三条线，前面那些看起来诡异的现象就都能解释了。</p>
+<h2 id="容器不是轻量虚拟机"><a href="#容器不是轻量虚拟机" class="headerlink" title="容器不是轻量虚拟机"></a>容器不是轻量虚拟机</h2><p>先把定义摆出来。一个 Docker 容器，本质上是这样一个进程：它由 runc 通过 clone 创建，创建时带上一组 <code>CLONE_NEW*</code> 标志，于是拥有独立的 PID、mount、network、UTS、IPC 视图；创建后被放进一组 cgroup，CPU、内存、块设备 IO、进程数都按目录里的数值受控；它的根文件系统是若干只读镜像层加一个可写层联合挂载出来的；它的 capabilities 被裁到十几个，系统调用被 seccomp 过滤。这几件事凑齐，才叫”容器”；少任何一件，它都只是一个普通进程。</p>
+<p>虚拟机是另一条路。Hypervisor 虚拟出 CPU、内存、磁盘、网卡，guest 里跑一个完整的内核，内核再管理 guest 里的进程。容器没有这一步：容器里的进程直接跑在宿主机内核上，系统调用直接进宿主机内核，只是在进入之前，内核先按 namespace 换了一份视图。</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>虚拟机</th>
+<th>容器</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>内核</td>
+<td>每个 guest 一个完整内核</td>
+<td>共享宿主机内核</td>
+</tr>
+<tr>
+<td>启动</td>
+<td>引导内核与 init，数十秒</td>
+<td>fork&#x2F;exec 加挂载，毫秒到秒级</td>
+</tr>
+<tr>
+<td>隔离</td>
+<td>硬件虚拟化，边界在内核之外</td>
+<td>内核提供的视图，边界在内核之内</td>
+</tr>
+<tr>
+<td>密度</td>
+<td>单机个位数到几十</td>
+<td>单机上百很常见</td>
+</tr>
+<tr>
+<td>镜像</td>
+<td>几 GB 的磁盘镜像</td>
+<td>几十到几百 MB 的分层镜像</td>
+</tr>
+</tbody></table>
+<p>隔离强度上的差别要说得直白些。虚拟机逃逸需要打穿 Hypervisor，容器逃逸只需要一个内核漏洞加一个 <code>CAP_SYS_ADMIN</code>；共享内核意味着内核版本、sysctl、<code>/proc</code> 的一部分、时钟、设备都是共用的。所以”容器更轻”和”容器更不安全”是同一件事的两面，不是两件事。</p>
+<p>启动速度也一样。容器启动没有内核引导，所谓”启动”是 runc 准备 rootfs 的挂载、写好 cgroup 文件、clone 出进程、exec 用户命令。镜像已经在本地时，这段时间通常是几十到几百毫秒；慢的时候多半卡在镜像层没缓存或者存储驱动上。顺带一句，编排层的事情本文不涉及。</p>
+<h3 id="调用链：从-docker-run-到-clone"><a href="#调用链：从-docker-run-到-clone" class="headerlink" title="调用链：从 docker run 到 clone"></a>调用链：从 docker run 到 clone</h3><p>docker CLI 本身几乎不做事，它把参数打包成 JSON，通过 <code>/var/run/docker.sock</code> 发给 dockerd。dockerd 处理镜像、网络、卷这一层的事情，然后把”起一个容器”翻译成 containerd 的接口调用。containerd 管理容器的生命周期与镜像分发，真正创建进程时它会拉起一个 containerd-shim，由 shim 调用 runc。runc 是 OCI 运行时规范的参考实现，负责最脏的一段：准备 rootfs、建 cgroup、带命名空间标志调 clone、pivot_root、exec。当时 OCI 的运行时规范还没发布 1.0，仍停留在 rc 阶段。</p>
+<p>这段拆分是 2016 年定下来的。Docker 1.11 把 containerd 引进来，1.12 又把 swarm mode 塞进 dockerd；到 2017 年初，containerd 已经从”dockerd 的内部库”变成一个可以被别的系统调用的守护进程。好处是职责清楚了：dockerd 重启不影响已经在跑的容器，因为容器的父进程是 shim 而不是 dockerd，这也是升级 Docker 时容器能不重启的原因。</p>
+<pre class="mermaid">flowchart LR
+  cli["docker CLI"] -->|REST over unix socket| daemon["dockerd"]
+  daemon -->|gRPC| ct["containerd"]
+  ct --> shim["containerd-shim"]
+  shim --> runc["runc"]
+  runc -->|clone + CLONE_NEW*| proc["容器进程"]
+  runc -->|写 cgroup 文件| cg["/sys/fs/cgroup"]
+  runc -->|pivot_root| fs["overlay2 挂载的 rootfs"]</pre>
+
+<p>把这张图记住，后面每一节讲的都是 runc 在前面那一步到底写了什么。</p>
+<h2 id="namespace-总览与-PID-namespace"><a href="#namespace-总览与-PID-namespace" class="headerlink" title="namespace 总览与 PID namespace"></a>namespace 总览与 PID namespace</h2><p>namespace 是一层给进程换视角的机制。同一份全局资源，在不同 namespace 里的进程看到的是一份不同的副本：进程号、挂载表、网卡、主机名、IPC 对象、uid 映射，都是这样被改写的。2017 年初的内核里，Docker 会用到的有六种，加上 4.6 才进来的 cgroup namespace 一共七种。</p>
+<table>
+<thead>
+<tr>
+<th>namespace</th>
+<th>隔离的东西</th>
+<th><code>/proc/&lt;pid&gt;/ns</code> 下的名字</th>
+<th>clone 标志</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PID</td>
+<td>进程号空间，能否看见别的进程</td>
+<td>pid</td>
+<td>CLONE_NEWPID</td>
+</tr>
+<tr>
+<td>Mount</td>
+<td>挂载表与根目录</td>
+<td>mnt</td>
+<td>CLONE_NEWNS</td>
+</tr>
+<tr>
+<td>Network</td>
+<td>网卡、路由表、iptables、端口空间</td>
+<td>net</td>
+<td>CLONE_NEWNET</td>
+</tr>
+<tr>
+<td>UTS</td>
+<td>hostname 与 domainname</td>
+<td>uts</td>
+<td>CLONE_NEWUTS</td>
+</tr>
+<tr>
+<td>IPC</td>
+<td>System V 共享内存、信号量、消息队列</td>
+<td>ipc</td>
+<td>CLONE_NEWIPC</td>
+</tr>
+<tr>
+<td>User</td>
+<td>uid&#x2F;gid 映射与 capabilities 的边界</td>
+<td>user</td>
+<td>CLONE_NEWUSER</td>
+</tr>
+<tr>
+<td>Cgroup</td>
+<td>进程看到的 cgroup 根路径</td>
+<td>cgroup</td>
+<td>CLONE_NEWCGROUP</td>
+</tr>
+</tbody></table>
+<p>读懂这张表要抓住两点。第一，namespace 是视图机制，不是配额机制，它不限制任何资源用量；一个容器里 fork 出多少进程、吃多少内存，和它有几种 namespace 毫无关系。第二，一个进程可以只加入其中几种：<code>--network=host</code> 就是不要 network namespace，<code>--pid=host</code> 就是不要 PID namespace，这正是开篇那台机器 top 能看到全部进程的直接原因。</p>
+<h3 id="PID-namespace：进程号从-1-重新开始"><a href="#PID-namespace：进程号从-1-重新开始" class="headerlink" title="PID namespace：进程号从 1 重新开始"></a>PID namespace：进程号从 1 重新开始</h3><p>内核里每个 task 都有一个全局唯一的 pid 编号，PID namespace 在这层编号外面套了一张翻译表。同一个进程，宿主机上看到的是 12345，容器里看到的是 1；<code>/proc</code> 里的目录名、<code>ps</code> 的输出、信号的目标，全都走这张表。所以在容器里 <code>kill 1</code> 和在宿主机上 <code>kill 1</code> 是两件不同的事。</p>
+<p>新建 PID namespace 的最小演示不需要 Docker：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 新建 PID 与 mount namespace，并重新挂一份 /proc</span></span><br><span class="line">unshare --pid --fork --mount-proc bash</span><br><span class="line"><span class="built_in">echo</span> $$          <span class="comment"># 输出 1</span></span><br><span class="line">ps -ef           <span class="comment"># 只剩 bash 和 ps 自己</span></span><br></pre></td></tr></table></figure>
+
+<p>这里两个参数都不能省。<code>--fork</code> 是因为 unshare 进程本身早就存在于旧 namespace，只有 fork 出来的子进程才会进入新的 PID namespace 并拿到 1 号。<code>--mount-proc</code> 同时新建 mount namespace 并重新挂载 proc，否则你仍然在看宿主机那份 <code>/proc</code>，<code>ps</code> 照样列出几百个进程。很多”进入容器看不到正确 ps 输出”的怪事，都是 <code>/proc</code> 没跟着换导致的。</p>
+<p>PID 1 在 namespace 里有一串特殊待遇，值得单独记住：</p>
+<ol>
+<li>内核不会给 namespace 的 1 号进程投递”没有注册处理函数”的信号。也就是说，SIGTERM 发过去没有反应，是内核跳过了默认动作，而不是进程主动忽略。<code>docker stop</code> 对一个不处理 SIGTERM 的 PID 1 只能等 10 秒再 SIGKILL，这就是 2016 年大家往镜像里塞 tini、dumb-init 的原因。</li>
+<li>孤儿回收的责任落在 1 号进程身上。namespace 内父进程先退出的孤儿会被挂到 1 号名下，1 号要负责 wait；如果 1 号本身就是业务进程，它通常不会 wait，僵尸进程就慢慢堆起来了。</li>
+<li>1 号退出，整个 namespace 里的进程会被内核一并杀掉，namespace 随之销毁。所以容器的主进程一挂，其他进程也活不下来。</li>
+</ol>
+<p>可见性是单向的：宿主机能看到容器里的全部进程，容器看不到宿主机上的。想在宿主机上”进”到容器里，用 nsenter 最直接：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">&#123;% raw %&#125;</span><br><span class="line"><span class="comment"># 先拿到容器在宿主机上的 pid</span></span><br><span class="line">pid=$(docker inspect -f <span class="string">&#x27;&#123;&#123;.State.Pid&#125;&#125;&#x27;</span> web)</span><br><span class="line"><span class="comment"># setns 到它的 mount/uts/ipc/net/pid 五个 namespace，再执行 bash</span></span><br><span class="line">nsenter -t <span class="string">&quot;<span class="variable">$pid</span>&quot;</span> -m -u -i -n -p bash</span><br><span class="line">&#123;% endraw %&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>docker exec</code> 在效果上类似，区别是它走 containerd 的 exec 接口，并且只加入容器已经有的 namespace。顺带说一句，<code>/proc/&lt;pid&gt;/status</code> 里的 NSpid 字段会同时给出宿主机编号和 namespace 内编号，4.1 之后的内核都支持，排查时比猜更可靠。</p>
+<h2 id="Mount-namespace：rootfs、pivot-root-与-overlay2"><a href="#Mount-namespace：rootfs、pivot-root-与-overlay2" class="headerlink" title="Mount namespace：rootfs、pivot_root 与 overlay2"></a>Mount namespace：rootfs、pivot_root 与 overlay2</h2><p>每个 mount namespace 有一份独立的挂载表，<code>clone(CLONE_NEWNS)</code> 时从父进程复制一份。所以容器里的 mount、umount 不会动到宿主机，前提是挂载传播属性设对了。Docker 的 rootfs 就是在这份私有挂载表上拼出来的：若干个只读的镜像层，叠一个属于这个容器的可写层。</p>
+<p>以 overlay2 为例，runc 最终执行的是这样一条挂载：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">mount -t overlay overlay \</span><br><span class="line">  -o lowerdir=/var/lib/docker/overlay2/l/LOW1:/var/lib/docker/overlay2/l/LOW2,\</span><br><span class="line">upperdir=/var/lib/docker/overlay2/&lt;<span class="built_in">id</span>&gt;/diff,\</span><br><span class="line">workdir=/var/lib/docker/overlay2/&lt;<span class="built_in">id</span>&gt;/work \</span><br><span class="line">  /var/lib/docker/overlay2/&lt;<span class="built_in">id</span>&gt;/merged</span><br></pre></td></tr></table></figure>
+
+<p><code>lowerdir</code> 是镜像层，只读，可以被同一镜像的所有容器共享；<code>upperdir</code> 是容器层，每个容器一份，可写；<code>workdir</code> 是 overlayfs 自己用的临时目录，必须和 upperdir 在同一个文件系统上；<code>merged</code> 是最终给容器看到的根。镜像层之所以能共享，是因为它们从不被写：同一台机器上起十个 nginx 容器，<code>lowerdir</code> 指向的是同一批目录，磁盘上只有一份。</p>
+<p>写入发生在第一次真正写某个文件的时候。内核发现这个文件只存在于下层，会先把整个文件复制到 upperdir，再由写入方修改，这叫 copy-up。删除则相反：upperdir 里放一个 0&#x2F;0 的 whiteout 字符设备，把下层同名文件遮住，文件本身没有被动过。<code>docker diff</code> 输出的 A、C、D 三个字母，对应的就是新增、修改、删除这三类记录。</p>
+<p>copy-up 是按文件粒度的，代价经常被低估。如果镜像层里有个 500 MB 的数据文件，容器的第一次写就要拷 500 MB，还会多占 500 MB 磁盘。所以数据库目录、日志目录、上传目录必须挂 volume：volume 本质是 bind mount，直接落在宿主机文件系统上，不经过联合挂载，也不受 copy-up 影响。</p>
+<p>根目录的切换用的是 pivot_root 而不是 chroot。chroot 只是把进程的 root 指针指向另一个目录，老的根仍然挂在挂载树上，只要进程手里还留着指向老根的 fd，或者有 <code>CAP_SYS_CHROOT</code> 又能 mount，就有路溜回去。pivot_root 做的是把整个挂载树的根换掉，然后让 runc 把老根 umount 掉，从挂载表里彻底摘走；这才叫断根。chroot 在 runc 里只作为某些辅助场景的兜底存在。</p>
+<p>挂载传播属性也值得一提。runc 会把容器内的挂载点设为 private 或 slave，容器里执行 mount 不会把事件传播回宿主机的挂载表；反过来说，宿主机后来插入的 U 盘、挂载的 NFS，也不会自动出现在已经启动的容器里，因为那份挂载表在 clone 时就已经复制完了。这也是”为什么容器里看不到宿主机新挂的盘”的标准答案。</p>
+<p>最后是几个必须重新准备的特殊文件系统。<code>/proc</code> 要跟 PID namespace 配套重新挂；<code>/sys</code> 通常以只读方式挂入；<code>/dev</code> 由 runc 用 tmpfs 搭一个最小集合，只有 null、zero、full、random、tty 这几个节点，其余设备节点要 <code>--device</code> 才会出现。</p>
+<p>还有一个当年的现实问题：CentOS 7 上 Docker 默认的存储驱动一度是 devicemapper 的 loop 模式，thin pool 只有 10 GB，写满后容器报 <code>no space left on device</code>，而 <code>df -h</code> 看着还有空间。overlay2 在 1.12 之后逐渐成为首选，Ubuntu 16.04 的 4.4 内核原生支持，CentOS 7.2 之后的内核也回填了支持；迁移前先看一眼 <code>docker info</code> 里的 Storage Driver。</p>
+<h2 id="Network-namespace：veth、docker0-与端口映射"><a href="#Network-namespace：veth、docker0-与端口映射" class="headerlink" title="Network namespace：veth、docker0 与端口映射"></a>Network namespace：veth、docker0 与端口映射</h2><p>每个容器一份 network namespace，意味着独立的网卡列表、路由表、iptables 规则、socket 端口空间和 lo 回环。两个容器可以同时监听 80 端口而不冲突，因为”端口”这个编号只在各自的 netns 里有意义；宿主机上的 80 已经被占用也不影响容器里的 80。</p>
+<p>网卡是这样塞进去的：veth pair 是一对虚拟网卡，从一头发出去的包会从另一头收到。创建容器时，runc 建一对 veth，一头放进容器的 netns 改名为 eth0，另一头留在宿主机上叫 vethxxxxx，再插到 docker0 这个网桥上。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 宿主机视角：网桥与容器的对端网卡</span></span><br><span class="line">ip addr show docker0</span><br><span class="line">ip <span class="built_in">link</span> show <span class="built_in">type</span> veth</span><br><span class="line">brctl show docker0</span><br></pre></td></tr></table></figure>
+
+<p>docker0 默认是 172.17.0.1&#x2F;16，既是网桥也是容器的默认网关。容器之间通信走二层转发，不经过 NAT，所以互相访问速度快，也不消耗宿主机端口。</p>
+<p>出网才需要 NAT。容器的默认路由指向 docker0，源地址是 172.17.0.x，这个地址在外面不可路由；宿主机打开 <code>net.ipv4.ip_forward</code>，再在 nat 表的 POSTROUTING 上做 MASQUERADE，把源地址改成出口网卡的地址。外面看到的流量来自宿主机 IP，回来的包靠 conntrack 还原。所以容器访问外网失败时，先查 ip_forward，再查 MASQUERADE 规则，比怀疑应用快得多。</p>
+<p>端口映射的本质是 DNAT，不是”监听转发”。dockerd 会在 nat 表里建一条 DOCKER 链：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">iptables -t nat -L DOCKER -n --line-numbers</span><br><span class="line"><span class="comment"># DNAT  tcp  --  0.0.0.0/0  0.0.0.0/0  tcp dpt:8080 to:172.17.0.2:80</span></span><br></pre></td></tr></table></figure>
+
+<p>包到达宿主机 8080，在 PREROUTING 阶段被改写成 172.17.0.2:80，再转发进 docker0。另外 dockerd 还会起一个 docker-proxy 进程在宿主机上监听 8080 做用户态转发，主要兜底 DNAT 处理不了的路径，比如从宿主机自己访问映射端口、以及早期内核的 hairpin 问题；<code>--userland-proxy=false</code> 可以关掉它，代价是某些访问方式要自己补 iptables 规则。</p>
+<p><code>-p 8080:80</code> 和 <code>-p 127.0.0.1:8080:80</code> 的差别也在这条规则上：后者的 DNAT 只匹配目的地址是 127.0.0.1 的包，外网打不进来，只给本机 Nginx 反代用时这是正确姿势，比在应用层做 IP 白名单可靠。</p>
+<p>两个常见的坑。第一，容器里执行 <code>ip addr</code> 只看到 lo 和 eth0，看不到 docker0，因为 docker0 在宿主机的 netns 里，这不是网络坏了。第二，docker0 默认占 172.17.0.0&#x2F;16，一旦和公司内网网段撞上，路由会非常难受，上线前用 <code>--bip</code> 或 daemon.json 里的 <code>bip</code> 换掉，别等到出问题再改。至于 <code>--network=host</code>，等于容器直接用宿主机的 netns，端口就是宿主机的端口，也不再需要 DNAT，代价是这层隔离彻底消失。</p>
+<h2 id="UTS、IPC-与-User-namespace"><a href="#UTS、IPC-与-User-namespace" class="headerlink" title="UTS、IPC 与 User namespace"></a>UTS、IPC 与 User namespace</h2><p>UTS namespace 管的是 hostname 和 domainname，是最简单的一种。<code>docker run -h web-1</code> 设主机名，不设就用容器 ID 的前 12 位。它的意义在于老程序喜欢拿 hostname 当节点标识：没有隔离时，容器里执行 <code>hostname foo</code> 会把整台机器的名字改掉；有了 UTS namespace，每个容器可以各叫各的，宿主机不受影响。</p>
+<p>IPC namespace 隔离 System V 的共享内存、信号量和消息队列，也包括 POSIX 消息队列。默认每个容器一份私有的，PHP-FPM、PostgreSQL 这类重度依赖共享内存缓冲的服务不会互相踩键值。需要共享时有两个开关：<code>--ipc=host</code> 让容器用宿主机的 IPC，性能好、兼容老程序，但等于主动放弃这层隔离；<code>--ipc=container:&lt;id&gt;</code> 让两个容器共用一份，典型的 sidecar 用法。</p>
+<p>User namespace 是七种里最晚成熟、也最容易被忽略的。它隔离的是 uid&#x2F;gid 的映射关系，以及 capabilities 的适用边界。容器里可以是 root（uid 0），但这个 0 在宿主机上可以映射成 100000 这种没人用的普通 uid：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 容器内看到的 uid 映射：容器内 0-65535 对应宿主机 100000-165535</span></span><br><span class="line"><span class="built_in">cat</span> /proc/self/uid_map</span><br><span class="line"><span class="comment">#          0     100000      65536</span></span><br></pre></td></tr></table></figure>
+
+<p>Docker 侧的开关是 <code>--userns-remap=default</code>，配合 <code>/etc/subuid</code>、<code>/etc/subgid</code> 预先分配 id 段。开了之后，容器里的 root 在宿主机上毫无特权，就算逃出去也只是个普通用户，这是所有隔离手段里最实的一层。</p>
+<p>但 2016 年真正在生产上开它的团队不多，原因有三个：overlay2 与 user namespace 的组合当时还有限制，镜像里所有文件的属主都要重新 chown 一遍（镜像越大越痛），CentOS 7 上的相关默认配置也不友好。更常见的折中是镜像里用 <code>USER</code> 指定非 root 用户跑业务，虽然治不了”容器内 root 等于宿主机 root”的根，但成本低得多，配合 cap-drop 已经能挡掉大部分顺手攻击。</p>
+<p>顺带提一句 cgroup namespace，4.6 才进内核，作用是让容器内看到的 cgroup 根路径变成自己那棵子树。Docker 在 2016 年底还没有默认启用它，所以本文后面讲 cgroup 时，路径一律按宿主机的视角写。</p>
+<h2 id="cgroup-v1：从-memory-开始记账"><a href="#cgroup-v1：从-memory-开始记账" class="headerlink" title="cgroup v1：从 memory 开始记账"></a>cgroup v1：从 memory 开始记账</h2><p>namespace 解决”看得见”，cgroup 解决”用多少”。cgroup 的思路很朴素：在 <code>/sys/fs/cgroup</code> 下按子系统建树，把进程的 pid 写进某个目录的 <code>tasks</code> 文件，它就归这个节点管；节点目录里的一组文件就是限额与统计。CentOS 7 与 Ubuntu 16.04 用的都是 cgroup v1，各子系统各自一棵树，互不相干：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">mount | grep cgroup</span><br><span class="line"><span class="comment"># cgroup on /sys/fs/cgroup/cpu,cpuacct type cgroup (rw,...,cpu,cpuacct)</span></span><br><span class="line"><span class="comment"># cgroup on /sys/fs/cgroup/memory type cgroup (rw,...,memory)</span></span><br><span class="line"><span class="comment"># cgroup on /sys/fs/cgroup/blkio type cgroup (rw,...,blkio)</span></span><br><span class="line"><span class="comment"># cgroup on /sys/fs/cgroup/pids type cgroup (rw,...,pids)</span></span><br></pre></td></tr></table></figure>
+
+<p>常用的是 cpu、cpuacct、memory、blkio、pids、devices、freezer 这几只。systemd 会把每个服务放进自己的 cgroup，Docker 起的容器默认落在 <code>/sys/fs/cgroup/&lt;子系统&gt;/docker/&lt;完整容器 id&gt;/</code>；如果 daemon 用 systemd 做 cgroup 驱动，路径则是 <code>system.slice/docker-&lt;id&gt;.scope</code>。<code>cat /proc/&lt;pid&gt;/cgroup</code> 能一次看到进程在每个子系统里的位置，这是后面做验证实验的入口。顺便说一句，cgroup v2 当时还处在内核实验阶段、尚未普及，本文不涉及。</p>
+<p>还有一点要记住：限制沿层级继承。容器目录里的数值是它自己的节点，父节点（比如 <code>/sys/fs/cgroup/memory/docker</code>）上的设置会成为所有容器的共同上限，所以排查时不要只看容器那一层。把进程放进节点有两个入口，往 <code>tasks</code> 写 pid 只影响那一个线程，往 <code>cgroup.procs</code> 写则是整个进程的所有线程一起进，排查时后者更常用。</p>
+<h3 id="memory：限额、统计与-OOM"><a href="#memory：限额、统计与-OOM" class="headerlink" title="memory：限额、统计与 OOM"></a>memory：限额、统计与 OOM</h3><p>这个目录里真正要看的只有几个文件。<code>memory.limit_in_bytes</code> 是硬上限，<code>-m</code> 或 <code>--memory</code> 就写在这里；<code>memory.usage_in_bytes</code> 是当前记账用量；<code>memory.max_usage_in_bytes</code> 是历史峰值；<code>memory.stat</code> 给出 rss、cache、swap 的分项；<code>memory.oom_control</code> 里能读到 <code>under_oom</code> 状态，也能写 <code>oom_kill_disable</code>。</p>
+<p>第一个容易误解的点是 usage 包含 page cache。容器里读一个大文件，cache 涨上去，usage 逼近 limit，内核会先回收这些可回收的页，而不是立刻杀人。所以”usage 贴着 limit”不等于”马上要挂”，真正危险的是 <code>memory.stat</code> 里的 <code>total_rss</code> 贴着 limit，那部分回收不掉。</p>
+<p>第二个点是 OOM 的作用域。真的收不回来时，内核在这个 cgroup 内部触发 OOM killer，挑一个进程杀掉，通常挑 rss 最大的那个；<code>dmesg</code> 里会出现类似 <code>Memory cgroup out of memory: Kill process 12345 (node) score 123</code> 的记录，容器退出码 137（128 加 9），<code>docker inspect</code> 里 <code>State.OOMKilled</code> 为 true。注意被杀的范围是这个 cgroup，不是整台机器，这正是开篇那个困惑的答案：宿主机空着十几 GB，容器照样死。</p>
+<p>还有一个常被忽略的参数是 swap。设了 <code>-m</code> 却没设 <code>--memory-swap</code> 时，容器可以用到两倍内存额度的 swap；在开了 swap 的机器上，”内存明明超了却没 OOM”多半就是这个原因。真要严格限制，两个参数一起给。</p>
+<h3 id="cpu：quota-period-与-shares-是两回事"><a href="#cpu：quota-period-与-shares-是两回事" class="headerlink" title="cpu：quota&#x2F;period 与 shares 是两回事"></a>cpu：quota&#x2F;period 与 shares 是两回事</h3><p>cpu 子系统里有两套完全不同的旋钮，混着讲会得出错误结论。</p>
+<p>第一套是带宽限制，靠 CFS 的周期与配额。<code>cpu.cfs_period_us</code> 默认 100000，即 100 ms 一个周期；<code>cpu.cfs_quota_us</code> 默认 -1 表示不限，写 50000 就是每个周期最多跑 50 ms，也就是半个核。命令行上这两个值直接对应 <code>--cpu-period</code> 与 <code>--cpu-quota</code>：想要一个半核，就写 <code>--cpu-quota=150000</code>；想要半个核，写 <code>--cpu-quota=50000</code>。按核数直接写的 <code>--cpus</code> 当时还在合入，稳定版里用不上，笔者反而习惯自己算 quota，账更清楚。</p>
+<p>顺带说一句 <code>-c</code>。它是 <code>--cpu-shares</code> 的简写，不是配额。想限半核却写成 <code>-c 0.5</code>，Docker 会直接报错；就算写成 <code>-c 512</code>，也只是把权重减半，机器空闲时这个容器照样能跑满所有核。</p>
+<p>它的语义是上限而非独占。容器在一个周期里跑满配额就会被 throttle 到下一个周期，哪怕机器上还有空闲核。<code>cpu.stat</code> 里的 <code>nr_throttled</code> 与 <code>throttled_time</code> 直接记录这件事。一个单线程的 Node 服务被设成半个核之后，一次 200 ms 的同步计算会被切成几个周期执行，P99 延迟突然变差，根因就在这里。</p>
+<p>第二套是权重。<code>cpu.shares</code> 默认 1024，对应 <code>--cpu-shares</code>，没有单位也没有绝对含义，只在自己的 cgroup 和别的 cgroup 争抢同一个核时才生效：两个容器 shares 分别是 1024 和 512，抢起来大致是 2 比 1。机器空闲时，shares 为 2 的容器照样能跑满所有核。所以 shares 保证不了下限，只决定”抢的时候分多少”。</p>
+<p>如果确实要绑核，用 <code>--cpuset-cpus=0,1</code>，那是 cpuset 子系统，语义又不同：它改变的是进程能在哪些 CPU 上被调度，而不是能用多少时间。</p>
+<h3 id="blkio-与-pids"><a href="#blkio-与-pids" class="headerlink" title="blkio 与 pids"></a>blkio 与 pids</h3><p>blkio 管块设备读写，限速按设备写，格式是”主设备号:次设备号 速率”：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 等价于 --device-read-bps /dev/sda:10mb</span></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&quot;8:0 10485760&quot;</span> &gt; /sys/fs/cgroup/blkio/docker/&lt;<span class="built_in">id</span>&gt;/blkio.throttle.read_bps_device</span><br></pre></td></tr></table></figure>
+
+<p>限制 IOPS 用 <code>blkio.throttle.read_iops_device</code>。此外还有 <code>blkio.weight</code>（10 到 1000），对应 <code>--blkio-weight</code>，但它是按比例分配，且依赖 IO 调度器支持：deadline 与 noop 下权重不起作用，只有 CFQ 认它，在 SSD 上经常踩空。</p>
+<p>pids 子系统只有一个关键文件 <code>pids.max</code>，默认 max。Docker 1.12 里可以直接 <code>--pids-limit 200</code>。它的价值不在正常业务，而在防 fork bomb：一个死循环 fork 的脚本能在几秒内耗尽宿主机的 pid，整机跟着不可用；有了上限，超出的 fork 直接返回 EAGAIN，影响被关在一个容器里。默认不设限是个隐患，不少团队是被坑过一次才补上的。</p>
+<h2 id="安全边界：capabilities、seccomp-与只读根"><a href="#安全边界：capabilities、seccomp-与只读根" class="headerlink" title="安全边界：capabilities、seccomp 与只读根"></a>安全边界：capabilities、seccomp 与只读根</h2><p>namespace 和 cgroup 之外，还有一层决定”能做什么”的开关。</p>
+<p>capabilities 把 root 的特权拆成几十项。Docker 默认只给容器十几项，包括 <code>CHOWN</code>、<code>DAC_OVERRIDE</code>、<code>SETUID</code>、<code>SETGID</code>、<code>NET_BIND_SERVICE</code>、<code>NET_RAW</code>、<code>KILL</code>、<code>MKNOD</code>、<code>SYS_CHROOT</code> 这些日常要用的；<code>SYS_ADMIN</code>、<code>SYS_PTRACE</code>、<code>SYS_MODULE</code>、<code>SYS_TIME</code> 都不给。容器里 <code>cat /proc/self/status | grep CapEff</code> 能看到当前的有效位图，用 <code>capsh --decode=</code> 解出来是哪些位：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker run --<span class="built_in">rm</span> --cap-drop=ALL --cap-add=NET_BIND_SERVICE nginx</span><br></pre></td></tr></table></figure>
+
+<p>这条命令把权限收到只剩”绑定 1024 以下端口”一项，是 2016 年比较推荐的做法。反过来，<code>--privileged</code> 会把所有 capabilities 全给、关掉 seccomp 与 AppArmor、把宿主机的设备都挂进来，等于这层防护整体失效；线上除极少数需要操作硬件的场景，不应该出现它。</p>
+<p>seccomp 是第二道闸。Docker 从 1.10 起给容器挂一份默认 profile，直接拒绝四十多个系统调用，主要是加载内核模块、kexec、部分已废弃的调用，另外对 socket、clone 这类调用还有参数级白名单。要放行只能用 <code>--security-opt seccomp=unconfined</code>，但那就等于把它关了，不建议这么干。想确认某个调用是不是被拦，<code>dmesg</code> 里会留下 seccomp 的审计记录。</p>
+<p>第三道是文件系统。<code>--read-only</code> 把整个根挂成只读，只有显式声明的卷和 <code>--tmpfs /tmp</code> 可写。这一条对防”应用被打了之后往镜像里写 webshell”特别有效，代价是要提前把应用会写的目录都准备好，改造量比想象中大一些。</p>
+<p>最后是 root 用户的风险。没有开 user namespace 时，容器里的 uid 0 在宿主机上也是 uid 0，再叠加 <code>SYS_ADMIN</code> 或者一个没打补丁的内核漏洞，逃逸就不是难事。所以镜像里尽量用 <code>USER</code> 切到非 root，只给必要的 capabilities，根文件系统只读，三件事一起做才有意义。</p>
+<h2 id="动手验证与几个误解"><a href="#动手验证与几个误解" class="headerlink" title="动手验证与几个误解"></a>动手验证与几个误解</h2><p>前面讲的都是机制，落到手上就是几条命令。起两个容器，一个限 256 MB 内存、半个 CPU，另一个什么都不限：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">docker run -d --name web1 -m 256m --cpu-quota 50000 nginx</span><br><span class="line">docker run -d --name web2 nginx</span><br></pre></td></tr></table></figure>
+
+<p>然后从宿主机上分别读它们的 namespace 和 cgroup：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">&#123;% raw %&#125;</span><br><span class="line"><span class="keyword">for</span> c <span class="keyword">in</span> web1 web2; <span class="keyword">do</span></span><br><span class="line">  pid=$(docker inspect -f <span class="string">&#x27;&#123;&#123;.State.Pid&#125;&#125;&#x27;</span> <span class="variable">$c</span>)</span><br><span class="line">  <span class="built_in">echo</span> <span class="string">&quot;== <span class="variable">$c</span> pid=<span class="variable">$pid</span>&quot;</span></span><br><span class="line">  <span class="built_in">ls</span> -l /proc/<span class="variable">$pid</span>/ns/ | awk <span class="string">&#x27;&#123;print $9, $10, $11&#125;&#x27;</span></span><br><span class="line">  <span class="built_in">cat</span> /proc/<span class="variable">$pid</span>/cgroup</span><br><span class="line"><span class="keyword">done</span></span><br><span class="line">&#123;% endraw %&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>ls -l /proc/&lt;pid&gt;/ns/</code> 每行末尾都有 <code>pid:[4026532xxx]</code> 这样的 inode 号。把两个容器并排看：mnt、pid、net、uts、ipc 五项全都不同；再和宿主机上自己的 shell 比，也全都不同。而同一个容器里 fork 出来的子进程，这五项完全一样。这就是判断”是否在同一个 namespace”的硬依据。示意如下，实际编号每次创建都会变：</p>
+<table>
+<thead>
+<tr>
+<th>对象</th>
+<th>mnt</th>
+<th>pid</th>
+<th>net</th>
+<th>uts</th>
+<th>ipc</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>宿主机 shell</td>
+<td>4026531841</td>
+<td>4026531836</td>
+<td>4026531992</td>
+<td>4026531838</td>
+<td>4026531839</td>
+</tr>
+<tr>
+<td>web1</td>
+<td>4026532245</td>
+<td>4026532246</td>
+<td>4026532247</td>
+<td>4026532248</td>
+<td>4026532249</td>
+</tr>
+<tr>
+<td>web2</td>
+<td>4026532250</td>
+<td>4026532251</td>
+<td>4026532252</td>
+<td>4026532253</td>
+<td>4026532254</td>
+</tr>
+</tbody></table>
+<p><code>/proc/&lt;pid&gt;/cgroup</code> 是另一条线，它给出这个进程在每个子系统里的目录，形如 <code>11:memory:/docker/3f2a...</code>。拿到路径就能直接读数值，和 <code>docker stats</code> 对账：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">&#123;% raw %&#125;</span><br><span class="line"><span class="built_in">id</span>=$(docker inspect -f <span class="string">&#x27;&#123;&#123;.Id&#125;&#125;&#x27;</span> web1)</span><br><span class="line"><span class="built_in">cat</span> /sys/fs/cgroup/memory/docker/<span class="variable">$id</span>/memory.limit_in_bytes   <span class="comment"># 268435456</span></span><br><span class="line"><span class="built_in">cat</span> /sys/fs/cgroup/memory/docker/<span class="variable">$id</span>/memory.usage_in_bytes</span><br><span class="line">docker stats --no-stream web1</span><br><span class="line">&#123;% endraw %&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>docker stats</code> 的 MEM USAGE 就是从这些文件读出来的，只不过它扣掉了一部分非活跃的文件缓存，所以和手 cat 的数字不完全相等，差值通常正是 page cache；LIMIT 那一列则严格等于 <code>memory.limit_in_bytes</code>。CPU 百分比是拿 cpuacct 的累计用量做差分算出来的，cgroup 里并不存在一个叫”当前 CPU 占用率”的文件。</p>
+<p>顺着这条线还能分清两种 137。退出码都是 128 加 9，但 <code>OOMKilled</code> 为 true 的，是被本容器的 memory cgroup 杀的；<code>OOMKilled</code> 为 false 的，多半是被宿主机全局的 OOM killer 挑中，或者被容器里别的进程、宿主机上的运维脚本 kill 掉的，排查方向完全不同。</p>
+<h3 id="三个流传很广的误解"><a href="#三个流传很广的误解" class="headerlink" title="三个流传很广的误解"></a>三个流传很广的误解</h3><p>第一个，容器里 <code>free</code> 看到的是宿主机的内存。<code>/proc/meminfo</code> 没有 namespace，它反映的是整个内核的内存状况，到 2017 年也没有隔离。于是在一个限制 256 MB 的容器里，free 会理直气壮地显示 16 GB。想让应用看到”正确”数字，当时常见的办法是挂 lxcfs，把 <code>/proc/meminfo</code>、<code>/proc/cpuinfo</code> 换成按 cgroup 数值伪造的版本。</p>
+<p>第二个，<code>nproc</code> 不准。它读 <code>/proc/cpuinfo</code>，同样是全量视图：容器里 <code>nproc</code> 出来是 32，而 <code>--cpu-quota=200000</code> 只给了相当于两个核的时间片。Node 的 <code>os.cpus().length</code>、Java 的 <code>availableProcessors()</code>、Go 的 <code>runtime.NumCPU()</code> 都有同样的问题，按 CPU 数决定线程池大小的库会在容器里开出一堆抢不到时间的线程。这也是 <code>--cpuset-cpus</code> 在当年流行的原因之一：它能顺带让 <code>nproc</code> 看起来正常。</p>
+<p>第三个，<code>ulimit</code> 与 cgroup 不是一回事。<code>ulimit -n</code> 是 per-process 的 rlimit，限的是单个进程能开多少 fd；<code>pids.max</code> 是 cgroup 级的进程数；<code>memory.limit_in_bytes</code> 是 cgroup 级的内存，三者互不覆盖。容器里的 rlimit 默认继承 dockerd 的设置（再由 systemd 的 LimitNOFILE 决定），要改得用 <code>--ulimit nofile=65535:65535</code>，改 cgroup 文件没有用。同理，<code>ulimit -v</code> 限的是虚拟地址空间，和 memory cgroup 的记账完全是两套逻辑。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>回到开头那句话：容器是一个被内核约束的普通进程。namespace 决定它看到什么，cgroup 决定它用多少，capabilities 与 seccomp 决定它能做什么，overlay 拼出来的 rootfs 决定它有什么文件。这四件事全部由宿主机内核执行，没有一层自己的内核，所以它快、轻、密度高，也所以它的隔离强度天生比虚拟机低一个量级。</p>
+<p>排查容器问题可以按固定顺序走：先看 <code>/proc/&lt;pid&gt;/ns/*</code> 确认隔离有没有被主动放弃（<code>--pid=host</code>、<code>--network=host</code>、宿主机 <code>/proc</code> 挂进来），再看 <code>/proc/&lt;pid&gt;/cgroup</code> 找到它在每棵 cgroup 树上的位置，然后读对应目录里的数值，最后才怀疑应用。开篇那三个现象，按这个顺序很快就能定性。</p>
+<table>
+<thead>
+<tr>
+<th>资源 &#x2F; 维度</th>
+<th>隔离或限制机制</th>
+<th>查看命令</th>
+<th>常见坑</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>进程视图</td>
+<td>PID namespace</td>
+<td>ls -l &#x2F;proc&#x2F;<pid>&#x2F;ns&#x2F;pid</td>
+<td>用了 –pid&#x3D;host，或 &#x2F;proc 来自宿主机</td>
+</tr>
+<tr>
+<td>文件系统</td>
+<td>Mount namespace + overlay2</td>
+<td>docker diff、mount</td>
+<td>写大文件触发 copy-up，容器层暴涨</td>
+</tr>
+<tr>
+<td>网络</td>
+<td>Network namespace + veth + DNAT</td>
+<td>ip addr、iptables -t nat -L DOCKER</td>
+<td>网段与内网冲突，容器内看不到 docker0</td>
+</tr>
+<tr>
+<td>主机名</td>
+<td>UTS namespace</td>
+<td>hostname</td>
+<td>老程序依赖 hostname 做节点标识</td>
+</tr>
+<tr>
+<td>内存</td>
+<td>memory cgroup</td>
+<td>memory.usage_in_bytes、memory.stat</td>
+<td>cache 计入 usage，swap 额度没设</td>
+</tr>
+<tr>
+<td>CPU 上限</td>
+<td>cpu.cfs_quota_us</td>
+<td>cpu.stat</td>
+<td>配额导致 throttle，不是独占半个核</td>
+</tr>
+<tr>
+<td>CPU 权重</td>
+<td>cpu.shares</td>
+<td>cpu.shares</td>
+<td>空闲时不生效，保证不了下限</td>
+</tr>
+<tr>
+<td>磁盘 IO</td>
+<td>blkio throttle</td>
+<td>blkio.throttle.read_bps_device</td>
+<td>权重依赖 CFQ，在 SSD 上常无效</td>
+</tr>
+<tr>
+<td>进程数</td>
+<td>pids cgroup</td>
+<td>pids.max</td>
+<td>默认不设限，fork bomb 拖垮整机</td>
+</tr>
+<tr>
+<td>特权</td>
+<td>capabilities + seccomp</td>
+<td>CapEff、–cap-drop</td>
+<td>–privileged 等于全部放开</td>
+</tr>
+</tbody></table>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://www.kernel.org/doc/Documentation/cgroup-v1/cgroups.txt">Control Groups（内核文档）</a></li>
+<li><a href="https://www.kernel.org/doc/Documentation/cgroup-v1/memory.txt">Memory Resource Controller（内核文档）</a></li>
+<li><a href="http://man7.org/linux/man-pages/man7/namespaces.7.html">namespaces(7) 手册页</a></li>
+<li><a href="http://man7.org/linux/man-pages/man7/pid_namespaces.7.html">pid_namespaces(7) 手册页</a></li>
+<li><a href="https://github.com/opencontainers/runtime-spec">OCI Runtime Specification</a></li>
+<li><a href="https://docs.docker.com/engine/reference/run/">Docker Engine 运行参数参考</a></li>
+<li><a href="https://docs.docker.com/engine/userguide/storagedriver/overlayfs-driver/">Docker overlayfs 存储驱动文档</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Docker 原理：namespace 与 cgroup</p><p><a href="https://987763485.github.io/2017/01/08/Docker原理namespace与cgroup/">https://987763485.github.io/2017/01/08/Docker原理namespace与cgroup/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2017-01-08</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/docker/">docker</a><a class="link-muted mr-2" rel="tag" href="/tags/linux/">linux</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/">容器技术</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2017/01/10/TypeScript%E7%B1%BB%E4%B8%8E%E8%AE%BF%E9%97%AE%E4%BF%AE%E9%A5%B0%E7%AC%A6/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">TypeScript 类与访问修饰符</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2017/01/01/TypeScript2.3%E6%96%B0%E7%89%B9%E6%80%A7%E8%AF%A6%E8%A7%A3/"><span class="level-item">TypeScript 2.3 新特性详解</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

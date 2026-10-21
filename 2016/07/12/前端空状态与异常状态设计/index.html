@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>前端空状态与异常状态设计 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="那天早上，订单列表页什么都没有"><meta property="og:type" content="blog"><meta property="og:title" content="前端空状态与异常状态设计"><meta property="og:url" content="https://987763485.github.io/2016/07/12/%E5%89%8D%E7%AB%AF%E7%A9%BA%E7%8A%B6%E6%80%81%E4%B8%8E%E5%BC%82%E5%B8%B8%E7%8A%B6%E6%80%81%E8%AE%BE%E8%AE%A1/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="那天早上，订单列表页什么都没有"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2016-07-12T15:07:59.000Z"><meta property="article:modified_time" content="2026-10-21T01:57:50.509Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="web前端"><meta property="article:tag" content="前端工程化"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2016/07/12/%E5%89%8D%E7%AB%AF%E7%A9%BA%E7%8A%B6%E6%80%81%E4%B8%8E%E5%BC%82%E5%B8%B8%E7%8A%B6%E6%80%81%E8%AE%BE%E8%AE%A1/"},"headline":"前端空状态与异常状态设计","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2016-07-12T15:07:59.000Z","dateModified":"2026-10-21T01:57:50.509Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"那天早上，订单列表页什么都没有"}</script><link rel="canonical" href="https://987763485.github.io/2016/07/12/%E5%89%8D%E7%AB%AF%E7%A9%BA%E7%8A%B6%E6%80%81%E4%B8%8E%E5%BC%82%E5%B8%B8%E7%8A%B6%E6%80%81%E8%AE%BE%E8%AE%A1/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2016-07-12T15:07:59.000Z" title="7/12/2016, 11:07:59 PM">2016-07-12</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/">效率工具</a></span><span class="level-item">29 分钟读完 (大约4312个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">前端空状态与异常状态设计</h1><div class="content"><h2 id="那天早上，订单列表页什么都没有"><a href="#那天早上，订单列表页什么都没有" class="headerlink" title="那天早上，订单列表页什么都没有"></a>那天早上，订单列表页什么都没有</h2><p>2016 年 7 月 5 号上午，客服转来一个投诉：一个商户老板说我们后台挂了，订单页打开是一片白，一条单子都看不到。我第一反应是不可能，前一晚还在测试环境跑过一遍。但截图确实摆在那儿，表头下面一块白，连个报错都没有。</p>
+<p>扒开看，请求是成功的，返回 200，<code>data</code> 是个空数组。真实原因是他上午手滑，把时间筛成”今天”、状态筛成”已取消”，而他当天确实没有取消单，页面就把这块白给了他。在他看来”什么都没有”和”服务打挂了”是同一件事，页面没给任何一句话来推翻这个判断。那天改了六处代码，但真正值得记的是：我们压根没把”这个页面能有几种状态”当成一个需要设计的东西。</p>
+<p>先说边界：这篇只讲状态的枚举、判定优先级和代码分工，不讲视觉。loading 动效与骨架屏的 CSS 写法，讲 CSS 实现那篇已经写透了，这里一行动画代码都不贴；错误的采集与上报，讲监控那篇讲过了，不重讲。示例按当时最土的 ES5 回调写。</p>
+<h2 id="把状态拆开：一个列表页到底有几种"><a href="#把状态拆开：一个列表页到底有几种" class="headerlink" title="把状态拆开：一个列表页到底有几种"></a>把状态拆开：一个列表页到底有几种</h2><p>我们最后定了六个分支：</p>
+<ol>
+<li>首次加载中：请求发出去了，还没有可展示的结果。</li>
+<li>加载失败：传输层出问题，超时、5xx、连接被打挂，压根没拿到业务数据。</li>
+<li>业务返回空数组：请求成功、码正常、<code>data.length === 0</code>，这是”真空”。</li>
+<li>筛选或分页后为空：结果同样是空数组，但用户带着条件进来。</li>
+<li>无权限：403 或鉴权类业务码，数据存在，只是不给这个人看。</li>
+<li>部分数据降级：主列表回来了，旁边的汇总数字、状态字典挂了。</li>
+</ol>
+<p>**”空”和”错”是两条完全不同的分支，一次都不许混。**错是”我们不知道有没有数据”，空是”我们确定没有”。把错显示成空，用户以为生意真的这么差；把空显示成错，用户以为服务出问题，于是反复刷新、打电话。</p>
+<p>再看互斥：这六个状态在<strong>判定条件上并不互斥</strong>。无权限的响应里 <code>data</code> 常常也是空数组，筛选后为空和业务空在响应体上长得一模一样。条件重叠，渲染却只能出一个，所以必须有一张按顺序判定的表来仲裁。</p>
+<h2 id="判定优先级：顺序错了就把”未登录”显示成”暂无数据”"><a href="#判定优先级：顺序错了就把”未登录”显示成”暂无数据”" class="headerlink" title="判定优先级：顺序错了就把”未登录”显示成”暂无数据”"></a>判定优先级：顺序错了就把”未登录”显示成”暂无数据”</h2><p>定这张表之前心里没底，表本身是对着真实响应一条条试出来的，从上往下判，命中就停：</p>
+<table>
+<thead>
+<tr>
+<th>顺序</th>
+<th>判定</th>
+<th>落到哪个状态</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>本地有没有 token</td>
+<td>未登录，跳登录</td>
+</tr>
+<tr>
+<td>2</td>
+<td>请求本身成没成</td>
+<td>加载失败</td>
+</tr>
+<tr>
+<td>3</td>
+<td>码是不是鉴权类</td>
+<td>无权限</td>
+</tr>
+<tr>
+<td>4</td>
+<td>码是不是参数类</td>
+<td>参数错，回表单</td>
+</tr>
+<tr>
+<td>5</td>
+<td>长度是否为 0</td>
+<td>空 &#x2F; 筛选后为空</td>
+</tr>
+<tr>
+<td>6</td>
+<td>辅助字段是否残缺</td>
+<td>部分降级</td>
+</tr>
+</tbody></table>
+<p>第一条在最上面，因为 token 在本地就能读出来，不必花一个请求去问后端。顺序放后面，等于用一次失败的请求去发现”这人根本没登录”，再把它呈现成一个让人摸不着头脑的空状态。同事的账号在另一个浏览器登出后，回到页面看到的是”暂无数据”。</p>
+<h2 id="状态流转图"><a href="#状态流转图" class="headerlink" title="状态流转图"></a>状态流转图</h2><p>箭头就是上面那张表的执行顺序，降级那条边是后来补的。</p>
+<pre class="mermaid">flowchart TD
+    START[进入页面] --> P0{本地有 token?}
+    P0 -->|没有| S_LOGIN[未登录]
+    P0 -->|有| S_LOADING[加载中]
+    S_LOADING --> R{请求成功?}
+    R -->|失败| S_ERROR[加载失败]
+    R -->|成功| C{返回码类型}
+    C -->|鉴权| S_FORBID[无权限]
+    C -->|参数| S_BADPARAM[参数错]
+    C -->|正常| D{数据长度}
+    D -->|大于 0| S_LIST[渲染列表]
+    D -->|等于 0| F{带条件?}
+    F -->|是| S_FILTER_EMPTY[筛选后为空]
+    F -->|否| S_EMPTY[业务空]
+    S_LIST --> G{辅助字段残缺?}
+    G -->|是| S_DEGRADE[部分降级]
+    G -->|否| DONE[正常]
+    S_ERROR --> RETRY{重试}
+    RETRY -->|未达上限| S_LOADING
+    RETRY -->|达上限| S_GIVEUP[退让提示]</pre>
+
+<h2 id="代码分层：状态是一个值，不是一堆-if"><a href="#代码分层：状态是一个值，不是一堆-if" class="headerlink" title="代码分层：状态是一个值，不是一堆 if"></a>代码分层：状态是一个值，不是一堆 if</h2><p>改之前那一版太典型，坑也踩得实在：<code>order-list.js</code> 这个 controller 有六百多行，拿到响应先判是不是 403 弹个层，再判是不是空、塞一句”暂无数据”，中间还夹一个是不是筛选导致的。三个判断散在三个地方，其中一个写在模板里。</p>
+<p>问题不是不优雅，是<strong>改不动</strong>。加一种状态得先把所有分支读一遍才敢下手；空值和空长度在几种组合里互相兜底，没人说得清哪条实际生效；后端把空数组改成 <code>null</code> 的那天，页面直接白屏。我们的做法是把状态收成一个字符串：判定层只输出一句 <code>view.setState(...)</code>，模板层只认这一个值。状态名定死在常量表里。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// state.js  状态枚举：全项目只有这一处定义</span></span><br><span class="line"><span class="keyword">var</span> <span class="title class_">ViewState</span> = &#123;</span><br><span class="line">  <span class="attr">LOADING</span>: <span class="string">&#x27;loading&#x27;</span>,            <span class="comment">// 首次加载中</span></span><br><span class="line">  <span class="attr">ERROR</span>: <span class="string">&#x27;error&#x27;</span>,                <span class="comment">// 传输层失败</span></span><br><span class="line">  <span class="attr">EMPTY</span>: <span class="string">&#x27;empty&#x27;</span>,                <span class="comment">// 业务返回空数组</span></span><br><span class="line">  <span class="attr">FILTER_EMPTY</span>: <span class="string">&#x27;filterEmpty&#x27;</span>,   <span class="comment">// 筛选或分页后为空</span></span><br><span class="line">  <span class="attr">UNAUTHORIZED</span>: <span class="string">&#x27;unauthorized&#x27;</span>,  <span class="comment">// 未登录</span></span><br><span class="line">  <span class="attr">FORBIDDEN</span>: <span class="string">&#x27;forbidden&#x27;</span>,        <span class="comment">// 无权限</span></span><br><span class="line">  <span class="attr">BAD_PARAM</span>: <span class="string">&#x27;badParam&#x27;</span>,         <span class="comment">// 参数错</span></span><br><span class="line">  <span class="attr">DEGRADED</span>: <span class="string">&#x27;degraded&#x27;</span>,          <span class="comment">// 部分数据降级</span></span><br><span class="line">  <span class="attr">DATA</span>: <span class="string">&#x27;data&#x27;</span>                   <span class="comment">// 正常有数据</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>判定函数按那张表的顺序往下走，命中就返回，没有嵌套：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// judge.js  唯一的状态判定入口，顺序不许调整</span></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">judgeState</span>(<span class="params">token, transportOk, res, hasFilter</span>) &#123;</span><br><span class="line">  <span class="keyword">if</span> (!token) <span class="keyword">return</span> <span class="title class_">ViewState</span>.<span class="property">UNAUTHORIZED</span>;</span><br><span class="line">  <span class="keyword">if</span> (!transportOk || !res) <span class="keyword">return</span> <span class="title class_">ViewState</span>.<span class="property">ERROR</span>;</span><br><span class="line">  <span class="keyword">if</span> (res.<span class="property">code</span> === <span class="number">401</span>) <span class="keyword">return</span> <span class="title class_">ViewState</span>.<span class="property">UNAUTHORIZED</span>;</span><br><span class="line">  <span class="keyword">if</span> (res.<span class="property">code</span> === <span class="number">403</span>) <span class="keyword">return</span> <span class="title class_">ViewState</span>.<span class="property">FORBIDDEN</span>;</span><br><span class="line">  <span class="keyword">if</span> (res.<span class="property">code</span> &gt;= <span class="number">1000</span> &amp;&amp; res.<span class="property">code</span> &lt; <span class="number">2000</span>) <span class="keyword">return</span> <span class="title class_">ViewState</span>.<span class="property">BAD_PARAM</span>;</span><br><span class="line">  <span class="keyword">if</span> (res.<span class="property">code</span> !== <span class="number">0</span>) <span class="keyword">return</span> <span class="title class_">ViewState</span>.<span class="property">ERROR</span>;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">var</span> list = (res.<span class="property">data</span> &amp;&amp; res.<span class="property">data</span>.<span class="property">list</span>) ? res.<span class="property">data</span>.<span class="property">list</span> : [];</span><br><span class="line">  <span class="keyword">if</span> (list.<span class="property">length</span> === <span class="number">0</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> hasFilter ? <span class="title class_">ViewState</span>.<span class="property">FILTER_EMPTY</span> : <span class="title class_">ViewState</span>.<span class="property">EMPTY</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">// 主列表有了，但汇总那块挂了：走降级，不走空</span></span><br><span class="line">  <span class="keyword">if</span> (res.<span class="property">data</span> &amp;&amp; res.<span class="property">data</span>.<span class="property">degraded</span>) <span class="keyword">return</span> <span class="title class_">ViewState</span>.<span class="property">DEGRADED</span>;</span><br><span class="line">  <span class="keyword">return</span> <span class="title class_">ViewState</span>.<span class="property">DATA</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>模板层只挂一组块，状态写在容器上决定哪个出来，模板里不再有判断：</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">&#123;% raw %&#125;</span><br><span class="line"><span class="tag">&lt;<span class="name">div</span> <span class="attr">class</span>=<span class="string">&quot;list-panel&quot;</span> <span class="attr">data-state</span>=<span class="string">&quot;&#123;&#123;state&#125;&#125;&quot;</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">div</span> <span class="attr">class</span>=<span class="string">&quot;pane pane-loading&quot;</span>&gt;</span>&#123;&#123;loadingText&#125;&#125;<span class="tag">&lt;/<span class="name">div</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">div</span> <span class="attr">class</span>=<span class="string">&quot;pane pane-error&quot;</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">p</span>&gt;</span>&#123;&#123;errorText&#125;&#125;<span class="tag">&lt;/<span class="name">p</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">button</span> <span class="attr">type</span>=<span class="string">&quot;button&quot;</span> <span class="attr">class</span>=<span class="string">&quot;js-retry&quot;</span>&gt;</span>重新加载<span class="tag">&lt;/<span class="name">button</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;/<span class="name">div</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">div</span> <span class="attr">class</span>=<span class="string">&quot;pane pane-empty&quot;</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">p</span>&gt;</span>这个店铺还没有订单<span class="tag">&lt;/<span class="name">p</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">button</span> <span class="attr">type</span>=<span class="string">&quot;button&quot;</span> <span class="attr">class</span>=<span class="string">&quot;js-goto-create&quot;</span>&gt;</span>去新建第一条<span class="tag">&lt;/<span class="name">button</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;/<span class="name">div</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">div</span> <span class="attr">class</span>=<span class="string">&quot;pane pane-filter-empty&quot;</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">p</span>&gt;</span>没有符合当前条件的订单<span class="tag">&lt;/<span class="name">p</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">button</span> <span class="attr">type</span>=<span class="string">&quot;button&quot;</span> <span class="attr">class</span>=<span class="string">&quot;js-clear-filter&quot;</span>&gt;</span>清空筛选条件<span class="tag">&lt;/<span class="name">button</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;/<span class="name">div</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">div</span> <span class="attr">class</span>=<span class="string">&quot;pane pane-forbidden&quot;</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">p</span>&gt;</span>你没有查看订单的权限<span class="tag">&lt;/<span class="name">p</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">button</span> <span class="attr">type</span>=<span class="string">&quot;button&quot;</span> <span class="attr">class</span>=<span class="string">&quot;js-contact-admin&quot;</span>&gt;</span>联系管理员<span class="tag">&lt;/<span class="name">button</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;/<span class="name">div</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">div</span> <span class="attr">class</span>=<span class="string">&quot;pane pane-data&quot;</span>&gt;</span>&#123;&#123;tableHtml&#125;&#125;<span class="tag">&lt;/<span class="name">div</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">div</span>&gt;</span></span><br><span class="line">&#123;% endraw %&#125;</span><br></pre></td></tr></table></figure>
+
+<p>好处很实在：加状态变成三步，排查变成看容器上那个属性；最关键是判定顺序第一次成了一段能被人核对的代码，而不是一张谁都能往里塞判断的网。</p>
+<h2 id="文案负责说下一步，不负责安慰人"><a href="#文案负责说下一步，不负责安慰人" class="headerlink" title="文案负责说下一步，不负责安慰人"></a>文案负责说下一步，不负责安慰人</h2><p>页面能给的东西只有三样，第三样最重要：现在能做什么。我们和设计同学吵了两天，最后写死一句话贴在工位上：**只写”暂无数据”等于没做设计。**它不告诉用户是没有还是看不见，更不告诉他该点哪里；反过来一个状态给三个按钮同样让人抓瞎，所以一个状态只给一个主操作：</p>
+<table>
+<thead>
+<tr>
+<th>状态</th>
+<th>主操作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>加载失败</td>
+<td>重新加载</td>
+</tr>
+<tr>
+<td>业务空</td>
+<td>去新建第一条</td>
+</tr>
+<tr>
+<td>筛选后为空</td>
+<td>清空筛选条件</td>
+</tr>
+<tr>
+<td>无权限</td>
+<td>联系管理员</td>
+</tr>
+<tr>
+<td>参数错</td>
+<td>回到出错的输入框</td>
+</tr>
+<tr>
+<td>部分降级</td>
+<td>重试失败的辅助区块</td>
+</tr>
+</tbody></table>
+<p>两个要点。”业务空”和”筛选后为空”的动作相反：一个让用户创造数据，一个让用户去掉限制，合成一个必然有一个动作是错的。”当前条件”四个字也必须有，把条件原样显示在空状态下面一行之后投诉少了一截（这是我们自己那次的粗略观察，口径是那个月客服工单的分类数量）。</p>
+<h2 id="重试按钮：三种写法只有一种是对的"><a href="#重试按钮：三种写法只有一种是对的" class="headerlink" title="重试按钮：三种写法只有一种是对的"></a>重试按钮：三种写法只有一种是对的</h2><p>重试最容易写错，因为它要回答”重试期间页面算什么状态”。2016 年 6 月底，运营同事反馈”重试按钮点了三次，后台收到十个请求”。扒开看，按钮绑了点击就发请求，请求没回来时按钮还可点；用户切走再切回来，组件又初始化一次，把在飞的请求丢在外面。这些响应依次回来互相覆盖，显示哪个全看运气。</p>
+<p>现在这版把三件事做全了：先把状态置回加载中，再禁用按钮，再限制次数。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// retry.js  ES5 回调，只管状态与请求闸门</span></span><br><span class="line"><span class="keyword">var</span> <span class="variable constant_">MAX_RETRY</span> = <span class="number">3</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">bindRetry</span>(<span class="params">view, fetchList</span>) &#123;</span><br><span class="line">  <span class="keyword">var</span> retryCount = <span class="number">0</span>;</span><br><span class="line">  <span class="keyword">var</span> inFlight = <span class="literal">false</span>;</span><br><span class="line">  <span class="keyword">var</span> ticket = <span class="number">0</span>; <span class="comment">// 用来丢弃过期响应</span></span><br><span class="line"></span><br><span class="line">  view.<span class="title function_">on</span>(<span class="string">&#x27;click&#x27;</span>, <span class="string">&#x27;.js-retry&#x27;</span>, <span class="keyword">function</span> (<span class="params"></span>) &#123;</span><br><span class="line">    <span class="keyword">if</span> (inFlight || retryCount &gt;= <span class="variable constant_">MAX_RETRY</span>) <span class="keyword">return</span>;</span><br><span class="line"></span><br><span class="line">    retryCount += <span class="number">1</span>;</span><br><span class="line">    inFlight = <span class="literal">true</span>;</span><br><span class="line">    view.<span class="title function_">setState</span>(<span class="title class_">ViewState</span>.<span class="property">LOADING</span>);   <span class="comment">// 关键：先回加载中</span></span><br><span class="line">    view.<span class="title function_">disable</span>(<span class="string">&#x27;.js-retry&#x27;</span>);          <span class="comment">// 再闸门，防连点</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">var</span> myTicket = ++ticket;</span><br><span class="line">    <span class="title function_">fetchList</span>(<span class="keyword">function</span> <span class="title function_">onDone</span>(<span class="params">transportOk, res</span>) &#123;</span><br><span class="line">      <span class="keyword">if</span> (myTicket !== ticket) <span class="keyword">return</span>;  <span class="comment">// 过期响应，直接丢</span></span><br><span class="line">      inFlight = <span class="literal">false</span>;</span><br><span class="line">      view.<span class="title function_">enable</span>(<span class="string">&#x27;.js-retry&#x27;</span>);</span><br><span class="line">      <span class="keyword">if</span> (retryCount &gt;= <span class="variable constant_">MAX_RETRY</span>) &#123;</span><br><span class="line">        view.<span class="title function_">setState</span>(<span class="title class_">ViewState</span>.<span class="property">ERROR</span>);</span><br><span class="line">        view.<span class="title function_">setHint</span>(<span class="string">&#x27;连续几次都没能加载成功，请稍后再试或联系管理员&#x27;</span>);</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">      &#125;</span><br><span class="line">      view.<span class="title function_">setState</span>(<span class="title function_">judgeState</span>(view.<span class="title function_">getToken</span>(), transportOk, res, view.<span class="title function_">hasFilter</span>()));</span><br><span class="line">    &#125;);</span><br><span class="line">  &#125;);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>最容易漏的是第一条：重试期间必须把状态置回加载中。只禁按钮不改状态，屏幕上一直挂着”加载失败”，用户以为没反应，于是更用力地点。自增号防的是旧响应覆盖新结果。</p>
+<p>退让也要设计：达到上限后不再自动重试，提示里给出”联系管理员”这个出口。还有一次是失败后加了定时器自己重试，页面在后台标签挂一整晚，接口被自己的页面轮了几个小时。后来定了规矩——<strong>自动重试只发生在用户看得见这个页面的时候</strong>，页面隐藏就清掉定时器。</p>
+<h2 id="加载中的那一屏：一句文案还是一个骨架"><a href="#加载中的那一屏：一句文案还是一个骨架" class="headerlink" title="加载中的那一屏：一句文案还是一个骨架"></a>加载中的那一屏：一句文案还是一个骨架</h2><p>怎么画不在这里讲，只讲用哪种、什么时候升级。</p>
+<p>默认用一句”正在加载”，什么页面都能用。骨架屏这个说法当时刚从国外传进来，2016 年上半年我们只在订单列表和商品列表试过，因为只有它们结构固定；行数不固定的页面别做，格子跟真实结果差太多，加载完整页跳动，比空白还难受。规矩定成<strong>结构稳定才用占位，否则就用一句文案</strong>。</p>
+<p>更要紧的是超时升级，”加载中”挂着不动跟白屏没区别。当期阈值：1.5 秒以内什么都不显示，避免一闪而过；超过 1.5 秒显示”正在加载”；超过 8 秒换成”加载有点慢，请稍候”；超过 15 秒判成失败并给出重试。依据是那阵子我们后台的响应时间分布，多数列表接口在 1 秒内，而”页面卡住”这类投诉到打电话大概要等十几秒（这是我们自己那次的粗略观察，口径是网关日志按接口聚合的耗时中位数和长尾，样本不到一个月）。</p>
+<h2 id="接口错误码约定：状态模型的另一半在后端"><a href="#接口错误码约定：状态模型的另一半在后端" class="headerlink" title="接口错误码约定：状态模型的另一半在后端"></a>接口错误码约定：状态模型的另一半在后端</h2><p>前端单干撑不起这套东西。2016 年 7 月中旬，我们和后端把响应体谈成一个约定：错误分四层，每层只对应前端一个状态，不许跨层。</p>
+<table>
+<thead>
+<tr>
+<th>层</th>
+<th>后端怎么回</th>
+<th>前端落到哪个状态</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>传输层</td>
+<td>HTTP 500、网关超时、无响应</td>
+<td>加载失败</td>
+</tr>
+<tr>
+<td>鉴权层</td>
+<td>HTTP 401、403，或业务码 4001、4003</td>
+<td>未登录 &#x2F; 无权限</td>
+</tr>
+<tr>
+<td>业务空</td>
+<td>码为 0，列表字段是空数组</td>
+<td>空 &#x2F; 筛选后为空</td>
+</tr>
+<tr>
+<td>参数错</td>
+<td>码在 1000 段，另带一个字段名</td>
+<td>参数错</td>
+</tr>
+</tbody></table>
+<p>响应体三段固定成 <code>code</code>、<code>message</code>、<code>data</code>，其中 <code>message</code> 只给我们排查用，不往页面贴，文案由前端按状态自己出。</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;code&quot;</span><span class="punctuation">:</span> <span class="number">0</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;message&quot;</span><span class="punctuation">:</span> <span class="string">&quot;ok&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;data&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;list&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span><span class="punctuation">]</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;total&quot;</span><span class="punctuation">:</span> <span class="number">0</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;echoFilter&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span> <span class="attr">&quot;time&quot;</span><span class="punctuation">:</span> <span class="string">&quot;2016-07-05&quot;</span><span class="punctuation">,</span> <span class="attr">&quot;status&quot;</span><span class="punctuation">:</span> <span class="string">&quot;cancelled&quot;</span> <span class="punctuation">&#125;</span></span><br><span class="line">  <span class="punctuation">&#125;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;code&quot;</span><span class="punctuation">:</span> <span class="number">1004</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;message&quot;</span><span class="punctuation">:</span> <span class="string">&quot;date range invalid: end before start&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;field&quot;</span><span class="punctuation">:</span> <span class="string">&quot;endTime&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;data&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">null</span></span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p><code>echoFilter</code> 是这次约定里我最满意的一条：后端把生效的筛选条件原样带回来，前端拿它判有没有条件，比在本地猜”用户是不是筛过”可靠得多。约定写成文档之后，加新接口不用再讨论”这种情况算失败还是算空”。</p>
+<h2 id="403-被渲染成空列表：查了三天的排查"><a href="#403-被渲染成空列表：查了三天的排查" class="headerlink" title="403 被渲染成空列表：查了三天的排查"></a>403 被渲染成空列表：查了三天的排查</h2><p>6 月下旬，一个连锁品牌的分店账号说看不到总部给的订单，数据同学怀疑是同步延迟。前端查了一天，列表确实是空的，看着完全符合”数据没同步”。直到我把 <code>XMLHttpRequest</code> 那层手写的封装扒开看，才发现里面有一句非 200 也照样按成功往下回调——403 就是这样变成空数组的。</p>
+<p>三天的排查，根因是十行拦截代码把状态码吃了：把”我拒绝你”翻译成”这里没东西”，鉴权问题就伪装成了数据问题。修完加两条规矩：封装层不许把非 200 归成成功；判定表里鉴权分支排在长度分支前面。</p>
+<p>监控只引用一句，采集与上报那篇写透了：我们把”空数据率”当指标看了一整周，把日志里”码为 0 且列表为空”的占比和”带条件的空”分开算。空集中在带条件的请求上，是筛选太严；无条件请求上也抬头、失败计数同时上涨，就是接口真挂了（口径是我们自己那次的粗略观察，只统计三个主要列表接口）。</p>
+<h2 id="上线之后又改了两处"><a href="#上线之后又改了两处" class="headerlink" title="上线之后又改了两处"></a>上线之后又改了两处</h2><p>这套模型 7 月中旬上线，站稳之前被改过两次。</p>
+<p>第一处是”筛选后为空”。初版判的是当前表单值，很快发现用户翻到第 5 页时结果为空也被算成它，给的动作是”清空筛选条件”，一点跳回第 1 页，用户以为搜索坏了。后来把分页拆出来：条件为空但页码大于 1，动作是”回到上一页”。</p>
+<p>第二处是把未登录从列表状态里拿掉：没有 token 应该直接跳登录页，它留在枚举里，就有人在没登录时又渲染了一次空列表。</p>
+<p>两处都好落地，反而是”部分降级”最难，难不在前端。它要求接口说清”哪部分挂了”，而后端当时的做法是辅助字段查不到就悄悄留空，前端无法区分”这单没有备注”和”备注接口挂了”。最后我们逼着接口加了一个字段列出残缺区块，这事排了两个月。结论是：<strong>降级不是一个前端状态，是一种需要接口配合的能力</strong>，接口不配合时宁可不显示辅助区块，也别让整页空。</p>
+<h2 id="收尾：一张对照表，不是视觉规范"><a href="#收尾：一张对照表，不是视觉规范" class="headerlink" title="收尾：一张对照表，不是视觉规范"></a>收尾：一张对照表，不是视觉规范</h2><p>最后把状态按”触发条件—唯一主操作”收在一处。它只回答”该干什么”，不回答”长什么样”，颜色和插图不在这里定。</p>
+<table>
+<thead>
+<tr>
+<th>状态</th>
+<th>触发条件</th>
+<th>该给的唯一主操作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>加载中</td>
+<td>请求已发出且未超时</td>
+<td>无，只给一句文案</td>
+</tr>
+<tr>
+<td>加载失败</td>
+<td>传输层不成或超时到阈值</td>
+<td>重新加载</td>
+</tr>
+<tr>
+<td>业务空</td>
+<td>码为 0，无条件，长度为 0</td>
+<td>去新建第一条</td>
+</tr>
+<tr>
+<td>筛选后为空</td>
+<td>条件还在且结果为 0</td>
+<td>清空筛选条件</td>
+</tr>
+<tr>
+<td>无权限</td>
+<td>403 或鉴权码</td>
+<td>联系管理员</td>
+</tr>
+<tr>
+<td>参数错</td>
+<td>参数段业务码</td>
+<td>回到出错的输入框</td>
+</tr>
+<tr>
+<td>部分降级</td>
+<td>主列表有但带残缺标记</td>
+<td>重试失败的辅助区块</td>
+</tr>
+</tbody></table>
+<p>回头看那个早上，那位老板看到的不是一个 bug，而是一个没人负责回答的问题。把状态枚举出来、把顺序定下来、把动作绑到状态上，剩下的只是把那一片白换成一句带下一步的文案。它让”页面看起来像挂了”第一次变成一个能核对、能改、能负责的分支。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>前端空状态与异常状态设计</p><p><a href="https://987763485.github.io/2016/07/12/前端空状态与异常状态设计/">https://987763485.github.io/2016/07/12/前端空状态与异常状态设计/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2016-07-12</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-21</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/web%E5%89%8D%E7%AB%AF/">web前端</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/">前端工程化</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2016/07/17/JavaScript%E5%A4%A7%E6%95%B0%E8%BF%90%E7%AE%97%E5%AE%9E%E7%8E%B0/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">JavaScript 大数运算实现</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2016/07/07/%E8%A1%A8%E5%8D%95%E4%BA%A4%E4%BA%92%E8%AE%BE%E8%AE%A1%E6%9C%80%E4%BD%B3%E5%AE%9E%E8%B7%B5/"><span class="level-item">表单交互设计最佳实践</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

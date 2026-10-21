@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Coding Agent 设计与实现 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="自己写一个 Coding Agent，难的不是那个 while 循环，而是循环周围的六个决策：仓库怎么进上下文、改动用什么表示、执行反馈从哪里来、失败之后重试几次、写操作在哪里拦住、预算怎么收口。这篇只走这条工程线，不拆某个产品的内部实现，也不谈评测取数口径，目标是给出一份可以直接改的骨架和每一格的取舍理由。文中阈值均为团队约定示例，出现的数字一律是示意值，不能当实测结论。"><meta property="og:type" content="blog"><meta property="og:title" content="Coding Agent 设计与实现"><meta property="og:url" content="https://987763485.github.io/2026/08/01/CodingAgent%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%AE%9E%E7%8E%B0/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="自己写一个 Coding Agent，难的不是那个 while 循环，而是循环周围的六个决策：仓库怎么进上下文、改动用什么表示、执行反馈从哪里来、失败之后重试几次、写操作在哪里拦住、预算怎么收口。这篇只走这条工程线，不拆某个产品的内部实现，也不谈评测取数口径，目标是给出一份可以直接改的骨架和每一格的取舍理由。文中阈值均为团队约定示例，出现的数字一律是示意值，不能当实测结论。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2026-07-31T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-20T17:22:23.528Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="大模型"><meta property="article:tag" content="python"><meta property="article:tag" content="agent"><meta property="article:tag" content="typescript"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2026/08/01/CodingAgent%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%AE%9E%E7%8E%B0/"},"headline":"Coding Agent 设计与实现","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2026-07-31T16:00:00.000Z","dateModified":"2026-10-20T17:22:23.528Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"自己写一个 Coding Agent，难的不是那个 while 循环，而是循环周围的六个决策：仓库怎么进上下文、改动用什么表示、执行反馈从哪里来、失败之后重试几次、写操作在哪里拦住、预算怎么收口。这篇只走这条工程线，不拆某个产品的内部实现，也不谈评测取数口径，目标是给出一份可以直接改的骨架和每一格的取舍理由。文中阈值均为团队约定示例，出现的数字一律是示意值，不能当实测结论。"}</script><link rel="canonical" href="https://987763485.github.io/2026/08/01/CodingAgent%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%AE%9E%E7%8E%B0/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2026-07-31T16:00:00.000Z" title="8/1/2026, 12:00:00 AM">2026-08-01</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></span><span class="level-item">31 分钟读完 (大约4679个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Coding Agent 设计与实现</h1><nav class="series-nav" aria-label="系列文章导航"><div class="series-nav-meta"><i class="fas fa-book-open" aria-hidden="true"></i><span>本文属于《<a class="series-nav-title" href="/series/agent/">Agent 智能体开发</a>》第 54/55 篇</span></div><div class="series-nav-links"><a class="series-nav-link series-nav-prev" href="/2026/07/25/%E4%BB%8ECopilot%E5%88%B0Agent%E7%9A%84%E6%BC%94%E8%BF%9B/"><i class="fas fa-chevron-left" aria-hidden="true"></i><span>上一篇</span></a><a class="series-nav-link series-nav-index" href="/series/agent/">系列目录</a><a class="series-nav-link series-nav-next" href="/2026/08/08/Agent%E5%BE%AE%E8%B0%83%E4%B8%8E%E9%A2%86%E5%9F%9F%E9%80%82%E9%85%8D/"><span>下一篇</span><i class="fas fa-chevron-right" aria-hidden="true"></i></a></div></nav><div class="content"><p>自己写一个 Coding Agent，难的不是那个 while 循环，而是循环周围的六个决策：仓库怎么进上下文、改动用什么表示、执行反馈从哪里来、失败之后重试几次、写操作在哪里拦住、预算怎么收口。这篇只走这条工程线，不拆某个产品的内部实现，也不谈评测取数口径，目标是给出一份可以直接改的骨架和每一格的取舍理由。文中阈值均为团队约定示例，出现的数字一律是示意值，不能当实测结论。</p>
+<h2 id="本文的口径与边界"><a href="#本文的口径与边界" class="headerlink" title="本文的口径与边界"></a>本文的口径与边界</h2><p>本文假设你手上已经有两样东西：一个能调用工具的模型，一台能跑构建与测试、且愿意被套上沙箱的机器。要讨论的是把这两样缝成可靠系统的那层胶水，也就是通常所说的 harness。</p>
+<p>这一层的麻烦来自三条硬约束。第一条是模型会自信地编造：它会调用你没注册的工具、引用不存在的符号、把你贴给它的一半代码当成全部真相。第二条是仓库读不完：再怎么大的上下文窗口，面对一个中等规模代码库的全文也只能塞进零头，所以必须有召回与压缩。第三条是执行有副作用：文件会被真的改掉，命令会真的跑，token 会真的花掉，这三件事都比“回答错了”更难撤销。</p>
+<p>业界参照只提一句，避免和同批文章重复：Devin 在 2024-03-12 以 early access 形态出现，GitHub Copilot 的 agent mode 在 2025-02-06 进入 Insiders 公开预览、2025-04-04 转为全量并带上 MCP 支持，Claude Code 是 2025 年公开的命令行形态；SWE-bench 这类代码基准早在 2023 年就已存在，但本文不引用任何通过率或名次。产品内部长什么样，见《Claude Code 源码架构解析》；极简框架的取舍，见《PiAgent框架解析》；怎么建任务集、怎么取数，见《AI编码助手深度评测》。这三件事本文一概不复述，只谈“自己实现要做的决策”。</p>
+<h2 id="循环骨架与三个必须存在的槽位"><a href="#循环骨架与三个必须存在的槽位" class="headerlink" title="循环骨架与三个必须存在的槽位"></a>循环骨架与三个必须存在的槽位</h2><p>先看形状。一个能跑起来的骨架大约是这样，下面是示意性的伪码，重点在槽位而不是语法：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">run_agent</span>(<span class="params">task, repo, budget, model, tools, policy</span>):</span><br><span class="line">    ctx = build_context(task, repo)          <span class="comment"># 召回 + 压缩，不是全文塞入</span></span><br><span class="line">    <span class="keyword">while</span> budget.has_room():</span><br><span class="line">        step = model.decide(ctx, task, tools.spec())</span><br><span class="line">        <span class="keyword">if</span> step.kind == <span class="string">&quot;final&quot;</span>:</span><br><span class="line">            <span class="keyword">return</span> summarize(step, ctx)</span><br><span class="line">        verdict = policy.check(step)         <span class="comment"># 默认拒绝，命中白名单才放行</span></span><br><span class="line">        <span class="keyword">if</span> verdict.deny:</span><br><span class="line">            ctx = ctx.append_denied(verdict) <span class="comment"># 拒绝也要回写，否则反复撞同一扇门</span></span><br><span class="line">            <span class="keyword">continue</span></span><br><span class="line">        result = tools.execute(step, budget.step_limit())</span><br><span class="line">        ctx = ctx.merge(step, result)        <span class="comment"># 保留 diff，不保留原始长日志</span></span><br><span class="line">        <span class="keyword">if</span> ctx.is_unstable():</span><br><span class="line">            repo.rollback_to_last_checkpoint()</span><br><span class="line">    <span class="keyword">return</span> stop_for_budget(task, ctx)</span><br></pre></td></tr></table></figure>
+
+<p>这段里有三个槽位经常被省掉，而它们恰恰决定稳定性。第一个是拒绝回写：权限拦下一个动作时，必须把“为什么被拦、有什么替代”当成一条观测塞回上下文，否则模型会在同一个门槛上撞三五次，白烧预算。第二个是取消点：预算检查和取消标志只放在循环顶部，动作执行中途不要指望能停，长命令要靠外部超时把进程收掉。第三个是回滚锚点：每完成一次校验通过的状态就打一个检查点，失败时回到锚点而不是带着半改的状态继续猜。</p>
+<p>在 TypeScript 侧做同样的事，习惯做法是把动作表示成可判别的联合类型，用 kind 字段分支，而不是让模型自由返回一个对象再到处取键。模型输出的键名不稳定，联合类型能把“缺字段”从运行期崩溃变成一次可重试的解析失败。控制流建议保持单线程顺序，并行只放在只读检索那一层；写操作并行会引入合并冲突，收益远小于代价。</p>
+<h2 id="仓库上下文构建：索引、依赖图与相关文件召回"><a href="#仓库上下文构建：索引、依赖图与相关文件召回" class="headerlink" title="仓库上下文构建：索引、依赖图与相关文件召回"></a>仓库上下文构建：索引、依赖图与相关文件召回</h2><p>上下文构建的决策只有一句话：在有限的窗口里，放什么、不放什么、按什么顺序放。常见做法是分层装配，优先级从高到低大致是任务原文与约束、入口相关文件、依赖图邻居、跨模块检索命中的片段、仓库级摘要与约定。把优先级写成显式的装配清单，比事后调 prompt 可靠得多。</p>
+<p>召回手段各有明显的失效场景，选型时按这张表对照：</p>
+<table>
+<thead>
+<tr>
+<th>召回手段</th>
+<th>建索引成本</th>
+<th>相关性问题</th>
+<th>典型失效场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>全文或关键词匹配</td>
+<td>很低，可直接扫</td>
+<td>命名不一致就漏</td>
+<td>大型仓库里噪声爆炸</td>
+</tr>
+<tr>
+<td>结构召回：导入与调用图邻居</td>
+<td>中，需要解析器</td>
+<td>只覆盖显式依赖</td>
+<td>反射、动态加载、配置驱动</td>
+</tr>
+<tr>
+<td>嵌入向量相似检索</td>
+<td>中高，需推理与存储</td>
+<td>相似不等于需要</td>
+<td>短标识符、模板代码难区分</td>
+</tr>
+<tr>
+<td>构建系统给出的目标依赖</td>
+<td>中，复用现有构建</td>
+<td>粒度偏粗</td>
+<td>未纳入构建的脚本与资源</td>
+</tr>
+</tbody></table>
+<p>这四路是并联的：只走一路会漏，四路全走会重复，所以召回之后必须去重与裁剪，同一文件的不同区间合并，跨路命中的同一片段只留一份，并按“是否会被本次改动直接触碰”排序。</p>
+<p>依赖图这一路的性价比最高。边可以从语言级导入语句抽，也可以从构建配置的目标依赖抽；前者精细但跨语言会断，后者粗糙却天然贴合“改这里要重新编译哪些地方”。图不必常驻上下文，它的正确用法是回答“改这个函数会被谁看到”，把调用点列表塞进去。增量维护比全量重建友好：内容哈希变了才重解析，解析失败就退化成路径近邻，别让一个语法错误打死整条召回链。</p>
+<h2 id="修改的表示与应用：补丁还是整文件"><a href="#修改的表示与应用：补丁还是整文件" class="headerlink" title="修改的表示与应用：补丁还是整文件"></a>修改的表示与应用：补丁还是整文件</h2><p>改动怎么表示，是 Coding Agent 里最容易被低估的一格。三条主流路线的取舍大致如下：</p>
+<table>
+<thead>
+<tr>
+<th>表示方式</th>
+<th>优点</th>
+<th>代价</th>
+<th>适合的场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>行级统一补丁，带上下文行</td>
+<td>便宜、可读、易审计、易回滚</td>
+<td>上下文漂移就应用失败</td>
+<td>小范围确定性修改</td>
+</tr>
+<tr>
+<td>整文件重写</td>
+<td>不会因为偏移失败，模型擅长</td>
+<td>贵，且极易顺手改掉无关代码</td>
+<td>新生成的小文件、模板类文件</td>
+</tr>
+<tr>
+<td>区域替换，靠唯一锚点定位</td>
+<td>比行号稳，比整文件省</td>
+<td>锚点不唯一就歧义</td>
+<td>中段插入、配置块修改</td>
+</tr>
+</tbody></table>
+<p>真正决定可用性的是应用环节的四道安全检查。第一道是应用前重读：模型看到的是几秒前的快照，文件可能已经被格式化钩子或并发动作改过，落地前要重新取一次内容和内容哈希。第二道是乐观并发：把快照版本号或哈希带进应用请求，不匹配就放弃本次改动并重新规划，而不是强行按行号戳进去。第三道是幂等：同一个补丁因为重试被应用两次，是“重复插入代码块”这个经典故障的根源，应用层要有已应用的标记或做双向检测。第四道是应用后再校验：读回文件确认结果与预期一致，这一步很便宜，却能挡住大部分静默失败。</p>
+<p>失败要分级。锚点找不到，降级为区域替换或整文件重写；哈希不匹配，重新读并重新规划；权限不足，走拒绝回写。千万别做成“所有失败都重试三次”，那只会在同一个死结上烧预算。至于撤销，最省心的做法是在会话开始时建立检查点，回滚只回本次会话产生的改动，绝不碰用户已有的未提交工作。</p>
+<h2 id="执行反馈回路：测试、构建与-lint"><a href="#执行反馈回路：测试、构建与-lint" class="headerlink" title="执行反馈回路：测试、构建与 lint"></a>执行反馈回路：测试、构建与 lint</h2><p>反馈回路是把 Coding Agent 从“生成器”变成“收敛系统”的那一步。没有反馈时，模型的置信度与正确率无关；有了反馈，它至少能在错得离谱时自己发现。四类反馈的性价比差别很大，选型时按“时长、信噪比、能证明什么”三列对照：类型检查与编译最快，能证明接口接得上；单元测试中等，能证明行为符合预期；lint 便宜但噪声多，适合当收尾体检而不是决策依据；端到端与集成测试最慢也最贵，只应该在改动半径真的触及边界时启动。</p>
+<p>关键决策有三个。第一，跑什么命令不由模型自由拼，而是从仓库自己声明的地方取：脚本清单、CI 配置、构建目标；让模型现编命令，等于把权限门槛和破坏半径同时放大。第二，回给模型的输出必须做结构化压缩：退出码、失败用例名、第一条错误的文件与行号，再加有限长度的原文片段；整段构建日志塞回上下文只会烧钱，还会稀释真正有用的那一行。第三，反馈粒度要和改动半径匹配，改一行注释去跑全量端到端，等于没有反馈，只是延迟很高的噪声。</p>
+<p>一次回路在时序上大致是这样：</p>
+<pre class="mermaid">sequenceDiagram
+    participant M as 模型
+    participant P as 权限层
+    participant F as 文件层
+    participant C as 命令层
+    M->>P: 提交动作与理由
+    P-->>M: 放行或拒绝并给出替代
+    M->>F: 提交补丁与快照哈希
+    F-->>M: 应用结果与新哈希
+    M->>C: 运行仓库声明的检查命令
+    C-->>M: 退出码与截断日志
+    M->>F: 失败则回滚到检查点</pre>
+
+<p>反馈之后是重试。一个可审计的重试阶梯大致是这样：</p>
+<pre class="mermaid">stateDiagram-v2
+    [*] --> 规划
+    规划 --> 应用
+    应用 --> 校验
+    校验 --> 提交: 通过
+    校验 --> 修复: 首次失败
+    修复 --> 应用: 同一假设内
+    校验 --> 重召回: 二次失败
+    重召回 --> 规划
+    校验 --> 回滚: 三次失败
+    回滚 --> 结束: 交人工
+    提交 --> [*]
+    结束 --> [*]</pre>
+
+<p>阶梯的设计意图是把失败归因区分开：第一次失败默认当成实现细节写错，在同一个假设内修；第二次失败说明假设本身可疑，回到召回层，检查是不是读错了文件、漏了调用点；第三次失败就停止猜测，回滚到锚点，把已知的 diff、失败输出和尝试过的路径整理成一次交代清楚的人工交接。比“重试三次”更重要的是每一次都要有新的信息进来，否则只是复读。</p>
+<p>与重试配套的是最小化改动纪律，要写成显式约束而不是指望模型自觉：不顺手重构、不新增无关依赖、不做全局格式化。每一行无关改动都会放大反馈的排查面，也会让权限确认时无法回答“这行为什么要改”。校验通过后再加一轮收缩，逐段确认哪些行是达成目标所必需的，能删则删；格式化工具造成的整文件重排应在应用阶段识别出来单独对待，别混进语义改动。</p>
+<h2 id="权限与写操作确认：默认拒绝加人工门槛"><a href="#权限与写操作确认：默认拒绝加人工门槛" class="headerlink" title="权限与写操作确认：默认拒绝加人工门槛"></a>权限与写操作确认：默认拒绝加人工门槛</h2><p>任何会改状态的动作，都要走“默认拒绝、命中白名单才放行、越界触发人工确认”这条链。把工具按副作用与可撤销性分档，门槛跟着档位走，比按“看起来危不危险”逐条判断更可维护：</p>
+<table>
+<thead>
+<tr>
+<th>档位</th>
+<th>例子</th>
+<th>默认策略</th>
+<th>确认方式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>只读检索</td>
+<td>列目录、读文件、查引用</td>
+<td>放行</td>
+<td>事后审计即可</td>
+</tr>
+<tr>
+<td>仓库内写</td>
+<td>改文件、加测试、跑构建</td>
+<td>白名单目录放行</td>
+<td>展示 diff 后确认</td>
+</tr>
+<tr>
+<td>外部副作用</td>
+<td>装依赖、访问网络、开 PR</td>
+<td>默认拒绝</td>
+<td>单次逐条确认，不长期授权</td>
+</tr>
+<tr>
+<td>破坏性操作</td>
+<td>删分支、强推、跑数据迁移</td>
+<td>拒绝</td>
+<td>本文范围内一律不做，交人工</td>
+</tr>
+</tbody></table>
+<p>两个实现细节决定这套东西是否真的有效。其一是确认信息的密度：一次合格的人工确认要能回答“改哪个文件、影响哪些调用点、跑什么命令、失败怎么回滚”，只弹一个“是否允许”是无效的，用户只能盲签。其二是拒绝也要成为反馈：门槛拦下动作时，把替代路径一起写回上下文，例如“这条命令被拦，可改用仓库脚本清单里的哪一个”。</p>
+<p>凭据的处理单独说，因为它是最容易在示例代码里出事的地方。原则是 Agent 侧永远拿不到明文：凭据由运行环境注入，模型看到的只是占位符或受控代理；不写进任何明文示例，不进日志，不进缓存键。缓存键的常见错误是把带令牌的东西直接拼进去，正确做法是对一个不含机密的部分做摘要，或者用运行期的会话标识；落盘的审计轨迹里，命令参数要过一遍脱敏，长输出的原文别整体留存。会话结束后，临时产物按保留策略清理，不要指望“反正没人看”。</p>
+<p>沙箱与超时属于同一格。写操作限制在仓库根目录之内，路径规范化后再判定，防住越界的相对路径；命令执行有独立的墙钟超时和输出字节上限，两者都要能被外部观察者看到，而不是静默失败。</p>
+<h2 id="成本与时长预算"><a href="#成本与时长预算" class="headerlink" title="成本与时长预算"></a>成本与时长预算</h2><p>预算要同时管两件事：token 和墙钟。只看 token 会漏掉“跑了一次二十分钟的端到端”，只看时长会漏掉“上下文反复全量重发”。可行的做法是三层预算：会话总额、单轮上限、单条命令上限，每层都能独立触发停止，停止时输出的不是失败而是当前状态。下表数字是团队约定示例，示意值不代表合理值：</p>
+<table>
+<thead>
+<tr>
+<th>层级</th>
+<th>团队约定示例</th>
+<th>触发后的动作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>会话总额</td>
+<td>一次任务不超过若干轮工具调用</td>
+<td>收口成人工交接，附 diff 与失败摘要</td>
+</tr>
+<tr>
+<td>单轮上限</td>
+<td>单轮注入上下文有字节上限</td>
+<td>触发压缩与截断，不整段塞日志</td>
+</tr>
+<tr>
+<td>单命令上限</td>
+<td>构建或测试有墙钟与输出双上限</td>
+<td>外部超时收进程，记为一次失败</td>
+</tr>
+</tbody></table>
+<p>上下文压缩是成本的主体，值得单独设计。增量做法是保留三样：目标原文、已落地的 diff、最近若干条观测；早期轮次折叠成摘要，摘要里留文件与符号名而不是散文。要警惕摘要把约束摘丢，任务里的硬性限制一旦被压缩掉，模型就会去做被明令禁止的事，所以约束原文常驻、不进压缩队列。</p>
+<p>可观测性决定这些阈值能不能调对。至少记下：完成任务用的轮数、召回命中率、补丁应用失败率、回滚次数、被权限拦下的动作数、单位任务成本。这几个量能直接指出瓶颈在召回、在表示、还是在反馈，而凭手感通常会误判成“模型不行”。取消与恢复也要有骨架：中断时把当前 diff、检查点标识和未完成的假设写进会话状态，恢复时从状态重放，而不是从头再召回一遍。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>自己实现一个 Coding Agent，工作量集中在六个决策上：分层装配上下文、给改动选一个能审计的表示、用仓库自己声明的命令造反馈、按失败次数换假设而不是换措辞、把写操作放进默认拒绝加人工门槛的链里、用三层预算和可观测性给一切收口。骨架本身十几行就够，稳定性全来自拒绝回写、回滚锚点和取消点这些不起眼的槽位。</p>
+<p>落地顺序建议反过来：先写最小循环，把权限与预算钉死，宁可它什么也做不成；再补反馈回路，让它能自己发现错误；最后才优化召回质量，因为前三步决定它会不会把事情弄糟，第四步只决定它快不快。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Coding Agent 设计与实现</p><p><a href="https://987763485.github.io/2026/08/01/CodingAgent设计与实现/">https://987763485.github.io/2026/08/01/CodingAgent设计与实现/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2026-08-01</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-21</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="link-muted mr-2" rel="tag" href="/tags/python/">python</a><a class="link-muted mr-2" rel="tag" href="/tags/agent/">agent</a><a class="link-muted mr-2" rel="tag" href="/tags/typescript/">typescript</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2026/08/08/Agent%E5%BE%AE%E8%B0%83%E4%B8%8E%E9%A2%86%E5%9F%9F%E9%80%82%E9%85%8D/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Agent 微调与领域适配</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2026/07/25/%E4%BB%8ECopilot%E5%88%B0Agent%E7%9A%84%E6%BC%94%E8%BF%9B/"><span class="level-item">从 Copilot 到 Agent 的演进</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>安全工单与流程自动化 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="安全团队每天面对的并不是一条条孤立的告警，而是一堆需要有人负责、有时限、有证据、能复盘的处置任务。本文讨论如何用一张工单把这些任务串起来：它从哪里来、经过哪些状态、怎么分级与分派、哪些动作可以自动做、哪些必须有人点头，最后用什么指标证明流程确实变快了。文章适合正在建设或改造 SOC 流程的安全工程师、平台研发与运维负责人阅读。"><meta property="og:type" content="blog"><meta property="og:title" content="安全工单与流程自动化"><meta property="og:url" content="https://987763485.github.io/2023/02/28/%E5%AE%89%E5%85%A8%E5%B7%A5%E5%8D%95%E4%B8%8E%E6%B5%81%E7%A8%8B%E8%87%AA%E5%8A%A8%E5%8C%96/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="安全团队每天面对的并不是一条条孤立的告警，而是一堆需要有人负责、有时限、有证据、能复盘的处置任务。本文讨论如何用一张工单把这些任务串起来：它从哪里来、经过哪些状态、怎么分级与分派、哪些动作可以自动做、哪些必须有人点头，最后用什么指标证明流程确实变快了。文章适合正在建设或改造 SOC 流程的安全工程师、平台研发与运维负责人阅读。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2023-02-27T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-19T02:36:11.413Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="网络安全"><meta property="article:tag" content="等级保护"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2023/02/28/%E5%AE%89%E5%85%A8%E5%B7%A5%E5%8D%95%E4%B8%8E%E6%B5%81%E7%A8%8B%E8%87%AA%E5%8A%A8%E5%8C%96/"},"headline":"安全工单与流程自动化","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2023-02-27T16:00:00.000Z","dateModified":"2026-10-19T02:36:11.413Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"安全团队每天面对的并不是一条条孤立的告警，而是一堆需要有人负责、有时限、有证据、能复盘的处置任务。本文讨论如何用一张工单把这些任务串起来：它从哪里来、经过哪些状态、怎么分级与分派、哪些动作可以自动做、哪些必须有人点头，最后用什么指标证明流程确实变快了。文章适合正在建设或改造 SOC 流程的安全工程师、平台研发与运维负责人阅读。"}</script><link rel="canonical" href="https://987763485.github.io/2023/02/28/%E5%AE%89%E5%85%A8%E5%B7%A5%E5%8D%95%E4%B8%8E%E6%B5%81%E7%A8%8B%E8%87%AA%E5%8A%A8%E5%8C%96/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2023-02-27T16:00:00.000Z" title="2/28/2023, 12:00:00 AM">2023-02-28</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a></span><span class="level-item">1 小时读完 (大约7770个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">安全工单与流程自动化</h1><div class="content"><p>安全团队每天面对的并不是一条条孤立的告警，而是一堆需要有人负责、有时限、有证据、能复盘的处置任务。本文讨论如何用一张工单把这些任务串起来：它从哪里来、经过哪些状态、怎么分级与分派、哪些动作可以自动做、哪些必须有人点头，最后用什么指标证明流程确实变快了。文章适合正在建设或改造 SOC 流程的安全工程师、平台研发与运维负责人阅读。</p>
+<h2 id="从告警到工单：来源、分类与字段模型"><a href="#从告警到工单：来源、分类与字段模型" class="headerlink" title="从告警到工单：来源、分类与字段模型"></a>从告警到工单：来源、分类与字段模型</h2><p>安全运营的日常很容易被描述成“看告警”，真实情况更接近“管任务”。一条告警被确认之后，后面跟着的是封禁、隔离、通知业务方、修复、复测、写报告，这些动作恰恰是工单能承担的。因此在讨论流程自动化之前，先把工单模型定清楚，比直接上编排平台更重要。</p>
+<h3 id="工单的六类来源"><a href="#工单的六类来源" class="headerlink" title="工单的六类来源"></a>工单的六类来源</h3><p>按输入渠道分，安全工单大体来自六处，噪声水平相差两三个数量级（示意说法）。</p>
+<p>检测侧告警量最大，包括 SIEM 关联规则、EDR 行为检测、NDR 流量告警与云平台配置告警，置信度参差，需要先聚合再建单。扫描与评估结果结构化程度最高，包括漏洞扫描、基线核查等，天然适合自动建单并自动回写验证结果。</p>
+<p>外部情报（厂商通告、应急响应组织通报、开源组件披露）的价值在于提前，但只有与资产台账匹配过才有意义，否则只是一封转发的邮件。人员上报（钓鱼邮件、可疑登录、丢失终端、越权访问）数量不大，信息质量却参差，需要用模板引导上报人填清时间、现象与影响范围。</p>
+<p>监管与客户侧输入自带外部时限，不应与内部 SLA 共用一个字段；演练与自查的发现则重在转成可跟踪、可验收的整改项。如果用一个入口全部接收，工单系统很快退化成告警收件箱。</p>
+<h3 id="分类回答“是什么”，分级回答“多急”"><a href="#分类回答“是什么”，分级回答“多急”" class="headerlink" title="分类回答“是什么”，分级回答“多急”"></a>分类回答“是什么”，分级回答“多急”</h3><p>术语上必须把 category 与 priority 分开。category 描述工作类型，决定流程模板、必填字段、审批路径与关闭条件；priority 描述紧迫程度，决定响应与处置时限。把二者压成一个字段，是最常见的设计错误。</p>
+<p>举例来说，“某对外系统的高危远程可利用漏洞”与“某员工误点钓鱼链接但未输入凭据”，都可能判为高优先级，但前者需要变更窗口与复测，后者几小时内就能关闭。分类与分级一旦耦合，SLA 就没法按类型分别设定，指标也没法分层看。</p>
+<p>一个够用的分类集合大致是：事件、告警调查、漏洞、风险例外、合规整改、权限与访问申请。数量控制在六到八个，再多就会出现“什么都归到其他”的情况，统计随之失效。</p>
+<h3 id="先聚合，再建单"><a href="#先聚合，再建单" class="headerlink" title="先聚合，再建单"></a>先聚合，再建单</h3><p>检测侧告警不应该一对一建单。中间需要一个 triage 层，做三件事：按指纹去重、按时间窗聚合、按规则抑制已知的良性模式。</p>
+<p>指纹的构造很关键。常见做法是把规则标识、资产标识与一个粗粒度时间桶拼起来做哈希，例如按 10 分钟分桶（示意值）。这样同一台主机上同一条规则在短时间内反复触发，只会产生一张工单，并在其中累计触发次数。时间桶太细则去重无效，太粗则会把相隔数小时的两件事混为一谈，需要按规则类型分别调。</p>
+<p>抑制要格外谨慎。每条抑制规则都应当有责任人、有到期日、有命中计数，否则半年之后没人说得清它还在挡什么。</p>
+<h3 id="一张工单至少要有这些字段"><a href="#一张工单至少要有这些字段" class="headerlink" title="一张工单至少要有这些字段"></a>一张工单至少要有这些字段</h3><p>下面这张表是最小字段集合，缺一项都会在某个环节付出代价。</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>作用</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ticket_id</td>
+<td>全局唯一标识</td>
+<td>建议带日期前缀，便于口头沟通</td>
+</tr>
+<tr>
+<td>source</td>
+<td>来源系统</td>
+<td>用于统计各渠道噪声</td>
+</tr>
+<tr>
+<td>dedup_key</td>
+<td>去重指纹</td>
+<td>建单时加唯一约束</td>
+</tr>
+<tr>
+<td>category</td>
+<td>工作类型</td>
+<td>决定流程模板</td>
+</tr>
+<tr>
+<td>priority</td>
+<td>优先级</td>
+<td>可被人工修正，修正需留痕</td>
+</tr>
+<tr>
+<td>asset_ref</td>
+<td>关联资产</td>
+<td>指向资产台账主键，不存 IP 字符串</td>
+</tr>
+<tr>
+<td>owner &#x2F; queue</td>
+<td>负责人与队列</td>
+<td>分派结果</td>
+</tr>
+<tr>
+<td>state</td>
+<td>当前状态</td>
+<td>只由状态机修改</td>
+</tr>
+<tr>
+<td>sla_due</td>
+<td>响应与处置截止时间</td>
+<td>两条独立计时</td>
+</tr>
+<tr>
+<td>first_response_at</td>
+<td>首次有效响应时间</td>
+<td>MTTA 的分子</td>
+</tr>
+<tr>
+<td>resolution</td>
+<td>处置结论与根因分类</td>
+<td>关闭前必填</td>
+</tr>
+<tr>
+<td>related</td>
+<td>关联工单</td>
+<td>父子、合并、重复</td>
+</tr>
+<tr>
+<td>evidence</td>
+<td>证据与附件</td>
+<td>存哈希与对象存储地址</td>
+</tr>
+</tbody></table>
+<p>要特别强调 asset_ref。很多团队在工单里直接写 IP 地址或主机名，短期看方便，长期看是灾难：IP 会重新分配，主机名会改，日后回查难以定位当时的处理对象。工单应当持有资产台账的主键，展示层再去解析。</p>
+<p>工单的本质是“决策与动作的账本”，不是聊天窗口。凡是不能用字段表达的处理过程，最后都会变成一段没人愿意读的备注。</p>
+<h2 id="生命周期状态机：把“处理中”拆开"><a href="#生命周期状态机：把“处理中”拆开" class="headerlink" title="生命周期状态机：把“处理中”拆开"></a>生命周期状态机：把“处理中”拆开</h2><h3 id="状态只描述责任在谁手上"><a href="#状态只描述责任在谁手上" class="headerlink" title="状态只描述责任在谁手上"></a>状态只描述责任在谁手上</h3><p>在一个典型的工单系统里，“处理中”常常占到全部工单的八成。它同时包含了“已分派但还没看”“正在查”“等业务方回话”“等变更窗口”几种完全不同的处境，导致任何基于状态的统计都失去意义。</p>
+<p>状态设计的第一个原则是：状态只表达责任归属与卡点位置，不表达完成度。不要设计“处理中 60%”这类伪状态，也不要让状态数量膨胀到二十个。</p>
+<p>第二个原则是：每个状态都要定义四件事，谁能进入、进入前必须填什么、由谁负责推动、SLA 是否计时。定义不清的状态，最终都会变成谁都不敢关的悬案。</p>
+<h3 id="用一张状态表代替散落的条件判断"><a href="#用一张状态表代替散落的条件判断" class="headerlink" title="用一张状态表代替散落的条件判断"></a>用一张状态表代替散落的条件判断</h3><p>下面是一个可以直接落地的状态机骨架，用 Python 写，思路与语言无关。它把允许的迁移与迁移的前置条件集中在数据里，而不是散落在各个接口中。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Python 3.11；迁移表与守卫集中定义，接口层只调用 transit()</span></span><br><span class="line"><span class="keyword">from</span> dataclasses <span class="keyword">import</span> dataclass, field</span><br><span class="line"><span class="keyword">from</span> datetime <span class="keyword">import</span> datetime, timezone</span><br><span class="line"></span><br><span class="line">STATES = &#123;<span class="string">&quot;new&quot;</span>, <span class="string">&quot;triaged&quot;</span>, <span class="string">&quot;in_progress&quot;</span>, <span class="string">&quot;pending_confirm&quot;</span>,</span><br><span class="line">          <span class="string">&quot;on_hold&quot;</span>, <span class="string">&quot;resolved&quot;</span>, <span class="string">&quot;closed&quot;</span>, <span class="string">&quot;merged&quot;</span>, <span class="string">&quot;false_positive&quot;</span>&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment"># (源状态, 事件) -&gt; 目标状态</span></span><br><span class="line">TRANSITIONS = &#123;</span><br><span class="line">    (<span class="string">&quot;new&quot;</span>, <span class="string">&quot;triage&quot;</span>): <span class="string">&quot;triaged&quot;</span>,</span><br><span class="line">    (<span class="string">&quot;triaged&quot;</span>, <span class="string">&quot;assign&quot;</span>): <span class="string">&quot;in_progress&quot;</span>,</span><br><span class="line">    (<span class="string">&quot;triaged&quot;</span>, <span class="string">&quot;merge&quot;</span>): <span class="string">&quot;merged&quot;</span>,</span><br><span class="line">    (<span class="string">&quot;triaged&quot;</span>, <span class="string">&quot;mark_fp&quot;</span>): <span class="string">&quot;false_positive&quot;</span>,</span><br><span class="line">    (<span class="string">&quot;in_progress&quot;</span>, <span class="string">&quot;hold&quot;</span>): <span class="string">&quot;on_hold&quot;</span>,</span><br><span class="line">    (<span class="string">&quot;on_hold&quot;</span>, <span class="string">&quot;resume&quot;</span>): <span class="string">&quot;in_progress&quot;</span>,</span><br><span class="line">    (<span class="string">&quot;in_progress&quot;</span>, <span class="string">&quot;submit&quot;</span>): <span class="string">&quot;pending_confirm&quot;</span>,</span><br><span class="line">    (<span class="string">&quot;pending_confirm&quot;</span>, <span class="string">&quot;approve&quot;</span>): <span class="string">&quot;resolved&quot;</span>,</span><br><span class="line">    (<span class="string">&quot;pending_confirm&quot;</span>, <span class="string">&quot;reject&quot;</span>): <span class="string">&quot;in_progress&quot;</span>,</span><br><span class="line">    (<span class="string">&quot;resolved&quot;</span>, <span class="string">&quot;close&quot;</span>): <span class="string">&quot;closed&quot;</span>,</span><br><span class="line">    (<span class="string">&quot;closed&quot;</span>, <span class="string">&quot;reopen&quot;</span>): <span class="string">&quot;in_progress&quot;</span>,</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment"># 进入某状态前必须非空的字段，缺失则拒绝迁移</span></span><br><span class="line">REQUIRED = &#123;</span><br><span class="line">    <span class="string">&quot;triaged&quot;</span>: (<span class="string">&quot;category&quot;</span>, <span class="string">&quot;priority&quot;</span>, <span class="string">&quot;asset_ref&quot;</span>),</span><br><span class="line">    <span class="string">&quot;in_progress&quot;</span>: (<span class="string">&quot;owner&quot;</span>,),</span><br><span class="line">    <span class="string">&quot;resolved&quot;</span>: (<span class="string">&quot;resolution&quot;</span>, <span class="string">&quot;root_cause&quot;</span>),</span><br><span class="line">    <span class="string">&quot;closed&quot;</span>: (<span class="string">&quot;closed_at&quot;</span>,),</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="meta">@dataclass</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Ticket</span>:</span><br><span class="line">    ticket_id: <span class="built_in">str</span></span><br><span class="line">    state: <span class="built_in">str</span> = <span class="string">&quot;new&quot;</span></span><br><span class="line">    owner: <span class="built_in">str</span> | <span class="literal">None</span> = <span class="literal">None</span></span><br><span class="line">    resolution: <span class="built_in">str</span> | <span class="literal">None</span> = <span class="literal">None</span></span><br><span class="line">    root_cause: <span class="built_in">str</span> | <span class="literal">None</span> = <span class="literal">None</span></span><br><span class="line">    closed_at: datetime | <span class="literal">None</span> = <span class="literal">None</span></span><br><span class="line">    reopen_count: <span class="built_in">int</span> = <span class="number">0</span></span><br><span class="line">    history: <span class="built_in">list</span> = field(default_factory=<span class="built_in">list</span>)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">transit</span>(<span class="params">self, event, actor, **fields</span>):</span><br><span class="line">        target = TRANSITIONS.get((<span class="variable language_">self</span>.state, event))</span><br><span class="line">        <span class="keyword">if</span> target <span class="keyword">is</span> <span class="literal">None</span>:</span><br><span class="line">            <span class="keyword">raise</span> ValueError(<span class="string">f&quot;<span class="subst">&#123;self.state&#125;</span> 不接受事件 <span class="subst">&#123;event&#125;</span>&quot;</span>)</span><br><span class="line">        <span class="keyword">for</span> key, value <span class="keyword">in</span> fields.items():</span><br><span class="line">            <span class="built_in">setattr</span>(<span class="variable language_">self</span>, key, value)</span><br><span class="line">        <span class="keyword">for</span> name <span class="keyword">in</span> REQUIRED.get(target, ()):</span><br><span class="line">            <span class="keyword">if</span> <span class="built_in">getattr</span>(<span class="variable language_">self</span>, name, <span class="literal">None</span>) <span class="keyword">is</span> <span class="literal">None</span>:</span><br><span class="line">                <span class="keyword">raise</span> ValueError(<span class="string">f&quot;进入 <span class="subst">&#123;target&#125;</span> 前缺少字段 <span class="subst">&#123;name&#125;</span>&quot;</span>)</span><br><span class="line">        <span class="variable language_">self</span>.history.append(&#123;</span><br><span class="line">            <span class="string">&quot;at&quot;</span>: datetime.now(timezone.utc).isoformat(),</span><br><span class="line">            <span class="string">&quot;from&quot;</span>: <span class="variable language_">self</span>.state, <span class="string">&quot;to&quot;</span>: target,</span><br><span class="line">            <span class="string">&quot;event&quot;</span>: event, <span class="string">&quot;actor&quot;</span>: actor,</span><br><span class="line">        &#125;)</span><br><span class="line">        <span class="keyword">if</span> event == <span class="string">&quot;reopen&quot;</span>:</span><br><span class="line">            <span class="variable language_">self</span>.reopen_count += <span class="number">1</span></span><br><span class="line">        <span class="variable language_">self</span>.state = target</span><br><span class="line">        <span class="keyword">return</span> target</span><br></pre></td></tr></table></figure>
+
+<p>这段代码里，守卫检查目标状态的必填字段，补字段的时机就被钉死在迁移那一刻。第三个原则是：所有迁移都要产生一条不可修改的审计记录，包含操作者、时间、原状态与新状态。history 只是工单内的可读视图，真正的留痕要落到只追加的日志里。</p>
+<h3 id="合并、父子与重开"><a href="#合并、父子与重开" class="headerlink" title="合并、父子与重开"></a>合并、父子与重开</h3><p>真实世界还有三种状态机之外的形态，必须提前设计。</p>
+<p>第一种是合并。当两张工单的 dedup_key 相同，或者在人工判断下属于同一批事件，应当保留一张主单，其余置为 merged 并指向主单。统计时 merged 单不计入分母，但来源要保留，否则噪声数据就消失了。</p>
+<p>第二种是父子。一次应急可能拆出“封禁出口 IP”“重置受影响账号”“通知业务方”三张子单，父单只负责汇总与关闭条件。子单全部关闭并不等于父单关闭，父单通常还有根因分析这类不产生动作的收尾工作。父子关系最多两层，再深就没人看得懂了。</p>
+<p>第三种是重开。关闭后允许重开，但要累加 reopen_count 并保留原关闭时间。重开率是流程质量的重要信号：一个季度内它突然上升，往往说明关闭标准被放宽了，而不是问题变多了。</p>
+<h2 id="分级与-SLA：有限人力的排序依据"><a href="#分级与-SLA：有限人力的排序依据" class="headerlink" title="分级与 SLA：有限人力的排序依据"></a>分级与 SLA：有限人力的排序依据</h2><h3 id="不要直接拿-CVSS-当工单优先级"><a href="#不要直接拿-CVSS-当工单优先级" class="headerlink" title="不要直接拿 CVSS 当工单优先级"></a>不要直接拿 CVSS 当工单优先级</h3><p>漏洞管理里 CVSS 是常用的严重度标尺，但它回答的是“这个漏洞本身有多坏”，不是“现在该先处理哪一张单”。CVSS 7.5 的漏洞落在离线测试机上，和 CVSS 6.5 的漏洞落在对公网开放、承载实名数据的接口上，前者显然不该优先。</p>
+<p>工单分级至少要三个维度：影响面、紧迫性、确定性。影响面由资产重要性与数据敏感度决定，紧迫性看是否在野利用、是否暴露于互联网、攻击是否仍在进行，确定性则是对当前判断的置信度。三个维度都不高的工单，即使规则名称很吓人，也应该降级。</p>
+<h3 id="一张可解释的分级矩阵"><a href="#一张可解释的分级矩阵" class="headerlink" title="一张可解释的分级矩阵"></a>一张可解释的分级矩阵</h3><p>下面是一张示意性的分级矩阵，具体数值需按组织规模与人力调整，不要照抄。</p>
+<table>
+<thead>
+<tr>
+<th>级别</th>
+<th>判定条件（满足其一）</th>
+<th>首次响应</th>
+<th>处置时限</th>
+<th>通报要求</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>P1</td>
+<td>核心业务中断或数据外泄正在进行</td>
+<td>15 分钟</td>
+<td>4 小时</td>
+<td>立即上报安全负责人</td>
+</tr>
+<tr>
+<td>P2</td>
+<td>重要资产被确认入侵，或公网高危漏洞在野利用</td>
+<td>30 分钟</td>
+<td>24 小时</td>
+<td>当日通报</td>
+</tr>
+<tr>
+<td>P3</td>
+<td>一般资产异常、可利用但未证实的高危漏洞</td>
+<td>4 小时</td>
+<td>5 个工作日</td>
+<td>周报汇总</td>
+</tr>
+<tr>
+<td>P4</td>
+<td>低风险配置问题、加固建议、咨询类</td>
+<td>1 个工作日</td>
+<td>20 个工作日</td>
+<td>月报汇总</td>
+</tr>
+</tbody></table>
+<p>这张表真正起作用的不是时限数字，而是“满足其一”的判定条件。判定条件含糊，分级就退化成主观感觉。允许人工改级，但必须留下理由与操作者，统计时把“人工上调”与“系统判定”分开，否则会掩盖检测规则的偏差。</p>
+<h3 id="SLA-的计时口径比时限本身更重要"><a href="#SLA-的计时口径比时限本身更重要" class="headerlink" title="SLA 的计时口径比时限本身更重要"></a>SLA 的计时口径比时限本身更重要</h3><p>SLA 落地失败，九成不是时限定得太紧，而是计时口径没定清楚。</p>
+<p>一是分清自然时间与工作日历。P1 用自然时间，7×24 不停表；P4 用工作日历，节假日不计，两套日历混用会让月末报表对不上。二是暂停必须白名单化：等待业务方、等待变更窗口、等待厂商响应可以挂起，但要按预设原因挂起、单独统计时长、设置上限并超限自动恢复计时，不能由处理人自由填写“挂起”。</p>
+<p>三是违约要留痕，不能静默改期。四是内部 SLA 与外部承诺分开，监管通报、客户合同里的独立时限应作为单独字段存在并触发额外提醒，不能混进普通工单的计时。</p>
+<p>超时升级要提前设计触发点与接收人：时限过半提醒处理人，剩余四分之一时提醒主管，超时后升级到上一级队列。升级的目的是把卡住的工单交给有权限推动它的人，通知里要写清卡在哪个状态、做过什么、需要谁做什么决定。</p>
+<h2 id="自动分派与路由"><a href="#自动分派与路由" class="headerlink" title="自动分派与路由"></a>自动分派与路由</h2><h3 id="规则路由与能力路由"><a href="#规则路由与能力路由" class="headerlink" title="规则路由与能力路由"></a>规则路由与能力路由</h3><p>自动分派有两种思路，实践中要结合使用。规则路由基于工单属性做匹配：资产归属哪个业务线、位于哪个网络区域、属于哪类系统、在什么时间段产生，它可解释、易审计，缺点是规则越写越多。能力路由基于“谁有能力处理”做匹配：技能标签、认证资质、当班表、当前负载，它更接近真实分工，缺点是需要维护人员画像。常见顺序是先用规则确定候选队列，再在队列内按能力与负载选人。</p>
+<h3 id="让分派表跟着资产台账走"><a href="#让分派表跟着资产台账走" class="headerlink" title="让分派表跟着资产台账走"></a>让分派表跟着资产台账走</h3><p>分派规则里最容易腐化的一类，是把“网段到负责人”的映射硬编码在配置里。组织一调整，这份映射就无人维护。</p>
+<p>更稳的做法是把归属关系放在资产台账里，工单只做一次关联查询：asset_ref 指向资产，资产指向业务系统，业务系统指向责任团队与责任人。工单系统不需要知道网段，只需要知道主键。</p>
+<p>规则本身应当配置化，并纳入版本管理与评审。下面是一段示意性的规则配置，用 YAML 表达，按顺序匹配，命中即停。</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 路由规则示意；order 决定匹配顺序，命中即停</span></span><br><span class="line"><span class="attr">version:</span> <span class="number">7</span></span><br><span class="line"><span class="attr">rules:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">核心支付系统事件</span></span><br><span class="line">    <span class="attr">order:</span> <span class="number">10</span></span><br><span class="line">    <span class="attr">when:</span></span><br><span class="line">      <span class="attr">category:</span> <span class="string">incident</span></span><br><span class="line">      <span class="attr">asset.system_tier:</span> <span class="string">core</span></span><br><span class="line">      <span class="attr">asset.business_unit:</span> <span class="string">payment</span></span><br><span class="line">    <span class="attr">route:</span></span><br><span class="line">      <span class="attr">queue:</span> <span class="string">soc-p1</span></span><br><span class="line">      <span class="attr">oncall:</span> <span class="string">payment-security</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">公网暴露主机告警</span></span><br><span class="line">    <span class="attr">order:</span> <span class="number">20</span></span><br><span class="line">    <span class="attr">when:</span></span><br><span class="line">      <span class="attr">category:</span> <span class="string">alert_triage</span></span><br><span class="line">      <span class="attr">asset.exposure:</span> <span class="string">internet</span></span><br><span class="line">    <span class="attr">route:</span></span><br><span class="line">      <span class="attr">queue:</span> <span class="string">soc-triage</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">办公终端类事件</span></span><br><span class="line">    <span class="attr">order:</span> <span class="number">30</span></span><br><span class="line">    <span class="attr">when:</span></span><br><span class="line">      <span class="attr">category:</span> <span class="string">incident</span></span><br><span class="line">      <span class="attr">asset.asset_type:</span> <span class="string">endpoint</span></span><br><span class="line">    <span class="attr">route:</span></span><br><span class="line">      <span class="attr">queue:</span> <span class="string">endpoint-response</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">兜底</span></span><br><span class="line">    <span class="attr">order:</span> <span class="number">999</span></span><br><span class="line">    <span class="attr">when:</span> &#123;&#125;</span><br><span class="line">    <span class="attr">route:</span></span><br><span class="line">      <span class="attr">queue:</span> <span class="string">soc-unassigned</span></span><br></pre></td></tr></table></figure>
+
+<p>有两处细节值得注意。一是必须有兜底队列，任何不命中规则的工单都要落到一个明确的地方。二是兜底队列要有人看，并且要监控它的存量，存量持续上升说明规则覆盖不全，而不是“这些工单本来就不重要”。</p>
+<h3 id="负载均衡、转派与交接"><a href="#负载均衡、转派与交接" class="headerlink" title="负载均衡、转派与交接"></a>负载均衡、转派与交接</h3><p>队列内选人可以按当前在手的 P1、P2 数量做加权轮询，避免所有急单压给同一个人。但要小心专长单点：某些系统只有一个工程师真正熟悉，规则会把相关工单全部指向他，短期效率最高，长期是风险。缓解办法是设置“影子处理人”，让第二个人参与会诊并记录过程，逐步把隐性知识转成处置手册。</p>
+<p>转派必须填写原因，接收方要在时限内确认，超时未确认自动退回原队列，否则会出现“我转给你、你转给他、最后没人管”的空转。跨班次还要有结构化交接单：未关闭的 P1、P2、正在执行的隔离动作、等待外部回复的工单、有时效性的观察项。</p>
+<h2 id="审批与授权边界"><a href="#审批与授权边界" class="headerlink" title="审批与授权边界"></a>审批与授权边界</h2><h3 id="用两个轴决定能不能自动做"><a href="#用两个轴决定能不能自动做" class="headerlink" title="用两个轴决定能不能自动做"></a>用两个轴决定能不能自动做</h3><p>自动化做到哪一步，不该由技术能力决定，而该由两个业务属性决定：动作是否可逆，影响半径有多大。</p>
+<p>可逆且局部，例如给一台终端打上隔离标记、在防火墙上临时封禁一个外部地址，这类动作失败或误判的代价可控，适合全自动执行并在事后通知。</p>
+<p>不可逆或影响面大，例如删除终端上的文件、停用核心业务账号、断开生产数据库所在网段、批量重置口令，这类动作一旦做错很难挽回，必须有人确认。</p>
+<p>把这两个轴画成四象限之后，审批策略就自然浮现：可逆且局部免审，可逆但影响面大需要单人审批，不可逆但局部需要双人复核，不可逆且影响面大原则上不自动执行，只生成建议与操作单。</p>
+<h3 id="高影响动作的审批表"><a href="#高影响动作的审批表" class="headerlink" title="高影响动作的审批表"></a>高影响动作的审批表</h3><table>
+<thead>
+<tr>
+<th>动作</th>
+<th>影响</th>
+<th>审批要求</th>
+<th>授权有效期</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>封禁外部 IP（单条）</td>
+<td>局部、可逆</td>
+<td>无需审批，事后通知</td>
+<td>不适用</td>
+</tr>
+<tr>
+<td>停用员工账号</td>
+<td>影响个人办公</td>
+<td>单人审批</td>
+<td>30 分钟（示意）</td>
+</tr>
+<tr>
+<td>封禁核心业务账号</td>
+<td>影响生产</td>
+<td>双人复核</td>
+<td>30 分钟（示意）</td>
+</tr>
+<tr>
+<td>断开生产网段</td>
+<td>影响面大、半可逆</td>
+<td>双人复核加变更窗口</td>
+<td>15 分钟（示意）</td>
+</tr>
+<tr>
+<td>删除终端文件或数据</td>
+<td>不可逆</td>
+<td>原则上不自动执行</td>
+<td>不适用</td>
+</tr>
+</tbody></table>
+<p>表中的有效期是示意值。它的作用是让审批结论具有时效性：半小时前批准的“封禁这个地址”，不应在后续工单被复用。</p>
+<h3 id="审批签发的是令牌，不是口头同意"><a href="#审批签发的是令牌，不是口头同意" class="headerlink" title="审批签发的是令牌，不是口头同意"></a>审批签发的是令牌，不是口头同意</h3><p>审批通过之后，系统应当签发一枚与具体动作绑定的短时令牌，令牌里至少包含工单标识、动作类型、目标对象、动作参数的哈希、批准人与执行人。执行端在真正调用下游接口前校验这枚令牌，参数一变即失效。</p>
+<p>这样做的价值在于把“批准了什么”与“执行了什么”对齐。只记录一句“主管已同意”，无法证明执行参数与批准参数是否一致。审批人也不应该等于执行人，至少在双人复核的动作上要强制校验这两个身份不同。</p>
+<p>执行令牌的服务账号本身同样要最小化。常见错误是拿域管理员或云平台超级管理员执行脚本，一旦编排平台被攻破，等于把环境交出去。正确做法是为每类动作建立专用账号，只授予必需权限，并纳入与特权账号同级的监控：登录来源限制、调用频率告警、权限变更审计。</p>
+<p>还有一条兜底通道需要显式设计：紧急情况下允许先执行、后补审的破窗，但必须限定可选动作，自动生成事后复核工单并指定复核人与截止时间，使用次数单独统计。没有约束的破窗是永久后门，完全没有破窗，则会逼着值班人员在最紧张的时候绕过系统直接登录设备。</p>
+<h2 id="与-SOAR-剧本的衔接"><a href="#与-SOAR-剧本的衔接" class="headerlink" title="与 SOAR 剧本的衔接"></a>与 SOAR 剧本的衔接</h2><h3 id="工单提供上下文，剧本提供动作"><a href="#工单提供上下文，剧本提供动作" class="headerlink" title="工单提供上下文，剧本提供动作"></a>工单提供上下文，剧本提供动作</h3><p>SOAR 的剧本本质是一组可复用的动作序列，它本身不持有状态。工单则是状态的载体。二者衔接的接口应当很窄：剧本从工单读取一份上下文快照，执行完毕后把结果写回工单的时间线。</p>
+<p>上下文快照通常包括：工单的分类与级别、关联资产的属性、告警原文的关键字段、已完成的富化结果。把这些一次性打包给剧本，比让剧本自己去查五个系统要稳得多，也便于复现。</p>
+<h3 id="用事件触发，不要让剧本轮询"><a href="#用事件触发，不要让剧本轮询" class="headerlink" title="用事件触发，不要让剧本轮询"></a>用事件触发，不要让剧本轮询</h3><p>剧本的触发应当由工单状态变化驱动：工单进入 triaged 且分类为事件时触发初筛剧本，分级变为 P1 时触发应急协同剧本，处置提交后触发验证剧本。</p>
+<p>轮询式触发（每隔几分钟扫一遍符合条件的工单）看起来简单，但会带来重复执行、延迟不可控、以及数据库压力随工单量线性增长的问题。事件驱动则需要一个可靠的事件通道，并对事件做去重与顺序保证。</p>
+<h3 id="剧本不能直接改工单状态"><a href="#剧本不能直接改工单状态" class="headerlink" title="剧本不能直接改工单状态"></a>剧本不能直接改工单状态</h3><p>剧本只允许通过状态机的接口提交事件，由状态机判断该事件在当前状态下是否合法。如果剧本可以直接写库改状态，那么所有关于必填字段与合法路径的设计都会被绕过，状态机形同虚设。</p>
+<p>下图是一次从告警到处置的典型往返。</p>
+<pre class="mermaid">sequenceDiagram
+    participant A as 检测平台
+    participant T as 工单系统
+    participant O as 编排引擎
+    participant E as 执行目标
+    A->>T: 上报告警（带去重指纹）
+    T->>T: 聚合去重、分级、路由
+    T->>O: 工单进入 triaged 事件
+    O->>T: 读取上下文快照
+    O->>O: 富化与风险评估
+    O->>T: 写回富化结果与建议动作
+    T->>T: 生成待确认动作，等待审批
+    T->>O: 审批通过，提交执行指令
+    O->>E: 调用下游接口（带幂等键）
+    E-->>O: 返回执行结果
+    O->>T: 追加动作记录，提交 resolved
+    T->>T: 复核后关闭</pre>
+
+<h3 id="单实例、超时与降级"><a href="#单实例、超时与降级" class="headerlink" title="单实例、超时与降级"></a>单实例、超时与降级</h3><p>同一张工单上的同一个剧本，必须保证只有一个运行实例。做法是在工单与剧本的组合上加唯一约束，或者用分布式锁。缺少这层保护，重复事件会导致两次封禁、两次通知，甚至两次删除。</p>
+<p>每一步动作都要有独立的超时与重试上限，整个剧本还要有一个总期限。超过总期限的剧本进入降级状态：停止后续自动动作，把已完成的部分整理成摘要，转人工接管。降级不是失败，它是流程设计里必须存在的出口。</p>
+<p>剧本的版本号要写进工单。半年后复盘时，需要知道当时跑的是哪一版逻辑，而不是拿今天的剧本去解释昨天的结果。</p>
+<h2 id="处置动作的幂等、回滚与人工确认"><a href="#处置动作的幂等、回滚与人工确认" class="headerlink" title="处置动作的幂等、回滚与人工确认"></a>处置动作的幂等、回滚与人工确认</h2><h3 id="一个动作键决定重复执行是否安全"><a href="#一个动作键决定重复执行是否安全" class="headerlink" title="一个动作键决定重复执行是否安全"></a>一个动作键决定重复执行是否安全</h3><p>自动化的主要风险往往不是做错，而是重做。超时重试、事件重复投递、人工连点两次，都会让同一个封禁动作执行多遍，把临时封禁叠加成永久封禁。</p>
+<p>幂等键建议由工单标识、动作类型与目标对象三段组成，必要时再把参数哈希拼进去。下游若本身支持请求号去重，直接透传；不支持就在本地建执行记录表，用唯一约束挡住重复。下面是一张示意表结构，MySQL 8.0 语法。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CREATE TABLE</span> action_log (</span><br><span class="line">  id <span class="type">BIGINT</span> <span class="keyword">PRIMARY KEY</span> AUTO_INCREMENT,</span><br><span class="line">  idem_key <span class="type">VARCHAR</span>(<span class="number">160</span>) <span class="keyword">NOT NULL</span>,</span><br><span class="line">  ticket_id <span class="type">VARCHAR</span>(<span class="number">32</span>) <span class="keyword">NOT NULL</span>,</span><br><span class="line">  action <span class="type">VARCHAR</span>(<span class="number">64</span>) <span class="keyword">NOT NULL</span>,</span><br><span class="line">  target <span class="type">VARCHAR</span>(<span class="number">256</span>) <span class="keyword">NOT NULL</span>,</span><br><span class="line">  params_hash <span class="type">CHAR</span>(<span class="number">64</span>) <span class="keyword">NOT NULL</span>,</span><br><span class="line">  status <span class="type">VARCHAR</span>(<span class="number">16</span>) <span class="keyword">NOT NULL</span>,   <span class="comment">-- pending / done / failed / rolled_back</span></span><br><span class="line">  before_state JSON <span class="keyword">NULL</span>,        <span class="comment">-- 回滚所需的快照</span></span><br><span class="line">  started_at DATETIME <span class="keyword">NOT NULL</span>,</span><br><span class="line">  finished_at DATETIME <span class="keyword">NULL</span>,</span><br><span class="line">  <span class="keyword">UNIQUE</span> KEY uk_idem (idem_key)</span><br><span class="line">) ENGINE<span class="operator">=</span>InnoDB;</span><br></pre></td></tr></table></figure>
+
+<p>唯一约束是最后一道闸门：并发重复提交时，只有一条能插入成功，其余直接返回已存在的结果。</p>
+<h3 id="回滚靠事先登记的补偿动作"><a href="#回滚靠事先登记的补偿动作" class="headerlink" title="回滚靠事先登记的补偿动作"></a>回滚靠事先登记的补偿动作</h3><p>每个动作在定义阶段就要写清补偿动作与前置快照：封禁地址的补偿是解封，隔离终端的补偿是解除隔离。执行前把 before 状态写入记录，回滚时按记录还原，而不是凭记忆重新配置。</p>
+<p>有些动作没有补偿：已删除的终端文件、已发出的客户通报、已重置的口令。这类动作只能向前，必须放在人工确认之后，并在动作目录里显式标记为不可回滚。把不可回滚的动作混在可回滚的剧本里，是回滚设计最常见的漏洞。</p>
+<h3 id="人工确认点放在哪里"><a href="#人工确认点放在哪里" class="headerlink" title="人工确认点放在哪里"></a>人工确认点放在哪里</h3><p>三个位置值得设确认点：不可回滚的动作执行前；影响面超过阈值的批量动作，例如一次性隔离二十台以上终端（示意值）；会产生外部可见后果的动作，例如通报客户或上报监管。</p>
+<p>确认不等于免责。确认界面要给出对象、参数、预期影响、回滚方案与超时时间，让确认人真的能判断。确认疲劳是真实存在的：确认点太多，注意力被稀释；太少，风险失控。把每天的确认请求控制在个位数（示意），才有可能被认真对待。</p>
+<h2 id="审计留痕、闭环指标与台账联动"><a href="#审计留痕、闭环指标与台账联动" class="headerlink" title="审计留痕、闭环指标与台账联动"></a>审计留痕、闭环指标与台账联动</h2><h3 id="留痕要能回答五个问题"><a href="#留痕要能回答五个问题" class="headerlink" title="留痕要能回答五个问题"></a>留痕要能回答五个问题</h3><p>谁在什么时候，依据什么，对什么对象做了什么，结果如何。工单字段只能覆盖其中一部分，动作级日志必须单独记录，并采用只追加写入，辅以哈希链或存储层的不可变能力，防止事后修改。工单正文允许编辑，但每次编辑都要留修订历史与操作者。</p>
+<p>等保 2.0 对审计记录的保护与留存有明确要求，具体条款以标准原文为准。实践中的底线是：处置动作的日志保留期不短于工单保留期，且两者能通过工单标识互相关联。</p>
+<h3 id="指标的口径比数值重要"><a href="#指标的口径比数值重要" class="headerlink" title="指标的口径比数值重要"></a>指标的口径比数值重要</h3><p>常用的四个指标是：MTTA，从建单到首次有效响应；MTTR，从建单到恢复或关闭；MTTD，从活动发生到被检测；误报率，确认误报的工单数除以关闭工单总数。另有重开率、一次解决率、剧本成功率、审批平均耗时。</p>
+<p>口径陷阱不比指标少。暂停时间扣不扣、合并工单算给谁、P1 与全量能不能混算，任何一个没定清楚，报表就会在部门之间打架。误报率尤其要拆开看：检测误报是规则判错了，分级误判是级别判错了，两者对应的改进动作完全不同。</p>
+<p>指标应当用来改流程，而不是给人排名。一旦与个人绩效强绑定，拆分工单、拖延关闭等行为就会自然出现。</p>
+<h3 id="与资产台账、漏洞管理的联动"><a href="#与资产台账、漏洞管理的联动" class="headerlink" title="与资产台账、漏洞管理的联动"></a>与资产台账、漏洞管理的联动</h3><p>资产台账提供归属团队、业务重要性、网络位置与暴露面，这些字段直接决定路由与分级，因此台账的准确度就是流程的上限。最常见的故障是台账过期：工单被分给已离职的人，或者仍指向已经下线的机器。对策是定期对账、给过期记录打失效标记、保留兜底队列。</p>
+<p>漏洞侧的闭环更长：扫描发现后按“同一组件同一资产”去重建单，修复走变更窗口，扫描器复测通过才允许关闭。只靠人点“已修复”就关闭，等于把验证环节删掉了。确实无法按期修复的，走风险例外审批，带明确到期日，到期自动重开。资产下线时，关联的未关闭工单要级联处理，否则指标里会长期挂着永远修不完的漏洞。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>安全工单的价值不在于记录，而在于让每一次处置都有责任人、有时限、有证据、可回滚。落地时建议按这个顺序推进：先把分类、分级与字段模型定清楚，再用状态机约束流转，接着做规则与能力结合的分派，最后才把动作交给剧本。自动化的边界用可逆性与影响半径来划，高风险动作保留人工确认，所有动作带幂等键与补偿方案。指标只服务于流程改进，别让它变成新的形式主义。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/61/r2/final">NIST SP 800-61 Rev. 2, Computer Security Incident Handling Guide</a></li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/final">NIST SP 800-53 Rev. 5, Security and Privacy Controls</a></li>
+<li><a href="https://openstd.samr.gov.cn/">GB&#x2F;T 22239-2019 信息安全技术 网络安全等级保护基本要求（国家标准全文公开系统）</a></li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc6749">RFC 6749: The OAuth 2.0 Authorization Framework</a></li>
+<li><a href="https://docs.python.org/3.11/">Python 3.11 Documentation</a></li>
+<li><a href="https://mermaid.js.org/">Mermaid Documentation</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>安全工单与流程自动化</p><p><a href="https://987763485.github.io/2023/02/28/安全工单与流程自动化/">https://987763485.github.io/2023/02/28/安全工单与流程自动化/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2023-02-28</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-19</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a><a class="link-muted mr-2" rel="tag" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/">等级保护</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2023/03/02/%E4%BA%8B%E4%BB%B6%E9%A9%B1%E5%8A%A8%E6%9E%B6%E6%9E%84%E5%AE%9E%E8%B7%B5/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">事件驱动架构实践</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2023/02/23/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E6%B5%81%E5%BC%8F%E8%BE%93%E5%87%BA%E5%AE%9E%E8%B7%B5/"><span class="level-item">大模型流式输出实践</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

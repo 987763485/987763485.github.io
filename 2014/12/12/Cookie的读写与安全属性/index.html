@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Cookie 的读写与安全属性 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="cookie 是最容易被误解的一枚老工具：会话标识刷新还在，换个子域就读不到，明明删了记录仍挂着。本文只讲 cookie 自身——读写语义、六个属性的匹配规则，以及属性组合怎么选。"><meta property="og:type" content="blog"><meta property="og:title" content="Cookie 的读写与安全属性"><meta property="og:url" content="https://987763485.github.io/2014/12/12/Cookie%E7%9A%84%E8%AF%BB%E5%86%99%E4%B8%8E%E5%AE%89%E5%85%A8%E5%B1%9E%E6%80%A7/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="cookie 是最容易被误解的一枚老工具：会话标识刷新还在，换个子域就读不到，明明删了记录仍挂着。本文只讲 cookie 自身——读写语义、六个属性的匹配规则，以及属性组合怎么选。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2014-12-12T12:38:24.000Z"><meta property="article:modified_time" content="2026-10-17T17:15:50.559Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="javascript"><meta property="article:tag" content="web前端"><meta property="article:tag" content="浏览器"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2014/12/12/Cookie%E7%9A%84%E8%AF%BB%E5%86%99%E4%B8%8E%E5%AE%89%E5%85%A8%E5%B1%9E%E6%80%A7/"},"headline":"Cookie 的读写与安全属性","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2014-12-12T12:38:24.000Z","dateModified":"2026-10-17T17:15:50.559Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"cookie 是最容易被误解的一枚老工具：会话标识刷新还在，换个子域就读不到，明明删了记录仍挂着。本文只讲 cookie 自身——读写语义、六个属性的匹配规则，以及属性组合怎么选。"}</script><link rel="canonical" href="https://987763485.github.io/2014/12/12/Cookie%E7%9A%84%E8%AF%BB%E5%86%99%E4%B8%8E%E5%AE%89%E5%85%A8%E5%B1%9E%E6%80%A7/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2014-12-12T12:38:24.000Z" title="12/12/2014, 8:38:24 PM">2014-12-12</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/">前端开发</a></span><span class="level-item">35 分钟读完 (大约5302个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Cookie 的读写与安全属性</h1><div class="content"><p>cookie 是最容易被误解的一枚老工具：会话标识刷新还在，换个子域就读不到，明明删了记录仍挂着。本文只讲 cookie 自身——读写语义、六个属性的匹配规则，以及属性组合怎么选。</p>
+<h2 id="先把口径立住：能用的只有六个属性"><a href="#先把口径立住：能用的只有六个属性" class="headerlink" title="先把口径立住：能用的只有六个属性"></a>先把口径立住：能用的只有六个属性</h2><p>依据是 RFC 6265（2011 年 6 月发布，取代 RFC 2109）：服务端用 <code>Set-Cookie</code> 写、<code>Cookie</code> 头带回，页面脚本用 <code>document.cookie</code> 读写，而一条记录能被谁读、活多久全由属性决定。可用的只有六个：</p>
+<ul>
+<li><code>expires</code>：绝对过期时间，必须是 GMT 格式的日期串。</li>
+<li><code>max-age</code>：相对秒数，与 <code>expires</code> 同时出现时它优先；IE 8 及更早完全不认。</li>
+<li><code>domain</code>：允许读取这条记录的域范围。</li>
+<li><code>path</code>：允许读取它的路径前缀。</li>
+<li><code>secure</code>：只在 https 请求里发送。</li>
+<li><code>HttpOnly</code>：不允许脚本读取，只能由服务端 <code>Set-Cookie</code> 设置。</li>
+</ul>
+<p>属性名不区分大小写，这六个之外没有可配项。<code>document.cookie</code> 设不了 <code>HttpOnly</code>，写了也不生效，不少”读不到 cookie”的排查就从这里跑偏；前端赋值等价于一条只含名字、值和可选属性的 <code>Set-Cookie</code>，谁能写谁能读是第一道判断。cookie 不属于 HTTP 缓存体系，这条边界《浏览器缓存机制全景》讲过，不重复。</p>
+<h2 id="读写语义：赋值只提交一条，读取只给可见部分"><a href="#读写语义：赋值只提交一条，读取只给可见部分" class="headerlink" title="读写语义：赋值只提交一条，读取只给可见部分"></a>读写语义：赋值只提交一条，读取只给可见部分</h2><p>误解在于把它当普通字符串属性：有人写 <code>document.cookie = &#39;&#39;</code> 想清空，有人以为 <code>document.cookie = &#39;a=1&#39;</code> 会连带抹掉另外十几条。实际这个 setter 不读左侧的完整串，整条赋值只提交一个 cookie——同名同域同路径的旧记录被覆盖，其余一动不动。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 三行的效果分别是：新增一条、覆盖同 name + domain + path 的那条、什么都没删</span></span><br><span class="line"><span class="variable language_">document</span>.<span class="property">cookie</span> = <span class="string">&#x27;a=1&#x27;</span>;</span><br><span class="line"><span class="variable language_">document</span>.<span class="property">cookie</span> = <span class="string">&#x27;a=2; path=/; domain=example.com&#x27;</span>;</span><br><span class="line"><span class="variable language_">document</span>.<span class="property">cookie</span> = <span class="string">&#x27;&#x27;</span>;</span><br></pre></td></tr></table></figure>
+
+<p>读取相反：只有当前域与路径匹配到、且没有 <code>HttpOnly</code> 标记的记录才出现在返回值里。所以”读不到”有三种解释——没写、作用域不匹配、被 <code>HttpOnly</code> 挡住。</p>
+<h3 id="解析要按分号切，两端必须去空白"><a href="#解析要按分号切，两端必须去空白" class="headerlink" title="解析要按分号切，两端必须去空白"></a>解析要按分号切，两端必须去空白</h3><figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">trim</span>(<span class="params">s</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="title class_">String</span>(s).<span class="title function_">replace</span>(<span class="regexp">/^\s+|\s+$/g</span>, <span class="string">&quot;&quot;</span>);    <span class="comment">// IE 8 没有 String.prototype.trim</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">getCookieValue</span>(<span class="params">name</span>) &#123;</span><br><span class="line">    <span class="keyword">var</span> parts = <span class="variable language_">document</span>.<span class="property">cookie</span>.<span class="title function_">split</span>(<span class="string">&quot;;&quot;</span>), i, at, key;</span><br><span class="line">    <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; parts.<span class="property">length</span>; i++) &#123;</span><br><span class="line">        at = parts[i].<span class="title function_">indexOf</span>(<span class="string">&quot;=&quot;</span>);</span><br><span class="line">        <span class="keyword">if</span> (at &lt; <span class="number">0</span>) &#123; <span class="keyword">continue</span>; &#125;</span><br><span class="line">        key = <span class="title function_">trim</span>(parts[i].<span class="title function_">substring</span>(<span class="number">0</span>, at));     <span class="comment">// 分号后的空格必须去掉</span></span><br><span class="line">        <span class="keyword">if</span> (key === name) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="built_in">decodeURIComponent</span>(parts[i].<span class="title function_">substring</span>(at + <span class="number">1</span>));</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">null</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>主流内核在分号后补一个空格，<code>split(&#39;; &#39;)</code> 看着够用，但个别老版本只用分号，所以按分号切再两端去空白最稳；取等号用 <code>indexOf</code> 而不是 <code>split(&#39;=&#39;)</code>，后者会被值里的等号截断。</p>
+<p>同名不同路径的两条会同时出现在这个串里：写入只是新增，读取拿到先出现的那条，服务端 <code>Cookie</code> 头里的顺序则由浏览器决定——这是”改了值、接口读到旧值”最隐蔽的来源，排查时打印整个 <code>document.cookie</code> 数一下名字出现几次就够了。</p>
+<h3 id="4-KB-是单条上限，各家口径还要实测"><a href="#4-KB-是单条上限，各家口径还要实测" class="headerlink" title="4 KB 是单条上限，各家口径还要实测"></a>4 KB 是单条上限，各家口径还要实测</h3><p>主流内核普遍按 <code>name</code> 加 <code>value</code> 计算，约 4096 字节，属性串不计入；超出后有的拒绝整条写入，有的截断保存。条数上限更要命：老 IE 每个域名只留几十条，整个浏览器另有总量限制。最坑的是超限不抛异常、静默失败，只能写回再读出来验证。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 写完立刻读回校验：静默失败只有这一步能发现</span></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">assertCookieWritten</span>(<span class="params">name, value</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="title function_">getCookieValue</span>(name) === <span class="title class_">String</span>(value);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>所以”要实测”不是客套：同一份数据在 Chrome、Safari 与 Android 2.3 原生浏览器上能写的长度确实不同。</p>
+<h3 id="删除是最容易失败的操作"><a href="#删除是最容易失败的操作" class="headerlink" title="删除是最容易失败的操作"></a>删除是最容易失败的操作</h3><p>删不掉的原因几乎只有一个：作用域没对上。必须用同名、同 <code>domain</code>、同 <code>path</code> 的组合再写一次，并把过期时间设到过去。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 删除三要素：同名、同 domain、同 path，再加一个过去的过期时间</span></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">delCookie</span>(<span class="params">name, path, domain</span>) &#123;</span><br><span class="line">    <span class="keyword">if</span> (<span class="title function_">getCookieValue</span>(name) === <span class="literal">null</span> &amp;&amp; <span class="variable language_">document</span>.<span class="property">cookie</span>.<span class="title function_">indexOf</span>(name) === -<span class="number">1</span>) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">false</span>;                               <span class="comment">// HttpOnly 的记录前端根本删不掉</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">var</span> s = <span class="built_in">encodeURIComponent</span>(name) + <span class="string">&quot;=; expires=Thu, 01 Jan 1970 00:00:01 GMT&quot;</span>;</span><br><span class="line">    s += <span class="string">&quot;; max-age=0&quot;</span>;                             <span class="comment">// 现代浏览器走这条，不受本机时钟影响</span></span><br><span class="line">    s += <span class="string">&quot;; path=&quot;</span> + (path ? path : <span class="string">&quot;/&quot;</span>);           <span class="comment">// 默认给根路径，别用当前目录</span></span><br><span class="line">    <span class="keyword">if</span> (domain) &#123; s += <span class="string">&quot;; domain=&quot;</span> + domain; &#125;</span><br><span class="line">    <span class="variable language_">document</span>.<span class="property">cookie</span> = s;</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>最高频的坑是省略 <code>path</code>：不写时浏览器取当前 URL 的目录部分作默认路径，页面在 <code>/app/user/list.html</code> 默认就是 <code>/app/user/</code>；删除代码往往写在另一个页面，目录不同，两者根本不是同一条记录。所以任何写入都显式带 <code>path=/</code>。另外老 IE 对超出 1970 到 2038 区间的时间串处理不一致，<code>expires=0</code> 是无效串，会被整段忽略。</p>
+<h2 id="作用域三属性的匹配规则"><a href="#作用域三属性的匹配规则" class="headerlink" title="作用域三属性的匹配规则"></a>作用域三属性的匹配规则</h2><h3 id="domain：写了就含子域，不写就锁死当前主机"><a href="#domain：写了就含子域，不写就锁死当前主机" class="headerlink" title="domain：写了就含子域，不写就锁死当前主机"></a>domain：写了就含子域，不写就锁死当前主机</h3><p>规则只有两条：不写 <code>domain</code>，cookie 只属于当前主机名，精确匹配；写了 <code>domain=example.com</code>，<code>example.com</code> 本身和它的所有子域都能收到。</p>
+<table>
+<thead>
+<tr>
+<th>页面主机</th>
+<th>写入时的 domain</th>
+<th>谁能读到</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>www.example.com</code></td>
+<td>省略</td>
+<td>只有 <code>www.example.com</code></td>
+</tr>
+<tr>
+<td><code>www.example.com</code></td>
+<td><code>example.com</code></td>
+<td>裸域加全部子域</td>
+</tr>
+<tr>
+<td><code>example.com</code></td>
+<td>省略</td>
+<td>只有裸域，带 <code>www</code> 前缀的读不到</td>
+</tr>
+<tr>
+<td><code>www.example.com</code></td>
+<td><code>other.org</code></td>
+<td>跨注册域的写入被整段忽略</td>
+</tr>
+<tr>
+<td><code>m.example.com</code></td>
+<td><code>co.uk</code> 这类公共后缀</td>
+<td>拒绝写入</td>
+</tr>
+</tbody></table>
+<p>三个结论：<code>www.example.com</code> 与 <code>example.com</code> 是两个不同主机，裸域写的记录带前缀的页面读不到，反向也一样，这是后文第一起故障的根因；<code>domain</code> 只能往更泛的方向写，且必须是当前主机自己或它的父域，写别的域不报错但完全无效；公共后缀不允许当 <code>domain</code>。</p>
+<p>至于 <code>document.domain</code>，设成父域之后脚本写出的记录归属主机跟着变成父域，几个同名值的子域就能共享，代价是同源边界被削弱——同域下任何能把脚本注进来的 iframe 都能读写别人的记录。新代码我更倾向显式写 <code>domain</code>。</p>
+<h3 id="path：前缀匹配，而且要求斜杠边界"><a href="#path：前缀匹配，而且要求斜杠边界" class="headerlink" title="path：前缀匹配，而且要求斜杠边界"></a>path：前缀匹配，而且要求斜杠边界</h3><p><code>path</code> 不是简单的字符串前缀包含。规范要求的匹配是：请求路径与 <code>path</code> 完全相同；或者 <code>path</code> 是请求路径的前缀，且前缀之后的第一个字符是斜杠，或者 <code>path</code> 自身以斜杠结尾。</p>
+<table>
+<thead>
+<tr>
+<th>cookie 的 path</th>
+<th>请求路径</th>
+<th>是否携带</th>
+<th>原因</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/foo</code></td>
+<td><code>/foo</code></td>
+<td>是</td>
+<td>完全相同</td>
+</tr>
+<tr>
+<td><code>/foo</code></td>
+<td><code>/foo/</code></td>
+<td>是</td>
+<td>前缀之后是斜杠</td>
+</tr>
+<tr>
+<td><code>/foo</code></td>
+<td><code>/foo/bar</code></td>
+<td>是</td>
+<td>前缀之后是斜杠</td>
+</tr>
+<tr>
+<td><code>/foo</code></td>
+<td><code>/foobar</code></td>
+<td>否</td>
+<td>缺斜杠边界</td>
+</tr>
+<tr>
+<td><code>/foo/</code></td>
+<td><code>/foo</code></td>
+<td>否</td>
+<td>path 不是请求路径的前缀</td>
+</tr>
+<tr>
+<td><code>/</code></td>
+<td>任意路径</td>
+<td>是</td>
+<td>根路径匹配全部</td>
+</tr>
+</tbody></table>
+<p>最后两行解释了一类玄学问题：写成 <code>/foo/</code>，<code>/foo</code> 入口页收不到；写成 <code>/foo</code>，<code>/foobar</code> 那类活动页又带上本该隔离的记录。默认值是当前 URL 的目录部分并带结尾斜杠，空 <code>path</code> 不等于 <code>/</code>。</p>
+<h3 id="secure：只在-https-请求里出现"><a href="#secure：只在-https-请求里出现" class="headerlink" title="secure：只在 https 请求里出现"></a>secure：只在 https 请求里出现</h3><p><code>secure</code> 让记录只在 https 请求里出现，http 页面既发不出也读不到。还没全站 https 的现实里，典型故障来自混用协议：登录接口在 https 上写了带 <code>secure</code> 的会话，页面却跳回 http 的活动页，会话发不出去，用户被踢回登录页。反过来，非 secure 的记录在两种协议下共享同一个存储桶，明文链路里会被中间人一览无余。</p>
+<h2 id="生命周期选型：会话、expires-与-max-age"><a href="#生命周期选型：会话、expires-与-max-age" class="headerlink" title="生命周期选型：会话、expires 与 max-age"></a>生命周期选型：会话、expires 与 max-age</h2><p>三种活法：会话 cookie 不带过期属性，浏览器关闭即消失；<code>expires</code> 给绝对时间点；<code>max-age</code> 给相对秒数，两者同时出现时 <code>max-age</code> 胜出。会话 cookie 的前提本身就不牢靠——主流浏览器默认恢复上次会话，进程重启后记录还在，别当短期存储；退出时若只清了服务端状态、本地留的是会话 cookie，就会出现”退出后刷新又登录了”的错觉。</p>
+<p>绝对时间的致命弱点是按客户端时钟判定：服务端算出”三十天后”转成 GMT 串，用户把日期改到两年前，这条记录写入瞬间就已过期被丢弃；时钟慢半小时，”三十分钟不再提示”就多半小时，这是后文第二起故障的机制。相对时间从写入起算不受影响，可惜 IE 8 及更早完全不认、只认 <code>expires</code>，所以真实项目要双写。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 同时写 expires 与 max-age，两个值表达同一个时长</span></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">setCookieTtl</span>(<span class="params">name, value, seconds, path, domain</span>) &#123;</span><br><span class="line">    <span class="keyword">var</span> exp = <span class="keyword">new</span> <span class="title class_">Date</span>(<span class="keyword">new</span> <span class="title class_">Date</span>().<span class="title function_">getTime</span>() + seconds * <span class="number">1000</span>);</span><br><span class="line">    <span class="keyword">var</span> s = <span class="built_in">encodeURIComponent</span>(name) + <span class="string">&quot;=&quot;</span> + <span class="built_in">encodeURIComponent</span>(value) +</span><br><span class="line">        <span class="string">&quot;; max-age=&quot;</span> + seconds +                    <span class="comment">// IE 8 及更早会整段忽略这一项</span></span><br><span class="line">        <span class="string">&quot;; expires=&quot;</span> + exp.<span class="title function_">toGMTString</span>() +          <span class="comment">// 给老 IE；toUTCString 也可以</span></span><br><span class="line">        <span class="string">&quot;; path=&quot;</span> + (path ? path : <span class="string">&quot;/&quot;</span>);</span><br><span class="line">    <span class="keyword">if</span> (domain) &#123; s += <span class="string">&quot;; domain=&quot;</span> + domain; &#125;</span><br><span class="line">    <span class="variable language_">document</span>.<span class="property">cookie</span> = s;</span><br><span class="line">    <span class="keyword">return</span> <span class="title function_">getCookieValue</span>(name) === value;          <span class="comment">// 写完立刻读回，静默失败在这里现形</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>双写要注意两点：两个值必须表达同一时长；<code>expires</code> 不要写到 2038 年之外，超出后老 IE 静默丢弃，看着像压根没写进去。</p>
+<h2 id="HttpOnly-与-secure：安全属性各挡什么"><a href="#HttpOnly-与-secure：安全属性各挡什么" class="headerlink" title="HttpOnly 与 secure：安全属性各挡什么"></a>HttpOnly 与 secure：安全属性各挡什么</h2><p><code>HttpOnly</code> 只解决一件事：让页面脚本读不到这条记录。它从 <code>document.cookie</code> 的返回值里消失，改不了也删不了，挡住的是 XSS 落地后偷走会话凭证这条路——评论区、富文本这类原样渲染用户输入的地方，一个链接就够把可读 cookie 全 dump 一遍，这个面在《HTML5 contenteditable 富文本编辑入门》里谈过。但它挡不住 CSRF：伪造请求不需要读 cookie，浏览器自己会把记录带上，那条防线在同源校验与一次性 token 上，两者不能混为一谈。</p>
+<p>想要 <code>HttpOnly</code> 只能由服务端写：</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span></span><br><span class="line"><span class="comment">// PHP 5.x：第七个参数才是 httponly，别漏掉前面的 path 与 domain</span></span><br><span class="line"><span class="title function_ invoke__">setcookie</span>(</span><br><span class="line">    <span class="string">&#x27;sid&#x27;</span>, <span class="variable">$sessionId</span>,</span><br><span class="line">    <span class="title function_ invoke__">time</span>() + <span class="number">30</span> * <span class="number">86400</span>,      <span class="comment">// expires</span></span><br><span class="line">    <span class="string">&#x27;/&#x27;</span>,                       <span class="comment">// path：显式给根路径</span></span><br><span class="line">    <span class="string">&#x27;.example.com&#x27;</span>,            <span class="comment">// domain：要跨子域就写出来</span></span><br><span class="line">    <span class="literal">true</span>,                      <span class="comment">// secure</span></span><br><span class="line">    <span class="literal">true</span>                       <span class="comment">// HttpOnly</span></span><br><span class="line">);</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Node 0.10：多条 Set-Cookie 用数组传，拼成一个字符串会被后一条覆盖</span></span><br><span class="line">res.<span class="title function_">setHeader</span>(<span class="string">&#x27;Set-Cookie&#x27;</span>, [</span><br><span class="line">    <span class="string">&#x27;sid=&#x27;</span> + sessionId + <span class="string">&#x27;; Path=/; Domain=.example.com; Max-Age=2592000; HttpOnly; Secure&#x27;</span>,</span><br><span class="line">    <span class="string">&#x27;lang=zh_CN; Path=/; Max-Age=31536000&#x27;</span></span><br><span class="line">]);</span><br><span class="line">res.<span class="title function_">end</span>(body);</span><br></pre></td></tr></table></figure>
+
+<p>划分如下：</p>
+<table>
+<thead>
+<tr>
+<th>数据</th>
+<th>谁写</th>
+<th>前端可读</th>
+<th>HttpOnly</th>
+<th>Secure</th>
+<th>补充建议</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>会话标识 sid</td>
+<td>服务端 <code>Set-Cookie</code></td>
+<td>否</td>
+<td>必须</td>
+<td>有 https 就必须</td>
+<td><code>path=/</code>，跟会话同生死</td>
+</tr>
+<tr>
+<td>长期登录凭证</td>
+<td>服务端</td>
+<td>否</td>
+<td>必须</td>
+<td>必须</td>
+<td><code>max-age</code> 与 <code>expires</code> 双写</td>
+</tr>
+<tr>
+<td>CSRF token</td>
+<td>服务端下发</td>
+<td>是，要回填表单</td>
+<td>不加</td>
+<td>跟随页面协议</td>
+<td>短 <code>max-age</code></td>
+</tr>
+<tr>
+<td>灰度标识、A&#x2F;B 分桶</td>
+<td>前端或服务端</td>
+<td>是</td>
+<td>不加</td>
+<td>不必</td>
+<td>显式 <code>domain</code> 与 <code>path=/</code></td>
+</tr>
+<tr>
+<td>界面偏好</td>
+<td>前端</td>
+<td>是</td>
+<td>不加</td>
+<td>不必</td>
+<td>长期 <code>max-age</code>，值控制在几十字节</td>
+</tr>
+<tr>
+<td>统计访客 id</td>
+<td>服务端或前端</td>
+<td>是</td>
+<td>不加</td>
+<td>不必</td>
+<td><code>domain</code> 放宽到主域</td>
+</tr>
+</tbody></table>
+<p>由此推出一条纪律：前端不要把任何身份凭证手写进可读 cookie。用一句 <code>document.cookie</code> 把接口返回的令牌存起来，等于主动放弃 <code>HttpOnly</code> 唯一的保护，还把它塞进了每一个请求头；真要让服务端认身份，就交给登录接口的 <code>Set-Cookie</code>。</p>
+<p>https 尚未普及，<code>secure</code> 要不要一刀切？我的结论是不必，但登录态必须：站点只要有一处能走 http，中间人就能改写非 secure 的记录，给会话标识加 <code>secure</code> 是下限；对偏好类、统计类数据，加它只会带来混用协议的故障。</p>
+<h2 id="编码、命名与值的设计"><a href="#编码、命名与值的设计" class="headerlink" title="编码、命名与值的设计"></a>编码、命名与值的设计</h2><p><code>value</code> 里的分号、逗号、等号、空格都会破坏解析，中文在老浏览器上更麻烦，所以写入前必须 <code>encodeURIComponent</code>，读取后 <code>decodeURIComponent</code>。<code>encodeURI</code> 不够用：它按设计保留 <code>: / ? # [ ] @ &amp; = + $ , ;</code> 这些有语法含义的字符，正好把最危险的留下。<code>escape</code> 要淘汰：它不在标准里，ES5 只在附录 B 当遗留兼容项标着，遇到汉字输出 <code>%u4F60</code> 这种私有形式，服务端按 UTF-8 百分号解码根本认不出来——同一段中文在老 IE 里是 <code>%uXXXX</code>、在 Chrome 里是 <code>%E4%BD%A0</code>，两套形态混在同一字段，后端只能两种都试一次。</p>
+<p>三条原则。别把 JSON 大对象塞进去：中文经编码膨胀到三倍，超限又是静默失败，坏数据比没数据更难查。宁可拆成几条小的，也不攒成一条大的：拆开之后作用域和过期时间能独立设置，一项变更不连带整块失效，调试还能单条删除。命名带前缀和版本，形如 <code>app1_theme_v1</code>，换结构时递增版本号而不是原地改语义。</p>
+<h2 id="一套可以直接抄的-ES5-工具函数"><a href="#一套可以直接抄的-ES5-工具函数" class="headerlink" title="一套可以直接抄的 ES5 工具函数"></a>一套可以直接抄的 ES5 工具函数</h2><figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> <span class="title class_">CookieUtil</span> = (<span class="keyword">function</span> (<span class="params"></span>) &#123;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 拼一条完整的 Set-Cookie 语义串</span></span><br><span class="line">    <span class="keyword">function</span> <span class="title function_">build</span>(<span class="params">name, value, opts</span>) &#123;</span><br><span class="line">        <span class="keyword">var</span> s = <span class="built_in">encodeURIComponent</span>(name) + <span class="string">&quot;=&quot;</span> +</span><br><span class="line">            <span class="built_in">encodeURIComponent</span>(value === <span class="literal">null</span> || <span class="keyword">typeof</span> value === <span class="string">&quot;undefined&quot;</span> ? <span class="string">&quot;&quot;</span> : value);</span><br><span class="line">        opts = opts || &#123;&#125;;</span><br><span class="line">        <span class="keyword">var</span> exp = <span class="literal">null</span>;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (opts.<span class="property">expires</span> <span class="keyword">instanceof</span> <span class="title class_">Date</span>) &#123;</span><br><span class="line">            exp = opts.<span class="property">expires</span>;</span><br><span class="line">        &#125; <span class="keyword">else</span> <span class="keyword">if</span> (<span class="keyword">typeof</span> opts.<span class="property">expires</span> === <span class="string">&quot;number&quot;</span>) &#123;</span><br><span class="line">            <span class="comment">// 跟 jQuery 插件对齐：数字按天理解</span></span><br><span class="line">            exp = <span class="keyword">new</span> <span class="title class_">Date</span>(<span class="keyword">new</span> <span class="title class_">Date</span>().<span class="title function_">getTime</span>() + opts.<span class="property">expires</span> * <span class="number">86400000</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (<span class="keyword">typeof</span> opts.<span class="property">maxAge</span> === <span class="string">&quot;number&quot;</span>) &#123;</span><br><span class="line">            exp = <span class="keyword">new</span> <span class="title class_">Date</span>(<span class="keyword">new</span> <span class="title class_">Date</span>().<span class="title function_">getTime</span>() + opts.<span class="property">maxAge</span> * <span class="number">1000</span>);</span><br><span class="line">            s += <span class="string">&quot;; max-age=&quot;</span> + opts.<span class="property">maxAge</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// IE 8 及更早完全不认 max-age，只认 expires：走过任一条都要补绝对时间</span></span><br><span class="line">        <span class="keyword">if</span> (exp) &#123; s += <span class="string">&quot;; expires=&quot;</span> + exp.<span class="title function_">toGMTString</span>(); &#125;</span><br><span class="line"></span><br><span class="line">        s += <span class="string">&quot;; path=&quot;</span> + (opts.<span class="property">path</span> || <span class="string">&quot;/&quot;</span>);        <span class="comment">// 永远显式给 path</span></span><br><span class="line">        <span class="keyword">if</span> (opts.<span class="property">domain</span>) &#123; s += <span class="string">&quot;; domain=&quot;</span> + opts.<span class="property">domain</span>; &#125;</span><br><span class="line">        <span class="keyword">if</span> (opts.<span class="property">secure</span>) &#123; s += <span class="string">&quot;; secure&quot;</span>; &#125;</span><br><span class="line">        <span class="keyword">return</span> s;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> &#123;</span><br><span class="line">        <span class="attr">set</span>: <span class="keyword">function</span> (<span class="params">name, value, opts</span>) &#123;</span><br><span class="line">            <span class="variable language_">document</span>.<span class="property">cookie</span> = <span class="title function_">build</span>(name, value, opts);</span><br><span class="line">            <span class="keyword">return</span> <span class="title function_">getCookieValue</span>(name) === <span class="title class_">String</span>(value);   <span class="comment">// 4 KB 超限是静默失败</span></span><br><span class="line">        &#125;,</span><br><span class="line">        <span class="attr">get</span>: <span class="keyword">function</span> (<span class="params">name</span>) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="title function_">getCookieValue</span>(name);</span><br><span class="line">        &#125;,</span><br><span class="line">        <span class="attr">remove</span>: <span class="keyword">function</span> (<span class="params">name, opts</span>) &#123;</span><br><span class="line">            opts = opts || &#123;&#125;;</span><br><span class="line">            <span class="keyword">return</span> <span class="title function_">delCookie</span>(name, opts.<span class="property">path</span> || <span class="string">&quot;/&quot;</span>, opts.<span class="property">domain</span>);</span><br><span class="line">        &#125;,</span><br><span class="line">        <span class="attr">names</span>: <span class="keyword">function</span> (<span class="params"></span>) &#123;</span><br><span class="line">            <span class="keyword">var</span> parts = <span class="variable language_">document</span>.<span class="property">cookie</span>.<span class="title function_">split</span>(<span class="string">&quot;;&quot;</span>), out = [], i, at, k;</span><br><span class="line">            <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; parts.<span class="property">length</span>; i++) &#123;</span><br><span class="line">                at = parts[i].<span class="title function_">indexOf</span>(<span class="string">&quot;=&quot;</span>);</span><br><span class="line">                <span class="keyword">if</span> (at &lt; <span class="number">0</span>) &#123; <span class="keyword">continue</span>; &#125;</span><br><span class="line">                k = <span class="title function_">trim</span>(parts[i].<span class="title function_">substring</span>(<span class="number">0</span>, at));</span><br><span class="line">                <span class="keyword">if</span> (k) &#123; out.<span class="title function_">push</span>(k); &#125;                     <span class="comment">// 同名多条要去重</span></span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">return</span> out;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;;</span><br><span class="line">&#125;());</span><br></pre></td></tr></table></figure>
+
+<p>调用与验证：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 想少打几个字就摊平成三个函数，行为与上面完全一致</span></span><br><span class="line"><span class="keyword">var</span> setCookie = <span class="title class_">CookieUtil</span>.<span class="property">set</span>, getCookie = <span class="title class_">CookieUtil</span>.<span class="property">get</span>, removeCookie = <span class="title class_">CookieUtil</span>.<span class="property">remove</span>;</span><br><span class="line"></span><br><span class="line"><span class="title function_">setCookie</span>(<span class="string">&quot;app1_theme_v1&quot;</span>, <span class="string">&quot;深色&quot;</span>, &#123; <span class="attr">maxAge</span>: <span class="number">30</span> * <span class="number">86400</span> &#125;);   <span class="comment">// 返回 true 才算写成功</span></span><br><span class="line"><span class="title function_">getCookie</span>(<span class="string">&quot;app1_theme_v1&quot;</span>);                                    <span class="comment">// 解码后的原始值</span></span><br><span class="line"><span class="title function_">removeCookie</span>(<span class="string">&quot;app1_theme_v1&quot;</span>, &#123; <span class="attr">path</span>: <span class="string">&quot;/&quot;</span> &#125;);                  <span class="comment">// path 要与写入时一致</span></span><br></pre></td></tr></table></figure>
+
+<p>已经有 jQuery 的项目，当时常用 <code>jquery.cookie.js</code> 1.4.1，接口 <code>$.cookie(name, value, options)</code>，<code>options</code> 支持 <code>expires</code>（天数或 Date）、<code>path</code>、<code>domain</code>、<code>secure</code>、<code>raw</code>。两点留意：它默认 <code>path</code> 就是 <code>/</code>，比手写安全；默认对值编码，而 <code>raw: true</code> 同时跳过编码和解码，后端按原样取值两边就分叉。它没有 <code>max-age</code> 支持，双写策略得自己补。</p>
+<h2 id="该不该用-cookie：与-Web-Storage-的分工"><a href="#该不该用-cookie：与-Web-Storage-的分工" class="headerlink" title="该不该用 cookie：与 Web Storage 的分工"></a>该不该用 cookie：与 Web Storage 的分工</h2><p>先问”要不要参与 HTTP 请求”，再问”用哪些属性”。三种存储摆开：</p>
+<table>
+<thead>
+<tr>
+<th>存储手段</th>
+<th>随请求发送</th>
+<th>容量口径</th>
+<th>服务端读写</th>
+<th>过期能力</th>
+<th>HttpOnly 保护</th>
+<th>跨子域</th>
+<th>WebView 的 file:&#x2F;&#x2F; 场景</th>
+<th>适合存什么</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>cookie</td>
+<td>是，匹配到的每个请求都带</td>
+<td>单条约 4 KB</td>
+<td>能写能读</td>
+<td>原生支持 expires 与 max-age</td>
+<td>有，唯一的选项</td>
+<td>能，靠 domain 放宽</td>
+<td>各家不一致，读写不保证</td>
+<td>会话凭证、灰度标识、A&#x2F;B 分桶</td>
+</tr>
+<tr>
+<td>localStorage</td>
+<td>否</td>
+<td>每个源约几 MB</td>
+<td>看不见</td>
+<td>无，要自己实现 TTL</td>
+<td>无</td>
+<td>不能，origin 严格划分</td>
+<td>常被当成不透明源，读取抛错</td>
+<td>偏好、草稿等不出门的缓存</td>
+</tr>
+<tr>
+<td>sessionStorage</td>
+<td>否</td>
+<td>同上量级</td>
+<td>看不见</td>
+<td>上下文结束即清</td>
+<td>无</td>
+<td>不能</td>
+<td>同上</td>
+<td>一次性表单流程状态</td>
+</tr>
+</tbody></table>
+<p>localStorage 的封装、配额与私有模式抛错，《localStorage 与 sessionStorage 本地存储实战》写过一遍；跨域带 cookie 是另一套规则，<code>withCredentials</code> 配合 <code>Access-Control-Allow-Credentials</code> 在《AJAX 与跨域请求实践》里讲过；Hybrid 里 <code>file://</code> 页面干脆走原生通道，属于《JSBridge 设计与实现》。三处都不重复。</p>
+<pre class="mermaid">flowchart TD
+    A[这份数据要不要参与 HTTP 请求] -->|不需要| B[localStorage 或 sessionStorage]
+    A -->|需要| C{是身份或会话数据吗}
+    C -->|是| D[服务端 Set-Cookie 加 HttpOnly 与 Secure]
+    C -->|否| E[前端 document.cookie 显式 path 与 domain]
+    D --> F[max-age 与 expires 双写，避开本机时钟]
+    E --> F</pre>
+
+<p>结论很硬：cookie 唯一不可替代的场景就是”要参与 HTTP 请求”——会话标识、灰度分流、A&#x2F;B 分桶，以及服务端渲染时要读的首选项，其余数据都不该放 cookie。</p>
+<p>带宽账算一次就够：主站域名挂着 2 KB 左右的记录，一个活动页有 80 个静态资源请求，就是 160 KB 纯上行头开销，全部落在首屏关键路径上。解法不是把 cookie 写小，而是静态资源走独立域名、那个域名一条 cookie 都不写——域名隔离的论证在《CDN 加速原理与接入实践》，引用规范在《静态资源版本号与缓存更新》。</p>
+<h2 id="两个故障复盘"><a href="#两个故障复盘" class="headerlink" title="两个故障复盘"></a>两个故障复盘</h2><h3 id="子域写的状态主域读不到"><a href="#子域写的状态主域读不到" class="headerlink" title="子域写的状态主域读不到"></a>子域写的状态主域读不到</h3><p>现场：引导流程写在 <code>m.example.com</code>，用户跳到 <code>www.example.com</code> 的落地页，引导又从零开始。根因是写入没带 <code>domain</code>，记录被锁在 <code>m.example.com</code> 这个主机上；排查时还发现第二个问题——引导页路径 <code>/guide/step2.html</code> 让默认 <code>path</code> 成了 <code>/guide/</code>，连 <code>/guide/help</code> 也读不到。修复是显式统一作用域并在写入后校验，免得跨注册域这类被静默拒绝的写法混进来：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> <span class="variable constant_">COOKIE_SCOPE</span> = &#123; <span class="attr">path</span>: <span class="string">&quot;/&quot;</span>, <span class="attr">domain</span>: <span class="string">&quot;.example.com&quot;</span> &#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">rememberStep</span>(<span class="params">step</span>) &#123;</span><br><span class="line">    <span class="keyword">if</span> (!<span class="title class_">CookieUtil</span>.<span class="title function_">set</span>(<span class="string">&quot;app1_guide_v1&quot;</span>, step, <span class="variable constant_">COOKIE_SCOPE</span>)) &#123;</span><br><span class="line">        <span class="keyword">new</span> <span class="title class_">Image</span>().<span class="property">src</span> = <span class="string">&quot;/1x1.gif?ev=cookie_fail&amp;n=app1_guide&quot;</span>;   <span class="comment">// 写失败上报一次</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>跨子域共享是 <code>domain</code> 唯一的价值，但一旦放宽，这个域下所有子站都能读写同一份数据，所以共享记录必须带前缀和版本号。</p>
+<h3 id="客户端时间倒退让”下次自动登录”当场作废"><a href="#客户端时间倒退让”下次自动登录”当场作废" class="headerlink" title="客户端时间倒退让”下次自动登录”当场作废"></a>客户端时间倒退让”下次自动登录”当场作废</h3><p>现场：个别用户每次登录都得重勾”下次自动登录”，同批其他人正常。根因：登录接口按服务端时间算出三十天后的绝对时间下发 <code>expires</code>，而这些用户把机器日期改到两年前，浏览器一比本机时间就判定记录已过期，写入即刻被丢弃。修复分三层：<code>max-age</code> 与 <code>expires</code> 双写；把”记住我”的时长语义放回服务端，浏览器只保存凭证；本机时间与服务端响应头 <code>Date</code> 偏差超过一天时，把绝对时间逻辑退化成相对时间并提示校时。教训一句话：任何按绝对时间的客户端逻辑，都要假设用户时钟是错的。</p>
+<h2 id="小结：一张属性配置决策表"><a href="#小结：一张属性配置决策表" class="headerlink" title="小结：一张属性配置决策表"></a>小结：一张属性配置决策表</h2><p>先问三个问题：要不要参与 HTTP 请求；是不是身份或会话；作用域要多大。按这三问铺开：</p>
+<table>
+<thead>
+<tr>
+<th>要存什么</th>
+<th>谁写</th>
+<th>HttpOnly</th>
+<th>Secure</th>
+<th>生命周期</th>
+<th>domain 与 path</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>会话标识</td>
+<td>服务端</td>
+<td>加</td>
+<td>有 https 就加</td>
+<td>会话级，退出即清</td>
+<td>显式 <code>path=/</code>，不跨子域就别写 domain</td>
+</tr>
+<tr>
+<td>长期登录凭证</td>
+<td>服务端</td>
+<td>加</td>
+<td>必加</td>
+<td>max-age 双写 expires，别超 2038</td>
+<td>主域加 <code>path=/</code></td>
+</tr>
+<tr>
+<td>CSRF token</td>
+<td>服务端</td>
+<td>不加，要回填</td>
+<td>跟随页面协议</td>
+<td>十几分钟</td>
+<td>path 收窄到表单页</td>
+</tr>
+<tr>
+<td>灰度标识、A&#x2F;B 分桶</td>
+<td>前端或服务端</td>
+<td>不加</td>
+<td>不加</td>
+<td>跟实验周期，max-age 为主</td>
+<td>要跨子域统计就放宽到主域</td>
+</tr>
+<tr>
+<td>界面偏好</td>
+<td>前端</td>
+<td>不加</td>
+<td>不加</td>
+<td>长期</td>
+<td><code>path=/</code>，别按目录散着写</td>
+</tr>
+<tr>
+<td>统计访客 id</td>
+<td>服务端</td>
+<td>不加</td>
+<td>不加</td>
+<td>一年量级</td>
+<td>主域共享，便于跨子域归因</td>
+</tr>
+<tr>
+<td>一次性表单流程</td>
+<td>前端</td>
+<td>不适用</td>
+<td>不适用</td>
+<td>用 sessionStorage</td>
+<td>不该出现在 cookie 里</td>
+</tr>
+</tbody></table>
+<p>属性之外还有三条纪律：写入永远显式带 <code>path</code>，需要共享时才加 <code>domain</code>，值一律编码；写完立刻读回校验，4 KB 超限和非法 <code>domain</code> 都是静默失败；删除必须同名同域同路径，<code>HttpOnly</code> 只能由服务端清。这几件事一次做对，剩下的只是按时长填参数。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Cookie 的读写与安全属性</p><p><a href="https://987763485.github.io/2014/12/12/Cookie的读写与安全属性/">https://987763485.github.io/2014/12/12/Cookie的读写与安全属性/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2014-12-12</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/javascript/">javascript</a><a class="link-muted mr-2" rel="tag" href="/tags/web%E5%89%8D%E7%AB%AF/">web前端</a><a class="link-muted mr-2" rel="tag" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/">浏览器</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2014/12/19/CSS%E9%80%89%E6%8B%A9%E5%99%A8%E6%80%A7%E8%83%BD%E8%AF%AF%E5%8C%BA/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">CSS 选择器性能误区</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2014/12/05/Swiper%E8%BD%AE%E6%92%AD%E5%9B%BE%E7%BB%84%E4%BB%B6%E5%AE%9E%E6%88%98/"><span class="level-item">Swiper 轮播图组件实战</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

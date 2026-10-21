@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>安全域划分与边界防护 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="安全域划分解决的不是买什么设备，而是先回答“谁可以和谁说话、说到什么程度”。很多团队把网络画成一张大平面，靠一台防火墙隔开内外，一旦攻击者进入内网，横向移动几乎没有阻力。本文从划分方法讲到访问控制矩阵、设备分工、防火墙策略、DMZ 与微隔离，最后落到变更运营和等保 2.0 映射，适合正在做整改或梳理内网边界的工程师。"><meta property="og:type" content="blog"><meta property="og:title" content="安全域划分与边界防护"><meta property="og:url" content="https://987763485.github.io/2019/10/14/%E5%AE%89%E5%85%A8%E5%9F%9F%E5%88%92%E5%88%86%E4%B8%8E%E8%BE%B9%E7%95%8C%E9%98%B2%E6%8A%A4/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="安全域划分解决的不是买什么设备，而是先回答“谁可以和谁说话、说到什么程度”。很多团队把网络画成一张大平面，靠一台防火墙隔开内外，一旦攻击者进入内网，横向移动几乎没有阻力。本文从划分方法讲到访问控制矩阵、设备分工、防火墙策略、DMZ 与微隔离，最后落到变更运营和等保 2.0 映射，适合正在做整改或梳理内网边界的工程师。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2019-10-14T06:33:03.000Z"><meta property="article:modified_time" content="2026-10-18T13:49:39.820Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="网络安全"><meta property="article:tag" content="等级保护"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2019/10/14/%E5%AE%89%E5%85%A8%E5%9F%9F%E5%88%92%E5%88%86%E4%B8%8E%E8%BE%B9%E7%95%8C%E9%98%B2%E6%8A%A4/"},"headline":"安全域划分与边界防护","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2019-10-14T06:33:03.000Z","dateModified":"2026-10-18T13:49:39.820Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"安全域划分解决的不是买什么设备，而是先回答“谁可以和谁说话、说到什么程度”。很多团队把网络画成一张大平面，靠一台防火墙隔开内外，一旦攻击者进入内网，横向移动几乎没有阻力。本文从划分方法讲到访问控制矩阵、设备分工、防火墙策略、DMZ 与微隔离，最后落到变更运营和等保 2.0 映射，适合正在做整改或梳理内网边界的工程师。"}</script><link rel="canonical" href="https://987763485.github.io/2019/10/14/%E5%AE%89%E5%85%A8%E5%9F%9F%E5%88%92%E5%88%86%E4%B8%8E%E8%BE%B9%E7%95%8C%E9%98%B2%E6%8A%A4/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2019-10-14T06:33:03.000Z" title="10/14/2019, 2:33:03 PM">2019-10-14</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a></span><span class="level-item">1 小时读完 (大约7349个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">安全域划分与边界防护</h1><div class="content"><p>安全域划分解决的不是买什么设备，而是先回答“谁可以和谁说话、说到什么程度”。很多团队把网络画成一张大平面，靠一台防火墙隔开内外，一旦攻击者进入内网，横向移动几乎没有阻力。本文从划分方法讲到访问控制矩阵、设备分工、防火墙策略、DMZ 与微隔离，最后落到变更运营和等保 2.0 映射，适合正在做整改或梳理内网边界的工程师。</p>
+<h2 id="安全域的本质是信任边界"><a href="#安全域的本质是信任边界" class="headerlink" title="安全域的本质是信任边界"></a>安全域的本质是信任边界</h2><p>安全域（Security Zone）是一组具有相同业务属性、数据敏感度和信任级别的资产集合。域内可按较宽松的规则通信，跨域则必须经过边界设备，按最小权限逐条放行。划分不是为了把网络切碎，而是把大量点对点关系收敛成少量域间关系，让策略可写、可审、可维护。</p>
+<h3 id="域内信任，不等于域内不设防"><a href="#域内信任，不等于域内不设防" class="headerlink" title="域内信任，不等于域内不设防"></a>域内信任，不等于域内不设防</h3><p>“域内信任”不是同一网段可以随便访问。它指域内主机身份和用途相对可控，边界不必为每台主机单独设规则，防护重心放在主机加固、账户、补丁和审计上。即便如此，数据库区内部也不应允许任意主机互访，管理区同样要区分管理员的操作范围。</p>
+<p>反过来，如果域内主机已经被攻陷，域边界就是阻止扩散的最后一道闸门。因此域内信任的前提是资产清楚、基线达标、日志完整，否则只是心理安慰。</p>
+<h3 id="三条划分轴：业务、数据、信任级别"><a href="#三条划分轴：业务、数据、信任级别" class="headerlink" title="三条划分轴：业务、数据、信任级别"></a>三条划分轴：业务、数据、信任级别</h3><p>实际划分通常同时考虑三条轴。业务轴按职责分，例如交易、订单、内容、办公；数据轴按敏感度分，例如公开数据、个人信息、支付数据、密钥；信任级别轴按暴露面和失陷后果分，例如互联网可达、合作方可达、仅内部可达、仅运维可达。</p>
+<p>三条轴冲突时，优先级由风险决定：数据敏感、暴露面大的系统，即使同属一个团队，也应单独成域。常见错误是照组织架构图划域，部门各一个域，结果同一个域里既有公网门户，又有存着身份证号的数据库。</p>
+<h2 id="划分方法：从业务清单到边界"><a href="#划分方法：从业务清单到边界" class="headerlink" title="划分方法：从业务清单到边界"></a>划分方法：从业务清单到边界</h2><p>划分不是对着拓扑图拍脑袋，而是有输入、有输出、可复核的过程。稳妥顺序是业务梳理、数据流、资产分级、边界识别，最后才是地址规划与设备选型。</p>
+<p>业务梳理先列出所有对外和对内服务，写清负责人、用户群体、峰值流量和依赖关系。数据流梳理沿一次完整请求，标出每一跳：浏览器、CDN、负载均衡、应用、缓存、数据库、消息队列、第三方接口。资产分级把主机、数据库、中间件、存储按重要程度和敏感度打标签，至少区分核心、重要、一般三级。边界识别则寻找信任级别变化的位置，这些位置就是防火墙、代理或网关应当部署的地方。</p>
+<p>下图是一个电商企业兼顾办公网络的示例。它不追求完备，重点在于展示区域之间是串行收口，而不是互相直通。</p>
+<pre class="mermaid">flowchart TD
+    Internet[互联网] --> Border[边界路由器与清洗]
+    Border --> FW1[互联网接入防火墙]
+    FW1 --> WAF[反向代理与 WAF]
+    WAF --> DMZ[DMZ 前置区]
+    DMZ --> FW2[核心防火墙]
+    FW2 --> APP[应用区]
+    APP --> FW3[数据防火墙]
+    FW3 --> DB[(数据区)]
+    FW1 --> VPN[远程接入网关]
+    VPN --> MGMT[管理区]
+    MGMT --> APP
+    MGMT --> DB
+    OFFICE[办公区] --> FW2
+    DEV[开发测试区] --> FW2</pre>
+
+<p>这张图里几处约束是刻意为之。互联网流量只能进入 DMZ，不能直接到应用区；应用区访问数据库必须再次穿过数据防火墙；管理区可以单向进入应用区和数据区，反向则不允许；办公区与开发测试区各自收口到核心防火墙，不能绕过边界直连。专线、云上 VPC、分支机构和合作方接入也遵循同一原则：每跨一次信任级别，就要有一次可审计的检查。</p>
+<h3 id="边界识别比地址规划更重要"><a href="#边界识别比地址规划更重要" class="headerlink" title="边界识别比地址规划更重要"></a>边界识别比地址规划更重要</h3><p>很多项目先分 IP 段，再倒推区域，最后发现同一段里混着测试机和数据库。正确做法是先确定边界，再为每个域分配连续地址段；地址段只服务于路由和策略聚合，不承担安全语义。边界不一定是防火墙：跨云专线、容器入口、VPN 网关、API 网关都可能是信任级别的分界点。</p>
+<p>边界确定后形成三份文档：区域清单写职责、负责人、地址段与资产范围；互联清单写域间全部访问关系；设备清单写每个边界由什么设备控制。</p>
+<h2 id="典型区域与暴露面"><a href="#典型区域与暴露面" class="headerlink" title="典型区域与暴露面"></a>典型区域与暴露面</h2><p>区域名称各家不同，但职责相通；写清每个区域“谁能进来、能去哪里”，比争论名字更有价值。</p>
+<p>互联网接入区是外部流量的第一站，通常部署边界路由器、清洗设备、外网防火墙和反向代理。它暴露面最大，只允许已登记的业务端口进入，管理面绝不暴露公网，入站连接必须经过 NAT 和策略双重收口。</p>
+<p>DMZ 放置必须被互联网访问、又不该接触核心数据的服务，例如门户静态资源、API 前置、邮件网关、文件交换。DMZ 主机即使被攻陷也不能横向进入应用区和数据区，到内网的连接应极少且明确到端口。</p>
+<p>应用区承载业务逻辑，只接受 DMZ 和办公区的已授权请求，不直接面向互联网。数据区存放数据库、缓存、对象存储和备份，只接受应用区和运维管理区的连接，禁止办公终端直连，禁止公网地址映射到数据库端口。</p>
+<p>管理区是运维人员进入各区的唯一入口，堡垒机、跳板机、监控、日志、补丁服务器放在这里。访问方向应是管理区到被管对象，而非反过来；管理区不承载业务，也不与办公区混在一个 VLAN。</p>
+<p>办公区面向员工终端，暴露面来自钓鱼、恶意软件和违规外联。控制重点是出网代理、终端准入、办公到应用的按需授权，而不是把办公网当成可信内网。开发测试区单独隔离，使用脱敏数据，禁止配置生产数据库连接，代码发布走独立制品通道。</p>
+<table>
+<thead>
+<tr>
+<th>区域</th>
+<th>主要暴露面</th>
+<th>允许的入站方向</th>
+<th>允许的出站方向</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>互联网接入区</td>
+<td>公网扫描、DDoS、漏洞利用</td>
+<td>互联网已登记端口</td>
+<td>DMZ、VPN 网关</td>
+</tr>
+<tr>
+<td>DMZ</td>
+<td>Web 攻击、文件上传、反连</td>
+<td>接入区</td>
+<td>应用区指定端口</td>
+</tr>
+<tr>
+<td>应用区</td>
+<td>越权、接口滥用、横向探测</td>
+<td>DMZ、办公区、管理区</td>
+<td>数据区、消息队列</td>
+</tr>
+<tr>
+<td>数据区</td>
+<td>弱口令、未授权查询、拖库</td>
+<td>应用区、管理区</td>
+<td>备份区，原则上不出网</td>
+</tr>
+<tr>
+<td>管理区</td>
+<td>凭据窃取、运维工具滥用</td>
+<td>VPN、办公区堡垒机入口</td>
+<td>各区域管理端口</td>
+</tr>
+<tr>
+<td>办公区</td>
+<td>终端失陷、违规外联</td>
+<td>员工接入</td>
+<td>互联网代理、应用区</td>
+</tr>
+<tr>
+<td>开发测试区</td>
+<td>测试后门、脏数据、配置泄露</td>
+<td>研发人员</td>
+<td>测试环境，禁止生产</td>
+</tr>
+</tbody></table>
+<h2 id="访问控制矩阵"><a href="#访问控制矩阵" class="headerlink" title="访问控制矩阵"></a>访问控制矩阵</h2><p>区域图回答“分成几块”，矩阵回答“块与块之间通什么”。每一行是一条访问关系，至少包含源域、目的域、协议、端口、用途和审批人，落地时再加有效期、工单号、执行设备和复核记录。</p>
+<table>
+<thead>
+<tr>
+<th>源域</th>
+<th>目的域</th>
+<th>协议</th>
+<th>端口</th>
+<th>用途</th>
+<th>审批人</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>互联网</td>
+<td>DMZ</td>
+<td>TCP</td>
+<td>443</td>
+<td>门户与 API 入口</td>
+<td>业务负责人</td>
+</tr>
+<tr>
+<td>DMZ</td>
+<td>应用区</td>
+<td>TCP</td>
+<td>8080</td>
+<td>反向代理回源</td>
+<td>应用负责人</td>
+</tr>
+<tr>
+<td>应用区</td>
+<td>数据区</td>
+<td>TCP</td>
+<td>3306</td>
+<td>订单库读写</td>
+<td>数据负责人</td>
+</tr>
+<tr>
+<td>管理区</td>
+<td>应用区</td>
+<td>TCP</td>
+<td>22</td>
+<td>堡垒机运维</td>
+<td>运维负责人</td>
+</tr>
+<tr>
+<td>办公区</td>
+<td>应用区</td>
+<td>TCP</td>
+<td>443</td>
+<td>内部管理后台</td>
+<td>应用负责人</td>
+</tr>
+<tr>
+<td>应用区</td>
+<td>互联网</td>
+<td>TCP</td>
+<td>443</td>
+<td>支付回调</td>
+<td>财务与安全</td>
+</tr>
+<tr>
+<td>开发测试区</td>
+<td>制品库</td>
+<td>TCP</td>
+<td>443</td>
+<td>拉取构建产物</td>
+<td>研发负责人</td>
+</tr>
+</tbody></table>
+<p>矩阵的核心纪律是默认拒绝。没有登记的组合一律不通，而不是“先放着，出事再说”。每条放行都要能回答：为什么需要、为什么是这些端口、为什么范围不能再小。回答不了的规则，要么补材料，要么删掉。</p>
+<p>最小权限在矩阵里体现为四个“具体”：源具体到地址组而非整个私网，目的具体到服务而非整个网段，端口具体到监听端口而非端口范围，时间具体到项目周期而非永久。临时联调、第三方支持必须设到期时间，到期自动失效，避免临时规则变成永久后门。</p>
+<p>矩阵还是业务与安全之间的契约。应用负责人签字确认访问关系，安全团队把它翻译成设备策略，运维负责执行和留档。矩阵更新必须先于策略变更，不能出现设备已放通、文档还写着禁止的情况。每季度用实际流量与矩阵比对，既能发现漏登记的连接，也能发现没人使用的僵尸规则。</p>
+<h2 id="边界设备的分工"><a href="#边界设备的分工" class="headerlink" title="边界设备的分工"></a>边界设备的分工</h2><p>边界防护常被简化成“买一台防火墙”，但不同设备回答不同层面的问题，可以重叠部署，却不能互相替代；职责一混，某类攻击就会成为盲区。</p>
+<p>防火墙工作在网络层和传输层，核心是五元组过滤与状态检测：源地址、目的地址、源端口、目的端口、协议，加上连接状态。它能精确控制“谁能连谁”，却看不懂 HTTP 参数里有没有注入，也分不清正常登录和暴力破解。</p>
+<p>WAF 工作在应用层，解析 HTTP 请求头、URL、参数、Cookie 和上传内容，能识别注入、跨站脚本、恶意文件上传等攻击。它通常以反向代理或串接方式部署在 Web 入口，适合保护 80 和 443 端口，但对数据库协议、SMB 共享、内网远程桌面无能为力。</p>
+<p>IDS 与 IPS 的差别在动作：IDS 旁路镜像，只告警不阻断；IPS 串接在链路中，可以丢弃会话。它们擅长发现扫描、漏洞利用、木马回连和口令爆破，但受加密流量和性能约束，不能替代防火墙做精细的访问控制。</p>
+<p>堡垒机是运维流量的统一入口，负责账号托管、权限分配、命令审计和会话回放。它解决“谁在什么时间对哪台机器做了什么”，而不是网络隔离。把堡垒机当防火墙用，或让运维绕过堡垒机直连服务器，都会让审计链条断裂。</p>
+<p>代理分为正向和反向。正向代理服务内部用户出网，可按域名、端口、用户做白名单，并留下访问日志；反向代理位于服务入口，承担 TLS 卸载、路由和部分防护。出网如果不收口，数据外传和恶意软件回连就很难发现。</p>
+<table>
+<thead>
+<tr>
+<th>设备</th>
+<th>主要看什么</th>
+<th>典型位置</th>
+<th>不能替代什么</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>防火墙</td>
+<td>五元组与连接状态</td>
+<td>各区域边界</td>
+<td>应用层攻击检测</td>
+</tr>
+<tr>
+<td>WAF</td>
+<td>HTTP 语义与载荷</td>
+<td>Web 入口</td>
+<td>网络层隔离</td>
+</tr>
+<tr>
+<td>IDS&#x2F;IPS</td>
+<td>流量特征与行为</td>
+<td>旁路或串接</td>
+<td>精细访问控制</td>
+</tr>
+<tr>
+<td>堡垒机</td>
+<td>运维账号与会话</td>
+<td>管理区</td>
+<td>区域边界防护</td>
+</tr>
+<tr>
+<td>代理</td>
+<td>出网目的地与用户</td>
+<td>互联网出口</td>
+<td>入站攻击防护</td>
+</tr>
+</tbody></table>
+<h2 id="防火墙策略设计"><a href="#防火墙策略设计" class="headerlink" title="防火墙策略设计"></a>防火墙策略设计</h2><p>策略设计不是把能通的都写上，而是用最少规则表达最清楚意图。好规则只看名字就知道为什么存在。</p>
+<h3 id="白名单、状态检测与方向"><a href="#白名单、状态检测与方向" class="headerlink" title="白名单、状态检测与方向"></a>白名单、状态检测与方向</h3><p>默认策略必须拒绝，入站和出站都是。先允许业务必需流量，再显式拒绝并记录其余。状态检测让返回流量自动通过，不必为每个连接写反向规则；但 UDP、ICMP 和路由不对称场景要单独验证，否则请求出去了、响应回不来。</p>
+<p>方向要写进规则名和注释。同一端口，应用区访问数据区与反向访问是两条规则，风险和审批人不同；写反轻则业务不通，重则留下反向通道。</p>
+<h3 id="顺序、分组与命名"><a href="#顺序、分组与命名" class="headerlink" title="顺序、分组与命名"></a>顺序、分组与命名</h3><p>防火墙按顺序匹配，命中第一条即停止，因此具体规则在前、宽泛规则在后。宽泛规则排前面会让后面的精细规则永不生效，这就是策略遮蔽。上线前要逐条检查遮蔽关系，尤其是宽泛规则与精细规则并存时。</p>
+<p>地址组和服务组用于聚合，不是隐藏。地址组按角色命名，如“订单应用集群”，而不是“组 1”“临时”。成员变更留记录，避免测试机塞进生产组；嵌套不超过三层，否则排障困难。</p>
+<p>命名建议统一为“方向-源域-目的域-应用-序号”，例如：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">INET-DMZ-HTTP-001</span><br><span class="line">DMZ-APP-ORDERAPI-010</span><br><span class="line">APP-DB-MYSQL-021</span><br><span class="line">OPS-APP-SSH-101</span><br></pre></td></tr></table></figure>
+
+<p>规则描述写工单号和到期时间，如“订单服务回源，工单 CHG-2019-1024，2020-03-31 到期”。半年后接手的人能据此判断能不能删。</p>
+<h3 id="冗余清理与-NAT"><a href="#冗余清理与-NAT" class="headerlink" title="冗余清理与 NAT"></a>冗余清理与 NAT</h3><p>策略只增不减是通病。清理不能只看配置，要看命中计数：连续九十天零命中的允许规则，要么业务下线，要么流量改道，都应进入待确认清单。重复、被覆盖、地址组为空的规则可合并删除；删除前先在拒绝日志观察一周。</p>
+<p>NAT 与策略的关系常被忽略。源转换改变源地址，目的转换改变目的地址，策略匹配的是转换前还是转换后，不同设备顺序不同。设计时要明确“先转换后过滤”还是“先过滤后转换”，并写全双向规则。数据库只做目的 NAT 而不做策略限制，等于把内网端口暴露给公网。</p>
+<p>日志也是策略的一部分。拒绝日志必须开，关键允许日志按重要性选择；全开会被噪声淹没，全关则无法追溯。至少保留管理、数据库和跨区访问的日志。</p>
+<h2 id="DMZ-设计：把“可被攻陷”当作前提"><a href="#DMZ-设计：把“可被攻陷”当作前提" class="headerlink" title="DMZ 设计：把“可被攻陷”当作前提"></a>DMZ 设计：把“可被攻陷”当作前提</h2><p>DMZ 的设计前提不是“这里不会出事”，而是“一旦出事，不能伤到核心”。对外服务应尽量前置：静态资源、反向代理、API 网关放在 DMZ；必须由应用处理的逻辑，只暴露明确的回源地址和端口。数据库、缓存、消息队列不进入 DMZ，也不允许 DMZ 直接访问数据区。</p>
+<p>反向代理在这里承担三件事：终止 TLS，隐藏后端真实地址；按域名和路径路由，只暴露必要的接口；统一记录访问日志，为 WAF 和审计提供输入。后端应用服务器不绑定公网地址，安全组或防火墙只接受代理地址的回源请求。这样即使某台 DMZ 主机被攻陷，攻击者拿到的也只是一个没有数据、没有内网权限的跳板。</p>
+<p>运维通道要单独设计。不要为了“方便排查”把 SSH 或远程桌面映射到公网，也不要在 DMZ 主机上保存内网凭据。正确做法是从管理区经堡垒机接入，堡垒机到 DMZ 的规则单独审批，会话全程录屏；临时排障用完即关，不保留长期账号。DMZ 与内网之间尽量由不同的防火墙接口或不同的设备承载，避免一条策略写错就绕过了整段边界。</p>
+<h2 id="微隔离：把策略推到工作负载旁"><a href="#微隔离：把策略推到工作负载旁" class="headerlink" title="微隔离：把策略推到工作负载旁"></a>微隔离：把策略推到工作负载旁</h2><p>传统防火墙管南北向，东西向流量在核心交换机内部转发的部分往往看不见。微隔离（Micro-segmentation）的思路是把访问控制点下沉到主机或容器，以工作负载的身份、标签和角色而不是固定 IP 来定义策略，让“应用 A 只能访问数据库 B 的 3306”这种关系在每一台主机上生效。</p>
+<p>2019 年这项技术仍在落地早期。主机代理方案相对成熟，能覆盖物理机和主流虚拟化平台，但要解决 agent 兼容性、性能开销和跨平台管理；容器侧更多依赖编排系统自带的网络策略，跨集群、跨云仍然割裂。它适合保护核心数据，不适合一上来就全公司铺开。</p>
+<p>实施顺序建议是：先做流量可视化，至少观察两到四周，拿到真实的东西向连接清单；再设计标签体系，按应用、环境、角色打标签，避免用 IP 当身份；然后在只告警不阻断的模式下下发策略，逐条确认误报；最后按应用灰度开启阻断，保留一键回退。微隔离不能替代区域边界防火墙，它补的是域内细粒度控制；如果区域本身没划清，直接上微隔离只会把混乱复制到每一台主机。</p>
+<h2 id="横向移动防护：假设边界已经被穿过"><a href="#横向移动防护：假设边界已经被穿过" class="headerlink" title="横向移动防护：假设边界已经被穿过"></a>横向移动防护：假设边界已经被穿过</h2><p>边界防护做得再好，也要假设某台主机已经失陷。横向移动防护要让攻击者即使拿到落脚点，也难找下一个凭据、难用熟悉的协议跳板、难在日志里消失。</p>
+<p>第一道是凭据隔离。管理员账号与办公账号分开，服务器本地管理员不用统一弱口令，Domain Admin 一类高权限账号不登录办公终端和邮件服务器。运维人员用实名账号经堡垒机提权，操作可追溯；服务账号只授予运行所需权限，禁止交互式登录。凭据一旦不能复用，横向移动的成本就会显著上升。</p>
+<p>第二道是管理面与业务面分离。管理端口只对管理区开放，业务端口只对应用区开放，两者不共用同一个监听地址和同一套账号。SMB、RDP、WinRM 这类高风险协议要在边界和主机两层限制：能不用就不用，必须用时限定源地址、账户和时段。远程管理优先走堡垒机，不允许多台服务器之间随意互连。</p>
+<p>第三道是日志与检测点。登录成功与失败、特权组变更、服务安装、计划任务创建、防火墙拒绝记录、DNS 异常查询，都是横向移动的影子。日志要统一时间、集中采集，并设置基线告警，例如某台 Web 服务器突然向数据库端口发起大量连接，或办公终端在深夜登录多台服务器。检测不追求一次抓准，追求把异常从噪声里挑出来。</p>
+<h2 id="远程接入与第三方"><a href="#远程接入与第三方" class="headerlink" title="远程接入与第三方"></a>远程接入与第三方</h2><p>远程办公和第三方运维是边界上最容易被开口子的地方。VPN 仍是 2019 年的主流方案，但必须配合多因素认证、实名账号、终端合规和最小路由：只下发需要的网段，不做全内网通吃；分离隧道要谨慎，避免终端一边连内网一边把流量交给不可信网络。账号离职即停，长期不用自动禁用。</p>
+<p>零信任在当年更多是一种方向而不是成熟产品：不再默认“内网即可信”，而是每次访问都验证身份、设备状态和上下文，按应用授权而不是按网段授权。落地可以从暴露面最大的一两个系统开始，先做统一身份、强认证和细粒度代理，不必推倒现有网络。它和区域划分并不矛盾，区域解决粗粒度隔离，零信任解决“同一个区域内也不默认放行”。</p>
+<p>第三方接入要单独成域。专线或 VPN 只允许到达合同约定的系统，源地址、目的地址、端口、时段四者同时限定；对方账号由本方创建，不使用共享账号；接入过程有本方接口人陪访，操作留日志。项目结束要同时回收网络策略、账号、证书和专线，不能只停账号忘了关端口。</p>
+<h2 id="变更与运维：让策略可追溯"><a href="#变更与运维：让策略可追溯" class="headerlink" title="变更与运维：让策略可追溯"></a>变更与运维：让策略可追溯</h2><p>策略变更必须走工单，工单里写清业务原因、源和目的、端口、持续时间、影响范围和回滚方法。执行前由第二个人复核，重点看方向是否写反、地址组是否选错、是否会被更宽的规则遮蔽；涉及核心区或管理区的变更，安排在业务低峰窗口，并提前通知值班人员。</p>
+<p>变更后要验证，而不是“保存即完成”。从源端发起连接，确认放行符合预期；再从非授权源发起连接，确认拒绝生效；查看命中计数和日志，确认流量走新规则而非旧规则。回滚方案提前准备，至少能恢复到变更前的配置版本，不能靠记忆手工反向修改。</p>
+<p>策略审计建议每季度一次，按“矩阵、配置、流量、日志”四样对照：矩阵里有但配置里没有的，是漏配；配置里有但矩阵里没有的，是违规；有配置但长期零命中的，是候选清理对象；日志里出现但矩阵里没有的，是未知连接。审计结果要有负责人签字和整改期限，否则下一次审计会发现同样的问题。</p>
+<h2 id="与等保-2-0-的方向性映射"><a href="#与等保-2-0-的方向性映射" class="headerlink" title="与等保 2.0 的方向性映射"></a>与等保 2.0 的方向性映射</h2><p>等保 2.0 的 GB&#x2F;T 22239-2019 已于 2019 年 5 月 10 日发布，将于 12 月 1 日实施。本文写作时仍处于新旧标准衔接期，具体控制项和测评口径应以正式标准和测评机构要求为准，这里只谈方向，不引用条款号。</p>
+<p>2.0 常被概括为“一个中心、三重防护”：安全管理中心，以及安全通信网络、安全区域边界、安全计算环境。区域划分正好是“安全区域边界”的落地基础：先有域，才谈得上域间访问控制、入侵防范和恶意代码防范；管理区与堡垒机对应“安全管理中心”的集中管控思路；主机加固、账户权限、审计日志对应“安全计算环境”；网络架构、通信加密和带宽保障对应“安全通信网络”。</p>
+<p>映射的价值是把合规语言翻译成工程动作，而不是为条款堆设备。区域清单、互联矩阵、边界策略、日志留存既是检查会看的东西，也是日常运营的底稿；底稿做实，测评时只需导出和抽样。</p>
+<h2 id="常见问题"><a href="#常见问题" class="headerlink" title="常见问题"></a>常见问题</h2><p><strong>域划得过多，管理成本失控。</strong> 有的团队按每个应用一个域，最后几十个区域、上百条互联关系，策略没人维护得过来。划分粒度应由信任级别差异决定，同一信任级别、同一数据敏感度、同一运维主体的系统可以合并；一般企业从五到八个区域起步足够，规模变大后再细分。</p>
+<p><strong>默认放通，靠黑名单挡攻击。</strong> “先全通，出事再封”在早期很方便，却把安全建立在已知威胁上。正确顺序是默认拒绝、按矩阵放行、记录拒绝流量；新业务上线前先提交访问关系，而不是不通了再临时开全网。</p>
+<p><strong>策略只增不减。</strong> 项目结束、系统下线、临时联调到期，规则却留在设备上。每季度清理零命中规则，给临时规则设到期时间，变更时同步更新矩阵，策略规模才不会失控。</p>
+<p><strong>管理区与业务区混用。</strong> 堡垒机、监控、补丁服务器和业务应用挤在同一网段，一旦业务主机被攻陷，攻击者可直接摸到运维工具和凭据。管理区应独立成域，只允许运维终端经堡垒机进入，到业务区单向受控。</p>
+<p><strong>日志缺失，出事无法追溯。</strong> 只开拒绝日志还不够，NAT 转换前后的地址、用户身份、会话时长都要能关联。日志时间统一到同一时源，留存不少于六个月，并定期演练“给定一个 IP，能否还原它访问过什么”。做不到，区域划分就只剩一张好看的拓扑图。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>安全域划分是把复杂网络收敛成可管理信任关系的方法：先按业务、数据和信任级别定边界，再用访问控制矩阵把关系写清楚，最后用防火墙、WAF、IDS&#x2F;IPS、堡垒机和代理各司其职地执行。域内信任必须建立在资产清楚、基线达标和日志完整之上，域间则坚持默认拒绝与最小权限。微隔离和零信任是方向，不是一蹴而就的替代品；比技术选型更重要的是变更纪律和季度复核。把矩阵、配置、流量、日志四样对齐，边界才真正守得住。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://csrc.nist.gov/publications/detail/sp/800-41/rev-1/final">NIST SP 800-41 Rev. 1: Guidelines on Firewalls and Firewall Policy</a></li>
+<li><a href="https://csrc.nist.gov/publications/detail/sp/800-53/rev-4/final">NIST SP 800-53 Rev. 4: Security and Privacy Controls</a></li>
+<li><a href="https://tools.ietf.org/html/rfc1918">RFC 1918: Address Allocation for Private Internets</a></li>
+<li><a href="https://github.com/OWASP/Top10">OWASP Top 10 2017</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>安全域划分与边界防护</p><p><a href="https://987763485.github.io/2019/10/14/安全域划分与边界防护/">https://987763485.github.io/2019/10/14/安全域划分与边界防护/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2019-10-14</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a><a class="link-muted mr-2" rel="tag" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/">等级保护</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2019/10/16/Python%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1%E7%BC%96%E7%A8%8B/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Python 面向对象编程</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2019/10/12/KaliLinux%E6%B8%97%E9%80%8F%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA/"><span class="level-item">Kali Linux 渗透环境搭建</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

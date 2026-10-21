@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>网页性能优化全景：关键渲染路径 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="前端性能优化这个领域，2010 年之前靠的是经验和零散的技巧，2010 年之后才开始有了一套可解释的理论框架。这个框架就是关键渲染路径（Critical Rendering Path，简称 CRP）。它回答了一个根本问题：浏览器从拿到字节到画出像素，中间到底经历了什么。一旦看清了这条路径，绝大多数优化手段就不再是”据说有效”的偏方，而是”缩短某一段路程”的必然选择。本文把这条路径从网络层到合成层完"><meta property="og:type" content="blog"><meta property="og:title" content="网页性能优化全景：关键渲染路径"><meta property="og:url" content="https://987763485.github.io/2013/11/27/%E7%BD%91%E9%A1%B5%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E5%85%A8%E6%99%AF%E5%85%B3%E9%94%AE%E6%B8%B2%E6%9F%93%E8%B7%AF%E5%BE%84/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="前端性能优化这个领域，2010 年之前靠的是经验和零散的技巧，2010 年之后才开始有了一套可解释的理论框架。这个框架就是关键渲染路径（Critical Rendering Path，简称 CRP）。它回答了一个根本问题：浏览器从拿到字节到画出像素，中间到底经历了什么。一旦看清了这条路径，绝大多数优化手段就不再是”据说有效”的偏方，而是”缩短某一段路程”的必然选择。本文把这条路径从网络层到合成层完"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2013-11-27T04:25:47.000Z"><meta property="article:modified_time" content="2026-10-17T10:22:24.928Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="web前端"><meta property="article:tag" content="性能优化"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2013/11/27/%E7%BD%91%E9%A1%B5%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E5%85%A8%E6%99%AF%E5%85%B3%E9%94%AE%E6%B8%B2%E6%9F%93%E8%B7%AF%E5%BE%84/"},"headline":"网页性能优化全景：关键渲染路径","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2013-11-27T04:25:47.000Z","dateModified":"2026-10-17T10:22:24.928Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"前端性能优化这个领域，2010 年之前靠的是经验和零散的技巧，2010 年之后才开始有了一套可解释的理论框架。这个框架就是关键渲染路径（Critical Rendering Path，简称 CRP）。它回答了一个根本问题：浏览器从拿到字节到画出像素，中间到底经历了什么。一旦看清了这条路径，绝大多数优化手段就不再是”据说有效”的偏方，而是”缩短某一段路程”的必然选择。本文把这条路径从网络层到合成层完"}</script><link rel="canonical" href="https://987763485.github.io/2013/11/27/%E7%BD%91%E9%A1%B5%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E5%85%A8%E6%99%AF%E5%85%B3%E9%94%AE%E6%B8%B2%E6%9F%93%E8%B7%AF%E5%BE%84/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2013-11-27T04:25:47.000Z" title="11/27/2013, 12:25:47 PM">2013-11-27</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/">前端开发</a></span><span class="level-item">1 小时读完 (大约7146个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">网页性能优化全景：关键渲染路径</h1><div class="content"><p>前端性能优化这个领域，2010 年之前靠的是经验和零散的技巧，2010 年之后才开始有了一套可解释的理论框架。这个框架就是关键渲染路径（Critical Rendering Path，简称 CRP）。它回答了一个根本问题：浏览器从拿到字节到画出像素，中间到底经历了什么。一旦看清了这条路径，绝大多数优化手段就不再是”据说有效”的偏方，而是”缩短某一段路程”的必然选择。本文把这条路径从网络层到合成层完整走一遍，并给出每一段对应的优化手段与实测方法。</p>
+<p>理解关键渲染路径的价值，可以用一个类比：一条工厂流水线，产出是屏幕上的第一屏像素。任何一个工位慢了，整条线都要停下来等它。CSS 没下载完，渲染树就建不起来；头部一个同步脚本没执行完，解析就得停住。所以优化的第一课不是”怎么让它更快”，而是”谁在等谁、等的是哪一段”。</p>
+<h2 id="从字节流到-HTML：网络层做了什么"><a href="#从字节流到-HTML：网络层做了什么" class="headerlink" title="从字节流到 HTML：网络层做了什么"></a>从字节流到 HTML：网络层做了什么</h2><p>用户在地址栏敲下网址后，浏览器要做的第一件事是把服务器上的字节取回来。这一段常被前端忽略，但它往往是耗时最长的一段。</p>
+<p>首先是域名解析。浏览器先查自己的 DNS 缓存，没命中就查操作系统缓存，再没命中才向本地域名服务器发起递归查询。一个域名从零开始解析，常见耗时在几十到几百毫秒之间，跨运营商和国际线路时可能更长。DNS 查询的结果会被缓存一段时间，由域名的 TTL 决定。这就是”减少 DNS 查询”这条老规则的理论依据：解析本身就是一次实打实的网络往返。</p>
+<p>解析出 IP 之后是建立连接。HTTP&#x2F;1.1 时代，每个域名下的并发连接数有限制（浏览器常见是 6 个），每次新建 TCP 连接都要三次握手，如果走 HTTPS 还要加上 TLS 握手与证书校验，这又是两三个往返。TCP 的慢启动（slow start）机制决定了连接初期的发送速率是逐步爬升的，一个新连接传不了多少字节就要等确认。这也是为什么大文件要合并、小文件要压缩——新建连接的固定成本必须靠”一次多传点东西”摊薄。</p>
+<p>连接建立后，请求发出，服务器处理，第一个字节到达的时间就是首字节时间（TTFB）。然后是逐段传输，浏览器一边收字节一边做后面的解析工作——这正是 HTML 流式处理的起点。</p>
+<pre class="mermaid">flowchart TD
+  A[输入 URL] --> B[DNS 解析]
+  B --> C[TCP 三次握手]
+  C --> D[发送 HTTP 请求]
+  D --> E[服务器处理与响应]
+  E --> F[首字节到达 TTFB]
+  F --> G[HTML 字节流持续到达]
+  G --> H[解析器边收边解析]</pre>
+
+<p>这里要建立一个数字感：一个典型的宽带访问，DNS 加握手可能占去 100~300 毫秒，TTFB 几十到几百毫秒，而 HTML 本身可能只有几十千字节、传输只用几十毫秒。换句话说，在 2013 年的网络条件下，网络层的固定开销常常大于实际传输时间。CDN 之所以有效，是因为它同时缩短了地理距离带来的往返延迟、分担了连接建立成本、并让解析请求落在更近的节点上。</p>
+<h2 id="HTML-解析与预加载扫描器"><a href="#HTML-解析与预加载扫描器" class="headerlink" title="HTML 解析与预加载扫描器"></a>HTML 解析与预加载扫描器</h2><p>浏览器拿到字节流后并不是等整个文档下载完才动手。HTML 解析器是增量式的：字节到达、分词、构造节点、遇到引用外部资源的标签就把下载任务交给网络层，然后继续往下解析。</p>
+<p>这一步里有一个常被低估的组件——预加载扫描器（preloader &#x2F; speculative parser）。它的作用是：主解析器按文档顺序推进，遇到一段很大的同步脚本时要停下来等它下载执行，此时扫描器会继续往后看，把后面出现的图片、样式表、脚本的下载任务提前派发出去。这样即使主解析器被阻塞，后面的资源也已经在下载中了。</p>
+<p>预加载扫描器带来两个很重要的推论。第一，把样式表放在文档靠前的位置是有实际收益的，因为它会更早被发现、更早开始下载，CSSOM 也就更早就绪。第二，用 JavaScript 动态插入的资源，扫描器在解析阶段是看不见的——它只能看到 HTML 文本里的标签。所以 <code>document.createElement(&#39;script&#39;)</code> 动态插入的脚本，浏览器在初始解析时完全不知道它的存在，必须等脚本跑起来、插入节点后才开始下载。这是动态插入资源比静态引用慢的根因。</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">&lt;!-- 预加载扫描器能提前发现 script 与 link，并在解析被阻塞时继续下载 --&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">head</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">meta</span> <span class="attr">charset</span>=<span class="string">&quot;utf-8&quot;</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">link</span> <span class="attr">rel</span>=<span class="string">&quot;stylesheet&quot;</span> <span class="attr">href</span>=<span class="string">&quot;/css/base.css&quot;</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">link</span> <span class="attr">rel</span>=<span class="string">&quot;stylesheet&quot;</span> <span class="attr">href</span>=<span class="string">&quot;/css/layout.css&quot;</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">head</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">body</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">div</span> <span class="attr">id</span>=<span class="string">&quot;app&quot;</span>&gt;</span>正在加载……<span class="tag">&lt;/<span class="name">div</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">script</span> <span class="attr">src</span>=<span class="string">&quot;/js/lib.js&quot;</span>&gt;</span><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">script</span> <span class="attr">src</span>=<span class="string">&quot;/js/app.js&quot;</span>&gt;</span><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">body</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>还有一个细节与字节效率有关：尽早发送字节比攒一个大响应更好。服务器如果等整个页面渲染完再一次性输出，浏览器就完全没有提前解析的机会；而如果先输出 HTML 头部并 flush，浏览器就能立刻开始解析头部、下载样式表。这解释了为什么模板引擎与服务器端渲染应该尽早 flush，以及为什么”尽早刷新缓冲区”会成为雅虎规则里的一条。</p>
+<h2 id="DOM-树构建"><a href="#DOM-树构建" class="headerlink" title="DOM 树构建"></a>DOM 树构建</h2><p>HTML 解析的产物是 DOM 树。解析过程由 HTML5 规范精确定义：字节流先经过编码判定（优先看 BOM，再看 meta charset，再看响应头，最后靠启发式），解码成字符流；然后经过分词器（tokenizer）产出标签与文本；再经过树构造阶段（tree construction）按规范的状态机把节点挂到树上。规范之所以把错误恢复行为也逐条定义，是为了让各家浏览器对同一份畸形 HTML 得到相同的 DOM——这也是 HTML5 与 HTML4 在工程上最大的区别之一。</p>
+<p>树构造阶段有几个对性能有实际影响的规则：</p>
+<ul>
+<li>遇到 <code>&lt;link rel=&quot;stylesheet&quot;&gt;</code>，解析器不阻塞，但该资源会被加入渲染阻塞集合，后续见下文。</li>
+<li>遇到没有 <code>defer</code> 或 <code>async</code> 的 <code>&lt;script&gt;</code>，解析器必须停下来，下载并执行完这个脚本才继续。原因是脚本可能通过 <code>document.write()</code> 往文档流里插入内容，后面的解析结果可能因此改变。</li>
+<li>遇到 <code>&lt;img&gt;</code>、<code>&lt;iframe&gt;</code> 等，解析不阻塞，下载任务派发出去就继续走。</li>
+<li>表格布局、浮动、<code>display: table-cell</code> 等会让浏览器走一些额外的重算路径，但这些属于布局期，不在解析期。</li>
+</ul>
+<p>DOM 树的规模直接影响后面的布局与样式计算。节点数从一千涨到一万，样式匹配与布局的开销不是线性涨十倍，因为影响范围会扩散。所以”减少 DOM 元素数量”这条老规则，本质是在给后面的每一个阶段减负。</p>
+<h2 id="CSSOM-树构建"><a href="#CSSOM-树构建" class="headerlink" title="CSSOM 树构建"></a>CSSOM 树构建</h2><p>浏览器发现样式表后开始下载，下载完成后由 CSS 解析器处理。CSS 的解析比 HTML 简单——它是可回溯的、规则驱动的词法语法，没有 HTML 那套复杂的状态机。解析的产物是 CSSOM：一棵由规则组成的树，每个节点携带该元素生效的样式信息。</p>
+<p>CSSOM 有两个关键特性，都源于 CSS 语言本身的设计。</p>
+<p>第一是层叠（cascade）。同一个元素可能被多条规则命中，必须按优先级算出一个最终值。优先级由选择器的特异性（specificity）、来源（作者样式、用户样式、浏览器默认样式）、出现顺序共同决定。这意味着 CSSOM 的构建不是简单的”收集所有规则”，而是要对每条规则做匹配、合并、覆盖计算。选择器写得太复杂、嵌套太深，特异性计算与匹配的成本就上去。</p>
+<p>第二是继承（inheritance）。像 <code>color</code>、<code>font-family</code>、<code>line-height</code>、<code>visibility</code> 这类可继承属性，父元素上算出的值要沿树往下传。这决定了 CSSOM 必须按树的层次组织，而不能拍平成一个列表——子节点的最终值可能依赖父节点的计算结果。也正因如此，浏览器不会”部分应用”CSS：必须整棵样式表都处理完，才能保证继承值是正确的。</p>
+<pre class="mermaid">flowchart TD
+  A[HTML 字节流] --> B[DOM 树]
+  C[CSS 字节流] --> D[CSS 解析]
+  D --> E[层叠计算 特异性 来源 顺序]
+  E --> F[继承传递]
+  F --> G[CSSOM 树]
+  B --> H[合并]
+  G --> H
+  H --> I[渲染树]</pre>
+
+<p>这里藏着一个重要的结论：浏览器无法在 CSS 未全部就绪的情况下安全渲染。因此 CSS 是渲染阻塞（render blocking）资源。任何放在头部的外链样式表，都会把首屏绘制推迟到它下载完成之后。这不是浏览器的保守，而是语言语义决定的——它不知道后面还有没有规则会覆盖当前算出的值。</p>
+<h2 id="Render-树构建"><a href="#Render-树构建" class="headerlink" title="Render 树构建"></a>Render 树构建</h2><p>DOM 与 CSSOM 都就绪后，浏览器把两者合并成渲染树（render tree）。渲染树的构造规则有两条常被忽略的排除项：</p>
+<ul>
+<li><code>display: none</code> 的元素不进入渲染树。注意这与 <code>visibility: hidden</code> 不同——后者元素仍在渲染树中，仍占据布局空间，只是不可见。这也解释了为什么 <code>visibility: hidden</code> 比 <code>display: none</code> 更容易引发重排：前者改了还要重新布局，后者直接把子树从渲染树摘掉。</li>
+<li><code>&lt;head&gt;</code> 里的元素不进入渲染树。<code>&lt;meta&gt;</code>、<code>&lt;title&gt;</code>、<code>&lt;link&gt;</code>、<code>&lt;style&gt;</code>、<code>&lt;script&gt;</code> 都不产生可见盒子，自然不在其中。</li>
+</ul>
+<p>渲染树的节点不是一一对应 DOM 节点的。一个元素可能对应一个盒子，也可能是多个（行内元素跨行拆分、<code>li</code> 的标记盒子与主盒子）；反过来，某些 DOM 节点（如上述被排除的）在渲染树里根本没有对应物。这个”不一一对应”是理解后面所有布局与绘制行为的基础。</p>
+<h2 id="Layout-Reflow"><a href="#Layout-Reflow" class="headerlink" title="Layout &#x2F; Reflow"></a>Layout &#x2F; Reflow</h2><p>有了渲染树，浏览器开始计算布局，这一步在不同引擎里叫 layout、reflow、formatting。它要解决的是：每个盒子在视口中的确切位置与尺寸。</p>
+<p>布局是一个递归过程，从根元素开始，按文档流顺序确定每个盒子的几何信息。有些属性会立刻触发全局重算——比如视口宽度变化导致所有百分比宽度失效；有些则只影响局部子树。浏览器会做一定的优化：把失效的盒子标记为脏（dirty），在下一帧统一重新计算，而不是每次改动都全页重排。但 2013 年的实现并不完美，读写交替导致的强制同步布局仍是主要的性能陷阱。</p>
+<p>布局完成后，如果后续有改动需要重新计算，就称为重排（reflow）。触发重排的因素包括：DOM 结构变化、影响几何的样式变化、视口尺寸变化，以及——最隐蔽的——读取布局信息。读取 <code>offsetWidth</code>、<code>getBoundingClientRect()</code>、<code>getComputedStyle()</code> 等属性时，浏览器必须保证返回值是准确的，于是会把之前所有未应用的样式改动立刻结算成一次同步布局。写一行代码读一个属性，交替进行，重排次数就等于循环次数。</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 反模式：一次循环里读写交替，每圈强制一次同步布局</span></span><br><span class="line"><span class="keyword">var</span> list = <span class="variable language_">document</span>.<span class="title function_">getElementById</span>(<span class="string">&#x27;list&#x27;</span>);</span><br><span class="line"><span class="keyword">var</span> items = list.<span class="title function_">getElementsByTagName</span>(<span class="string">&#x27;li&#x27;</span>);</span><br><span class="line"><span class="keyword">for</span> (<span class="keyword">var</span> i = <span class="number">0</span>; i &lt; items.<span class="property">length</span>; i++) &#123;</span><br><span class="line">  <span class="keyword">var</span> h = items[i].<span class="property">offsetHeight</span>;        <span class="comment">// 读：强制结算布局</span></span><br><span class="line">  items[i].<span class="property">style</span>.<span class="property">height</span> = h + <span class="number">5</span> + <span class="string">&#x27;px&#x27;</span>; <span class="comment">// 写：标记布局失效</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 正模式：先批量读、再批量写</span></span><br><span class="line"><span class="keyword">var</span> heights = [];</span><br><span class="line"><span class="keyword">for</span> (<span class="keyword">var</span> j = <span class="number">0</span>; j &lt; items.<span class="property">length</span>; j++) &#123;</span><br><span class="line">  heights.<span class="title function_">push</span>(items[j].<span class="property">offsetHeight</span>);</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">for</span> (<span class="keyword">var</span> k = <span class="number">0</span>; k &lt; items.<span class="property">length</span>; k++) &#123;</span><br><span class="line">  items[k].<span class="property">style</span>.<span class="property">height</span> = heights[k] + <span class="number">5</span> + <span class="string">&#x27;px&#x27;</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="Paint-与-Composite"><a href="#Paint-与-Composite" class="headerlink" title="Paint 与 Composite"></a>Paint 与 Composite</h2><p>布局算出的只是几何信息，接下来要把像素填上去，这一步叫绘制（paint &#x2F; repaint）。绘制是按层与盒子的绘制顺序，把背景、边框、文字、阴影、图片等内容画到一系列绘制记录（display list）里。像 <code>background-color</code>、<code>color</code>、<code>box-shadow</code>、<code>border-radius</code> 这类只影响外观、不影响几何的属性，修改后只需要重绘，不需要重新布局——这是重绘比重排便宜的原因。</p>
+<p>在绘制之后还有合成（composite）。浏览器可能把页面分成多个合成层（compositing layer），各层分别绘制成位图，最后由合成线程按层级、透明度、变换等合成到屏幕上。触发提升为独立合成层的常见因素有：3D 变换（<code>translate3d</code>、<code>rotate3d</code>）、<code>will-change</code> 之前的时代里大家常用的视频元素、<code>opacity</code> 动画、Canvas 等。合成动画可以由合成线程直接处理，不必每次打扰主线程重排重绘，这是流畅动画的技术基础。</p>
+<pre class="mermaid">flowchart TD
+  A[渲染树] --> B[Layout 计算几何]
+  B --> C[Paint 生成绘制记录]
+  C --> D[合成层位图]
+  D --> E[Composite 合成上屏]
+  B -->|样式或结构变化| B
+  C -->|仅外观变化| C</pre>
+
+<h2 id="渲染阻塞与解析阻塞：两种不同的”卡住”"><a href="#渲染阻塞与解析阻塞：两种不同的”卡住”" class="headerlink" title="渲染阻塞与解析阻塞：两种不同的”卡住”"></a>渲染阻塞与解析阻塞：两种不同的”卡住”</h2><p>初学者最容易混淆的两个概念是渲染阻塞与解析阻塞。它们的受害者不同，后果也不同。</p>
+<p>渲染阻塞（render blocking）指资源未就绪时，浏览器不能进行到”绘制”这一步，但解析仍可继续。典型就是外链 CSS。CSS 阻塞的是渲染树之后的整条链路：没有 CSSOM 就没有渲染树，没有渲染树就不能布局与绘制。所以 CSS 没到位，屏幕就是白的，但 HTML 解析其实可以正常往下走，后面的 DOM 照样建得起来。</p>
+<p>解析阻塞（parser blocking）指资源未就绪时，HTML 解析器必须停下。典型就是位于文档流中、没有 <code>defer</code> 或 <code>async</code> 的 <code>&lt;script&gt;</code>。它连累的是解析本身：后面的 DOM 都还没建出来，更谈不上首屏。而且它间接阻塞渲染——DOM 不完整，渲染树也不完整。</p>
+<pre class="mermaid">flowchart TD
+  A[HTML 解析] -->|遇到 link stylesheet| B[派发下载 解析继续]
+  B --> C[CSS 就绪前 不生成渲染树]
+  A -->|遇到同步 script| D[解析暂停]
+  D --> E[下载并执行脚本]
+  E --> A
+  C --> F[可渲染]</pre>
+
+<p>为什么 CSS 放头部、JS 放底部，原因就在这里。CSS 放头部，浏览器尽早发现、尽早下载，解析期间就把 CSSOM 建好了，HTML 解析完立刻能渲染；如果 CSS 放底部，浏览器可能已经解析完整个 DOM 却还在等 CSS，白屏时间被无谓拉长。JS 放底部，是为了让脚本执行时不阻塞首屏 DOM 的构建——放在底部的脚本执行时，首屏内容已经解析完毕。</p>
+<p>但”JS 放底部”有个替代方案：<code>defer</code>。它让脚本提前开始下载，又不阻塞解析，还能保证在 DOM 构建完成后、<code>DOMContentLoaded</code> 之前按文档顺序执行。相比之下 <code>async</code> 一下载完就执行，顺序不保证，适合无依赖的分析类脚本。</p>
+<h2 id="三种脚本加载方式的时序"><a href="#三种脚本加载方式的时序" class="headerlink" title="三种脚本加载方式的时序"></a>三种脚本加载方式的时序</h2><p>同步脚本、<code>defer</code>、<code>async</code> 三者的下载与执行时机完全不同。用一个时序图看最清楚。</p>
+<pre class="mermaid">sequenceDiagram
+  participant P as 解析器
+  participant N as 网络层
+  participant S as 脚本引擎
+  P->>N: 遇到 script 派发下载
+  N->>S: 同步脚本下载完
+  S->>P: 执行 阻塞解析
+  Note over P,S: defer 脚本并行下载
+  P->>P: 解析继续 不受阻塞
+  Note over P,S: async 脚本下载完即执行
+  S->>P: 执行时机不固定
+  P->>S: DOM 构建完成
+  S->>S: 依次执行 defer 脚本
+  S->>P: 触发 DOMContentLoaded</pre>
+
+<p>三者的行为可以归纳成一张表。</p>
+<table>
+<thead>
+<tr>
+<th>方式</th>
+<th>下载时机</th>
+<th>执行时机</th>
+<th>是否阻塞解析</th>
+<th>执行顺序</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>同步 <code>&lt;script src&gt;</code></td>
+<td>遇到即下载</td>
+<td>下载完立即执行</td>
+<td>阻塞</td>
+<td>按文档顺序</td>
+</tr>
+<tr>
+<td><code>&lt;script defer src&gt;</code></td>
+<td>遇到即下载</td>
+<td>DOM 构建完成后、<code>DOMContentLoaded</code> 前</td>
+<td>不阻塞</td>
+<td>按文档顺序</td>
+</tr>
+<tr>
+<td><code>&lt;script async src&gt;</code></td>
+<td>遇到即下载</td>
+<td>下载完立即执行</td>
+<td>不阻塞（执行时可能打断）</td>
+<td>不保证</td>
+</tr>
+</tbody></table>
+<p>选型上：页面初始化逻辑、依赖 DOM 顺序的代码用 <code>defer</code>；统计、广告这类彼此独立、无依赖的第三方脚本用 <code>async</code>；极少数需要提前执行又必须同步的场景才用同步脚本，且要放到底部。2013 年的现实是 IE9 及以下不支持 <code>defer</code> 与 <code>async</code>，需要做特性检测并提供回退——把脚本动态插入 DOM 在旧 IE 上同样能避免阻塞，这是当年常用的折中。</p>
+<h2 id="资源优先级与预加载"><a href="#资源优先级与预加载" class="headerlink" title="资源优先级与预加载"></a>资源优先级与预加载</h2><p>浏览器不是同时下载所有资源的，它有内部优先级。2013 年 Chrome 的实现里，优先级大致是：CSS 最高，其次是按文档顺序出现的脚本，再是阻塞渲染的字体与首屏图片，最低是异步脚本、视频、延迟加载的图片。这个优先级解释了若干现象：为什么先出现的图片比后出现的先下载完；为什么一个头部同步脚本能推迟后面图片的下载（解析停了，扫描器虽在派发，但资源竞争会让路给高优先级项）。</p>
+<p>基于这个机制，当年的实践有几个直接推论：</p>
+<ul>
+<li>把首屏关键样式表放最前面，让它抢占最高优先级。</li>
+<li>非首屏图片不要写在 HTML 里等浏览器自动发现，用 JavaScript 在页面加载后按需替换 <code>data-src</code>，这是懒加载的做法，把带宽让给首屏。</li>
+<li>脚本合并要适度：一个巨大的 <code>all.js</code> 会让浏览器把带宽长时间花在高优先级脚本上，反而推迟 CSS 之后的图片。分拆成”核心库 + 按需模块”更利于并行。</li>
+</ul>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 2013 年典型的懒加载：先占位，页面就绪后再换成真实地址</span></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">lazyLoad</span>(<span class="params">imgs</span>) &#123;</span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">var</span> i = <span class="number">0</span>; i &lt; imgs.<span class="property">length</span>; i++) &#123;</span><br><span class="line">    <span class="keyword">var</span> real = imgs[i].<span class="title function_">getAttribute</span>(<span class="string">&#x27;data-src&#x27;</span>);</span><br><span class="line">    <span class="keyword">if</span> (real) &#123;</span><br><span class="line">      imgs[i].<span class="property">src</span> = real;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"><span class="variable language_">window</span>.<span class="property">onload</span> = <span class="keyword">function</span> (<span class="params"></span>) &#123;</span><br><span class="line">  <span class="title function_">lazyLoad</span>(<span class="variable language_">document</span>.<span class="title function_">querySelectorAll</span>(<span class="string">&#x27;img[data-src]&#x27;</span>));</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<h2 id="viewport-与首屏"><a href="#viewport-与首屏" class="headerlink" title="viewport 与首屏"></a>viewport 与首屏</h2><p>在桌面时代，首屏几乎不需要讨论；进入移动端时代后，视口（viewport）成了渲染路径上必须单独看待的一环。</p>
+<p>如果页面没有写 viewport 的 meta，移动浏览器会用一个较大的虚拟视口（常见 980 像素）布局整页，再缩小到设备宽度显示。后果是文字被等比缩小，用户要双击放大，而且浏览器实际绘制的是一张”大海报”，首屏要绘制的区域远大于用户真正看到的内容，绘制与合成的成本都上去了。</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">meta</span> <span class="attr">name</span>=<span class="string">&quot;viewport&quot;</span> <span class="attr">content</span>=<span class="string">&quot;width=device-width, initial-scale=1&quot;</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>这一行的作用是让布局视口等于设备宽度，首屏内容按真实尺寸布局。它与关键渲染路径的关系在于：布局视口决定了百分比与媒体查询的计算基准，也决定了首屏需要绘制多少内容。viewport 设置不当，等于让浏览器为一个用户根本不放大的页面做大面积绘制。</p>
+<p>移动端还有一点与桌面不同：连接更不稳定、CPU 更弱。桌面上一两百毫秒的解析开销在手机上可能被放大数倍，所以移动端对”减少阻塞、减少请求数、减少字节数”的收益比桌面更高。</p>
+<h2 id="优化手段与渲染阶段的对照表"><a href="#优化手段与渲染阶段的对照表" class="headerlink" title="优化手段与渲染阶段的对照表"></a>优化手段与渲染阶段的对照表</h2><p>把前面所有内容收拢成一张表，是本文最实用的部分。每一行都是”哪个阶段的问题，用哪个手段解决”。</p>
+<table>
+<thead>
+<tr>
+<th>优化手段</th>
+<th>作用的渲染阶段</th>
+<th>收益机理</th>
+<th>主要代价</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>使用 CDN</td>
+<td>网络层（DNS、握手、传输）</td>
+<td>缩短往返，就近分发</td>
+<td>成本、缓存一致性</td>
+</tr>
+<tr>
+<td>合并 CSS &#x2F; JS</td>
+<td>网络层 + 解析</td>
+<td>减少请求与握手次数</td>
+<td>缓存粒度变粗</td>
+</tr>
+<tr>
+<td>Gzip 压缩</td>
+<td>网络层</td>
+<td>减少传输字节</td>
+<td>服务器 CPU</td>
+</tr>
+<tr>
+<td>Expires &#x2F; Cache-Control</td>
+<td>网络层</td>
+<td>二次访问不发请求</td>
+<td>更新需要指纹化</td>
+</tr>
+<tr>
+<td>CSS 放头部</td>
+<td>CSSOM 构建</td>
+<td>尽早发现、尽早下载、尽早可渲染</td>
+<td>HTML 头部体积</td>
+</tr>
+<tr>
+<td>脚本置底或 defer</td>
+<td>DOM 构建</td>
+<td>不阻塞解析</td>
+<td>交互变晚、旧 IE 兼容</td>
+</tr>
+<tr>
+<td>精简与压缩 JS</td>
+<td>执行阶段</td>
+<td>缩短解析与执行时间</td>
+<td>构建复杂度</td>
+</tr>
+<tr>
+<td>减少 DOM 节点数</td>
+<td>Layout + 样式匹配</td>
+<td>缩小布局与匹配范围</td>
+<td>结构调整成本</td>
+</tr>
+<tr>
+<td>读写分离</td>
+<td>Layout</td>
+<td>减少强制同步布局次数</td>
+<td>代码可读性</td>
+</tr>
+<tr>
+<td>用 transform &#x2F; opacity 做动画</td>
+<td>Composite</td>
+<td>跳过布局与绘制</td>
+<td>合成层内存</td>
+</tr>
+<tr>
+<td>图片懒加载</td>
+<td>网络层 + 资源优先级</td>
+<td>把带宽让给首屏</td>
+<td>滚动时才加载</td>
+</tr>
+<tr>
+<td>内联关键 CSS</td>
+<td>CSSOM 构建</td>
+<td>消除一次请求阻塞</td>
+<td>无法缓存、体积增大</td>
+</tr>
+</tbody></table>
+<h2 id="一个完整页面的优化前后对比"><a href="#一个完整页面的优化前后对比" class="headerlink" title="一个完整页面的优化前后对比"></a>一个完整页面的优化前后对比</h2><p>下面用一个具体案例把前面的手段串起来。这是一个电商活动页，2013 年的真实结构，测试环境为 Chrome 30、宽带网络、三次取中位数。</p>
+<p>优化前的页面结构：</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&lt;!DOCTYPE <span class="keyword">html</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">html</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">head</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">title</span>&gt;</span>活动页<span class="tag">&lt;/<span class="name">title</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">script</span> <span class="attr">src</span>=<span class="string">&quot;/js/jquery-1.9.1.min.js&quot;</span>&gt;</span><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">script</span> <span class="attr">src</span>=<span class="string">&quot;/js/plugin-a.js&quot;</span>&gt;</span><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">script</span> <span class="attr">src</span>=<span class="string">&quot;/js/plugin-b.js&quot;</span>&gt;</span><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">script</span> <span class="attr">src</span>=<span class="string">&quot;/js/analytics.js&quot;</span>&gt;</span><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">link</span> <span class="attr">rel</span>=<span class="string">&quot;stylesheet&quot;</span> <span class="attr">href</span>=<span class="string">&quot;/css/reset.css&quot;</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">link</span> <span class="attr">rel</span>=<span class="string">&quot;stylesheet&quot;</span> <span class="attr">href</span>=<span class="string">&quot;/css/header.css&quot;</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">link</span> <span class="attr">rel</span>=<span class="string">&quot;stylesheet&quot;</span> <span class="attr">href</span>=<span class="string">&quot;/css/footer.css&quot;</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">link</span> <span class="attr">rel</span>=<span class="string">&quot;stylesheet&quot;</span> <span class="attr">href</span>=<span class="string">&quot;/css/activity.css&quot;</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">head</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">body</span>&gt;</span></span><br><span class="line">  <span class="comment">&lt;!-- 1200 余个 DOM 节点，30 余张小图标未合并 --&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">body</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">html</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>问题一眼可见：四个脚本在头部同步加载，阻塞了解析；四个样式表在脚本之后，被推迟发现；30 个小图标的请求排在后面。</p>
+<p>优化后的调整与每一项对应的收益：</p>
+<ol>
+<li>四个脚本合并为一个 <code>app.js</code>，加 <code>defer</code>，并移到 <code>&lt;/body&gt;</code> 前。解析不再被阻塞，脚本提前开始下载。</li>
+<li>四个样式表合并为一个 <code>all.css</code>，置于头部第一个阻塞位置。CSSOM 更早就绪。</li>
+<li>30 个小图标合成一张 CSS Sprite。请求数从 30 降到 1。</li>
+<li>首屏之外的商品图改为 <code>data-src</code> 占位，页面就绪后懒加载。</li>
+<li>jQuery 与插件分别配置长效缓存，业务代码加指纹。</li>
+</ol>
+<p>测量方法上，当年没有统一的性能 API 落地那么广，实践中主要靠三种手段结合：Chrome DevTools 的 Network 面板看瀑布图与请求数、Timeline 面板看 Loading &#x2F; Scripting &#x2F; Rendering &#x2F; Painting 各阶段耗时；WebPageTest 看首次渲染时间（start render）与完全加载时间；以及 <code>performance.timing</code> 在页面里打点记录关键节点。</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 2013 年可用的 Navigation Timing 打点</span></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">reportTiming</span>(<span class="params"></span>) &#123;</span><br><span class="line">  <span class="keyword">var</span> t = <span class="variable language_">window</span>.<span class="property">performance</span> &amp;&amp; <span class="variable language_">window</span>.<span class="property">performance</span>.<span class="property">timing</span>;</span><br><span class="line">  <span class="keyword">if</span> (!t) &#123; <span class="keyword">return</span>; &#125;</span><br><span class="line">  <span class="keyword">var</span> navStart = t.<span class="property">navigationStart</span>;</span><br><span class="line">  <span class="keyword">var</span> dns = t.<span class="property">domainLookupEnd</span> - t.<span class="property">domainLookupStart</span>;</span><br><span class="line">  <span class="keyword">var</span> tcp = t.<span class="property">connectEnd</span> - t.<span class="property">connectStart</span>;</span><br><span class="line">  <span class="keyword">var</span> ttfb = t.<span class="property">responseStart</span> - t.<span class="property">requestStart</span>;</span><br><span class="line">  <span class="keyword">var</span> domReady = t.<span class="property">domContentLoadedEventEnd</span> - navStart;</span><br><span class="line">  <span class="keyword">var</span> onload = t.<span class="property">loadEventEnd</span> - navStart;</span><br><span class="line">  <span class="keyword">var</span> img = <span class="variable language_">document</span>.<span class="title function_">createElement</span>(<span class="string">&#x27;img&#x27;</span>);</span><br><span class="line">  img.<span class="property">src</span> = <span class="string">&#x27;/timing?dns=&#x27;</span> + dns + <span class="string">&#x27;&amp;tcp=&#x27;</span> + tcp + <span class="string">&#x27;&amp;ttfb=&#x27;</span> + ttfb +</span><br><span class="line">            <span class="string">&#x27;&amp;dom=&#x27;</span> + domReady + <span class="string">&#x27;&amp;load=&#x27;</span> + onload;</span><br><span class="line">&#125;</span><br><span class="line"><span class="variable language_">window</span>.<span class="property">onload</span> = reportTiming;</span><br></pre></td></tr></table></figure>
+
+<p>优化前后的数字感大致是这样（三次取中位数）：</p>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>优化前</th>
+<th>优化后</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>请求数</td>
+<td>38</td>
+<td>9</td>
+</tr>
+<tr>
+<td>传输字节</td>
+<td>1.2 MB</td>
+<td>420 KB</td>
+</tr>
+<tr>
+<td>首次渲染时间</td>
+<td>2.1 s</td>
+<td>0.9 s</td>
+</tr>
+<tr>
+<td>DOM 可交互时间</td>
+<td>3.4 s</td>
+<td>1.5 s</td>
+</tr>
+<tr>
+<td>YSlow 得分</td>
+<td>62</td>
+<td>91</td>
+</tr>
+</tbody></table>
+<p>首次渲染时间从 2.1 秒降到 0.9 秒，主要贡献来自两处：头部同步脚本不再阻塞解析，CSS 提前就绪。请求数从 38 降到 9，贡献最大的是精灵图与合并。这个案例说明，收益最大的往往不是最”高级”的手段，而是把阻塞关系理顺。</p>
+<h2 id="测量工具"><a href="#测量工具" class="headerlink" title="测量工具"></a>测量工具</h2><p>优化必须建立在测量之上，否则只是感觉良好。2013 年可用的工具链有以下几类。</p>
+<p>Chrome DevTools 是主力。Network 面板看瀑布图，能看出请求的排队、阻塞、下载各阶段；Timeline 面板记录事件，按 Loading、Scripting、Rendering、Painting 分组，可以定位到具体某一段脚本或某次布局占了多少毫秒。这两个面板的组合，基本能回答”时间花在哪”。</p>
+<p>WebPageTest 是线上测量的好工具，可以指定地点与浏览器，看 start render、首字节、完全加载等曲线，还能出视频对比。它的价值在于环境可控、可重复，适合做前后对比。</p>
+<p><code>performance.timing</code>（Navigation Timing API）提供了页面加载各阶段的高精度时间戳，2012 年起主流浏览器陆续支持。把它上报到自己的统计系统，就能得到真实用户的分布，而不是只看到自己机器上的一个样本。</p>
+<p>YSlow 与 Page Speed 则把规则固化成评分，适合作为 checklist 逐项核对，但分数高不等于体验好，仍需结合实际指标。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 用 curl 看响应头，确认压缩与缓存是否生效</span></span><br><span class="line">curl -I -H <span class="string">&#x27;Accept-Encoding: gzip&#x27;</span> http://example.com/all.css</span><br></pre></td></tr></table></figure>
+
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>关键渲染路径是一条环环相扣的流水线：网络层取字节，解析器建 DOM，CSS 建 CSSOM，二者合成渲染树，再经布局、绘制、合成变成像素。CSS 因为语义上必须整棵就绪才能保证继承与层叠正确，所以是渲染阻塞资源；同步脚本因为可能改写文档流，所以是解析阻塞资源，两者受害者不同，优化手段也不同。把 CSS 放头部、脚本置底或用 defer，本质是重新排列阻塞顺序，让首屏更早开始绘制。所有优化手段都能在这条路径上找到自己作用的阶段，测量则决定了你该先动哪一段。看清链路，优化就从玄学变成了工程。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li>MDN: Render Blocking and Parsing Blocking Explained — <a href="https://developer.mozilla.org/en-US/docs/Web/Performance/Render-blocking_resources">https://developer.mozilla.org/en-US/docs/Web/Performance/Render-blocking_resources</a></li>
+<li>MDN: Critical Rendering Path — <a href="https://developer.mozilla.org/en-US/docs/Web/Performance/Critical_rendering_path">https://developer.mozilla.org/en-US/docs/Web/Performance/Critical_rendering_path</a></li>
+<li>MDN: Navigation Timing API — <a href="https://developer.mozilla.org/en-US/docs/Web/API/Performance_API/Navigation_timing">https://developer.mozilla.org/en-US/docs/Web/API/Performance_API/Navigation_timing</a></li>
+<li>WHATWG HTML Living Standard, sections on parsing and scripting — <a href="https://html.spec.whatwg.org/multipage/">https://html.spec.whatwg.org/multipage/</a></li>
+<li>Google Developers: Page Speed Insights 文档 — <a href="https://developers.google.com/speed/docs/insights/rules">https://developers.google.com/speed/docs/insights/rules</a></li>
+<li>Steve Souders, High Performance Web Sites, O’Reilly Media, 2007</li>
+<li>Ilya Grigorik, High Performance Browser Networking, O’Reilly Media, 2013</li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>网页性能优化全景：关键渲染路径</p><p><a href="https://987763485.github.io/2013/11/27/网页性能优化全景关键渲染路径/">https://987763485.github.io/2013/11/27/网页性能优化全景关键渲染路径/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2013-11-27</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-17</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/web%E5%89%8D%E7%AB%AF/">web前端</a><a class="link-muted mr-2" rel="tag" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/">性能优化</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2013/12/02/%E9%9B%85%E8%99%8E%E5%89%8D%E7%AB%AF%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%9635%E6%9D%A1%E8%A7%A3%E8%AF%BB/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">雅虎前端性能优化 35 条解读</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2013/11/25/jQuery%E6%BA%90%E7%A0%81%E6%9E%B6%E6%9E%84Sizzle%E9%80%89%E6%8B%A9%E5%99%A8%E5%BC%95%E6%93%8E/"><span class="level-item">jQuery 源码架构：Sizzle 选择器引擎</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

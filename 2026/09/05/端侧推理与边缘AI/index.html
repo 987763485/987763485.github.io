@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>端侧推理与边缘 AI - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="把模型搬到手机上跑，第一道门槛不是算法而是账本：内存放不放得下、每秒能搬多少字节、芯片愿意烧掉多少瓦、用户按下按钮之后多久必须出现第一个字。本文不提供任何一次评测的绝对数字，只把四本账的算法、量化与后端的适配位置、调度优先级、模型下发与边缘分工的骨架写清楚——公式给足，结论留给你自己的设备与模型。同批讨论智能体在端上如何组织形态的那篇讲的是产品与运行时形态，这里只算推理与部署的账。"><meta property="og:type" content="blog"><meta property="og:title" content="端侧推理与边缘 AI"><meta property="og:url" content="https://987763485.github.io/2026/09/05/%E7%AB%AF%E4%BE%A7%E6%8E%A8%E7%90%86%E4%B8%8E%E8%BE%B9%E7%BC%98AI/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="把模型搬到手机上跑，第一道门槛不是算法而是账本：内存放不放得下、每秒能搬多少字节、芯片愿意烧掉多少瓦、用户按下按钮之后多久必须出现第一个字。本文不提供任何一次评测的绝对数字，只把四本账的算法、量化与后端的适配位置、调度优先级、模型下发与边缘分工的骨架写清楚——公式给足，结论留给你自己的设备与模型。同批讨论智能体在端上如何组织形态的那篇讲的是产品与运行时形态，这里只算推理与部署的账。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2026-09-04T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-20T17:24:10.919Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="大模型"><meta property="article:tag" content="python"><meta property="article:tag" content="rust"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2026/09/05/%E7%AB%AF%E4%BE%A7%E6%8E%A8%E7%90%86%E4%B8%8E%E8%BE%B9%E7%BC%98AI/"},"headline":"端侧推理与边缘 AI","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2026-09-04T16:00:00.000Z","dateModified":"2026-10-20T17:24:10.919Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"把模型搬到手机上跑，第一道门槛不是算法而是账本：内存放不放得下、每秒能搬多少字节、芯片愿意烧掉多少瓦、用户按下按钮之后多久必须出现第一个字。本文不提供任何一次评测的绝对数字，只把四本账的算法、量化与后端的适配位置、调度优先级、模型下发与边缘分工的骨架写清楚——公式给足，结论留给你自己的设备与模型。同批讨论智能体在端上如何组织形态的那篇讲的是产品与运行时形态，这里只算推理与部署的账。"}</script><link rel="canonical" href="https://987763485.github.io/2026/09/05/%E7%AB%AF%E4%BE%A7%E6%8E%A8%E7%90%86%E4%B8%8E%E8%BE%B9%E7%BC%98AI/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2026-09-04T16:00:00.000Z" title="9/5/2026, 12:00:00 AM">2026-09-05</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></span><span class="level-item">1 小时读完 (大约9859个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">端侧推理与边缘 AI</h1><div class="content"><p>把模型搬到手机上跑，第一道门槛不是算法而是账本：内存放不放得下、每秒能搬多少字节、芯片愿意烧掉多少瓦、用户按下按钮之后多久必须出现第一个字。本文不提供任何一次评测的绝对数字，只把四本账的算法、量化与后端的适配位置、调度优先级、模型下发与边缘分工的骨架写清楚——公式给足，结论留给你自己的设备与模型。同批讨论智能体在端上如何组织形态的那篇讲的是产品与运行时形态，这里只算推理与部署的账。</p>
+<h2 id="端侧的账要从四个约束开始"><a href="#端侧的账要从四个约束开始" class="headerlink" title="端侧的账要从四个约束开始"></a>端侧的账要从四个约束开始</h2><p>服务器上的推理讨论通常从吞吐开始，端侧必须从约束开始。一台端侧设备同时给你四道天花板，任何一道先到，其余三道就会空转。</p>
+<p>第一道是算力，量纲是每秒可以完成多少次操作。厂商标称的是峰值，真实推理拿不到峰值：核数是否全部投入、频率是否被压住、算子形状是否匹配指令宽度、搬运与计算能否重叠，每一项都在打折。可用的方法只有一条：先用峰值做粗估，再用同一形状的微基准测出有效算力，两者之比就是这台设备的利用率因子。它是设备与内核实现的属性，不是你调参能变出来的东西，所以值得被记进配置表反复使用。</p>
+<p>第二道是内存容量，更准确说是”可持久驻留的字节数”。操作系统随时可能因为内存压力回收你的页，也可能因为温度或策略限制单个进程的可分配上限。容量账要算峰值而不是平均，因为崩在峰值上的那次就是全部。</p>
+<p>第三道是带宽，包括片外存储带宽与片上各级缓存之间的搬运能力。自回归解码的每一步都要读取与当前缓存成比例的数据，因此绝大多数端侧场景是搬运受限而不是计算受限：算力有余、带宽不足，表现为核占用率不高但每步耗时很长。</p>
+<p>第四道是功耗与热。端侧的功耗上限不是恒定值，而是一条随温度下滑的曲线。持续推理把芯片推入节流区间后，同样的代码在第五分钟比第一分钟慢，这类问题用平均值观测永远看不见。</p>
+<p>本文的写法是统一的：先给量纲，再给公式，最后给”什么症状对应哪本账没算清”。把参数量、层数、序列长度、位宽、设备档位这些量代进去，得到的是你自己设备上的可行域判断。代错了没关系，代进去这件事本身就会暴露你的假设里有多少是没测过的。需要展开编译流程、算子降级与引擎内部结构时，模型编译与推理引擎那篇已经有系统论述，本文只谈选择与账目。</p>
+<h2 id="内存账：权重、缓存与瞬时峰值"><a href="#内存账：权重、缓存与瞬时峰值" class="headerlink" title="内存账：权重、缓存与瞬时峰值"></a>内存账：权重、缓存与瞬时峰值</h2><p>内存是端侧最容易算错的一本账，因为人倾向于只算权重。</p>
+<p>权重部分最直白：权重字节数约等于参数量乘以每参数字节数。一个参数在 int4 下不足一字节但通常是按半字节打包，在 int8 下一字节，在 fp16 或 bf16 下两字节，fp32 下四字节。稀疏或混合精度方案里”每参数字节数”是一个加权平均值，不是某个单一档位。真正需要提醒的是别忘掉非权重部分：词表嵌入、输出层投影、以及某些结构里体量不小的位置编码相关缓存，都要单独列入。</p>
+<p>自回归解码的另一块大头是随序列长度线性增长的缓存字节。量纲公式如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 函数名与参数名均为本文示例自定义，不是任何运行时的官方 API。</span></span><br><span class="line"><span class="comment"># 请把你自己的模型结构与序列设置代进去，本文不提供结论值。</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">weight_bytes</span>(<span class="params">param_count, bytes_per_param</span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;权重驻留字节数 ≈ 参数量 × 每参数字节数。&quot;&quot;&quot;</span></span><br><span class="line">    <span class="keyword">return</span> param_count * bytes_per_param</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">step_cache_bytes</span>(<span class="params">seq_len, layers, kv_heads, head_dim, bytes_per_elem</span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;解码缓存字节数。系数 2 对应键与值两份张量。&quot;&quot;&quot;</span></span><br><span class="line">    <span class="keyword">return</span> <span class="number">2</span> * seq_len * layers * kv_heads * head_dim * bytes_per_elem</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">output_bytes</span>(<span class="params">vocab_size, bytes_per_elem</span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;一次前向的输出层缓冲区量级：与词表大小成正比。&quot;&quot;&quot;</span></span><br><span class="line">    <span class="keyword">return</span> vocab_size * bytes_per_elem</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">peak_bytes</span>(<span class="params">w_bytes, cache_bytes, act_bytes, workspace_bytes, safety_bytes</span>):</span><br><span class="line">    <span class="keyword">return</span> w_bytes + cache_bytes + act_bytes + workspace_bytes + safety_bytes</span><br></pre></td></tr></table></figure>
+
+<p>这段算式的价值不在于结果，而在于它把五个常被忽略的项并排列出来。激活峰值取决于你保留多少中间张量，图执行引擎为内核准备的临时空间取决于所选后端与形状对齐要求，安全余量则是对操作系统回收行为的尊重——没有它，你的”刚好能放下”会在系统压力下变成”偶尔能放下”。缓存机制本身、分页与复用策略在 KV Cache 机制那篇已经详细展开，这里只借它的量纲。</p>
+<p>容量账错了会有三种典型症状，很好辨认。一是启动即失败，通常是权重映射与运行时开销之和超过可用上限；二是长对话到中途崩溃，几乎总是缓存线性增长撞顶；三是启动后首段特别慢，这是分页载入的风暴期，磁盘到内存的搬运挤占了首步计算。三种症状对应三种缓解：常驻与可换出部分分开预算、给会话设定长度与预算上限、把权重布局调整为顺序读取友好的形态并预热必要页。</p>
+<p>最后一个提醒：能放进内存不等于放进去之后还能正常工作。端侧还要给系统自身的图形、音频、输入法留出空间，你的预算基线应当是”当前设备在本进程生命周期内可稳定持有的字节数”，而不是总内存或名义可用内存。</p>
+<h2 id="算力、带宽与功耗：同一条屋顶线上的三本账"><a href="#算力、带宽与功耗：同一条屋顶线上的三本账" class="headerlink" title="算力、带宽与功耗：同一条屋顶线上的三本账"></a>算力、带宽与功耗：同一条屋顶线上的三本账</h2><p>把这三本账放在一起讲，是因为它们由同一条屋顶线约束：任何一段内核的实际速度，取的是”计算能提供的上限”与”带宽能喂饱的上限”中较小的那个。形式化一点，某算子的时间下界约等于 max(操作次数 &#x2F; 有效算力, 搬运字节 &#x2F; 有效带宽)。你不需要真的算出秒数，只需要知道你的负载落在线的哪一侧——这决定了优化搬运还是优化计算。</p>
+<p>大模型推理两侧的差异非常明显。预填充阶段一次吞入整段提示，操作次数与提示长度成正比、搬运与权重与缓存相关，算术强度高，通常落在计算侧；解码阶段每次只推进一步，却要把与当前缓存成比例的数据读一遍，算术强度低，几乎总是落在带宽侧。于是端侧最常见的画面是：核占用不满、频率没到顶、但每步耗时顽固地不降。这时候继续换更大的核没有意义，要动的是每步搬运的字节数与搬运的层级。</p>
+<p>估算每 token 计算量的通用近似是”操作次数约等于两倍的参数量”，再按注意力部分随序列长度的增长做修正。把它除以有效算力得到计算侧下界，把每步需要搬运的字节除以有效带宽得到带宽侧下界，取大者即该步的量级。这两个量都不给结论值：参数量、位宽、有效带宽都要代你自己测出来的数。</p>
+<p>能量账同样可以拆开。一次推理消耗的焦耳，量纲上约等于搬运字节数乘以每字节能量，加上操作次数乘以每次操作能量，再加上静态功耗乘以占用时间。三项在不同设备上的主导项完全不同：老设备上静态与时间项占大头，新设备快节点上搬运项占大头。这个分解给出的实践结论比数字更有用——把请求做短、把空闲实例尽快卸载、把不该跑的实例从驻留集合里摘掉，节省的往往是静态功耗而不是计算功耗。</p>
+<p>热与节流是端侧独有的第四方。持续负载下，芯片会先跑在高性能区间，随后被温度限制压在较低水平；你的平均耗时里混着这两段，因此任何”跑三次取平均”的测量都会低估尾部。可行的观测方式是记录每一步的耗时分布，与同一时刻的频率或温度档位一起看：如果每步耗时的分布随时间整体右移，那是节流；如果只是偶发尖峰，那是调度或页错误。二者缓解手段完全不同，误判的代价是让团队在错误方向上做三个月优化。</p>
+<p>最后把屋顶线变成一个检查动作：任何端侧性能问题，先回答”这一步搬了多少字节、做了多少次操作”这两个问题，再谈换后端、换量化位宽或改调度。答不出这两个问题的优化，本质上是在猜。</p>
+<h2 id="量化与稀疏在端侧的适配"><a href="#量化与稀疏在端侧的适配" class="headerlink" title="量化与稀疏在端侧的适配"></a>量化与稀疏在端侧的适配</h2><p>压缩算法族本身不是本节对象——权重量化、激活量化、剪枝与知识蒸馏的方法学在长上下文压缩技术那篇已有系统梳理，这里只谈一件事：一个在笔记本上验证通过的压缩方案，搬到端侧为什么经常不划算。</p>
+<p>第一层原因是格式支持。设备内核只对少数几种数据布局有专门通路，位宽、分组粒度、对称与否、是否有缩放因子的存放方式，都会决定它走快路径还是走通用回退。因此端侧的量化方案设计要从”这台设备原生提供什么通路”倒推，而不是从”哪种方案精度最高”正推。具体哪些档位与格式可用，一律按官方兼容列表核对，本文不下结论，也不给对照表——因为设备与运行时都在演进，任何写死的结论都会过期。</p>
+<p>第二层原因是收益的位置。量化省下的字节如果最终仍在同一个层级里搬运，带宽受限的解码阶段就不会变快；只有当它减少了跨层级搬运的量，或者让原本放不下的模型变成放得下，收益才真实存在。这就是为什么”看起来更小的模型”在某些端侧配置上并不更快：内核把解压放进了计算通路，用带宽换成了算力，而你的瓶颈本来不在算力。</p>
+<p>第三层原因是稀疏的结构化要求。非结构化稀疏在参数计数上很漂亮，但端侧若没有对应的稀疏内核，搬运量并没有减少，只是多读了一些掩码。结构化稀疏（按块或按通道成组去除）才能把搬运与计算同时减下来，代价是精度损失更难预测。是否值得做，取决于该设备上稀疏通路的成熟度，这是一个实测问题而不是理论问题。</p>
+<p>第四层原因是分布偏移。校准数据代表的是你以为端上会发生什么，端上真实发生的是你产品里那些模板、语言混排、长度分布与图片尺寸。用云端批数据校准的模型，在端上最常见的输入上退化最明显是常态。做法上建议把端侧采样作为校准集的一部分，并且按最小必要原则采集：只取统计量或经脱敏与泛化后的样本，不取原文。</p>
+<p>精度验证也要换成任务级指标。困惑度下降一点不能说明产品可用，因为端上用户的体验集中在短指令遵循、结构化输出稳定性、特定语言的正确性上。建议维护一个端上真实分布回归集，量化前后跑同一套，把退化按任务列出，并保留逐层误差曲线用来定位是哪一段先坏掉。下表是常见选择与端侧适配问题的对照：</p>
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>端侧真实收益来源</th>
+<th>需要核对的适配问题</th>
+<th>常见误判</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>权重量化到更低位宽</td>
+<td>驻留字节减少、搬运字节减少</td>
+<td>内核是否有该位宽通路、分组粒度代价</td>
+<td>认为位宽越低一定越快</td>
+</tr>
+<tr>
+<td>权重与激活同时量化</td>
+<td>计算通路可用更低精度指令</td>
+<td>激活缩放带来的动态范围损失</td>
+<td>忽略首层与输出层特殊性</td>
+</tr>
+<tr>
+<td>结构化稀疏</td>
+<td>搬运与计算同时下降</td>
+<td>是否有稀疏内核、块粒度约束</td>
+<td>把稀疏比例直接当加速比</td>
+</tr>
+<tr>
+<td>缓存更低精度</td>
+<td>长会话驻留量下降</td>
+<td>读写通路的精度转换代价</td>
+<td>只测首步不测长会话</td>
+</tr>
+</tbody></table>
+<h2 id="内核与后端选择：兼容列表、覆盖矩阵与回退代价"><a href="#内核与后端选择：兼容列表、覆盖矩阵与回退代价" class="headerlink" title="内核与后端选择：兼容列表、覆盖矩阵与回退代价"></a>内核与后端选择：兼容列表、覆盖矩阵与回退代价</h2><p>端侧运行时的选择看上去是”用哪个后端”的一次性决定，实际是三层独立选择的叠加：设备上的加速器通路、运行时把图切给谁执行、以及切不开的部分落到哪里。任何一层没对上，表现都一样——跑得起来，但慢得不讲道理。</p>
+<pre class="mermaid">flowchart TD
+  A[拿到模型与目标设备档位] --> B{按官方兼容列表核对加速器通路}
+  B -->|列表内| C[列出算子覆盖清单]
+  B -->|列表外| D[退回通用计算通路]
+  C --> E{存在未覆盖算子}
+  E -->|否| F[整图交给加速器执行]
+  E -->|是| G[按未覆盖位置切分执行段]
+  G --> H[段间需要数据往返]
+  H --> I{往返量占搬运总量比例}
+  I -->|偏高| D
+  I -->|可接受| J[保留混合执行]
+  D --> K[建立验证矩阵后再上线]
+  J --> K
+  F --> K</pre>
+
+<p>第一层的核对动作没有捷径：把设备型号、运行时、加速器驱动这几项的组合，逐条对照官方兼容列表，能核对到什么程度就写进配置到什么程度，剩余部分标为未验证。本文不给出任何”某型号已支持”的结论，因为这类结论的失效速度比文档更新快。</p>
+<p>第二层的关键概念是覆盖矩阵而不是支持列表。支持列表告诉你某个算子”被实现了”，覆盖矩阵告诉你它在哪些数据类型、哪些形状范围、哪些秩与布局组合下被实现。大模型里最容易露馅的几处通常是层归一化变体、注意力实现方式、旋转位置编码相关操作、以及采样前的最后一层投影。把这几项单列出来做冒烟测试，比跑完整模型快一个数量级，也更容易定位。</p>
+<p>第三层是回退的代价。未覆盖算子落到通用通路，本身只是慢；真正的问题通常是切分导致的数据往返——加速器与通用计算单元之间每来回一次都要走片上或片外带宽。若你的模型每层都有一处回退，往返次数与层数成正比，性能会塌得莫名其妙。判断方法仍然是那两问：这一步搬了多少字节、做了多少次操作。</p>
+<p>构建产物的可复现性常被低估。端侧的模型产物通常经过一次离线转换，转换过程引入的形状推断与常量折叠结果，会直接影响哪些算子落在哪条通路。因此要做的不是记住版本号，而是记住内容摘要：把输入权重、转换配置与输出产物的摘要一并归档，出问题时可以用摘要反查到底是哪一次转换变了。下面这段是仓库内部自定义的清单结构，字段名与文件名都是我们团队约定的，不是任何运行时的官方配置键：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 示意用的自定义结构，字段名不是厂商 API，也不要当作标准格式。</span></span><br><span class="line">artifact_manifest = &#123;</span><br><span class="line">    <span class="string">&quot;source_weight_digest&quot;</span>: <span class="string">&quot;&lt;sha256-of-source-weights&gt;&quot;</span>,</span><br><span class="line">    <span class="string">&quot;converted_weight_digest&quot;</span>: <span class="string">&quot;&lt;sha256-of-device-artifact&gt;&quot;</span>,</span><br><span class="line">    <span class="string">&quot;conversion_tool_chain&quot;</span>: <span class="string">&quot;&lt;tool-name-and-its-commit-or-digest&gt;&quot;</span>,</span><br><span class="line">    <span class="string">&quot;target_family&quot;</span>: <span class="string">&quot;&lt;device-tier-name&gt;&quot;</span>,</span><br><span class="line">    <span class="string">&quot;operator_coverage_report&quot;</span>: <span class="string">&quot;&lt;path-to-report&gt;&quot;</span>,</span><br><span class="line">    <span class="string">&quot;fallback_ops&quot;</span>: [<span class="string">&quot;&lt;op-name&gt;&quot;</span>, <span class="string">&quot;&lt;op-name&gt;&quot;</span>],</span><br><span class="line">    <span class="string">&quot;verification_matrix_id&quot;</span>: <span class="string">&quot;&lt;matrix-id&gt;&quot;</span>,</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>验证矩阵建议四个维度：设备档位、执行通路、数值精度、序列长度。每个维度不需要全笛卡尔积，但每个组合都要有归属人，并且至少有一条端到端用例断言输出可用而不是断言没崩。</p>
+<h2 id="调度与并发：把前台响应放在唯一优先位"><a href="#调度与并发：把前台响应放在唯一优先位" class="headerlink" title="调度与并发：把前台响应放在唯一优先位"></a>调度与并发：把前台响应放在唯一优先位</h2><p>端侧调度的第一原则不是吞吐，而是”用户正在等的那一次请求必须最快”。设备只有一个用户界面，一次交互卡住，整个应用的感觉就坏了；而后台的摘要、补全预热、索引重建，晚几秒没有任何后果。</p>
+<p>一个健康的端侧调度器需要四个机制。其一是单槽优先：前台请求到来时，它进入一个专属槽位，不与后台任务竞争执行权。其二是抢占点：抢占只能发生在 token 边界或层边界这类安全位置，因此取消信号要能被执行循环看到，并且取消后缓存要正常释放而不是泄漏。其三是准入控制：新请求进来前先估算它需要的缓存增量，如果加上安全水位后放不下，就直接拒绝或降级——缩短长度、换更小配置、或者明确告诉用户需要重会话。端上最常见错误是没有准入，让系统去杀进程，然后从”慢”变成”崩溃”，用户体验断崖式下跌。其四是预算：把首步延迟与逐步延迟分开设定超时，两个预算独立观测，因为它们背后是不同的账。</p>
+<pre class="mermaid">sequenceDiagram
+  participant UI as 界面层
+  participant SCH as 调度器
+  participant ADM as 准入检查
+  participant EXE as 执行循环
+  participant MEM as 缓存管理
+  UI->>SCH: 提交请求（带优先级与预算）
+  SCH->>ADM: 询问可用缓存与安全水位
+  ADM-->>SCH: 放行或拒绝
+  SCH->>EXE: 分配前台槽位
+  EXE->>MEM: 申请逐步增长的缓存块
+  MEM-->>EXE: 可用块数或压力信号
+  EXE-->>UI: 流式返回增量
+  UI->>SCH: 用户取消
+  SCH->>EXE: 在下一个安全边界停止
+  EXE->>MEM: 归还全部块</pre>
+
+<p>实例生命周期也值得显式建模，因为端上”模型实例”是稀缺资源而不是常驻服务：</p>
+<pre class="mermaid">stateDiagram-v2
+  [*] --> Unloaded
+  Unloaded --> Loading: 首次需要
+  Loading --> Warm: 权重就绪并完成预热
+  Warm --> Running: 取得前台槽位
+  Running --> Warm: 请求结束
+  Warm --> Draining: 内存压力或进入后台
+  Draining --> Evicted: 归还全部资源
+  Warm --> Throttled: 温度或功耗档位下调
+  Throttled --> Warm: 温度回落
+  Evicted --> Loading: 再次需要</pre>
+
+<p>并发度是与内存账直接耦合的选择。多个槽位能提升后台吞吐，但每个槽位都要预留自己的缓存增长空间，于是驻留量的最坏值随槽位数线性上升；单槽位省内存，代价是后台任务只能排队。合理做法是”前台一槽 + 后台弹性槽”，并且后台槽数按当前可稳定持有的字节数动态决定，而不是配置一个固定数字。</p>
+<p>还有一件端侧特有的事：你的进程随时可能被系统终止。这意味着会话状态必须能廉价重建，推理进度不应当依赖内存里那份不可恢复的状态；解码中途被打断时，能够丢掉这一步重来，而不是把不一致的缓存留下。并发讨论到服务端会变成批处理与连续性管理，本文只谈端上这一侧的取舍。</p>
+<h2 id="模型下发与增量更新：把不可靠链路当默认"><a href="#模型下发与增量更新：把不可靠链路当默认" class="headerlink" title="模型下发与增量更新：把不可靠链路当默认"></a>模型下发与增量更新：把不可靠链路当默认</h2><p>端侧模型的分发不是”下载一个文件”，而是一条不可靠链路加上一个存储受限的对端。链路上会断、会慢、会重复；对端磁盘紧张、会被用户清理、可能装着上一个坏版本。设计目标因此是三件事：不重复搬运、坏了能退回去、永远不出现半份模型被加载。</p>
+<p>命名方式是起点。用内容摘要而不是版本号做本地产物名，可以让”同一份内容在设备上只有一份”成为自然结果：不同渠道、不同批次下发同一份权重时，落盘路径相同、校验相同，缓存天然去重。下发清单里则同时携带摘要与业务侧的模型标识，业务读清单，磁盘读摘要，两者解耦后回滚只是改一行清单指向。</p>
+<p>传输层要按分块处理。把大产物切成固定大小的分片，每片独立校验、独立续传，元数据记录已完成分片集合；恢复时只补缺失分片。分片大小是权衡：太小会让请求数与元数据膨胀，太大会让一次失败浪费过多流量。建议把它作为可调参数与网络档位关联，并在弱网下自动降为只取必要分片。</p>
+<p>差分包要谨慎。差分能省下明显流量，但它把正确性押在”设备上的基线与生成差分所依据的基线完全一致”这一假设上。现实中基线可能被清理工具删过、被另一渠道写过、或本身就是上一代转换产物。稳妥策略是差分只作为加速路径：校验合成结果的摘要，不匹配则回退全量。永远不要让合成结果未经摘要校验就进入加载路径。</p>
+<p>原子切换是最后一道保险。流程应当是：写入临时目录、全量校验、把分片合成为完整产物、再校验摘要、以原子重命名方式落位、最后更新清单指针。旧版本在清理窗口内保留一份，让”新版本加载失败”能立即指回旧指针。清理策略要显式区分常驻模型与可回收模型，并遵守磁盘配额——端上最坏的用户体验不是多等一次下载，而是模型把用户的存储空间吃掉。</p>
+<pre class="mermaid">flowchart TD
+  A[拉取下发清单] --> B[按摘要比对本地已有产物]
+  B -->|已具备| C[更新指针并加载]
+  B -->|缺失| D[申请分片下载]
+  D --> E{网络档位允许}
+  E -->|否| F[排队等待合适时机]
+  F --> D
+  E -->|是| G[逐片校验并落临时目录]
+  G --> H[合成完整产物并校验摘要]
+  H -->|摘要不符| D
+  H -->|摘要一致| I[原子重命名落位]
+  I --> J[更新清单指针]
+  J --> K{加载冒烟检查通过}
+  K -->|否| L[指针回退到上一份产物]
+  K -->|是| M[按配额清理旧产物]</pre>
+
+<p>灰度与反馈也按同一逻辑组织。按设备档位、地区与用户分组分批放量，每批只观测三件事：加载失败率、每步耗时分布、以及与推理无关的稳定性指标。遥测回传遵守最小必要原则：计数、分布分位数、错误码与产物摘要，不回传用户输入原文、不回传可关联到个人的标识。模型质量反馈要靠离线评测与自愿样本，不靠在端上偷偷采集对话。</p>
+<h2 id="边缘集群与中心云的分工"><a href="#边缘集群与中心云的分工" class="headerlink" title="边缘集群与中心云的分工"></a>边缘集群与中心云的分工</h2><p>单台设备是一笔账，一群设备是另一笔账。边缘这一层的价值不在于”把云缩小”，而在于把那些”跨设备但不出场地”的计算就近做完。</p>
+<p>三层各自的擅长范围相当清楚。设备擅长个体上下文：知道用户此刻在做什么、数据就在本机、不需要网络也能工作；它的弱点是资源少、生命周期不可控、版本碎片化。边缘节点擅长场地内的汇聚与协同：多路输入的重排与去重、跨设备检索、批量任务的潮汐调度、以及把场地的策略与权限集中执行；它的弱点是仍然要接受网络分区，规模有限。中心云擅长大规模训练、全局一致性、长周期任务与统一管理，代价是延迟、成本与数据出域。</p>
+<table>
+<thead>
+<tr>
+<th>判据</th>
+<th>更适合端侧</th>
+<th>更适合边缘</th>
+<th>更适合中心</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>强交互延迟敏感</td>
+<td>是</td>
+<td>视链路</td>
+<td>否</td>
+</tr>
+<tr>
+<td>原始数据属个人且无必要外传</td>
+<td>是</td>
+<td>需评估</td>
+<td>否</td>
+</tr>
+<tr>
+<td>需要跨设备或场地内聚合</td>
+<td>否</td>
+<td>是</td>
+<td>视规模</td>
+</tr>
+<tr>
+<td>计算量远超单设备资源</td>
+<td>否</td>
+<td>视配置</td>
+<td>是</td>
+</tr>
+<tr>
+<td>离线可用是硬要求</td>
+<td>是</td>
+<td>部分</td>
+<td>否</td>
+</tr>
+<tr>
+<td>需要全局一致的策略与数据</td>
+<td>否</td>
+<td>否</td>
+<td>是</td>
+</tr>
+<tr>
+<td>更新频率高且包体大</td>
+<td>需增量下发配合</td>
+<td>可作为分发缓存</td>
+<td>作为源</td>
+</tr>
+</tbody></table>
+<p>路由判据建议写成显式规则而不是让模型自己决定。一条实用的顺序是：先看隐私与合规是否禁止出域，禁止则留端侧；再看延迟预算，预算紧则就近执行；再看资源是否放得下，放不下则上移一层；最后看成本与可用性。任何一步得出的结论都要有回退路径，因为端侧与边缘都可能不可用。</p>
+<p>边缘作为分发缓存这一点常被忽略，但它收益稳定：同一场地内的多设备重复下载同一产物是纯浪费，边缘节点做一次拉取、多次本地供给，能把流量与等待时间同时压下来。反过来说，最常见的两个反模式也都在这里。一是把边缘当小号云，将原本为数据中心设计的部署形态整份搬到边缘机器上，结果资源利用率极低、运维复杂度翻倍；二是把端侧当可信执行环境，假设设备上跑的一定是你的完整模型，从而把业务秘密写进下发产物——权重下发意味着逻辑可被提取，需要保密的部分应当留在服务端，端侧只做能公开的那部分。私有化部署里的合规责任划分、审计与数据主权细节在私有化部署那篇有完整讨论，本文不重复，只强调分层选择的判据。</p>
+<h2 id="隐私与合规边界：默认端侧优先"><a href="#隐私与合规边界：默认端侧优先" class="headerlink" title="隐私与合规边界：默认端侧优先"></a>隐私与合规边界：默认端侧优先</h2><p>端侧最被低估的产品价值不是省流量，而是它可以把”数据不出设备”变成一个工程事实而不是承诺。承诺需要审计与信任来支撑，工程事实只需要一条链路：输入在本机被处理，结果在本机被消费，离开本机的只有不含原文的统计。</p>
+<p>要把这件事做稳，需要几条默认规则。第一，默认路径是本地执行；任何一次出域都必须是被显式开启的例外，而不是”因为方便所以顺带上传”。第二，出域要有目的限定：一次上传绑定一个具体用途，用途结束就结束生命周期，留存上限在实现里写死而不是写在政策文档里。第三，索引与检索留在本地：端侧做检索增强时，文档与向量索引默认放本机，若确实需要集中索引，必须先确认这份索引会暴露什么——向量在多数情况下并不比原文更安全。第四，明确”模型也是数据”：下发的产物是可被提取的逻辑，敏感规则与业务秘密不该塞进去，这条与上一节的分层选择直接呼应。</p>
+<p>遥测的写法决定了很多团队的合规成本。可用形态是：只回传统计量与分位数、只回传枚举型错误码、只回传产物摘要与设备档位；不可用形态是：原文片段、可关联标识、剪贴板或相册内容、以及任何形式的”临时全量采集”。采样在设备侧完成聚合再上报，比把原始事件整体上传后再在服务侧过滤要安全得多，也便宜得多——过滤式方案的风险在于你永远不确定那份原始数据在链路上停留了多久。</p>
+<p>同意与可解释性同样要落到实现。用户应当能在设置里看到三件事：本机装了哪些模型产物、占用了多少空间、哪些功能会把内容送出设备；并且能一键清除本地产物。清除必须是真清除——包含临时目录、合成中间产物与缓存的索引，否则”删除”只是让文件改名。跨区域场景、未成年人场景与行业特定要求，一律以法务评审结论为准，本文不做任何判断，只要求工程上留出可关闭、可审计、可分域的接口。</p>
+<p>审计线索建议分域存放：本地执行的事件留在本地，出域事件的元数据留在服务端，两边用同一次操作标识关联，但不互相携带内容。这样既能在投诉时还原”发生过什么”，又不需要任何一边保存完整原文。</p>
+<h2 id="观测：把约束变成可看的信号"><a href="#观测：把约束变成可看的信号" class="headerlink" title="观测：把约束变成可看的信号"></a>观测：把约束变成可看的信号</h2><p>上面所有账都要能被观测才有意义。端侧观测的四件套相当固定：容量水位（当前可稳定持有的字节数与已用量）、每步搬运量（字节数与它落在哪一层）、每步时间分解（等待、执行、搬运、外部阻塞各占多少）、以及设备状态（温度档位、功耗档位、是否在后台）。这四组量的量纲在前文各节都出现过，缺的只是把它们接进你的埋点。</p>
+<p>阈值不要写成结论数字。可行做法是用相对量：与同档位设备的历史分布比、与屋顶线估算的下界比、与灰度批次内其他版本比。任何绝对阈值都应当标注”团队约定示例”，并随固件与运行时更新重新评估；本文出现的”安全水位””预留比例”这类说法，全部属于团队约定示例，不是推荐值。</p>
+<p>把约束、常见症状、缓解手段与观测方式收进同一张表，是本文最想留下的东西：</p>
+<table>
+<thead>
+<tr>
+<th>约束</th>
+<th>典型症状</th>
+<th>缓解手段</th>
+<th>观测方式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>内存容量</td>
+<td>启动即失败</td>
+<td>权重与运行时开销分开预算、换更低驻留配置</td>
+<td>加载前后驻留字节数、失败时的可用上限</td>
+</tr>
+<tr>
+<td>内存增长</td>
+<td>长会话中途崩溃</td>
+<td>会话长度上限、准入控制、缓存块回收</td>
+<td>缓存字节随 token 数曲线、拒绝计数</td>
+</tr>
+<tr>
+<td>内存回收</td>
+<td>首段特别慢后恢复正常</td>
+<td>顺序友好布局、必要页预热</td>
+<td>首步耗时分布、页错误次数</td>
+</tr>
+<tr>
+<td>带宽</td>
+<td>核占用不满但每步很慢</td>
+<td>降低每步搬运量、减少回退往返</td>
+<td>每步搬运字节、段间往返次数</td>
+</tr>
+<tr>
+<td>算力</td>
+<td>预填充阶段明显卡</td>
+<td>缩短提示、提高算术强度、减少重复读权重</td>
+<td>每步操作次数与有效算力之比</td>
+</tr>
+<tr>
+<td>功耗与热</td>
+<td>越跑越慢、尾部变长</td>
+<td>限制持续时长、任务错峰、及时卸载</td>
+<td>每步耗时分位与温度档位联合曲线</td>
+</tr>
+<tr>
+<td>静态功耗</td>
+<td>空闲也在耗电发热</td>
+<td>驻留集合收窄、空闲即卸载</td>
+<td>实例驻留时长直方图</td>
+</tr>
+<tr>
+<td>算子覆盖</td>
+<td>换设备后速度断崖</td>
+<td>覆盖矩阵核对、避免逐层回退</td>
+<td>混合执行段数、每段搬运量</td>
+</tr>
+<tr>
+<td>调度竞争</td>
+<td>交互被后台任务拖住</td>
+<td>前台单槽优先、后台弹性槽</td>
+<td>等待时间占比、抢占次数</td>
+</tr>
+<tr>
+<td>分发链路</td>
+<td>反复下载或半份模型</td>
+<td>内容摘要命名、原子落位、指针回退</td>
+<td>加载失败率、摘要校验失败次数</td>
+</tr>
+<tr>
+<td>磁盘配额</td>
+<td>空间被模型产物吃掉</td>
+<td>常驻与可回收分列、按配额清理</td>
+<td>产物占用总量与清理事件计数</td>
+</tr>
+<tr>
+<td>精度退化</td>
+<td>特定输入质量骤降</td>
+<td>端上分布回归集、分层误差定位</td>
+<td>任务级指标差值、逐层误差曲线</td>
+</tr>
+</tbody></table>
+<p>最后强调一次方法论：任何端侧问题，先看”这一步搬了多少字节、做了多少次操作、驻留了多少字节、处于哪个功耗档位”，再谈换后端或调位宽。观测到位的团队讨论的是分布与量纲，观测缺失的团队讨论的是玄学。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>端侧推理与边缘 AI 的全部工程判断，可以压缩成四本账与一个顺序。四本账是内存、算力、带宽、功耗与热，它们共用一条屋顶线：速度取计算上界与搬运上界的较小者，而端侧解码通常先撞上搬运上界。顺序是先用通用算式做量级估算，再用微基准测出设备自己的利用率因子，最后才做选择——选后端、选位宽、选并发度、选哪一层执行。</p>
+<p>量化与稀疏在端侧是适配问题而不是算法问题：格式是否有原生通路、收益是否落在你的瓶颈上、校准是否代表端上真实分布、验证是否使用任务级指标。后端选择要看覆盖矩阵而不是支持列表，回退的真实代价是切分带来的数据往返。调度要把前台响应放在唯一优先位，用准入控制代替”让系统去杀进程”。分发则以不可靠链路为默认，用内容摘要、分片续传、摘要校验与原子落位把正确性兜住。</p>
+<p>分层的原则是就近做该做的事：个体上下文留在设备，场地协同交给边缘，全局一致性回到中心；隐私侧坚持默认端侧优先、数据不出设备，遥测只做最小必要采集与脱敏。本文刻意不写运行时版本号，也不给功耗、吞吐、延迟或体积的结论数字——所有公式都等你的模型与设备代进去，代入之后得到的东西，才是唯一适用于你的答案。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li>ExecuTorch 项目主页，PyTorch 端侧执行方案 —— <a href="https://github.com/pytorch/executorch">https://github.com/pytorch/executorch</a></li>
+<li>MLX 项目主页，Apple 芯片上的数组与推理框架 —— <a href="https://github.com/ml-explore/mlx">https://github.com/ml-explore/mlx</a></li>
+<li>llama.cpp 项目主页，端侧与消费级设备推理实现 —— <a href="https://github.com/ggml-org/llama.cpp">https://github.com/ggml-org/llama.cpp</a></li>
+<li>ONNX Runtime 官方网站，跨设备推理运行时 —— <a href="https://onnxruntime.ai/">https://onnxruntime.ai/</a></li>
+<li>OpenXLA 项目站点，编译器与算子生态 —— <a href="https://openxla.org/">https://openxla.org/</a></li>
+<li>Apple 开发者文档站点，设备端机器学习与加速通路 —— <a href="https://developer.apple.com/">https://developer.apple.com/</a></li>
+<li>Android 开发者文档站点，设备端推理与神经网络接口 —— <a href="https://developer.android.com/">https://developer.android.com/</a></li>
+<li>Roofline: An Insightful Visual Performance Model for Multicore Architectures —— <a href="https://cacm.acm.org/">https://cacm.acm.org/</a></li>
+<li>Hugging Face Hub 文档站点，模型产物与分发 —— <a href="https://huggingface.co/docs">https://huggingface.co/docs</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>端侧推理与边缘 AI</p><p><a href="https://987763485.github.io/2026/09/05/端侧推理与边缘AI/">https://987763485.github.io/2026/09/05/端侧推理与边缘AI/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2026-09-05</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-21</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="link-muted mr-2" rel="tag" href="/tags/python/">python</a><a class="link-muted mr-2" rel="tag" href="/tags/rust/">rust</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Rust 在大模型基础设施中的应用</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2026/09/03/Agent%E5%B7%A5%E5%85%B7%E7%94%9F%E6%80%81%E4%B8%8EMCPServer/"><span class="level-item">Agent 工具生态与 MCP Server</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

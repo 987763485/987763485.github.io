@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Git 版本控制入门与常用命令 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="add、commit、push 我是在别人的仓库里照着敲会的。排成自己的一条动线，是去年接手一个多人项目之后：那里每天都有推上来几十个文件、信息只写一句 fix 的提交，也有人改乱之后靠 checkout 和 reset 硬救，救活了却说不清为什么。我的困惑不在命令存不存在，而在同一个目的有三条命令都走得通，而我不知道该选哪条。"><meta property="og:type" content="blog"><meta property="og:title" content="Git 版本控制入门与常用命令"><meta property="og:url" content="https://987763485.github.io/2016/02/29/Git%E7%89%88%E6%9C%AC%E6%8E%A7%E5%88%B6%E5%85%A5%E9%97%A8%E4%B8%8E%E5%B8%B8%E7%94%A8%E5%91%BD%E4%BB%A4/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="add、commit、push 我是在别人的仓库里照着敲会的。排成自己的一条动线，是去年接手一个多人项目之后：那里每天都有推上来几十个文件、信息只写一句 fix 的提交，也有人改乱之后靠 checkout 和 reset 硬救，救活了却说不清为什么。我的困惑不在命令存不存在，而在同一个目的有三条命令都走得通，而我不知道该选哪条。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2016-02-29T15:58:31.000Z"><meta property="article:modified_time" content="2026-10-18T03:53:43.679Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="web前端"><meta property="article:tag" content="前端工程化"><meta property="article:tag" content="nodejs"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2016/02/29/Git%E7%89%88%E6%9C%AC%E6%8E%A7%E5%88%B6%E5%85%A5%E9%97%A8%E4%B8%8E%E5%B8%B8%E7%94%A8%E5%91%BD%E4%BB%A4/"},"headline":"Git 版本控制入门与常用命令","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2016-02-29T15:58:31.000Z","dateModified":"2026-10-18T03:53:43.679Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"add、commit、push 我是在别人的仓库里照着敲会的。排成自己的一条动线，是去年接手一个多人项目之后：那里每天都有推上来几十个文件、信息只写一句 fix 的提交，也有人改乱之后靠 checkout 和 reset 硬救，救活了却说不清为什么。我的困惑不在命令存不存在，而在同一个目的有三条命令都走得通，而我不知道该选哪条。"}</script><link rel="canonical" href="https://987763485.github.io/2016/02/29/Git%E7%89%88%E6%9C%AC%E6%8E%A7%E5%88%B6%E5%85%A5%E9%97%A8%E4%B8%8E%E5%B8%B8%E7%94%A8%E5%91%BD%E4%BB%A4/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2016-02-29T15:58:31.000Z" title="2/29/2016, 11:58:31 PM">2016-02-29</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/">前端开发</a></span><span class="level-item">31 分钟读完 (大约4722个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Git 版本控制入门与常用命令</h1><div class="content"><p><code>add</code>、<code>commit</code>、<code>push</code> 我是在别人的仓库里照着敲会的。排成自己的一条动线，是去年接手一个多人项目之后：那里每天都有推上来几十个文件、信息只写一句 <code>fix</code> 的提交，也有人改乱之后靠 <code>checkout</code> 和 <code>reset</code> 硬救，救活了却说不清为什么。我的困惑不在命令存不存在，而在同一个目的有三条命令都走得通，而我不知道该选哪条。</p>
+<p>本文假定你会基础的增删提交推送。变基与合并的语义、冲突怎么解、分支怎么摆、提交信息格式、内部对象结构，本仓库另有专文；我管的是命令面本身。</p>
+<h2 id="一次性配置：把新人第一天的成本降下来"><a href="#一次性配置：把新人第一天的成本降下来" class="headerlink" title="一次性配置：把新人第一天的成本降下来"></a>一次性配置：把新人第一天的成本降下来</h2><h3 id="名字、邮箱、编辑器"><a href="#名字、邮箱、编辑器" class="headerlink" title="名字、邮箱、编辑器"></a>名字、邮箱、编辑器</h3><p>作者字段跟着提交推出去、被别人拉下来，而它不追认：等你发现邮箱配错，错的历史已经在别人的克隆里，所以第一天那十分钟就该配对。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">git config --global user.name <span class="string">&quot;chunle&quot;</span></span><br><span class="line">git config --global user.email <span class="string">&quot;chunle@example.com&quot;</span></span><br><span class="line">git config --global core.editor <span class="string">&quot;vim&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p><code>core.editor</code> 决定哪些地方弹编辑器：不带 <code>-m</code> 的提交、<code>add -e</code> 改补丁、变基时那份待办清单。默认落到 <code>vi</code>；只想临时换一次，用 <code>GIT_EDITOR</code> 顶掉更省事。</p>
+<p>配置分三层：系统级、<code>~/.gitconfig</code>、仓库里的 <code>.git/config</code>，读取由外向内，后读到的赢，仓库级覆盖全局。某个仓库需要单独的换行策略或单独的邮箱，就在克隆里不带 <code>--global</code> 配一次。<code>git config --list</code> 把三层混在一起、看不出来源。</p>
+<h3 id="core-autocrlf：混合团队里要开会讨论的一条"><a href="#core-autocrlf：混合团队里要开会讨论的一条" class="headerlink" title="core.autocrlf：混合团队里要开会讨论的一条"></a>core.autocrlf：混合团队里要开会讨论的一条</h3><p>Windows 写出的文件是 CRLF 换行，Mac 和 Linux 是 LF，这个开关决定索引里存什么、工作区放什么。</p>
+<figure class="highlight ini"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># true ：检出时 LF 转成 CRLF 放进工作区，提交时再转回 LF 存进索引</span></span><br><span class="line"><span class="comment"># input：检出不转换，提交时把 CRLF 转成 LF</span></span><br><span class="line"><span class="comment"># false：两个方向都不动，仓库里存的就是当初写进去的字节</span></span><br><span class="line"><span class="section">[core]</span></span><br><span class="line">  <span class="attr">autocrlf</span> = input</span><br></pre></td></tr></table></figure>
+
+<p>坑在于 <code>true</code> 和 <code>input</code> 不是同一个约定：两个人各按一种提交，索引就一半 LF 一半 CRLF，此后每次比对都拖着一堆文字一模一样却标了改动的行。而且它只管新检出和新写入的内容，已经混进仓库的换行不会自动整理，得重新检出、重新暂存一遍才生效。</p>
+<p>更稳的做法是把约定写进仓库，不靠每个人的本地配置：仓库内统一 LF，加一份 <code>.gitattributes</code>。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">* text=auto</span><br><span class="line"># 需要钉方向的按后缀写，二进制的让 Git 彻底别碰</span><br><span class="line">*.sh text eol=lf</span><br><span class="line">*.bat text eol=crlf</span><br><span class="line">*.png binary</span><br></pre></td></tr></table></figure>
+
+<p>这几行进仓库之后，<code>core.autocrlf</code> 配错也破坏不了索引内容。</p>
+<h3 id="颜色与别名"><a href="#颜色与别名" class="headerlink" title="颜色与别名"></a>颜色与别名</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">git config --global color.ui auto</span><br><span class="line">git config --global alias.st status</span><br><span class="line">git config --global alias.co checkout</span><br><span class="line">git config --global alias.ci commit</span><br><span class="line">git config --global alias.lg <span class="string">&quot;log --oneline --graph --decorate --all&quot;</span></span><br><span class="line">git config --global alias.unstage <span class="string">&quot;reset HEAD --&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p><code>color.ui</code> 用 <code>auto</code> 不用 <code>always</code>，否则把 <code>log</code> 重定向进文件会带上一堆转义垃圾。别名只是字符串替换、不替你补参数：<code>git unstage</code> 漏了路径就退化成 <code>git reset HEAD</code>，整个暂存区一起回退；<code>lg</code> 把 <code>--all</code> 写死了，看单条主线时得手动去掉。带 <code>!</code> 开头的别名能跑 shell 命令，也最难排查。</p>
+<h2 id="看清状态与差异"><a href="#看清状态与差异" class="headerlink" title="看清状态与差异"></a>看清状态与差异</h2><p><code>git status -sb</code> 当默认：<code>-s</code> 一行一个文件、只留状态字母，<code>-b</code> 在最上面补一行分支与它的上游，形如 <code>## master [origin/master: ahead 2]</code>，ahead&#x2F;behind 的计数就在那一行。短格式省掉了未跟踪的细节，提交前该看一眼完整输出；目录太吵可以配 <code>status.showUntrackedFiles no</code>。</p>
+<p><code>diff</code> 有三个层次，搞混了就读不懂输出：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">git diff             <span class="comment"># 工作区 vs 索引</span></span><br><span class="line">git diff --staged    <span class="comment"># 索引 vs HEAD（--cached 是同一个选项的另一个名字）</span></span><br><span class="line">git diff HEAD        <span class="comment"># 工作区 vs HEAD，上面两段的合计</span></span><br></pre></td></tr></table></figure>
+
+<p>第一条是还没决定提交的，第二条是下一次提交会包含的；两者输出不一致，说明索引里躺着半份改动。另外三个选项省时间：<code>--stat</code> 只给文件名和行数，先看规模再决定读哪个文件；<code>--word-diff</code> 按词标改动，改一句文案时比按行标省一半眼睛；<code>-M</code> 让改名被识别，否则搬了位置的文件显示成全删全加。范围靠 <code>--</code> 限定，两侧留空格。</p>
+<p><code>log</code> 固定这条组合：<code>--oneline</code>、<code>--graph</code>、<code>--decorate</code>，最后这个把分支名和标签写在提交旁边，不加上只看见哈希、分不清哪条线是哪条线，比分支才补 <code>--all</code>。条件能叠着筛，<code>--since=2.weeks.ago --author=chunle -- src/</code> 一次限住时间、人和路径，<code>--until</code> 同样接受自然写法。看补丁用 <code>-p</code>，最近两条是 <code>-2</code>，<code>git show &lt;提交&gt;</code> 看单个提交、配路径只看那一个文件。</p>
+<h2 id="暂存的进阶：入门到进阶的分水岭"><a href="#暂存的进阶：入门到进阶的分水岭" class="headerlink" title="暂存的进阶：入门到进阶的分水岭"></a>暂存的进阶：入门到进阶的分水岭</h2><p><code>git add &lt;文件&gt;</code> 的语义是整个文件，按下去就全进索引。想只提交其中一半，粒度得降到块。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">git add -p</span><br><span class="line"><span class="comment"># y 收这块 / n 不收 / q 退出 / d 跳过本文件剩下的块</span></span><br><span class="line"><span class="comment"># s 把当前这块再拆细 / e 进编辑器手改补丁</span></span><br></pre></td></tr></table></figure>
+
+<p>我实际用得最多的是 <code>e</code>：两块改动拆不细的时候，手改那几行加号比来回按十次 <code>n</code> 快。<code>git add -e &lt;文件&gt;</code> 跳过挑选直接编辑补丁。再下一层是自己造补丁：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">git diff -- src/list.js &gt; part.patch</span><br><span class="line"><span class="comment"># 打开它，删掉不想提交的块，保留文件头</span></span><br><span class="line">git apply --cached part.patch</span><br></pre></td></tr></table></figure>
+
+<p><code>--cached</code> 只把改动写进索引，工作区一个字不动，于是得到”索引里是一半、桌面上是全部”，这正是拆提交的用意；上下文对不上时加 <code>--3way</code> 再试一次。暂存错了撤回来用这条：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git reset HEAD -- src/list.js</span><br></pre></td></tr></table></figure>
+
+<p>它把该文件在索引里的内容退回成 HEAD 的样子，工作区完全不动，改动还在桌面，只是不再进下一次提交。它和 <code>git checkout -- &lt;文件&gt;</code> 是方向相反的一对：前者取消”要提交”，后者取消”我改了”。记住索引这个中间层，这两条就不会按错。把一次改动拆成两个提交的完整序列：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">git add -p src/list.js      <span class="comment"># 只挑和新功能有关的块</span></span><br><span class="line">git commit -m <span class="string">&quot;列表支持多选&quot;</span></span><br><span class="line">git add -u                  <span class="comment"># 剩下的已跟踪改动全部入索引</span></span><br><span class="line">git diff --staged --<span class="built_in">stat</span>    <span class="comment"># 确认第二个提交里没有新功能残留</span></span><br><span class="line">git commit -m <span class="string">&quot;抽出公用渲染函数&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p><code>add -u</code> 只处理已跟踪文件，新增的还得单独 <code>add</code>。</p>
+<h2 id="提交与修正"><a href="#提交与修正" class="headerlink" title="提交与修正"></a>提交与修正</h2><p><code>commit -a</code> 把所有已跟踪文件的改动直接提交，两个边界：没跟踪过的新文件它不认识；它会绕过你在索引上做的挑选，已经 <code>add -p</code> 挑好一半再用 <code>-a</code>，另一半也一起进去。所以它只适合改动集中在几个老文件时。</p>
+<p><code>--amend</code> 修正最近一次提交，能换信息、补漏掉的文件、改作者。它换的是提交本身而不是追加一条修补，于是纪律只有一条：推出去之前才可以动。已经推给别人之后再改完重推，对方拉下来会看到两条分叉。为什么改一下就换了身份，另见对象模型那篇。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">git commit -a --amend -m <span class="string">&quot;列表支持多选，含空态&quot;</span></span><br><span class="line">git commit -m <span class="string">&quot;构建任务补上压缩一步&quot;</span> -m <span class="string">&quot;压缩只在发布分支启用，本地开发关掉以免看不清产物。&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>两个 <code>-m</code>，第一个当标题、第二个当正文，比在编辑器里手敲空行稳妥，也适合写进脚本。钩子要说清楚：<code>--no-verify</code> 跳过提交前的检查钩子，钩子挡的通常是格式和不该进仓库的文件，信息格式本身另见提交规范那篇。它能救命，但不该顺手用：你在本地绕过去的检查，通常只是推到别人机器或流水线里再炸一次。</p>
+<h2 id="撤销与找回的命令面"><a href="#撤销与找回的命令面" class="headerlink" title="撤销与找回的命令面"></a>撤销与找回的命令面</h2><p>丢弃工作区改动是 <code>git checkout -- &lt;文件&gt;</code>，拿索引内容覆盖桌面。取回旧版本是 <code>git checkout &lt;提交&gt; -- &lt;文件&gt;</code>，注意这条会同时改写索引，文件一落地就已经暂存，不必再 <code>add</code>。<code>reset</code> 三档各自动到哪一层：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">git reset --soft HEAD~1     <span class="comment"># 只退指针，索引和工作区全保留</span></span><br><span class="line">git reset HEAD~1            <span class="comment"># 默认的 --mixed：退指针和索引，改动留在桌面等你重挑</span></span><br><span class="line">git reset --hard HEAD~1     <span class="comment"># 三层一起退，未提交的改动当场消失</span></span><br></pre></td></tr></table></figure>
+
+<p>想留改动就别用最后一档；它为什么能决定这三层的取舍，指向对象模型那篇。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">git clean -dn          <span class="comment"># 先看名单，一个都不会真删</span></span><br><span class="line">git clean -<span class="built_in">df</span>          <span class="comment"># 确认名单没问题之后再执行</span></span><br></pre></td></tr></table></figure>
+
+<p><code>clean</code> 删的是未跟踪文件，Git 从没存过副本，删掉之后没有任何命令能找回，所以固定两步走。加 <code>-x</code> 会连被忽略的文件一起删，体积大的项目里这一条足够毁掉一个下午。</p>
+<p><code>stash</code> 收走未提交的改动、压进一个栈，工作区回到干净状态。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">git stash save <span class="string">&quot;改表格样式改一半&quot;</span></span><br><span class="line">git stash -k                <span class="comment"># 收走改动的同时把索引留在桌面（--keep-index）</span></span><br><span class="line">git stash list</span><br><span class="line">git stash apply stash@&#123;2&#125;</span><br><span class="line">git stash pop</span><br></pre></td></tr></table></figure>
+
+<p>先存起来再只提交一半这个动作，没 <code>-k</code> 就得手工来回搬。<code>apply</code> 只应用不出栈，<code>pop</code> 应用完再弹出：怀疑会冲突就用 <code>apply</code>，冲突了原始记录还在。<code>stash@{2}</code> 按栈位置数，每次入栈出栈全体挪一位，今天记住的编号明天就指向别的东西。这也是我不拿它长期存放改动的原因，另外两条更硬：记录只在本机、不进远端，重装就没了；换人接手还得传文件。结论是隔夜的改动应该变成一个提交，哪怕信息写”半成品，别合并”。</p>
+<h2 id="远端协作的命令"><a href="#远端协作的命令" class="headerlink" title="远端协作的命令"></a>远端协作的命令</h2><p><code>git remote -v</code> 看每个远端名下的读写地址；换地址用 <code>git remote set-url origin &lt;新地址&gt;</code>，它改配置、不动历史，比删了重加安全。<code>git remote show origin</code> 列出哪些本地分支已建立跟踪，排查时比 <code>-v</code> 有用。</p>
+<p><code>fetch</code> 与 <code>pull</code> 的差别：<code>pull</code> 是 <code>fetch</code> 加上把结果合并进当前分支，中间那步合并不是你决定的，而是默认行为。你在本地提交了两个、别人也推了两个，<code>pull</code> 直接把两边并起来，历史里多出一个信息为 <code>Merge branch &#39;master&#39; of ...</code> 的合并提交，谁都不想为它负责，却要永久留在图上。所以我先 <code>fetch</code>，看一眼 <code>status -sb</code> 的 ahead&#x2F;behind，再自己决定怎么并——并与变基的语义在变基那篇。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">git fetch --prune             <span class="comment"># 顺带清掉远端已删分支留下的本地引用</span></span><br><span class="line">git push -u origin list-refactor</span><br><span class="line">git ls-remote --heads origin  <span class="comment"># 还没克隆就能列出远端分支</span></span><br></pre></td></tr></table></figure>
+
+<p><code>--prune</code> 清掉别人已删分支留下的空引用，可配 <code>remote.origin.prune true</code> 让每次 <code>fetch</code> 自动带上。<code>push -u</code> 建立跟踪，之后裸 <code>git push</code> 和 <code>status -sb</code> 才知道该跟谁比；不带 <code>-u</code> 的裸推送在 Git 2.0 之后按 <code>simple</code> 只推当前分支，而更早的默认会把所有同名分支一起推上去，当年不少”我只想推一个分支”的事故就来自这里。删远端分支用 <code>git push origin --delete &lt;分支&gt;</code>。</p>
+<p>标签：<code>git tag -a v1.2.0 -m &quot;发布说明&quot;</code> 打带信息的，<code>-s</code> 那种还要配好签名密钥，团队没签名流程就不必勉强。<code>git push --tags</code> 是风险操作，它把本地所有标签一次推光，包括试手打的和早该删的，而标签推上去得请别人一起清才干净，发布时点名推一个。<code>--follow-tags</code> 只带当前提交可达的标注标签，比 <code>--tags</code> 克制得多。</p>
+<h2 id="文件与目录"><a href="#文件与目录" class="headerlink" title="文件与目录"></a>文件与目录</h2><p>改名用 <code>git mv 旧 新</code>，移动和更新索引一次做完。即便如此 <code>git blame</code> 在新文件的旧行上还是指向改名之前，查历史要补 <code>--follow</code>，怎么追让变基那篇讲细。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git <span class="built_in">rm</span> --cached config.local.js    <span class="comment"># 停止跟踪，文件留在桌面</span></span><br></pre></td></tr></table></figure>
+
+<p>一个极常见的误解：已跟踪的文件事后写进 <code>.gitignore</code> 不会自动停止跟踪，Git 照旧提交它的改动。要让它安静，必须先 <code>--cached</code>、再补忽略条目，顺序反了等于白做。</p>
+<p><code>.gitignore</code> 的写法记四条：开头带 <code>/</code> 只从仓库根算起，末尾的 <code>/</code> 只匹配目录，<code>**</code> 跨任意层，<code>!</code> 取反且写在后面才生效。有个反直觉的边界：父目录整体被忽略时，你没法用 <code>!</code> 把它里面的某个文件重新包含进来，得先放行目录。怀疑哪条规则在起作用，别靠猜：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">git check-ignore -v dist/app.js   <span class="comment"># 打印命中的规则以及它来自哪个文件哪一行</span></span><br><span class="line">git status --ignored -s           <span class="comment"># 把被忽略的东西列出来</span></span><br></pre></td></tr></table></figure>
+
+<p><code>-v</code> 的输出指到具体行号，”这文件为什么加不进去”多半当场结案。真要提交被忽略的文件用 <code>git add -f</code>。</p>
+<h2 id="排查类命令"><a href="#排查类命令" class="headerlink" title="排查类命令"></a>排查类命令</h2><p>只看一段用 <code>git blame -L 10,20 src/list.js</code>，默认 blame 整个文件在长文件里翻不动；加 <code>-w</code> 忽略空白改动，否则一次排版能把整段作者变成格式化的人。想知道这行代码是哪次提交引入或删掉的，用 <code>git log -S &#39;renderRow&#39; --oneline</code>：它比较这个字符串在改动前后出现的次数，添上和删掉都命中，一条命令同时回答”哪版开始有”和”哪版没了”，再配 <code>-- &lt;路径&gt;</code> 缩小范围。</p>
+<p>合并提交的统计输出，当时还没有专门的开关，<code>--stat-with-merges</code> 这类选项尚未出现。看单个合并提交我直接用 <code>git show -m &lt;提交&gt;</code>，它按父提交拆成几段分别给补丁，不够就退回 <code>git diff &lt;提交&gt;^1 &lt;提交&gt;</code>。至于找回被自己删掉的提交，<code>reflog</code> 是唯一入口，动线在变基那篇，本文不重复。</p>
+<h2 id="复盘：一次-git-add"><a href="#复盘：一次-git-add" class="headerlink" title="复盘：一次 git add ."></a>复盘：一次 <code>git add .</code></h2><p>去年三月新同事入职第一天，本地跑通之后 <code>git add .</code>、提交、推送，一气呵成。推上来的提交里带着三百多个调试数据文件，还有一整个 <code>node_modules</code>——刚换到 npm 3 的机器装出来的，扁平结构全在仓库根下，上万个文件。仓库体积当场翻几倍，别人拉下来从几秒变几分钟，钩子跑一次像卡死。</p>
+<p>处理顺序有讲究：先 <code>git rm -r --cached node_modules</code> 停止跟踪，这一步不动桌面，谁的本地环境都不会塌；再补 <code>.gitignore</code>，把 <code>node_modules/</code> 和调试数据的目录一起加上；然后提交这个修正，最后才讨论历史要不要洗。洗历史意味着别人已有的克隆全部作废或重走一遍变基，代价远大于一个臃肿仓库；我们没洗，只把提交前先跑一次 <code>status -sb</code> 写进检查清单。</p>
+<p>教训不在他手生，而在命令太顺手。<code>add .</code> 的语义是当前目录下所有没被忽略的东西，它默认 <code>.gitignore</code> 已经写全，而这个假设在第一天不可能成立。同样的便宜还有 <code>commit -a</code>：替你省掉一次 <code>add</code>，也替你省掉”这一次该不该带上”的判断。命令很顺手，代价在事后。</p>
+<h2 id="速查表"><a href="#速查表" class="headerlink" title="速查表"></a>速查表</h2><table>
+<thead>
+<tr>
+<th>我想干什么</th>
+<th>用哪条命令</th>
+<th>一句边界</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>看改动与离上游多远</td>
+<td><code>git status -sb</code></td>
+<td>省掉未跟踪细节</td>
+</tr>
+<tr>
+<td>看下次提交会包含什么</td>
+<td><code>git diff --staged</code></td>
+<td>与 <code>--cached</code> 等价</td>
+</tr>
+<tr>
+<td>只提交文件里的一部分</td>
+<td><code>git add -p</code></td>
+<td>拆不细就手改补丁</td>
+</tr>
+<tr>
+<td>取消暂存但保留改动</td>
+<td><code>git reset HEAD -- &lt;文件&gt;</code></td>
+<td>工作区不动</td>
+</tr>
+<tr>
+<td>丢弃工作区改动</td>
+<td><code>git checkout -- &lt;文件&gt;</code></td>
+<td>索引内容覆盖桌面</td>
+</tr>
+<tr>
+<td>取回旧版本的文件</td>
+<td><code>git checkout &lt;提交&gt; -- &lt;文件&gt;</code></td>
+<td>落地即已暂存</td>
+</tr>
+<tr>
+<td>收走改动、留下暂存</td>
+<td><code>git stash -k</code></td>
+<td>别拿来隔夜存放</td>
+</tr>
+<tr>
+<td>应用指定那条不出栈</td>
+<td><code>git stash apply stash@{2}</code></td>
+<td>编号会随栈位移</td>
+</tr>
+<tr>
+<td>修正最近一次提交</td>
+<td><code>git commit --amend</code></td>
+<td>推送之前才可以</td>
+</tr>
+<tr>
+<td>先看会删掉哪些文件</td>
+<td><code>git clean -dn</code></td>
+<td>未跟踪的删了找不回</td>
+</tr>
+<tr>
+<td>只拉不改工作区</td>
+<td><code>git fetch --prune</code></td>
+<td><code>pull</code> 会替你合并</td>
+</tr>
+<tr>
+<td>建立跟踪目标</td>
+<td><code>git push -u origin &lt;分支&gt;</code></td>
+<td>裸推送才有依据</td>
+</tr>
+<tr>
+<td>停止跟踪但保留文件</td>
+<td><code>git rm --cached &lt;文件&gt;</code></td>
+<td>光写忽略条目没用</td>
+</tr>
+<tr>
+<td>查哪条忽略规则生效</td>
+<td><code>git check-ignore -v &lt;文件&gt;</code></td>
+<td>输出带来源行号</td>
+</tr>
+<tr>
+<td>找代码何时出现或消失</td>
+<td><code>git log -S &#39;关键字&#39;</code></td>
+<td>引入与删除都命中</td>
+</tr>
+</tbody></table>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>这些命令没有一条是新东西，排成动线靠三个判断：改动现在在哪一层（桌面、索引、历史），我想让它去哪一层，这条命令默认会不会替我做第二个动作。<code>diff</code> 的三层、<code>reset</code> 的三档、<code>pull</code> 里藏着的那次合并，问的都是同一件事。配置那部分更像投资：<code>.gitattributes</code> 里钉死一次换行，此后所有人的本地开关都伤不到仓库内容。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Git 版本控制入门与常用命令</p><p><a href="https://987763485.github.io/2016/02/29/Git版本控制入门与常用命令/">https://987763485.github.io/2016/02/29/Git版本控制入门与常用命令/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2016-02-29</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/web%E5%89%8D%E7%AB%AF/">web前端</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/">前端工程化</a><a class="link-muted mr-2" rel="tag" href="/tags/nodejs/">nodejs</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2016/03/02/%E5%89%8D%E7%AB%AFMock%E6%95%B0%E6%8D%AE%E4%B8%8E%E8%81%94%E8%B0%83%E6%96%B9%E6%A1%88/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">前端Mock数据与联调方案</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2016/02/27/%E8%87%AA%E5%8A%A8%E5%8C%96%E6%B5%8B%E8%AF%95%E5%85%A5%E9%97%A8QUnit%E4%B8%8EJasmine/"><span class="level-item">自动化测试入门：QUnit 与 Jasmine</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

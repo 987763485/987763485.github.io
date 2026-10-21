@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>ES6 展开运算符实战 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="ECMA-262 第 6 版在六月中旬刚定稿，浏览器还没跟上，但 Babel 5 已经能让我们把展开运算符 ... 用进日常代码。本文不打算罗列语法特性，而是算三笔账：... 在三个位置上到底做了什么、它和 apply、concat、slice 的开销差在哪个量级、以及转译产物会把我们带回哪些老问题。读完你应该能在代码评审里说清”这里用展开是赚了还是亏了”。注意对象字面量里的展开当时还是提案，本文"><meta property="og:type" content="blog"><meta property="og:title" content="ES6 展开运算符实战"><meta property="og:url" content="https://987763485.github.io/2015/08/03/ES6%E5%B1%95%E5%BC%80%E8%BF%90%E7%AE%97%E7%AC%A6%E5%AE%9E%E6%88%98/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="ECMA-262 第 6 版在六月中旬刚定稿，浏览器还没跟上，但 Babel 5 已经能让我们把展开运算符 ... 用进日常代码。本文不打算罗列语法特性，而是算三笔账：... 在三个位置上到底做了什么、它和 apply、concat、slice 的开销差在哪个量级、以及转译产物会把我们带回哪些老问题。读完你应该能在代码评审里说清”这里用展开是赚了还是亏了”。注意对象字面量里的展开当时还是提案，本文"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2015-08-03T14:29:05.000Z"><meta property="article:modified_time" content="2026-10-18T01:48:52.368Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="javascript"><meta property="article:tag" content="web前端"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2015/08/03/ES6%E5%B1%95%E5%BC%80%E8%BF%90%E7%AE%97%E7%AC%A6%E5%AE%9E%E6%88%98/"},"headline":"ES6 展开运算符实战","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2015-08-03T14:29:05.000Z","dateModified":"2026-10-18T01:48:52.368Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"ECMA-262 第 6 版在六月中旬刚定稿，浏览器还没跟上，但 Babel 5 已经能让我们把展开运算符 ... 用进日常代码。本文不打算罗列语法特性，而是算三笔账：... 在三个位置上到底做了什么、它和 apply、concat、slice 的开销差在哪个量级、以及转译产物会把我们带回哪些老问题。读完你应该能在代码评审里说清”这里用展开是赚了还是亏了”。注意对象字面量里的展开当时还是提案，本文"}</script><link rel="canonical" href="https://987763485.github.io/2015/08/03/ES6%E5%B1%95%E5%BC%80%E8%BF%90%E7%AE%97%E7%AC%A6%E5%AE%9E%E6%88%98/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2015-08-03T14:29:05.000Z" title="8/3/2015, 10:29:05 PM">2015-08-03</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/">前端开发</a></span><span class="level-item">31 分钟读完 (大约4681个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">ES6 展开运算符实战</h1><div class="content"><p>ECMA-262 第 6 版在六月中旬刚定稿，浏览器还没跟上，但 Babel 5 已经能让我们把展开运算符 <code>...</code> 用进日常代码。本文不打算罗列语法特性，而是算三笔账：<code>...</code> 在三个位置上到底做了什么、它和 <code>apply</code>、<code>concat</code>、<code>slice</code> 的开销差在哪个量级、以及转译产物会把我们带回哪些老问题。读完你应该能在代码评审里说清”这里用展开是赚了还是亏了”。注意对象字面量里的展开当时还是提案，本文会单独标注状态。</p>
+<h2 id="先把三个位置和两个方向分清"><a href="#先把三个位置和两个方向分清" class="headerlink" title="先把三个位置和两个方向分清"></a>先把三个位置和两个方向分清</h2><p><code>...</code> 出现在三种地方，语义各不相同：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> merged = [a, b, ...list];      <span class="comment">// 位置一：数组字面量内，把 list 摊开进来</span></span><br><span class="line"><span class="keyword">var</span> max = <span class="title class_">Math</span>.<span class="title function_">max</span>(...scores);     <span class="comment">// 位置二：函数调用的实参位，把数组拆成逐个实参</span></span><br><span class="line"><span class="keyword">var</span> conf = &#123; ...defaults, ...opt &#125; <span class="comment">// 位置三：对象字面量内——提案语法，见下文</span></span><br></pre></td></tr></table></figure>
+
+<p>数组字面量和实参位这两处是 ES6 标准正文里的内容，Chrome 43 上已经能原样跑；IE 11 一个都不支持，Android 4.4 WebView（内核停在 Chrome 33）也只能靠转译。Firefox 40 计划本月 11 日发布，会带来一批默认启用的新语法，但写本文时版本还没落地，生产上别把宝押在它身上。</p>
+<p>对象位置的展开要单独说清楚状态：它不在 ES6 定稿里，是 TC39 上还在 stage 1 的”Spread and Destructuring Properties”提案，离定稿很远。Babel 5 默认不认这个写法，要显式打开可选转换器：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">babel src -d lib --watch --optional es7.objectRestSpread</span><br></pre></td></tr></table></figure>
+
+<p>这个开关是实验性质，转出来的代码是”键值逐个赋值”，不经过迭代器协议。对象展开的合法替代品是 ES6 正文里的 <code>Object.assign</code>（配合 core-js 补 runtime）：<code>Object.assign({}, defaults, opt)</code>。本文后续讲”合并配置”时会两者都出现，但请把它们当作提案糖与原语来对待。</p>
+<p>还有一个必须分开的方向：<code>...</code> 写在函数形参位时是 rest（剩余参数收集），方向是”多个实参收成一个数组”；本文只讲相反方向的 spread（展开），rest 留给同系列《ES6 默认参数与剩余参数》那篇去写。两者共用记号，转译路径和行为差别都很大，混为一谈是评审里最常见的争论源头。</p>
+<h2 id="它做了什么：apply-的语法改写与迭代协议消费"><a href="#它做了什么：apply-的语法改写与迭代协议消费" class="headerlink" title="它做了什么：apply 的语法改写与迭代协议消费"></a>它做了什么：apply 的语法改写与迭代协议消费</h2><p>位置二最好理解：<code>f(...args)</code> 语义上就是把数组拆成逐个实参，相当于 <code>f.apply(f, args)</code>，只是 <code>this</code> 的取法更细。Babel 5 的转译产物也确实走 <code>apply</code>，后面会看到。</p>
+<p>位置一就不是 <code>apply</code> 能类比的了——数组字面量里的展开消费的是迭代器协议：引擎拿 <code>list[Symbol.iterator]()</code>，反复 <code>next()</code>，把每个 <code>value</code> 按顺序塞进正在构造的新数组。这意味着 <code>...</code> 能摊开的不只是数组：<code>Set</code>、<code>Map</code>、字符串、任何自己挂了 <code>Symbol.iterator</code> 的对象都可以；但<strong>普通对象和 NodeList 不行</strong>，因为它们在那个年代的引擎里根本没有迭代器方法。这一点是后文好几个坑的总根源。</p>
+<p>浅拷贝的属性也要讲明白：<code>[...matrix]</code> 拷出来的一维元素还是原引用，<code>{ ...obj }</code> 或 <code>Object.assign</code> 同样只拷一层。展开不是深拷贝的解决方案，谁在 code review 里把它当深拷贝用，就等着共享引用的 bug 吧。</p>
+<h2 id="Math-max-能吃多少个参数：apply-的上限会咬人"><a href="#Math-max-能吃多少个参数：apply-的上限会咬人" class="headerlink" title="Math.max 能吃多少个参数：apply 的上限会咬人"></a>Math.max 能吃多少个参数：apply 的上限会咬人</h2><p><code>Math.max.apply(null, hugeArray)</code> 是把数组拆成实参的经典写法，也是经典事故：参数个数超过引擎上限就抛 <code>RangeError: Maximum call stack size exceeded</code>，因为每个实参都要占一份调用栈。上限没有规范值，各引擎在几千到十几万之间浮动。</p>
+<p>我手上这台机器同一口径的粗测（io.js 3.x，只求相对量级）：<code>apply</code> 在几万个元素时稳定炸栈；原生 Chrome 43 的 <code>Math.max(...huge)</code> 能正常算完，因为实现内部是循环压栈前的优化路径，不逐个占用 JS 栈帧；可一旦这段代码经过 Babel 5 转译，产物退回 <code>Math.max.apply(undefined, huge)</code>，上限问题原样复发。这是我强调”看转译产物”的第一个理由：<strong>同一行源码，原生和转译后是两种风险等级</strong>。给个不丢人的兜底写法：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">maxOf</span>(<span class="params">arr</span>) &#123;</span><br><span class="line">  <span class="keyword">if</span> (arr.<span class="property">length</span> &lt; <span class="number">10000</span>) &#123; <span class="keyword">return</span> <span class="title class_">Math</span>.<span class="property">max</span>.<span class="title function_">apply</span>(<span class="literal">null</span>, arr); &#125;</span><br><span class="line">  <span class="keyword">var</span> m = -<span class="title class_">Infinity</span>;</span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">var</span> i = <span class="number">0</span>; i &lt; arr.<span class="property">length</span>; i++) &#123; <span class="keyword">if</span> (arr[i] &gt; m) &#123; m = arr[i]; &#125; &#125;</span><br><span class="line">  <span class="keyword">return</span> m;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="把上限复现出来"><a href="#把上限复现出来" class="headerlink" title="把上限复现出来"></a>把上限复现出来</h3><p>判断有没有踩线，最笨也最可靠的办法是把规模翻倍往上顶。下面这段在 io.js 3.x 与 Chrome 43 控制台都能直接跑：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 找出&quot;从这个规模开始 apply 抛 RangeError&quot;的量级</span></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">explodes</span>(<span class="params">n</span>) &#123;</span><br><span class="line">  <span class="keyword">var</span> arr = <span class="keyword">new</span> <span class="title class_">Array</span>(n);</span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">var</span> i = <span class="number">0</span>; i &lt; n; i++) &#123; arr[i] = i; &#125;</span><br><span class="line">  <span class="keyword">try</span> &#123;</span><br><span class="line">    <span class="title class_">Math</span>.<span class="property">max</span>.<span class="title function_">apply</span>(<span class="literal">null</span>, arr);</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">  &#125; <span class="keyword">catch</span> (e) &#123;</span><br><span class="line">    <span class="keyword">return</span> e <span class="keyword">instanceof</span> <span class="title class_">RangeError</span>;   <span class="comment">// 爆栈是 RangeError，不是 TypeError</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">var</span> lo = <span class="number">0</span>, hi = <span class="number">1000</span>;</span><br><span class="line"><span class="keyword">while</span> (!<span class="title function_">explodes</span>(hi)) &#123;</span><br><span class="line">  lo = hi; hi *= <span class="number">2</span>;</span><br><span class="line">  <span class="keyword">if</span> (hi &gt; <span class="number">4e6</span>) &#123; <span class="keyword">break</span>; &#125;            <span class="comment">// 保险丝，别把机器拖死</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(hi + <span class="string">&#x27; 个元素开始抛，&#x27;</span> + lo + <span class="string">&#x27; 个还能过&#x27;</span>);</span><br></pre></td></tr></table></figure>
+
+<p>跑出来的绝对值不要抄进配置当常量。这条线算的是<strong>实参个数</strong>而不是字节数，元素是整数还是长字符串无关；栈大小可调，io.js 的 <code>--stack-size</code>、Worker 线程与主线程拿到的栈预算都不是一回事，同一份代码在你笔记本和 CI 容器里能差出几倍；嵌套调用本身也吃栈预算，调用链越深，单次 <code>apply</code> 能塞的实参越少。所以我的口径是：把它当作一条确实会咬人的线，阈值交给兜底代码，不猜数。</p>
+<h3 id="兜底不止一种：分块喂-apply，或者干脆回到循环"><a href="#兜底不止一种：分块喂-apply，或者干脆回到循环" class="headerlink" title="兜底不止一种：分块喂 apply，或者干脆回到循环"></a>兜底不止一种：分块喂 apply，或者干脆回到循环</h3><p><code>maxOf</code> 那种”先判长度再决定要不要走 apply”够用，但如果需求是<strong>追加</strong>而不是求极值，正确做法是分块：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// ES5 也能跑：切成小块逐块喂给 push，绕开单次调用放不下的限制</span></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">pushAll</span>(<span class="params">target, items</span>) &#123;</span><br><span class="line">  <span class="keyword">var</span> <span class="variable constant_">CHUNK</span> = <span class="number">1000</span>;</span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">var</span> i = <span class="number">0</span>, len = items.<span class="property">length</span>; i &lt; len; i += <span class="variable constant_">CHUNK</span>) &#123;</span><br><span class="line">    <span class="title class_">Array</span>.<span class="property"><span class="keyword">prototype</span></span>.<span class="property">push</span>.<span class="title function_">apply</span>(target, items.<span class="title function_">slice</span>(i, i + <span class="variable constant_">CHUNK</span>));</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> target;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>分块大小不必精确，几百到一两千都行，图的是”每次调用的实参个数稳稳落在那条安全线以内”。这类兜底在原生和产物两种环境下都是对的：按最保守的产物写代码才稳。</p>
+<h2 id="展开、concat、slice-的开销账"><a href="#展开、concat、slice-的开销账" class="headerlink" title="展开、concat、slice 的开销账"></a>展开、concat、slice 的开销账</h2><p>位置一每次执行都会构造一个<strong>新数组</strong>：开一段内存、跑一遍迭代器、逐项 push。和老写法比，我在我手上这台机器（io.js 3 与 Chrome 43，同一口径各跑五遍取中位，只看相对量级）粗测的印象是：</p>
+<table>
+<thead>
+<tr>
+<th>写法</th>
+<th>粗测量级</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>a.concat(b)</code></td>
+<td>基准</td>
+<td>原生一条路径，最快</td>
+</tr>
+<tr>
+<td><code>[...a, ...b]</code>（原生）</td>
+<td>与 concat 同量级，略慢</td>
+<td>走迭代器，逐项协议调用</td>
+</tr>
+<tr>
+<td><code>a.concat(...listOfArrays)</code></td>
+<td>慎用</td>
+<td>转译后即 <code>concat.apply</code>，同样撞参数上限</td>
+</tr>
+<tr>
+<td><code>slice()</code> 克隆单个数组</td>
+<td>与展开同量级</td>
+<td>语义有别，见下文稀疏数组一节</td>
+</tr>
+<tr>
+<td>Babel 转译后的展开</td>
+<td>视产物而定，见末节</td>
+<td>数组情形就是 concat，不亏</td>
+</tr>
+</tbody></table>
+<p>结论并不玄乎：常规规模下展开和 concat 的差距吃不掉一次 DOM 操作，<strong>选型看语义和可维护性，不用看计时器</strong>；真正的性能分界线是上面那条参数上限，它不是”慢一点”而是”直接抛错”。热路径上反复 <code>[...cache, item]</code> 重建大数组才是真开销，那种场合一个 push 或 <code>Object.assign</code> 的变更策略比换语法有用。</p>
+<h3 id="五种写法逐项对照"><a href="#五种写法逐项对照" class="headerlink" title="五种写法逐项对照"></a>五种写法逐项对照</h3><p>计时之外更要紧的是：这几种写法语义不等价，选错了不是慢，是错。”2015 可用性”指不依赖转译、当场就能跑的情况：</p>
+<table>
+<thead>
+<tr>
+<th>写法</th>
+<th>返回什么</th>
+<th>新建数组</th>
+<th>稀疏空位</th>
+<th>参数上限风险</th>
+<th>2015 可用性</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>[...a, ...b]</code></td>
+<td>新数组</td>
+<td>是</td>
+<td>读成 undefined，结果致密</td>
+<td>转译后是 concat 多参，规模极大时留意</td>
+<td>只有部分引擎原生</td>
+</tr>
+<tr>
+<td><code>a.concat(b)</code></td>
+<td>新数组</td>
+<td>是</td>
+<td>按当时规范跳过空位，结果变短</td>
+<td>只有多参用法有</td>
+<td>全部</td>
+</tr>
+<tr>
+<td><code>a.slice()</code> 之后再 push</td>
+<td>先克隆后原地改</td>
+<td>第一步新建</td>
+<td>保留</td>
+<td>逐个 push 没有</td>
+<td>全部</td>
+</tr>
+<tr>
+<td><code>Array.prototype.push.apply(a, b)</code></td>
+<td>新长度，不是数组</td>
+<td>否</td>
+<td>读成 undefined，致密</td>
+<td>有</td>
+<td>全部</td>
+</tr>
+<tr>
+<td>for 循环 push</td>
+<td>无</td>
+<td>否</td>
+<td>看写法</td>
+<td>无</td>
+<td>全部</td>
+</tr>
+</tbody></table>
+<p>两处容易看漏，也是评审里最常争的。<code>concat</code> 只展平<strong>一层</strong>数组参数：<code>a.concat([1, [2]])</code> 里那个 <code>[2]</code> 原样留作元素，<code>a.concat(...[[1, 2], [3, 4]])</code> 才得到四个元素，把”多维摊平”寄托在 concat 上就得自己再套一层循环。<code>push.apply</code> 返回的是 target 的新长度，一个数字，有人把它”优化”成 <code>var merged = Array.prototype.push.apply([], list)</code>，<code>merged</code> 当场变成 <code>list.length</code>，这类改写评审时很难一眼抓出来。</p>
+<h2 id="浅拷贝：展开不会断开嵌套引用"><a href="#浅拷贝：展开不会断开嵌套引用" class="headerlink" title="浅拷贝：展开不会断开嵌套引用"></a>浅拷贝：展开不会断开嵌套引用</h2><p>前文讲”选型看语义”，这里给一个我在评审里漏过的真实形状。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> <span class="variable constant_">DEFAULTS</span> = &#123; <span class="attr">url</span>: <span class="string">&#x27;/api&#x27;</span>, <span class="attr">headers</span>: &#123; <span class="string">&#x27;X-Client&#x27;</span>: <span class="string">&#x27;web&#x27;</span> &#125; &#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">var</span> conf = <span class="title class_">Object</span>.<span class="title function_">assign</span>(&#123;&#125;, <span class="variable constant_">DEFAULTS</span>);     <span class="comment">// 换成提案版 &#123; ...DEFAULTS &#125; 结论一样</span></span><br><span class="line">conf.<span class="property">headers</span>[<span class="string">&#x27;X-Client&#x27;</span>] = <span class="string">&#x27;ios&#x27;</span>;           <span class="comment">// 只动了&quot;新对象&quot;的一个字段</span></span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="variable constant_">DEFAULTS</span>.<span class="property">headers</span>[<span class="string">&#x27;X-Client&#x27;</span>]);  <span class="comment">// &#x27;ios&#x27;：默认值被改写了</span></span><br></pre></td></tr></table></figure>
+
+<p><code>Object.assign</code> 和对象展开都只拷一层，<code>headers</code> 那个键拷过来的是<strong>同一个内层对象的引用</strong>——明明拷贝了，怎么还共享？数组同理：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> rows = [&#123; <span class="attr">id</span>: <span class="number">1</span> &#125;, &#123; <span class="attr">id</span>: <span class="number">2</span> &#125;];</span><br><span class="line"><span class="keyword">var</span> copy = [...rows];      <span class="comment">// 新数组，里面两个对象还是原来那两个</span></span><br><span class="line">copy[<span class="number">0</span>].<span class="property">id</span> = <span class="number">99</span>;</span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(rows[<span class="number">0</span>].<span class="property">id</span>);   <span class="comment">// 99</span></span><br><span class="line">copy.<span class="title function_">push</span>(&#123; <span class="attr">id</span>: <span class="number">3</span> &#125;);      <span class="comment">// 这一步才真的只影响 copy</span></span><br></pre></td></tr></table></figure>
+
+<p>要在那个年代把嵌套层断开，只有两条路。一条是显式把每层再拷一次：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">cloneConf</span>(<span class="params">src</span>) &#123;</span><br><span class="line">  <span class="keyword">return</span> &#123; <span class="attr">url</span>: src.<span class="property">url</span>, <span class="attr">headers</span>: <span class="title class_">Object</span>.<span class="title function_">assign</span>(&#123;&#125;, src.<span class="property">headers</span>) &#125;;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>另一条是 JSON 往返：<code>JSON.parse(JSON.stringify(src))</code>。它便宜，但 <code>Date</code> 变成字符串，<code>undefined</code>、函数、<code>NaN</code> 直接消失，循环引用抛 <code>TypeError</code>。配置里没有这些花头时可以用，别当通用深拷贝塞进公共 util：当年没有标准的深拷贝 API，想要”一个调用解决”，最后都是往 util 里塞一段自己维护的递归。</p>
+<p>一条实操经验：<code>Object.freeze</code> 是这类 bug 的探测器。初始化处加一句 <code>Object.freeze(DEFAULTS.headers)</code>，上面的越界写要么抛错要么静默失败，都比”默认值被改掉、后续请求全带错 header”体面。</p>
+<h2 id="展开与-Object-assign-怎么分工"><a href="#展开与-Object-assign-怎么分工" class="headerlink" title="展开与 Object.assign 怎么分工"></a>展开与 Object.assign 怎么分工</h2><p>两者重叠的部分比想象中小，按场景切一遍，评审时就不必每次重吵。</p>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>2015 年该用哪个</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>数组拼接、中间插一段</td>
+<td>数组字面量里的展开</td>
+<td>转译产物就是 concat，不亏</td>
+</tr>
+<tr>
+<td>合并若干配置对象</td>
+<td><code>Object.assign</code> 到空对象上</td>
+<td>ES6 正文特性，polyfill 就能跑</td>
+</tr>
+<tr>
+<td>给已有对象补默认值</td>
+<td><code>Object.assign</code> 直接改 target</td>
+<td>不新建对象，代价是 target 被动了</td>
+</tr>
+<tr>
+<td>类数组转真数组</td>
+<td><code>slice.call</code>，或带 polyfill 的 <code>Array.from</code></td>
+<td>展开在这里最容易翻车</td>
+</tr>
+</tbody></table>
+<p>两个不重叠的点值得单独记。其一，assign 用在数组上是<strong>按下标覆盖</strong>，不是追加：<code>Object.assign([1], [2, 3])</code> 得 <code>[2, 3]</code> 而不是 <code>[1, 2, 3]</code>，源的自有键就是 <code>&#39;0&#39;</code> 和 <code>&#39;1&#39;</code>。其二，assign 忽略 <code>null</code> 与 <code>undefined</code> 这两个源，<code>Object.assign({}, null)</code> 安静返回空对象；展开遇 <code>null</code> 是硬失败，<code>[...null]</code> 抛 <code>TypeError</code>。来源不确定的数据（接口返回、本地存储）因此这样分工：对象那侧让 assign 兜着，数组那侧先判空再展开。</p>
+<p>另有一句：提案版展开走”新建属性”、assign 走”赋值”，两者并不完全等价。</p>
+<h2 id="四个实战件"><a href="#四个实战件" class="headerlink" title="四个实战件"></a>四个实战件</h2><p><strong>一，合并配置对象。</strong> 提案语法与 <code>Object.assign</code> 并存期的写法对照：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> <span class="variable constant_">DEFAULTS</span> = &#123; <span class="attr">url</span>: <span class="string">&#x27;/api&#x27;</span>, <span class="attr">method</span>: <span class="string">&#x27;GET&#x27;</span>, <span class="attr">retry</span>: <span class="number">0</span> &#125;;</span><br><span class="line"><span class="keyword">function</span> <span class="title function_">makeConf</span>(<span class="params">opt</span>) &#123;</span><br><span class="line">  opt = opt || &#123;&#125;;</span><br><span class="line">  <span class="comment">// 提案语法（需 --optional es7.objectRestSpread）：</span></span><br><span class="line">  <span class="keyword">return</span> &#123; ...<span class="variable constant_">DEFAULTS</span>, ...opt &#125;;</span><br><span class="line">  <span class="comment">// 保守等价写法，今天就能在所有目标环境用：</span></span><br><span class="line">  <span class="comment">// return Object.assign(&#123;&#125;, DEFAULTS, opt);</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>后到者覆盖前到者、返回新对象不动 DEFAULTS，这两条两种写法一致。</p>
+<p><strong>二，克隆数组。</strong> <code>[arr, ...tail]</code> 这类不可变更新在列表状态管理里已经很常见，配合浅拷贝语义够用；元素是对象时记得嵌套层还是共享的。</p>
+<p><strong>三，类数组转真数组。</strong> 这是最容易踩空的地方。<code>arguments</code> 在 Chrome 43 里带迭代器，<code>[...arguments]</code> 原生可跑；<strong>NodeList 不带迭代器，原生直接 TypeError</strong>。所以 2015 年的安全答案仍然是 <code>Array.prototype.slice.call(nodes)</code>，或者依赖 Babel 转译产物——它会把不可迭代的类数组退化成下标循环（见末节），行为反而比原生宽容。代码在”转译后能跑、原生环境报错”的方向上不一致，比反过来更阴险，因为测试环境过了、上线到新版浏览器才炸。</p>
+<p><strong>四，React 0.13&#x2F;0.14 的 props 透传。</strong> 组件包装层要原样转发父级 props 时：</p>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> <span class="title class_">Item</span> = <span class="title class_">React</span>.<span class="title function_">createClass</span>(&#123;</span><br><span class="line">  <span class="attr">render</span>: <span class="keyword">function</span> (<span class="params"></span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="language-xml"><span class="tag">&lt;<span class="name">Inner</span> &#123;<span class="attr">...this.props</span>&#125; <span class="attr">highlighted</span>=<span class="string">&#123;true&#125;</span> /&gt;</span></span>;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>注意 JSX 的展开属性是 JSX 语法自己的东西，Babel 5 的 react 转换器一直支持，转成内部的 <code>__spread</code> 合并调用，<strong>和上面那个 ES7 对象展开提案是两码事</strong>——不开 optional 开关也能用，别在评审里被”这还不是标准”唬住。</p>
+<h2 id="坑：报错、稀疏数组与记号撞车"><a href="#坑：报错、稀疏数组与记号撞车" class="headerlink" title="坑：报错、稀疏数组与记号撞车"></a>坑：报错、稀疏数组与记号撞车</h2><figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">[...<span class="variable language_">document</span>.<span class="title function_">querySelectorAll</span>(<span class="string">&#x27;li&#x27;</span>)];</span><br><span class="line"><span class="comment">// 原生 Chrome 43：TypeError（不可迭代）。Babel 转译后反而能跑，见上文。</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">var</span> sparse = [<span class="number">1</span>, , <span class="number">3</span>];</span><br><span class="line"><span class="keyword">var</span> spreaded = [...sparse];   <span class="comment">// [1, undefined, 3]：空位被当成 undefined 读出，结果致密</span></span><br><span class="line"><span class="keyword">var</span> sliced = sparse.<span class="title function_">slice</span>();  <span class="comment">// 空位保留，仍是稀疏数组</span></span><br></pre></td></tr></table></figure>
+
+<p>两者在 <code>forEach</code> 下表现不同（稀疏版跳过空位），这是”展开等价于 slice”说法不成立的反例。字符串会被静默拆字：<code>[...&#39;ab&#39;]</code> 得 <code>[&#39;a&#39;,&#39;b&#39;]</code>，想整串塞进去要么别展开，要么包一层数组。另外 <code>f(...args)</code> 与形参位 <code>function f(...args)</code> 的记号撞车再提醒一次：前者消费数组、后者生产数组，写高阶函数包装时看仔细。</p>
+<h2 id="降级写法与-Babel-转出来的样子"><a href="#降级写法与-Babel-转出来的样子" class="headerlink" title="降级写法与 Babel 转出来的样子"></a>降级写法与 Babel 转出来的样子</h2><p>最后把转译产物贴全，这是判断”用了会不会有副作用”的最直接材料。源码：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> all = [<span class="number">0</span>, ...list, <span class="number">9</span>];</span><br><span class="line"><span class="keyword">var</span> max = <span class="title class_">Math</span>.<span class="title function_">max</span>(...list);</span><br><span class="line"><span class="keyword">var</span> first = [...iterableThing][<span class="number">0</span>];</span><br></pre></td></tr></table></figure>
+
+<p>Babel 5 大致给出：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> all = [<span class="number">0</span>].<span class="title function_">concat</span>(list, [<span class="number">9</span>]);</span><br><span class="line"><span class="keyword">var</span> max = <span class="title class_">Math</span>.<span class="property">max</span>.<span class="title function_">apply</span>(<span class="title class_">Math</span>, list);</span><br><span class="line"><span class="keyword">var</span> first = <span class="title function_">_toConsumableArray</span>(iterableThing)[<span class="number">0</span>];</span><br></pre></td></tr></table></figure>
+
+<p>前两行完全在预期内：数组位展开就是 concat 的糖，所以<strong>对纯数组用展开没有任何隐藏成本</strong>；调用位展开就是 apply，参数上限随之继承。第三行的 <code>_toConsumableArray</code> 是 runtime helper：先试着走 <code>Symbol.iterator</code>，对象长得像数组就退化成下标循环，两头都不沾才抛错。用了它就要在浏览器端引 polyfill——<code>core-js</code> 或 <code>es6-shim</code> 均可，Babel 5 也可以用 <code>require(&#39;babel-core/browser-polyfill.js&#39;)</code> 一把带上 regenerator 和这批 helper。</p>
+<h3 id="helper-自己只有两条分支"><a href="#helper-自己只有两条分支" class="headerlink" title="helper 自己只有两条分支"></a>helper 自己只有两条分支</h3><p>前面那句”长得像数组就退化成下标循环”要说得更准。Babel 5 非 loose 模式产出的 helper 是这样：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">_toConsumableArray</span>(<span class="params">arr</span>) &#123;</span><br><span class="line">  <span class="keyword">if</span> (<span class="title class_">Array</span>.<span class="title function_">isArray</span>(arr)) &#123;                 <span class="comment">// 真数组：内联下标复制，空位读成 undefined</span></span><br><span class="line">    <span class="keyword">for</span> (<span class="keyword">var</span> i = <span class="number">0</span>, arr2 = <span class="title class_">Array</span>(arr.<span class="property">length</span>); i &lt; arr.<span class="property">length</span>; i++) &#123; arr2[i] = arr[i]; &#125;</span><br><span class="line">    <span class="keyword">return</span> arr2;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> <span class="title class_">Array</span>.<span class="title function_">from</span>(arr);                   <span class="comment">// 其余一切：整个交给 Array.from</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>容忍类数组那一步不在 helper 里，而在 polyfill 的 <code>Array.from</code> 里：core-js 与 es6-shim 在对象没有 <code>Symbol.iterator</code> 时会退到读 <code>.length</code> 加下标循环，这才是”转译后 NodeList 反而能跑”的机制。polyfill 没引或引在业务代码之后，同一位置报的是 <code>Array.from is not a function</code>，与原生的不可迭代 <code>TypeError</code> 不是一回事，看堆栈时先分清是哪一层。按输入摊开：</p>
+<table>
+<thead>
+<tr>
+<th>输入</th>
+<th>原生（认展开的引擎）</th>
+<th>转译加 polyfill</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>真数组</td>
+<td>正常</td>
+<td>走 <code>Array.isArray</code> 分支，不欠 helper</td>
+</tr>
+<tr>
+<td><code>arguments</code></td>
+<td>多数正常</td>
+<td>走 <code>Array.from</code> 的类数组分支</td>
+</tr>
+<tr>
+<td>NodeList</td>
+<td>当时普遍不可迭代</td>
+<td>能跑，全靠 polyfill</td>
+</tr>
+<tr>
+<td><code>Set</code></td>
+<td>可迭代</td>
+<td>走 <code>Array.from</code>，<code>Set</code> 本身也要补</td>
+</tr>
+<tr>
+<td>字符串</td>
+<td>按码点拆字</td>
+<td>走 <code>Array.from</code>，是否按码点看实现</td>
+</tr>
+<tr>
+<td>普通对象</td>
+<td>不可迭代，抛错</td>
+<td>一样抛错</td>
+</tr>
+</tbody></table>
+<p>反直觉的一点：数组那一支不需要任何 runtime，所以<strong>只有非数组输入才会把 helper 拖进 bundle</strong>。只展开数组就一条依赖都不欠；一旦写了 <code>[...new Set(list)]</code> 或 <code>[...arguments]</code>，polyfill 就从可选变必须。</p>
+<p>最后一层：<code>...</code> 是语法不是 API。IE 11 与内核停在 Chrome 33 的 Android 4.4 WebView 在解析阶段就抛 <code>SyntaxError</code>，整个脚本一行都不执行，core-js 与 es6-shim 帮不上——缺 API 可以 <code>typeof</code> 探测、可以补，缺语法只能全量转译。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p><code>...</code> 在 2015 年 8 月的正确打开方式：数组字面量里放心用，转译产物就是 concat，赚的是可读性；函数调用位用得着但记住它转译后是 apply，大数组先想想上限；对象字面量里的展开还是 stage 1 提案，代码评审时单列一类，能走 <code>Object.assign</code> 就先走 <code>Object.assign</code>。JSX 的 <code>{...props}</code> 属 JSX 语法，与提案无关。语义上永远记住三条：浅拷贝、消费迭代器协议、每次重建新数组。标准刚满月，语法可以尝鲜，runtime 必须靠 polyfill 兜底——把这盘账算清楚，展开运算符就不再是”看着时髦”而是”用得明白”。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>ES6 展开运算符实战</p><p><a href="https://987763485.github.io/2015/08/03/ES6展开运算符实战/">https://987763485.github.io/2015/08/03/ES6展开运算符实战/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2015-08-03</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/javascript/">javascript</a><a class="link-muted mr-2" rel="tag" href="/tags/web%E5%89%8D%E7%AB%AF/">web前端</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2015/08/10/ES6Generator%E5%87%BD%E6%95%B0%E5%85%A5%E9%97%A8/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">ES6 Generator 函数入门</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2015/07/29/CSS%E4%B8%ADz-index%E4%B8%8E%E5%B1%82%E5%8F%A0%E4%B8%8A%E4%B8%8B%E6%96%87%E7%9A%84%E7%A7%98%E5%AF%86/"><span class="level-item">CSS 中 z-index 与层叠上下文的秘密</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

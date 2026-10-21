@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>JavaScript 类型检测的完整方案 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="上一篇《instanceof 与 typeof 的原理与局限》把两个运算符的机制讲透了，那部分本文不再重复，只引用它的结论。机制之外还有半件事：工程里真正耗时的从来不是”typeof 返回哪个字符串”，而是”这个判断该交给哪种手段、它判不了的那一半谁来补”。本文就站在这个位置上，把类型检测拆成四个互不替代的问题，说清每种手段的适用边界，对照 underscore 1.7.0 与 jQuery 1."><meta property="og:type" content="blog"><meta property="og:title" content="JavaScript 类型检测的完整方案"><meta property="og:url" content="https://987763485.github.io/2015/06/15/JavaScript%E7%B1%BB%E5%9E%8B%E6%A3%80%E6%B5%8B%E7%9A%84%E5%AE%8C%E6%95%B4%E6%96%B9%E6%A1%88/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="上一篇《instanceof 与 typeof 的原理与局限》把两个运算符的机制讲透了，那部分本文不再重复，只引用它的结论。机制之外还有半件事：工程里真正耗时的从来不是”typeof 返回哪个字符串”，而是”这个判断该交给哪种手段、它判不了的那一半谁来补”。本文就站在这个位置上，把类型检测拆成四个互不替代的问题，说清每种手段的适用边界，对照 underscore 1.7.0 与 jQuery 1."><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2015-06-15T12:11:45.000Z"><meta property="article:modified_time" content="2026-10-17T22:49:12.799Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="javascript"><meta property="article:tag" content="web前端"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2015/06/15/JavaScript%E7%B1%BB%E5%9E%8B%E6%A3%80%E6%B5%8B%E7%9A%84%E5%AE%8C%E6%95%B4%E6%96%B9%E6%A1%88/"},"headline":"JavaScript 类型检测的完整方案","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2015-06-15T12:11:45.000Z","dateModified":"2026-10-17T22:49:12.799Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"上一篇《instanceof 与 typeof 的原理与局限》把两个运算符的机制讲透了，那部分本文不再重复，只引用它的结论。机制之外还有半件事：工程里真正耗时的从来不是”typeof 返回哪个字符串”，而是”这个判断该交给哪种手段、它判不了的那一半谁来补”。本文就站在这个位置上，把类型检测拆成四个互不替代的问题，说清每种手段的适用边界，对照 underscore 1.7.0 与 jQuery 1."}</script><link rel="canonical" href="https://987763485.github.io/2015/06/15/JavaScript%E7%B1%BB%E5%9E%8B%E6%A3%80%E6%B5%8B%E7%9A%84%E5%AE%8C%E6%95%B4%E6%96%B9%E6%A1%88/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2015-06-15T12:11:45.000Z" title="6/15/2015, 8:11:45 PM">2015-06-15</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/">前端开发</a></span><span class="level-item">38 分钟读完 (大约5731个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">JavaScript 类型检测的完整方案</h1><div class="content"><p>上一篇《instanceof 与 typeof 的原理与局限》把两个运算符的机制讲透了，那部分本文不再重复，只引用它的结论。机制之外还有半件事：工程里真正耗时的从来不是”typeof 返回哪个字符串”，而是”这个判断该交给哪种手段、它判不了的那一半谁来补”。本文就站在这个位置上，把类型检测拆成四个互不替代的问题，说清每种手段的适用边界，对照 underscore 1.7.0 与 jQuery 1.11.3 的真实实现，最后交出一套 ES5 的判定工具集和一张选型决策表。文中所有结论、包括两个库的行为差异，都在 Node 里跑断言验证过；只有当年 IE 才有的行为会明确标注为历史事实。浏览器基线是 IE 6 到 IE 11 加上 Chrome 40、Firefox 35 这一代桌面浏览器：ES6 刚刚在 2015 年 6 月定稿，生产代码仍然只能用 ES5，所以本文所有代码都是 <code>var</code> 加函数。</p>
+<h2 id="类型检测是四个问题，不是一个"><a href="#类型检测是四个问题，不是一个" class="headerlink" title="类型检测是四个问题，不是一个"></a>类型检测是四个问题，不是一个</h2><p>把”检测类型”当成一个动作，是所有混乱的起点。实际需求是四种，它们的答案由不同手段给出，互相不能替代：</p>
+<table>
+<thead>
+<tr>
+<th>问题</th>
+<th>问的是什么</th>
+<th>手段</th>
+<th>判不了什么</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Q1</td>
+<td>它是哪种原始类型</td>
+<td><code>typeof</code></td>
+<td>一切对象内部的种类</td>
+</tr>
+<tr>
+<td>Q2</td>
+<td>它是哪个内置对象</td>
+<td><code>Object.prototype.toString</code> 标签</td>
+<td>自定义类型、宿主对象</td>
+</tr>
+<tr>
+<td>Q3</td>
+<td>它是哪个构造函数的实例</td>
+<td><code>instanceof</code> &#x2F; <code>isPrototypeOf</code></td>
+<td>原始值、跨 realm 的对象</td>
+</tr>
+<tr>
+<td>Q4</td>
+<td>它是不是某个业务形状</td>
+<td>鸭子类型、品牌标记</td>
+<td>需要语言层保证的场合</td>
+</tr>
+</tbody></table>
+<p>Q1 要判 string、number、boolean、undefined 这四种原始值再加上 function（函数严格说是对象的一种，但 <code>typeof</code> 能单独把它认出来），这是 <code>typeof</code> 唯一可靠的主场。Q2 要判 Array、Date、RegExp、Error、arguments 这些内置对象，<code>typeof</code> 一律给 <code>&#39;object&#39;</code>，得靠标签——顺带说一句，<code>Map</code> 与 <code>Set</code> 此刻还停在规范草案里，浏览器基本用不上，标签法也就判不到它们。Q3 是”这个对象是不是我用 <code>new</code> 造出来的那种”，只有原型链能给答案。Q4 最容易被忽略：我要的不是语言层的种类，而是”它有没有 <code>then</code> 方法””它是不是我库里那个 Widget”，这一层的判据是我自己定的接口约定，语言层根本不知道我的类长什么样。</p>
+<p>线上 bug 大多来自拿 Q1、Q2 的手段去答 Q3、Q4 的题。两个真实写法：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 错误：这是 Q4（它是不是一个可等待的对象），却用了 Q2 的判据</span></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">waitReady</span>(<span class="params">target</span>) &#123;</span><br><span class="line">  <span class="keyword">if</span> (<span class="title class_">Object</span>.<span class="property"><span class="keyword">prototype</span></span>.<span class="property">toString</span>.<span class="title function_">call</span>(target) === <span class="string">&#x27;[object Object]&#x27;</span>) &#123;</span><br><span class="line">    target.<span class="title function_">then</span>(<span class="keyword">function</span> (<span class="params"></span>) &#123; <span class="title function_">start</span>(); &#125;);   <span class="comment">// 普通对象进来直接 TypeError</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 错误：这是 Q3（它是不是我库的 Widget），却用了 Q1 的判据</span></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">render</span>(<span class="params">widget</span>) &#123;</span><br><span class="line">  <span class="keyword">if</span> (<span class="keyword">typeof</span> widget === <span class="string">&#x27;object&#x27;</span>) &#123; <span class="comment">/* 渲染逻辑 */</span> &#125;  <span class="comment">// null 也过了这一关</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 正确：Q4 用接口探测，Q3 用品牌或 instanceof</span></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">waitReady</span>(<span class="params">target</span>) &#123;</span><br><span class="line">  <span class="keyword">if</span> (target &amp;&amp; <span class="keyword">typeof</span> target.<span class="property">then</span> === <span class="string">&#x27;function&#x27;</span>) &#123; target.<span class="title function_">then</span>(<span class="keyword">function</span> (<span class="params"></span>) &#123; <span class="title function_">start</span>(); &#125;); &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>先分清自己在答哪道题，工具的选择就自动出来了。下面逐层讲边界。</p>
+<h2 id="每种手段的工程边界"><a href="#每种手段的工程边界" class="headerlink" title="每种手段的工程边界"></a>每种手段的工程边界</h2><p>机制细节在前一篇已经写完，这一节只列”用的时候要知道”的部分。</p>
+<p><code>isPrototypeOf</code> 是 <code>instanceof</code> 的等价手写版，<code>Foo.prototype.isPrototypeOf(obj)</code> 与 <code>obj instanceof Foo</code> 在同一个 realm 里给出完全相同的答案，区别只在左边写法更啰嗦、右边可能被 <code>TypeError</code> 伺候。它和 <code>instanceof</code> 共享同一个致命边界：跨 realm 一样返回 false，实测 iframe 里造的数组对主页面的 <code>Array.prototype.isPrototypeOf</code> 同样说不。所以换写法解决不了问题，要解决的是”跨 realm 时靠什么”。</p>
+<p><code>constructor</code> 判断（<code>obj.constructor === Array</code>）看着省事，实际比 <code>instanceof</code> 更脆，三条实测理由：原型被整体替换后它会和 <code>instanceof</code> 给出相反的答案，旧实例的 <code>constructor</code> 仍指回原来的构造器、<code>instanceof</code> 却已经变成 false，两个判据各错一半；对象字面量继承来的 <code>constructor</code> 指向 <code>Object</code>，任何改写原型而忘了补 <code>constructor</code> 的类，其实例会被认成普通对象；<code>Object.create(null)</code> 的裸对象根本没有 <code>constructor</code>（实测 <code>undefined</code>），而老 IE 的宿主对象同样经常缺这个属性，读它就等着抛错。最后还有一条：<code>{constructor: Array}</code> 这样的字面量能直接伪造它，实测 <code>fake.constructor === Array</code> 为 true 而 <code>Array.isArray(fake)</code> 为 false。结论是 <code>constructor</code> 只能当作提示，不能当作判据。</p>
+<p>数组判定不需要讨论，一律 <code>Array.isArray</code>：它对跨 realm 可靠（实测 <code>vm.runInNewContext(&#39;[1,2]&#39;)</code> 返回 true），标签法只是它的兜底。IE 9 起可用，IE 8 要垫片：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (!<span class="title class_">Array</span>.<span class="property">isArray</span>) &#123;</span><br><span class="line">  <span class="title class_">Array</span>.<span class="property">isArray</span> = <span class="keyword">function</span> (<span class="params">value</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="title class_">Object</span>.<span class="property"><span class="keyword">prototype</span></span>.<span class="property">toString</span>.<span class="title function_">call</span>(value) === <span class="string">&#x27;[object Array]&#x27;</span>;</span><br><span class="line">  &#125;;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>toString</code> 标签有个必须写进规约的历史坑：IE 6、7 里 <code>Object.prototype.toString.call(null)</code> 与 <code>.call(undefined)</code> 返回的是 <code>&#39;[object Object]&#39;</code>，不是 <code>[object Null]</code>、<code>[object Undefined]</code>（历史事实，今天的引擎复现不出来）。这意味着凡是基于标签的判定，在老 IE 上会把空值认成对象。工程规则因此只有一条，而且必须前置：<strong>任何类型判断之前，先处理 <code>value === null || value === undefined</code></strong>。要么显式判，要么交给 <code>value == null</code> 这一句，要么像下面的工具集那样把它封进标签函数里，别让它散落在业务代码的每个分支。</p>
+<p>DOM 节点用 <code>nodeType</code> 加 <code>nodeName</code>，不要用 <code>instanceof Node</code> 也不要信标签。原因有两层：老 IE 里 <code>toString</code> 对同一个 div 给 <code>[object Object]</code>，别的浏览器给 <code>[object HTMLDivElement]</code>；而跨 iframe 传进来的节点，对主页面的 <code>Node</code> 构造函数 <code>instanceof</code> 必然 false。<code>nodeType</code> 是个数字属性，走的是 Q4 的路子——按接口特征认人，恰好是唯一在两个方向都稳的判据。将来 <code>Symbol.toStringTag</code> 会让对象自定义标签，宿主判定的口径有望统一，但 2015 年 6 月的今天指望不上。</p>
+<h2 id="真正难的是-Q4：鸭子类型与品牌标记"><a href="#真正难的是-Q4：鸭子类型与品牌标记" class="headerlink" title="真正难的是 Q4：鸭子类型与品牌标记"></a>真正难的是 Q4：鸭子类型与品牌标记</h2><p>这一层语言帮不了你，只能自己定契约。</p>
+<p><strong>接口探测</strong>。判”能不能当 Promise 用”的标准写法是探测 <code>then</code>：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">isPromiseLike</span>(<span class="params">value</span>) &#123;</span><br><span class="line">  <span class="keyword">return</span> !!value &amp;&amp; (<span class="keyword">typeof</span> value === <span class="string">&#x27;object&#x27;</span> || <span class="keyword">typeof</span> value === <span class="string">&#x27;function&#x27;</span>) &amp;&amp;</span><br><span class="line">    <span class="keyword">typeof</span> value.<span class="property">then</span> === <span class="string">&#x27;function&#x27;</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>它不依赖任何库、不依赖原生 Promise 是否存在，jQuery 1.11.3 的 Deferred 替身、<code>then</code> 挂在原型上的自建类，实测都能通过；<code>{then: &#39;no&#39;}</code> 这种假货被挡在外面。代价是把”有个叫 then 的方法”当成了身份，这是鸭子类型的固有取舍。</p>
+<p><strong>品牌标记</strong>。自己写的类要在跨 iframe 场景里被认出来，就给自己盖个章，别用 <code>instanceof</code>：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">Vector</span>(<span class="params">x, y</span>) &#123; <span class="variable language_">this</span>.<span class="property">x</span> = x; <span class="variable language_">this</span>.<span class="property">y</span> = y; &#125;</span><br><span class="line"><span class="title class_">Vector</span>.<span class="property"><span class="keyword">prototype</span></span>.<span class="property">constructorName</span> = <span class="string">&#x27;Vector&#x27;</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">isVector</span>(<span class="params">value</span>) &#123;</span><br><span class="line">  <span class="keyword">return</span> !!value &amp;&amp; value.<span class="property">constructorName</span> === <span class="string">&#x27;Vector&#x27;</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>或者用一个不可枚举、不可改写的属性，ES5 的 <code>Object.defineProperty</code> 在 IE 9 起可用：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">Matrix</span>(<span class="params">rows</span>) &#123; <span class="variable language_">this</span>.<span class="property">rows</span> = rows; &#125;</span><br><span class="line"><span class="keyword">if</span> (<span class="title class_">Object</span>.<span class="property">defineProperty</span>) &#123;</span><br><span class="line">  <span class="title class_">Object</span>.<span class="title function_">defineProperty</span>(<span class="title class_">Matrix</span>.<span class="property"><span class="keyword">prototype</span></span>, <span class="string">&#x27;type&#x27;</span>, &#123; <span class="attr">value</span>: <span class="string">&#x27;Matrix&#x27;</span>, <span class="attr">enumerable</span>: <span class="literal">false</span> &#125;);</span><br><span class="line">&#125; <span class="keyword">else</span> &#123;</span><br><span class="line">  <span class="title class_">Matrix</span>.<span class="property"><span class="keyword">prototype</span></span>.<span class="property">type</span> = <span class="string">&#x27;Matrix&#x27;</span>;   <span class="comment">// IE 8 退化为普通赋值</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>实测三条结论：跨 realm 传来、带 <code>constructorName</code> 的对象，品牌判定为 true 而 <code>instanceof Vector</code> 是 false——这正是品牌标记存在的意义；<code>type</code> 因为 <code>enumerable: false</code>，不会出现在 <code>Object.keys</code> 和 <code>for in</code> 里，也就不会被 <code>$.extend</code>、<code>_.omit</code> 这类按可枚举属性搬运的函数丢掉；非严格模式下改写它是静默失败，严格模式下抛 <code>TypeError</code>。品牌标记的成本是它可以被伪造，凡是”伪造了就出安全事故”的场合，仍然要用 <code>instanceof</code> 或者私有注册表。</p>
+<p><strong>纯对象</strong>。参数归一化里的 <code>defaults(options)</code> 必须只接受字面量对象，否则一个 Date、一个数组、一个组件实例都会被当成配置项逐键合并。完整条件有四条：非空、标签是 <code>Object</code>、原型链能走到 <code>Object.prototype</code>、不是宿主对象。实测五种输入的判定差异：</p>
+<table>
+<thead>
+<tr>
+<th>输入</th>
+<th>标签</th>
+<th><code>T.isPlainObject</code></th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>{}</code>、<code>{a: 1}</code></td>
+<td>Object</td>
+<td>true</td>
+<td>字面量，链顶是本 realm 的 <code>Object.prototype</code></td>
+</tr>
+<tr>
+<td><code>new Foo()</code></td>
+<td>Object</td>
+<td>false</td>
+<td>原型上没有 <code>isPrototypeOf</code>，判定为自定义实例</td>
+</tr>
+<tr>
+<td><code>Object.create(null)</code></td>
+<td>Object</td>
+<td>true</td>
+<td>裸对象，字典语义，按普通对象放行</td>
+</tr>
+<tr>
+<td><code>[1, 2]</code></td>
+<td>Array</td>
+<td>false</td>
+<td>标签这一关就挡掉，不进原型检查</td>
+</tr>
+<tr>
+<td><code>new Date()</code></td>
+<td>Date</td>
+<td>false</td>
+<td>同上</td>
+</tr>
+</tbody></table>
+<p>前四种口径与 jQuery 的 <code>isPlainObject</code> 一致（实测对比过），差别在于跨 realm：别的 realm 里 <code>new Foo()</code> 的实例标签是 Object、链顶是那个 realm 的 <code>Object.prototype</code>，<code>constructor.prototype</code> 上有 <code>isPrototypeOf</code>，于是所有同类实现都会把它误判成普通对象，jQuery 也一样。这是 2015 年无人能绕开的边界，写文档时要坦白。</p>
+<p><code>defaults</code> 里还有一条容易写错的：合并嵌套对象时不要回填源对象。实测先写 <code>src[key] = defaults({}, src[key])</code> 再 <code>target[key] = src[key]</code>，两者指向同一个新对象，后续深合并就把默认配置本身改脏了；正确写法是只往 <code>target</code> 上放副本，实测 <code>base.nested</code> 在合并后仍保持 <code>{x: 1}</code>。</p>
+<p><strong>类数组</strong>。判据是”有一个是非负整数的 <code>length</code>，且能用下标访问”，注意它不是数组：<code>arguments</code>、<code>NodeList</code>、字符串都是类数组，<code>Array.isArray</code> 对它们全返回 false。API 入口应当接受类数组，内部立刻转成真数组，后续逻辑只面对数组：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">toArray</span>(<span class="params">value</span>) &#123;</span><br><span class="line">  <span class="keyword">var</span> out = [], i, len;</span><br><span class="line">  <span class="keyword">if</span> (!value || <span class="keyword">typeof</span> value.<span class="property">length</span> !== <span class="string">&#x27;number&#x27;</span>) &#123; <span class="keyword">throw</span> <span class="keyword">new</span> <span class="title class_">TypeError</span>(<span class="string">&#x27;需要数组或类数组&#x27;</span>); &#125;</span><br><span class="line">  <span class="keyword">for</span> (i = <span class="number">0</span>, len = value.<span class="property">length</span>; i &lt; len; i++) &#123; out[i] = value[i]; &#125;</span><br><span class="line">  <span class="keyword">return</span> out;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>ES5 更常见的写法是 <code>Array.prototype.slice.call(arrayLike)</code>，两种做法的性能差别要看输入是什么形状，本机 Node 实测（<code>Date.now()</code> 计时，V8）：</p>
+<table>
+<thead>
+<tr>
+<th>输入形状</th>
+<th>规模</th>
+<th><code>slice.call</code></th>
+<th>手写 for</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>arguments</code></td>
+<td>3 元素，20 万次</td>
+<td>5 ms</td>
+<td>—</td>
+</tr>
+<tr>
+<td>真数组</td>
+<td>1000 元素，5 万次</td>
+<td>12 ms</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>arguments</code></td>
+<td>1000 元素，5 万次</td>
+<td>41 ms</td>
+<td>172 ms</td>
+</tr>
+<tr>
+<td>普通对象挂下标</td>
+<td>3 元素，20 万次</td>
+<td>40 ms</td>
+<td>4 ms</td>
+</tr>
+<tr>
+<td>普通对象挂下标</td>
+<td>1000 元素，5 万次</td>
+<td>1266 ms</td>
+<td>243 ms</td>
+</tr>
+<tr>
+<td>普通对象挂下标</td>
+<td>10 万元素，5 千次</td>
+<td>13014 ms</td>
+<td>2133 ms</td>
+</tr>
+</tbody></table>
+<p><code>slice.call</code> 在真数组和 <code>arguments</code> 上是引擎的快路径，比手写循环快；对”普通对象挂下标”这种伪装类数组则慢一个数量级，规模越大越明显。老 IE 上还有更硬的一堵墙：对某些宿主集合调 <code>slice.call</code> 会直接抛异常（历史事实）。jQuery 1.11.3 的 <code>makeArray</code> 走的正是后一条路——先 <code>isArraylike( Object(arr) )</code>（第 413 行，特意把原始值包一层，否则 <code>in</code> 就抛了），再交给 <code>jQuery.merge</code> 的下标 while 循环（第 451 到 456 行），第 459 行还留了一段注释，为 IE 9 以下把 NodeList 的 <code>length</code> 读成 <code>NaN</code> 的情况补了兜底。工程口径于是很清楚：入口转 <code>arguments</code> 用 <code>slice.call</code>，转任意类数组用手写循环。</p>
+<h2 id="库的实现对照：underscore-1-7-0-与-jQuery-1-11-3"><a href="#库的实现对照：underscore-1-7-0-与-jQuery-1-11-3" class="headerlink" title="库的实现对照：underscore 1.7.0 与 jQuery 1.11.3"></a>库的实现对照：underscore 1.7.0 与 jQuery 1.11.3</h2><p>选型不能凭印象，下面这些结论来自本地 <code>node_modules/underscore/underscore.js</code>（1.7.0）第 1070 到 1129 行，以及 jQuery 1.11.3 源码第 56 到 60、252 到 328、566 到 590 行，并逐条在 Node 里实测。</p>
+<table>
+<thead>
+<tr>
+<th>函数</th>
+<th>用的哪一手</th>
+<th>关键行为（实测）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>_.isArguments</code> &#x2F; <code>isFunction</code> &#x2F; <code>isString</code> &#x2F; <code>isNumber</code> &#x2F; <code>isDate</code> &#x2F; <code>isRegExp</code></td>
+<td>标签（1095 到 1099 行一个 <code>each</code> 循环批量生成）</td>
+<td><code>_.isNumber(NaN)</code> true；<code>_.isString(new String(&#39;a&#39;))</code> 也 true，因为标签分不开原始值与包装对象</td>
+</tr>
+<tr>
+<td><code>_.isArray</code></td>
+<td>&#96;nativeIsArray</td>
+<td></td>
+</tr>
+<tr>
+<td><code>_.isFunction</code></td>
+<td>标签版随即被 1110 行的条件覆盖</td>
+<td>该条件是 <code>typeof /./ !== &#39;function&#39;</code>，实测 Node 里为真，所以线上跑的是 <code>typeof obj == &#39;function&#39;</code> 那一版，回到 Q1 的手段</td>
+</tr>
+<tr>
+<td><code>_.isObject</code></td>
+<td><code>typeof</code>（1089 到 1092 行）</td>
+<td><code>_.isObject(null)</code> false、<code>_.isObject(undefined)</code> false、<code>_.isObject(function () {})</code> true</td>
+</tr>
+<tr>
+<td><code>_.isElement</code></td>
+<td><code>nodeType === 1</code>（1078 到 1080 行）</td>
+<td>只认元素，文本节点与 document 替身都 false</td>
+</tr>
+<tr>
+<td><code>_.isArguments</code> 回退</td>
+<td>特征检测（1103 到 1107 行）</td>
+<td>只在 <code>!_.isArguments(arguments)</code> 的老 IE 生效，届时 <code>{callee: fn}</code> 会被误判为 arguments</td>
+</tr>
+<tr>
+<td><code>_.isFinite</code> &#x2F; <code>_.isNaN</code></td>
+<td>全局 <code>isFinite</code> 加 <code>parseFloat</code> 双探、<code>obj !== +obj</code></td>
+<td><code>_.isFinite(&#39;123&#39;)</code> true、<code>_.isFinite(null)</code> false、<code>_.isFinite(&#39;&#39;)</code> false、<code>_.isNaN(&#39;abc&#39;)</code> false</td>
+</tr>
+<tr>
+<td><code>_.isEmpty</code></td>
+<td>先 <code>obj == null</code>，再长度，再自有可枚举键</td>
+<td><code>_.isEmpty(null)</code> true、<code>_.isEmpty({length: 0})</code> false、<code>_.isEmpty(function () {})</code> true</td>
+</tr>
+<tr>
+<td><code>_.isError</code></td>
+<td>不存在</td>
+<td>实测 <code>typeof _.isError === &#39;undefined&#39;</code>，1.7.0 的批量列表里没有 Error，判错误对象得自己写标签</td>
+</tr>
+</tbody></table>
+<p>jQuery 1.11.3 的取向不同：它把标签先翻译成小写名字再比较。<code>jQuery.type</code> 对空值直接 <code>obj + &#39;&#39;</code>（得到 <code>&#39;null&#39;</code>、<code>&#39;undefined&#39;</code>），对象和函数查 <code>class2type</code> 表，其余退回 <code>typeof</code>。这张表在 567 行只登记了九个名字，没有 Arguments，所以实测 <code>jQuery.type(arguments)</code> 是 <code>&#39;object&#39;</code>——一个 underscore 能答对、jQuery 答错的例子。<code>isFunction</code> 是 <code>type(obj) === &#39;function&#39;</code>，它上方 252 到 254 行的注释解释了来历：自 1.3 起不再支持 DOM 方法与 <code>alert</code> 这类宿主函数，它们在 IE 里返回 false（issue 2968）。在那之前，源码里为了兜住老 IE 中 <code>typeof</code> 报 <code>&#39;object&#39;</code> 的宿主函数，写过 <code>typeof obj === &#39;object&#39; &amp;&amp; typeof obj.call === &#39;function&#39;</code> 这种特征检测，1.11.3 已经不这样写，只留下注释作为痕迹（历史写法）。其余几个：<code>isWindow</code> 是 <code>obj != null &amp;&amp; obj == obj.window</code>，靠自引用认窗口，实测替身对象通过；<code>isNumeric</code> 写成 <code>!isArray(obj) &amp;&amp; (obj - parseFloat(obj) + 1) &gt;= 0</code>，实测 <code>isNumeric(&#39;0x10&#39;)</code> true、<code>isNumeric([2])</code> false、<code>isNumeric(&#39;&#39;)</code> false，是典型的”用算术做校验”，可读性差但能挡脏值；<code>isArraylike</code> 是模块私有函数，入口不做防御，实测对 <code>&#39;abc&#39;</code> 和 <code>5</code> 直接抛 <code>TypeError</code>，因为它第一句就是 <code>&quot;length&quot; in obj</code>，而 <code>in</code> 的右边必须是对象——公共 API 要暴露这个能力，得像本文的工具集那样先挡原始值。</p>
+<p>两家最常被拿来对比的是”undefined 算不算对象”。实测口径是这样：<code>_.isObject(undefined)</code> 与 <code>_.isObject(null)</code> 都是 false，因为 <code>isObject</code> 走 <code>typeof</code>，而函数是 <code>true</code>；jQuery 根本没有 <code>isObject</code>，最接近的写法是 <code>jQuery.type(x) === &#39;object&#39;</code>，它对 <code>undefined</code> 同样 false，对函数也是 false。答案的分歧点其实在函数上，来源是两套口径：ES 规范把函数视为对象的子集，underscore 照这个语义让 <code>isObject</code> 接纳函数；<code>[[Class]]</code> 把 Function 单列成一个标签，jQuery 照标签分类，函数就不再是”object”。同一句”它是不是对象”，问 Q1 与问 Q2 会得到不同答案，这正是第一节要拆四个问题的现实意义。</p>
+<h2 id="完整工具集"><a href="#完整工具集" class="headerlink" title="完整工具集"></a>完整工具集</h2><p>下面这份 <code>T</code> 是本文的交付物，全部 ES5，<code>Array.isArray</code> 带垫片，标签函数内置了空值前置判断，可直接抄进公共库。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> T = (<span class="keyword">function</span> (<span class="params"></span>) &#123;</span><br><span class="line">  <span class="keyword">var</span> toStr = <span class="title class_">Object</span>.<span class="property"><span class="keyword">prototype</span></span>.<span class="property">toString</span>;</span><br><span class="line">  <span class="keyword">var</span> hasOwn = <span class="title class_">Object</span>.<span class="property"><span class="keyword">prototype</span></span>.<span class="property">hasOwnProperty</span>;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// IE 8 垫片：原生 Array.isArray 从 IE 9 起才有</span></span><br><span class="line">  <span class="keyword">var</span> isArray = <span class="title class_">Array</span>.<span class="property">isArray</span> || <span class="keyword">function</span> (<span class="params">value</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> toStr.<span class="title function_">call</span>(value) === <span class="string">&#x27;[object Array]&#x27;</span>;</span><br><span class="line">  &#125;;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// IE 6/7 的 toStr 对 null / undefined 返回 [object Object]（历史事实），</span></span><br><span class="line">  <span class="comment">// 所以标签函数必须自己先判空。</span></span><br><span class="line">  <span class="keyword">function</span> <span class="title function_">tag</span>(<span class="params">value</span>) &#123;</span><br><span class="line">    <span class="keyword">if</span> (value === <span class="literal">null</span>) &#123; <span class="keyword">return</span> <span class="string">&#x27;Null&#x27;</span>; &#125;</span><br><span class="line">    <span class="keyword">if</span> (value === <span class="literal">undefined</span>) &#123; <span class="keyword">return</span> <span class="string">&#x27;Undefined&#x27;</span>; &#125;</span><br><span class="line">    <span class="keyword">return</span> toStr.<span class="title function_">call</span>(value).<span class="title function_">slice</span>(<span class="number">8</span>, -<span class="number">1</span>);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">function</span> <span class="title function_">isWindow</span>(<span class="params">value</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> value != <span class="literal">null</span> &amp;&amp; value == value.<span class="property">window</span>;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> &#123;</span><br><span class="line">    <span class="attr">tag</span>: tag,</span><br><span class="line">    <span class="attr">isNil</span>: <span class="keyword">function</span> (<span class="params">v</span>) &#123; <span class="keyword">return</span> v == <span class="literal">null</span>; &#125;,</span><br><span class="line">    <span class="attr">isString</span>: <span class="keyword">function</span> (<span class="params">v</span>) &#123; <span class="keyword">return</span> <span class="keyword">typeof</span> v === <span class="string">&#x27;string&#x27;</span>; &#125;,</span><br><span class="line">    <span class="comment">// 注意：NaN 也是 number，这里返回 true</span></span><br><span class="line">    <span class="attr">isNumber</span>: <span class="keyword">function</span> (<span class="params">v</span>) &#123; <span class="keyword">return</span> <span class="keyword">typeof</span> v === <span class="string">&#x27;number&#x27;</span>; &#125;,</span><br><span class="line">    <span class="attr">isFiniteNumber</span>: <span class="keyword">function</span> (<span class="params">v</span>) &#123; <span class="keyword">return</span> <span class="keyword">typeof</span> v === <span class="string">&#x27;number&#x27;</span> &amp;&amp; <span class="built_in">isFinite</span>(v); &#125;,</span><br><span class="line">    <span class="attr">isInteger</span>: <span class="keyword">function</span> (<span class="params">v</span>) &#123;</span><br><span class="line">      <span class="keyword">return</span> <span class="keyword">typeof</span> v === <span class="string">&#x27;number&#x27;</span> &amp;&amp; <span class="built_in">isFinite</span>(v) &amp;&amp; <span class="title class_">Math</span>.<span class="title function_">floor</span>(v) === v;</span><br><span class="line">    &#125;,</span><br><span class="line">    <span class="attr">isBoolean</span>: <span class="keyword">function</span> (<span class="params">v</span>) &#123; <span class="keyword">return</span> <span class="keyword">typeof</span> v === <span class="string">&#x27;boolean&#x27;</span>; &#125;,</span><br><span class="line">    <span class="attr">isFunction</span>: <span class="keyword">function</span> (<span class="params">v</span>) &#123; <span class="keyword">return</span> <span class="keyword">typeof</span> v === <span class="string">&#x27;function&#x27;</span>; &#125;,</span><br><span class="line">    <span class="attr">isArray</span>: isArray,</span><br><span class="line">    <span class="attr">isDate</span>: <span class="keyword">function</span> (<span class="params">v</span>) &#123; <span class="keyword">return</span> <span class="title function_">tag</span>(v) === <span class="string">&#x27;Date&#x27;</span>; &#125;,</span><br><span class="line">    <span class="attr">isRegExp</span>: <span class="keyword">function</span> (<span class="params">v</span>) &#123; <span class="keyword">return</span> <span class="title function_">tag</span>(v) === <span class="string">&#x27;RegExp&#x27;</span>; &#125;,</span><br><span class="line">    <span class="attr">isError</span>: <span class="keyword">function</span> (<span class="params">v</span>) &#123; <span class="keyword">return</span> <span class="title function_">tag</span>(v) === <span class="string">&#x27;Error&#x27;</span>; &#125;,</span><br><span class="line">    <span class="attr">isWindow</span>: isWindow,</span><br><span class="line">    <span class="attr">isNode</span>: <span class="keyword">function</span> (<span class="params">v</span>) &#123;</span><br><span class="line">      <span class="keyword">return</span> !!v &amp;&amp; <span class="keyword">typeof</span> v.<span class="property">nodeType</span> === <span class="string">&#x27;number&#x27;</span> &amp;&amp;</span><br><span class="line">        v.<span class="property">nodeType</span> &gt;= <span class="number">1</span> &amp;&amp; v.<span class="property">nodeType</span> &lt;= <span class="number">12</span> &amp;&amp;</span><br><span class="line">        <span class="keyword">typeof</span> v.<span class="property">nodeName</span> === <span class="string">&#x27;string&#x27;</span>;</span><br><span class="line">    &#125;,</span><br><span class="line">    <span class="attr">isArguments</span>: <span class="keyword">function</span> (<span class="params">v</span>) &#123;</span><br><span class="line">      <span class="keyword">if</span> (<span class="title function_">tag</span>(v) === <span class="string">&#x27;Arguments&#x27;</span>) &#123; <span class="keyword">return</span> <span class="literal">true</span>; &#125;</span><br><span class="line">      <span class="comment">// 老 IE 给 arguments 的标签是 Object（历史事实），退化为特征检测</span></span><br><span class="line">      <span class="keyword">return</span> !<span class="title function_">isArray</span>(v) &amp;&amp; <span class="title function_">tag</span>(v) === <span class="string">&#x27;Object&#x27;</span> &amp;&amp;</span><br><span class="line">        hasOwn.<span class="title function_">call</span>(v, <span class="string">&#x27;callee&#x27;</span>) &amp;&amp; <span class="keyword">typeof</span> v.<span class="property">length</span> === <span class="string">&#x27;number&#x27;</span>;</span><br><span class="line">    &#125;,</span><br><span class="line">    <span class="attr">isArrayLike</span>: <span class="keyword">function</span> (<span class="params">v</span>) &#123;</span><br><span class="line">      <span class="keyword">if</span> (v === <span class="literal">null</span> || v === <span class="literal">undefined</span>) &#123; <span class="keyword">return</span> <span class="literal">false</span>; &#125;</span><br><span class="line">      <span class="keyword">var</span> t = <span class="keyword">typeof</span> v;</span><br><span class="line">      <span class="keyword">if</span> (t !== <span class="string">&#x27;object&#x27;</span> &amp;&amp; t !== <span class="string">&#x27;function&#x27;</span> &amp;&amp; t !== <span class="string">&#x27;string&#x27;</span>) &#123; <span class="keyword">return</span> <span class="literal">false</span>; &#125;</span><br><span class="line">      <span class="keyword">if</span> (t === <span class="string">&#x27;function&#x27;</span> || <span class="title function_">isWindow</span>(v)) &#123; <span class="keyword">return</span> <span class="literal">false</span>; &#125;</span><br><span class="line">      <span class="comment">// 字符串没有 Object 的 in 语义，直接放行（&#x27;abc&#x27; 是类数组）</span></span><br><span class="line">      <span class="keyword">if</span> (t === <span class="string">&#x27;string&#x27;</span>) &#123; <span class="keyword">return</span> <span class="literal">true</span>; &#125;</span><br><span class="line">      <span class="keyword">if</span> (<span class="title function_">isArray</span>(v)) &#123; <span class="keyword">return</span> <span class="literal">true</span>; &#125;</span><br><span class="line">      <span class="keyword">if</span> (v.<span class="property">nodeType</span> === <span class="number">1</span> &amp;&amp; <span class="keyword">typeof</span> v.<span class="property">length</span> === <span class="string">&#x27;number&#x27;</span>) &#123; <span class="keyword">return</span> <span class="literal">true</span>; &#125;</span><br><span class="line">      <span class="keyword">var</span> len = v.<span class="property">length</span>;</span><br><span class="line">      <span class="keyword">return</span> <span class="keyword">typeof</span> len === <span class="string">&#x27;number&#x27;</span> &amp;&amp; <span class="built_in">isFinite</span>(len) &amp;&amp; len &gt;= <span class="number">0</span> &amp;&amp;</span><br><span class="line">        <span class="title class_">Math</span>.<span class="title function_">floor</span>(len) === len &amp;&amp; (len === <span class="number">0</span> || (len - <span class="number">1</span>) <span class="keyword">in</span> v);</span><br><span class="line">    &#125;,</span><br><span class="line">    <span class="attr">isPlainObject</span>: <span class="keyword">function</span> (<span class="params">v</span>) &#123;</span><br><span class="line">      <span class="keyword">if</span> (v === <span class="literal">null</span> || v === <span class="literal">undefined</span>) &#123; <span class="keyword">return</span> <span class="literal">false</span>; &#125;</span><br><span class="line">      <span class="keyword">if</span> (toStr.<span class="title function_">call</span>(v) !== <span class="string">&#x27;[object Object]&#x27;</span>) &#123; <span class="keyword">return</span> <span class="literal">false</span>; &#125;</span><br><span class="line">      <span class="comment">// 挡宿主：DOM 节点与 window 的标签同样是 Object</span></span><br><span class="line">      <span class="keyword">if</span> (<span class="keyword">typeof</span> v.<span class="property">nodeType</span> === <span class="string">&#x27;number&#x27;</span> &amp;&amp; <span class="keyword">typeof</span> v.<span class="property">nodeName</span> === <span class="string">&#x27;string&#x27;</span>) &#123; <span class="keyword">return</span> <span class="literal">false</span>; &#125;</span><br><span class="line">      <span class="keyword">if</span> (<span class="title function_">isWindow</span>(v)) &#123; <span class="keyword">return</span> <span class="literal">false</span>; &#125;</span><br><span class="line">      <span class="keyword">try</span> &#123;</span><br><span class="line">        <span class="comment">// 自定义构造器的实例：constructor 非自有，而它的原型上没有 isPrototypeOf</span></span><br><span class="line">        <span class="keyword">if</span> (v.<span class="property">constructor</span> &amp;&amp;</span><br><span class="line">            !hasOwn.<span class="title function_">call</span>(v, <span class="string">&#x27;constructor&#x27;</span>) &amp;&amp;</span><br><span class="line">            !hasOwn.<span class="title function_">call</span>(v.<span class="property">constructor</span>.<span class="property"><span class="keyword">prototype</span></span>, <span class="string">&#x27;isPrototypeOf&#x27;</span>)) &#123;</span><br><span class="line">          <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">        &#125;</span><br><span class="line">      &#125; <span class="keyword">catch</span> (e) &#123;</span><br><span class="line">        <span class="comment">// IE 8/9 访问某些宿主对象的 constructor 会抛异常（历史事实）</span></span><br><span class="line">        <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="keyword">var</span> key;</span><br><span class="line">      <span class="keyword">try</span> &#123;</span><br><span class="line">        <span class="keyword">for</span> (key <span class="keyword">in</span> v) &#123;&#125;</span><br><span class="line">      &#125; <span class="keyword">catch</span> (e2) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="keyword">return</span> key === <span class="literal">undefined</span> || hasOwn.<span class="title function_">call</span>(v, key);</span><br><span class="line">    &#125;,</span><br><span class="line">    <span class="attr">isPromiseLike</span>: <span class="keyword">function</span> (<span class="params">v</span>) &#123;</span><br><span class="line">      <span class="keyword">return</span> !!v &amp;&amp; (<span class="keyword">typeof</span> v === <span class="string">&#x27;object&#x27;</span> || <span class="keyword">typeof</span> v === <span class="string">&#x27;function&#x27;</span>) &amp;&amp;</span><br><span class="line">        <span class="keyword">typeof</span> v.<span class="property">then</span> === <span class="string">&#x27;function&#x27;</span>;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;;</span><br><span class="line">&#125;)();</span><br></pre></td></tr></table></figure>
+
+<p>这份代码跑过 103 条断言，全部通过，覆盖 <code>undefined</code>、<code>null</code>、<code>NaN</code>、<code>Infinity</code>、空串、<code>0</code>、<code>false</code>、<code>[]</code>、<code>[1,2]</code>、<code>{}</code>、<code>{a:1}</code>、<code>new Date()</code>、<code>/re/</code>、<code>new Error()</code>、函数、<code>arguments</code>、<code>RegExp.$1</code>、<code>Object.create(null)</code>、<code>new Number(5)</code>、<code>new String(&#39;a&#39;)</code>，以及 <code>vm.runInNewContext</code> 造出的跨 realm 空对象、裸对象、数组、<code>arguments</code> 与自定义实例。几个值得单独记住的实测结论：<code>T.isNumber(NaN)</code> 与 <code>T.isNumber(Infinity)</code> 是 true，要拒掉它们得用 <code>T.isFiniteNumber</code>；<code>T.isInteger(NaN)</code>、<code>T.isInteger(Infinity)</code> 是 false，<code>T.isInteger(Math.pow(2, 53))</code> 是 true；<code>T.isDate(new Date(&#39;zzz&#39;))</code> 是 true，Invalid Date 仍然是 Date 对象；<code>T.isString(new String(&#39;a&#39;))</code> 是 false 而 <code>_.isString</code> 是 true，工具集刻意只对原始值放行，包装对象交给 <code>T.tag</code> 自己看；<code>T.isArrayLike({length: 2})</code> 是 false 而 <code>T.isArrayLike({0: &#39;a&#39;, length: 1})</code> 是 true，光有长度不算类数组，得真能按下标取；跨 realm 的数组被 <code>T.isArray</code> 认下，跨 realm 的自定义实例被 <code>T.isPlainObject</code> 拒绝，跨 realm 的 <code>arguments</code> 被 <code>T.isArguments</code> 认下。</p>
+<h2 id="到底用哪个：决策表"><a href="#到底用哪个：决策表" class="headerlink" title="到底用哪个：决策表"></a>到底用哪个：决策表</h2><table>
+<thead>
+<tr>
+<th>要判断的目标</th>
+<th>用哪个</th>
+<th>为什么不能用别的</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>数组</td>
+<td><code>T.isArray</code>（原生 <code>Array.isArray</code> 加 IE 8 垫片）</td>
+<td><code>instanceof Array</code> 跨 iframe 必 false；<code>typeof</code> 给不出区别；<code>constructor === Array</code> 可伪造且宿主对象缺属性</td>
+</tr>
+<tr>
+<td>字符串</td>
+<td><code>T.isString</code></td>
+<td>标签法会把 <code>new String(&#39;a&#39;)</code> 一起认进来；<code>x + &#39;&#39; === x</code> 这类技巧会被隐式转换骗</td>
+</tr>
+<tr>
+<td>数字</td>
+<td><code>T.isNumber</code>，拒 NaN 用 <code>T.isFiniteNumber</code>，要整数用 <code>T.isInteger</code></td>
+<td>全局 <code>isNaN(&#39;abc&#39;)</code> 是 true，它判的是”能不能转成数”而不是”是不是数”；<code>x === x</code> 单看会把别的类型漏进来</td>
+</tr>
+<tr>
+<td>函数</td>
+<td><code>T.isFunction</code></td>
+<td>标签法认不出老 IE 的宿主函数；<code>obj.call</code> 特征检测已被 jQuery 1.3 之后放弃</td>
+</tr>
+<tr>
+<td>日期</td>
+<td><code>T.isDate</code></td>
+<td><code>instanceof Date</code> 跨 realm 失灵；<code>getTime</code> 探测会被鸭子对象骗</td>
+</tr>
+<tr>
+<td>正则</td>
+<td><code>T.isRegExp</code></td>
+<td>同上；<code>x instanceof RegExp</code> 在 iframe 里造的表达式对象上为 false</td>
+</tr>
+<tr>
+<td>null 与 undefined</td>
+<td><code>T.isNil</code></td>
+<td>老 IE 的标签把二者都报成 Object；分开判要写成 <code>T.tag(x) === &#39;Null&#39;</code>，别在业务里手写两条 &#x3D;&#x3D;&#x3D;</td>
+</tr>
+<tr>
+<td>DOM 节点</td>
+<td><code>T.isNode</code>（<code>nodeType</code> 加 <code>nodeName</code>）</td>
+<td>宿主对象不受规范管，标签各家不同；<code>instanceof Node</code> 跨 iframe 为 false</td>
+</tr>
+<tr>
+<td>自家库与 jQuery 对象</td>
+<td>品牌标记优先，同 realm 的内部调用再补 <code>x instanceof MyType</code></td>
+<td>语言层不认识业务类型；<code>jQuery.type(x) === &#39;object&#39;</code> 与标签都只能说到”是个对象”，跨 realm 时 <code>instanceof</code> 整段失效</td>
+</tr>
+<tr>
+<td>第三方”像 Promise”的对象</td>
+<td><code>T.isPromiseLike</code></td>
+<td>它可能来自另一个 realm、另一个库，甚至只是实现了 <code>then</code>；标签与 <code>instanceof Promise</code> 都判不准</td>
+</tr>
+<tr>
+<td>参数归一化的纯对象</td>
+<td><code>T.isPlainObject</code></td>
+<td><code>T.tag(x) === &#39;Object&#39;</code> 会把 <code>new Foo()</code>、跨 realm 实例一起放进来，深合并时直接污染默认配置</td>
+</tr>
+</tbody></table>
+<h2 id="什么时候干脆不要判类型"><a href="#什么时候干脆不要判类型" class="headerlink" title="什么时候干脆不要判类型"></a>什么时候干脆不要判类型</h2><p>工具集越顺手，越容易在每个函数门口都摆一道校验，最后代码长成防御性迷宫。我的口径是收敛到边界：只在公共 API 的入口校验参数，报错要响、要带上下文；模块内部的函数靠约定和单元测试，不重复判类型，内部校验出错时该修的是调用方而不是加一条分支。同理，<code>typeof x === &#39;object&#39;</code> 这种半吊子检查（null 也过）应该直接删掉，而不是补一句 null 判断继续留着。判类型换来的安全感是有价的：每个 <code>if</code> 分支都要有测试覆盖，每个 <code>isArrayLike</code> 分支都要有人记得下标语义，多一条分支就多一条会腐烂的路径。真正需要区分的只有 Q4 那种”接口形状”的判断，以及跨 realm 边界上必须容错的地方，其余场景，写清楚函数只接受数组，比写一段”数组和类数组都行”的检测便宜得多。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>类型检测不是一个动作而是四个问题：原始类型问 <code>typeof</code>，内置对象问标签，实例归属问 <code>instanceof</code> 或品牌标记，业务形状问接口探测。四者的边界各不相同，越界的判据就会给出看似合理的答案——<code>constructor</code> 在原型替换后与 <code>instanceof</code> 相反，标签在老 IE 里把空值认成对象，<code>isArraylike</code> 在原始值上抛 <code>TypeError</code>。underscore 与 jQuery 的实现差异告诉我们，同一句”是不是对象”在两套口径下会有不同答案，所以库里落地的判定函数必须逐个写清语义、逐个跑断言。业务代码不该自己发明判断，把它交给一份测过的 <code>T</code>，四个问题各归各位，剩下的分支就该被删掉而不是继续堆。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li>underscore 1.7.0 源码（本地 <code>node_modules/underscore/underscore.js</code> 第 1070 到 1129 行）：<a href="https://github.com/jashkenas/underscore/blob/1.7.0/underscore.js">https://github.com/jashkenas/underscore/blob/1.7.0/underscore.js</a></li>
+<li>jQuery 1.11.3 源码（第 56 到 60、252 到 328、566 到 590 行）：<a href="https://code.jquery.com/jquery-1.11.3.js">https://code.jquery.com/jquery-1.11.3.js</a></li>
+<li>ECMA-262 第 5.1 版规范（2011 年 6 月）11.8.7、15.2.3.6、15.2.4.2、15.4.3.2：<a href="https://ecma-international.org/wp-content/uploads/ECMA-262_5.1_edition_june_2011.pdf">https://ecma-international.org/wp-content/uploads/ECMA-262_5.1_edition_june_2011.pdf</a></li>
+<li>MDN：Object.prototype.toString <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/toString">https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/toString</a></li>
+<li>MDN：Array.isArray <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/isArray">https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/isArray</a></li>
+<li>MDN：Object.defineProperty <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/defineProperty">https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/defineProperty</a></li>
+<li>jQuery 旧版工单 2968（宿主函数在 IE 里判定失败，1.11.3 源码注释中引用）：<a href="http://bugs.jquery.com/ticket/2968">http://bugs.jquery.com/ticket/2968</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>JavaScript 类型检测的完整方案</p><p><a href="https://987763485.github.io/2015/06/15/JavaScript类型检测的完整方案/">https://987763485.github.io/2015/06/15/JavaScript类型检测的完整方案/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2015-06-15</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/javascript/">javascript</a><a class="link-muted mr-2" rel="tag" href="/tags/web%E5%89%8D%E7%AB%AF/">web前端</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2015/06/17/JavaScript%E9%97%AD%E5%8C%85%E4%BB%8E%E5%8E%9F%E7%90%86%E5%88%B0%E5%AE%9E%E6%88%98/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">JavaScript 闭包从原理到实战</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2015/06/13/CSS%E6%B8%85%E9%99%A4%E6%B5%AE%E5%8A%A8%E7%9A%84%E5%87%A0%E7%A7%8D%E6%96%B9%E6%A1%88%E5%AF%B9%E6%AF%94/"><span class="level-item">CSS 清除浮动的几种方案对比</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

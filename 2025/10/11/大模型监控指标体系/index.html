@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>大模型监控指标体系 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="模型应用上线后最难回答的问题不是“服务活着没有”，而是“它今天答得还行不行、贵不贵、有没有漏东西出去”。本文给出大模型应用的四层监控指标体系：质量、性能、成本、安全，逐层讲清定义口径、采集位置、误报来源与告警形态，并给出命名规范、链路追踪与日志的分工、看板与灰度验收的做法。全文有一个前提：监控体系自身也是数据处理者，最小必要采集与脱敏优先不是附加要求，而是设计约束。"><meta property="og:type" content="blog"><meta property="og:title" content="大模型监控指标体系"><meta property="og:url" content="https://987763485.github.io/2025/10/11/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E7%9B%91%E6%8E%A7%E6%8C%87%E6%A0%87%E4%BD%93%E7%B3%BB/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="模型应用上线后最难回答的问题不是“服务活着没有”，而是“它今天答得还行不行、贵不贵、有没有漏东西出去”。本文给出大模型应用的四层监控指标体系：质量、性能、成本、安全，逐层讲清定义口径、采集位置、误报来源与告警形态，并给出命名规范、链路追踪与日志的分工、看板与灰度验收的做法。全文有一个前提：监控体系自身也是数据处理者，最小必要采集与脱敏优先不是附加要求，而是设计约束。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2025-10-10T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-20T15:03:18.235Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="大模型"><meta property="article:tag" content="python"><meta property="article:tag" content="typescript"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2025/10/11/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E7%9B%91%E6%8E%A7%E6%8C%87%E6%A0%87%E4%BD%93%E7%B3%BB/"},"headline":"大模型监控指标体系","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2025-10-10T16:00:00.000Z","dateModified":"2026-10-20T15:03:18.235Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"模型应用上线后最难回答的问题不是“服务活着没有”，而是“它今天答得还行不行、贵不贵、有没有漏东西出去”。本文给出大模型应用的四层监控指标体系：质量、性能、成本、安全，逐层讲清定义口径、采集位置、误报来源与告警形态，并给出命名规范、链路追踪与日志的分工、看板与灰度验收的做法。全文有一个前提：监控体系自身也是数据处理者，最小必要采集与脱敏优先不是附加要求，而是设计约束。"}</script><link rel="canonical" href="https://987763485.github.io/2025/10/11/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E7%9B%91%E6%8E%A7%E6%8C%87%E6%A0%87%E4%BD%93%E7%B3%BB/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2025-10-10T16:00:00.000Z" title="10/11/2025, 12:00:00 AM">2025-10-11</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></span><span class="level-item">1 小时读完 (大约10717个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">大模型监控指标体系</h1><div class="content"><p>模型应用上线后最难回答的问题不是“服务活着没有”，而是“它今天答得还行不行、贵不贵、有没有漏东西出去”。本文给出大模型应用的四层监控指标体系：质量、性能、成本、安全，逐层讲清定义口径、采集位置、误报来源与告警形态，并给出命名规范、链路追踪与日志的分工、看板与灰度验收的做法。全文有一个前提：监控体系自身也是数据处理者，最小必要采集与脱敏优先不是附加要求，而是设计约束。</p>
+<h2 id="从“请求返回-200”到“回答可靠”"><a href="#从“请求返回-200”到“回答可靠”" class="headerlink" title="从“请求返回 200”到“回答可靠”"></a>从“请求返回 200”到“回答可靠”</h2><p>传统应用性能监控（Application Performance Monitoring，APM）建立在四个黄金信号（Four Golden Signals）之上：延迟（Latency）、流量（Traffic）、错误（Errors）、饱和度（Saturation）。其隐含假设是：一次调用二值可判，成败由状态码、异常或超时决定；资源消耗与请求量近似线性；错误会留下堆栈。这四条假设在大模型应用里同时松动。</p>
+<p>答案的正确性是统计量而不是二值。一次请求可以完整走完流程、返回 200、时延优秀、毫无异常，同时给出一个编造的结论；网关看到的成功与用户感受到的成功之间隔着一次语义判断，而语义判断无法在请求路径上零成本完成，所以质量信号天生依赖抽样与评分。成本也不由 CPU 主导：同一台实例上，短上下文与长上下文请求的耗时与消耗可以差出一个量级，输入长度、缓存命中、工具与检索引入的额外轮次、失败重试都是钱，请求数与饱和度替代不了 token 口径。风险更不进错误率：注入尝试、越权工具调用、外泄拦截在业务语义上是“拦住了所以请求成功”，在监控语义上却必须单独计数，混进 200 就等于没发生。</p>
+<p>结论是：质量、性能、成本、安全四层必须同时存在，缺一层就有一类问题不可见；而是否采集用户原文，在四层里都以最小必要为原则。</p>
+<table>
+<thead>
+<tr>
+<th>层</th>
+<th>回答什么问题</th>
+<th>主要采集位置</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>质量</td>
+<td>用户拿到的答案是否可用、是否可信</td>
+<td>抽检与评审流水线、反馈埋点、输出侧校验器、引用一致性检查</td>
+</tr>
+<tr>
+<td>性能</td>
+<td>用户等了多久、时间花在哪一段</td>
+<td>网关埋点、编排层阶段计时、引擎内部计数、客户端首帧观测</td>
+</tr>
+<tr>
+<td>成本</td>
+<td>这件事值不值这个消耗、消耗归给谁</td>
+<td>网关用量字段、引擎 token 计数、轮次记录、缓存层日志</td>
+</tr>
+<tr>
+<td>安全</td>
+<td>有没有被试图带偏、有没有东西漏出去</td>
+<td>输入侧策略检查点、工具权限检查点、输出侧校验、限流组件</td>
+</tr>
+</tbody></table>
+<p>后文所有指标都在这三条底线内解释。其一，采集范围按字段白名单声明，未列入的一律不落；需要留存对话内容支撑抽检与排查时，必须同时满足五条：写入独立的对话内容域并与指标存储隔离、只留白名单字段、按角色做访问控制、写清留存期限与到期删除任务、脱敏优先（能只留长度、语言、类别标识就不要留文本）。用户提问原文、手机号、精确地理位置、身份证件号与账号信息都不构成“方便排查”的理由，也不许进任何指标标签。其二，堆快照、密钥、模型权重、用户数据不得写入任何外部服务、日志行或缓存键；缓存键只能由显式设计过的标识符与版本拼成，不能由内容摘要单独决定，否则键本身就成了可反查的数据出口。其三，所有阈值都是团队约定示例；本文不给任何 SLO 数值、告警数量、错误率百分比与时延毫秒数，只说明阈值该由谁依据什么来定。</p>
+<h2 id="质量层指标：把“答得不好”变成可观测的信号"><a href="#质量层指标：把“答得不好”变成可观测的信号" class="headerlink" title="质量层指标：把“答得不好”变成可观测的信号"></a>质量层指标：把“答得不好”变成可观测的信号</h2><p>离线评测的指标体系与题库构建在往期《大模型应用评估》里已经讲透，本文只谈线上监控这一侧，同一条指标的定义口径以评估篇为准。质量层最容易犯的错误是试图用一个数字回答“答得好不好”，可行做法是把它拆成一组信号，并对每个信号诚实标注证据强度：是结论，还是线索。</p>
+<h3 id="抽检评分：按类别分层抽样"><a href="#抽检评分：按类别分层抽样" class="headerlink" title="抽检评分：按类别分层抽样"></a>抽检评分：按类别分层抽样</h3><p>均匀随机抽样在真实流量下几乎必然失真：类别分布极不均，短问答型占大头，而真正高风险的场景——涉及资金操作、健康建议、跨部门权限查询——在随机样本里只剩几条，评分被高频低危请求稀释。正确做法先建抽样框，按“功能场景 × 风险等级 × 输出长度分桶”切格子，每格设最小样本量与抽样比例（皆为团队约定示例），格内再随机；输出为每格的评分通过率与按当期流量占比加权后的总分，加权必须显式声明，否则分数会随流量结构自己漂移，看起来像模型退化。抽检评分是本层少数可当结论使用的指标，但结论只覆盖样本足够的格子。误报来源四个：抽样框过期，新功能没有格子而长期落进“其他”桶；重试请求被当新样本重复计入；同一会话多轮被当作彼此独立样本；各格样本量差异过大，加权后被高样本量格压制。</p>
+<h3 id="拒答率拆成两条方向相反的指标"><a href="#拒答率拆成两条方向相反的指标" class="headerlink" title="拒答率拆成两条方向相反的指标"></a>拒答率拆成两条方向相反的指标</h3><p>把“模型拒绝回答”统计成一个比率是最常见的坑，因为两类处置方向完全相反。一条是“不应拒却拒”（过拒，False Refusal 一类），直接伤可用性：用户问了一件正常的事，模型因措辞触发保守倾向而拒答。另一条是“应拒未拒”（漏放），属安全层，本文只保留计数口径，发现如何登记与定级归同期《对齐评估与红队测试》。过拒率在输出侧策略检查点加编排层兜底话术识别处采集：先按类别维护一组“这算拒答”的判定，再按场景分别出曲线。误报包括把“我无法确定，建议核实”这类合规的谨慎表达误判为拒答、把检索无结果导致的“没有依据可回答”计入主观拒答、模板化回答被正则批量命中；判定本身要按类抽样复核，口径版本作为标签带着走。</p>
+<h3 id="幻觉线索：四类可观测代理信号"><a href="#幻觉线索：四类可观测代理信号" class="headerlink" title="幻觉线索：四类可观测代理信号"></a>幻觉线索：四类可观测代理信号</h3><p>幻觉没有免费的线上真值，能观测到的是线索；命中线索不等于答案错，未命中也不等于对。一是引用缺失：必须给来源的场景里输出没有可解析的来源标记，误报主要来自解析层——标记格式换一版，正则不认，整批被误判为缺失，看起来像模型突然不引用了。二是引用与原文不一致：引用的段落确实存在，但里面找不到支撑该说法的内容，误报来自片段被截断、引用编号错位、合理的跨段归纳被当成编造。三是工具返回为空却给出确定答案：接口返回空或明确失败，答案却给出肯定结论且无不确定性表述，误报来自答案确实取自模型参数知识这一合法情形——它可能对，但无法证明对，所以仍是要抽检的线索。四是答案中出现具体数字而上下文没有可追溯来源，数字最易误导用户故单独计数，误报来自系统提示中确含常量、格式要求里的示例数字与日期版本号。这四条不进质量总分，用途是驱动抽样：命中任一线索的样本自动进入高优先抽样框。</p>
+<h3 id="用户负反馈率与修正轮次比例"><a href="#用户负反馈率与修正轮次比例" class="headerlink" title="用户负反馈率与修正轮次比例"></a>用户负反馈率与修正轮次比例</h3><p>可点击负反馈（thumbs down 一类）回收率极低且分布偏斜，是线索不是结论：绝对值不能与抽检评分比大小，只看趋势与结构。误报很具体——按钮在流式渲染未完成时不可点，长答案被系统性少报；前端埋点改版后漏报。客户端采集边界与埋点治理归往期《前端埋点治理》，本文不重讲采集合规基础。修正轮次比例统计同一会话中用户拿到答案后立刻发起否定式、重问式或补充式追问的占比，它是纯代理信号，受语言习惯与业务复杂度影响极大，只适合在版本对照时看相对变化，不适合设绝对阈值告警。</p>
+<h2 id="质量指标怎么采出来：离线试验与线上抽检的分工"><a href="#质量指标怎么采出来：离线试验与线上抽检的分工" class="headerlink" title="质量指标怎么采出来：离线试验与线上抽检的分工"></a>质量指标怎么采出来：离线试验与线上抽检的分工</h2><p>离线评测试验负责发布前准入：样本可复现、版本可横向比较、失败可重跑，代价是分布人为、题目已知。线上抽检负责对真实分布做稀疏的高成本语义判断，代价是没有真值、样本量永远不够。分工写成一句可执行的规则：离线回答“这个版本有没有资格上”，线上回答“上了之后有没有变坏、坏在哪个格子”；质量波动先用线上抽检定位格子，再用离线样本复现。</p>
+<h3 id="自动打分是筛子，不是结论"><a href="#自动打分是筛子，不是结论" class="headerlink" title="自动打分是筛子，不是结论"></a>自动打分是筛子，不是结论</h3><p>用模型给模型打分（LLM as a Judge）的偏差是结构性的：偏好更长更工整的答案，即使信息量没变；偏好与自己表达风格相近的文本，从而系统性偏爱某个模型版本；分数随评审提示词措辞漂移；对格式极其敏感，对事实极其迟钝。所以它的职责是把可疑样本捞出来排序，不是给质量下结论。配套三条硬做法：每个评分批次固定抽取一定比例做人工复核，记录“一致／不一致／误判原因”，只用于校准与降级判定，不直接覆盖线上分数；当某批次人工一致率劣化到团队约定示例阈值之外，这批自动分数降级为“仅供排序，不进看板”；评审器版本、评审提示词版本、评分标定文件版本全部与样本绑定，评审器一升级就在曲线上打点，否则分数跳变会被读成模型跳变。一条评分样本若缺以下标签就进“不可比”池，不许出现在趋势图里：模型版本、提示词版本、检索配置版本、抽样框标识、评审器版本、人工复核状态；这套标签同时也是灰度对照与回滚判定的依据。</p>
+<h2 id="性能层指标：把一次生成拆到起止点"><a href="#性能层指标：把一次生成拆到起止点" class="headerlink" title="性能层指标：把一次生成拆到起止点"></a>性能层指标：把一次生成拆到起止点</h2><p>首 token 时延（Time To First Token，TTFT）的口径：起点取网关完成请求体解析、进入编排之刻，终点取第一个非空内容增量由网关写出之刻。三处最常被含糊过去：起点若取客户端发出请求，就把公网与本地队列算了进来；终点若取引擎产出首 token，就漏掉引擎到网关的返回路径；终点若取客户端看到第一个字符，又混进浏览器渲染。所以同一条 TTFT 至少并存两个计数——引擎侧首 token 与网关侧首字节，二者之差是有意义的量而不是误差。每 token 时延（Time Per Output Token，TPOT）取相邻两个输出 token 之间的间隔，工程上常用生成总耗时减 TTFT、再除以输出 token 数减一来近似；两件事必须写进定义：末尾停止序列的判定耗时算不算、最后一次 flush 与连接关闭算不算，算与不算都会让生成阶段耗时与引擎内部数字对不上。</p>
+<p>总耗时是端到端口径，从网关收到请求到流正常结束，含用量帧与连接关闭，它不等于 TTFT 加 TPOT 乘 token 数，因为还有非生成阶段。排队等待与生成时间必须拆开：排队含引擎批次队列等待与并发满时的外部排队，生成拆为预填充（Prefill，读入上下文）与解码（Decode，逐个产出 token）。流式连接中断率与重连率要显式声明分子分母口径：按请求算还是按连接算，一次请求重连三次算几个事件。中断与取消是两件事：取消（Cancellation）是客户端主动断开或用户点了停止，不是失败但真实消耗算力，其上升往往是 TTFT 变长或前端超时过短的先兆，属早期信号。长尾请求占比统计超出约定分位边界的请求比例，边界值由团队约定示例给出。</p>
+<p>为什么看分位数而不是均值：输出长度分布重尾，少数超长请求能拉高均值，而均值对应的“平均用户”并不存在，分位数回答的是最差那一档在哪里。为什么 p99 在低流量下不稳：窗口里只有百来个样本时，p99 事实上就是排序后第一个最大值，一次抖动就整点跳变；做法是按窗口样本量决定上报哪一档，样本不足时退到 p95 与窗口最大值，并把样本量作为伴生指标一起看。</p>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>起止边界</th>
+<th>标签维度</th>
+<th>常见误算</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TTFT（网关）</td>
+<td>请求体解析完成 → 首个内容增量写出</td>
+<td>服务、路由、模型版本、租户类型、流式与否</td>
+<td>把连接建立时间算入起点；把心跳帧当首 token</td>
+</tr>
+<tr>
+<td>TTFT（引擎）</td>
+<td>引擎入队完成 → 首 token 产出</td>
+<td>实例组、批次队列、并行配置</td>
+<td>与网关侧混用同一个指标名</td>
+</tr>
+<tr>
+<td>TPOT</td>
+<td>相邻输出 token 之间</td>
+<td>模型版本、输出长度分桶</td>
+<td>用总耗时除以 token 数，把排队算进去</td>
+</tr>
+<tr>
+<td>总耗时</td>
+<td>网关收请求 → 流结束</td>
+<td>场景、是否含工具轮次</td>
+<td>取消请求与正常请求混在一起</td>
+</tr>
+<tr>
+<td>排队等待</td>
+<td>入队 → 批次开始</td>
+<td>实例组、并发档位</td>
+<td>与预填充时间相加后叫“生成时间”</td>
+</tr>
+<tr>
+<td>中断率</td>
+<td>未按协议正常收尾的连接占比</td>
+<td>网络区域、SDK 版本</td>
+<td>按连接数算却写成按请求数算</td>
+</tr>
+<tr>
+<td>取消率</td>
+<td>客户端主动终止占比</td>
+<td>场景、前端超时配置</td>
+<td>计入错误率，导致可用性告警误触发</td>
+</tr>
+</tbody></table>
+<h3 id="采集位置与“两端对不上怎么办”"><a href="#采集位置与“两端对不上怎么办”" class="headerlink" title="采集位置与“两端对不上怎么办”"></a>采集位置与“两端对不上怎么办”</h3><p>网关计数与引擎计数最本质的差别是排队算在哪一侧：引擎看不到它在被调度之前已经在网关或队列里等过，网关看不到引擎内部批次队列，两条曲线相加才是用户等的总时间。客户端计数要单独留一路，它包含网关测不到的本地队列、公网、代理与渲染，但它是线索级数据，不能用来做服务侧达标判定，前端采集边界归往期《前端埋点治理》。</p>
+<p>时钟与单位是隐蔽重灾区：时延一律用毫秒，时长用单调时钟差值计算，绝对时间戳用墙钟并显式标注单位与时区；跨实例做差时时钟偏移会直接污染分位数，跨机对齐交给链路追踪的相对偏移估计，不许在原始时间戳上硬减。两端对不上时的正确动作是用同一 trace 标识把两侧观测串起来，看差值分布随哪个维度变化，定位差值主要来自排队、网络还是网关自身开销；错误动作是两侧取平均，或“以某侧为准再乘系数”。</p>
+<h2 id="成本层指标：归因、方向性与分母"><a href="#成本层指标：归因、方向性与分母" class="headerlink" title="成本层指标：归因、方向性与分母"></a>成本层指标：归因、方向性与分母</h2><p>降本的具体动作归同期《大模型成本优化实践》，本文只谈成本该被度量成什么样子，且全文不出现任何金额。</p>
+<p>token 消耗必须能归因，归因键是租户、功能、场景三类，来源只能是认证结果与请求上下文里的可信字段，绝不能从模型输出或用户输入推断——后者会让归因被内容本身改写；归因缺失的请求单独计数，其占比上升说明接入层在丢标签，而不是成本在涨。输入与输出必须分开统计：两个方向的单位成本差别很大，输入侧还因缓存读写而不同价，相加成一个“总 token”就再也看不出成本是被冗长上下文推高还是被长回答推高。缓存命中占比要成组看而不是看单个数，至少包含前缀缓存命中率、命中带来的输入 token 减少量、缓存写入所占输入比例；只看命中率会得出越高越省的错误结论，因为缓存本身有写入与占用成本，也可能因键设计不当反复失效，而缓存键只由显式设计的标识符与版本拼成，不写入任何内容或用户数据。</p>
+<p>工具与检索引入的额外轮次单独成指标：多轮代理式流程把一次用户请求放大成多次模型调用，指标形态是每任务的模型调用轮次分布，长尾轮次往往集中在一两个工具的失败重试上。失败与重试造成的消耗单独归集：网络重试、超时重试、校验不通过后的重新生成是纯粹的可回收浪费，混进正常成本就掩盖真实趋势。单位成本的分母必须是“成功且有质量的任务”，常用口径是每成功任务、每工单；分母只用请求数，就能靠让模型早点停止把单位成本做小，折中是分母取抽检与线上校验都通过的任务数，并与质量分放在同一张图上看。最后一句提醒：token 数不是成本，两者之间需要一张带版本与生效时间的换算表。</p>
+<h2 id="安全层指标：只计数，不搬运内容"><a href="#安全层指标：只计数，不搬运内容" class="headerlink" title="安全层指标：只计数，不搬运内容"></a>安全层指标：只计数，不搬运内容</h2><p>安全层是脱敏约束最硬的一层，因为它天然贴着攻击面。本层纪律是：指标里只出现类别、位置、版本与次数，绝不出现载荷，本文也不给任何注入文本样例，示例一律以类别名代替。</p>
+<p>注入尝试与拦截计数按“检出机制 × 拦截位置”二维分类，例如指令覆盖类、角色伪装类、工具参数诱导类、格式滥用类，拦截位置区分输入侧策略检查点、编排层约束、输出侧校验；每条计数只带类别、位置、检测器版本、租户类型四个维度，不带原文，也不带长度以外的内容特征。检测器版本必须带，否则升级检测器会让曲线整体跳变，被误读成攻击变多。越权工具调用尝试在工具权限检查点计数，分子是被策略拒绝的调用数，分母是模型发起的调用总数，混在一起会掩盖真问题：分母涨是模型变活跃，分子涨才是权限风险。敏感信息外泄拦截由输出侧检查器计数，类别只到“疑似个人号码／疑似证件或账号／疑似密钥形态／疑似内部标识”这一粒度，记录命中位置与字段名，不记录命中片段；命中样本若需留存复核，独立域存储、字段白名单、访问控制、留存期限四条一起生效，默认脱敏优先，而顺手把片段写进日志行以方便排查是本层最常见的破窗。</p>
+<p>输出侧校验失败率统计结构校验（字段齐全、枚举合法、引用结构可解析）的不通过占比，误报主要来自校验器改版而非模型退化，所以它必须与校验器版本标签同时出现。被限流与配额耗尽的次数按租户与原因分别计数，原因至少区分速率闸门、token 预算闸门、并发容量拒绝，三者处置完全不同。这些计数要进告警又不造成噪声，靠三条：对安全类计数用突变检测而非绝对值阈值，因为低频事件的绝对值天然抖；聚合窗口拉长，抑制规则按“同一租户同一类别同一窗口只发一次”写；单条高危事件不走指标通道，走人工登记与分级流程，怎么登记、怎么定级归同期《对齐评估与红队测试》。</p>
+<h2 id="指标分层与命名规范"><a href="#指标分层与命名规范" class="headerlink" title="指标分层与命名规范"></a>指标分层与命名规范</h2><p>低基数原则：标签集合的笛卡尔积决定序列总量，任何高基数值一旦进标签就再也拿不掉，因此模型输入、文档 ID、用户 ID、会话 ID、请求 ID 一律禁止作为指标标签，它们属于 trace 与日志的检索字段而不属于聚合维度；租户标识只在租户数量本身有界时可用，且用不可反查的内部标识而非手机号或名称。新增标签前先答三问：这个维度取值上界是多少、有没有不加它就定位不了的历史故障、能不能改放到 trace 属性里。</p>
+<p>单位与命名约定：时间一律毫秒或一律秒，选定后全局不换；token 数与字节数绝不混用同一个名字；单位写进指标名后缀。版本维度必须互相对上——模型版本、提示词版本、检索配置版本要能在同一张图上作为标签出现，否则“哪个版本变差了”无法回答。本文推荐的注册表形态如下。</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># metrics.registry.yaml（团队约定示例，不含任何阈值）</span></span><br><span class="line"><span class="attr">llm_quality_review_score_ratio:</span>      <span class="comment"># 抽检评分通过率，按抽样框格子</span></span><br><span class="line">  <span class="attr">unit:</span> <span class="string">&quot;1&quot;</span></span><br><span class="line">  <span class="attr">labels:</span> [<span class="string">scenario</span>, <span class="string">risk_tier</span>, <span class="string">length_bucket</span>, <span class="string">model_version</span>, <span class="string">prompt_version</span>, <span class="string">judge_version</span>]</span><br><span class="line"><span class="attr">llm_quality_false_refusal_ratio:</span>     <span class="comment"># 不应拒却拒的比例</span></span><br><span class="line">  <span class="attr">unit:</span> <span class="string">&quot;1&quot;</span></span><br><span class="line">  <span class="attr">labels:</span> [<span class="string">scenario</span>, <span class="string">refusal_rule_version</span>, <span class="string">model_version</span>]</span><br><span class="line"><span class="attr">llm_perf_ttft_ms:</span>                    <span class="comment"># 首 token 时延，毫秒</span></span><br><span class="line">  <span class="attr">unit:</span> <span class="string">&quot;ms&quot;</span></span><br><span class="line">  <span class="attr">labels:</span> [<span class="string">service</span>, <span class="string">route</span>, <span class="string">model_version</span>, <span class="string">tenant_tier</span>, <span class="string">streaming</span>]</span><br><span class="line"><span class="attr">llm_perf_tpot_ms:</span>                    <span class="comment"># 每 token 时延，毫秒</span></span><br><span class="line">  <span class="attr">unit:</span> <span class="string">&quot;ms&quot;</span></span><br><span class="line">  <span class="attr">labels:</span> [<span class="string">service</span>, <span class="string">model_version</span>, <span class="string">output_len_bucket</span>]</span><br><span class="line"><span class="attr">llm_cost_tokens_total:</span>               <span class="comment"># token 计数，方向必填</span></span><br><span class="line">  <span class="attr">unit:</span> <span class="string">&quot;tokens&quot;</span></span><br><span class="line">  <span class="attr">labels:</span> [<span class="string">tenant_id</span>, <span class="string">feature</span>, <span class="string">scenario</span>, <span class="string">direction</span>, <span class="string">cache_effect</span>, <span class="string">retry_class</span>]</span><br><span class="line"><span class="attr">llm_security_interception_total:</span>     <span class="comment"># 拦截次数，按类别</span></span><br><span class="line">  <span class="attr">unit:</span> <span class="string">&quot;1&quot;</span></span><br><span class="line">  <span class="attr">labels:</span> [<span class="string">check_point</span>, <span class="string">category</span>, <span class="string">detector_version</span>, <span class="string">tenant_tier</span>]</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">labels_are_safe</span>(<span class="params">labels: <span class="built_in">dict</span>, forbidden=(<span class="params"><span class="string">&quot;input&quot;</span>, <span class="string">&quot;doc_id&quot;</span>, <span class="string">&quot;user_id&quot;</span>, <span class="string">&quot;session_id&quot;</span></span>)</span>):</span><br><span class="line">    <span class="comment"># 采集前置校验：出现禁止维度直接拒绝上报，而不是等到基数爆炸</span></span><br><span class="line">    <span class="keyword">for</span> key <span class="keyword">in</span> labels:</span><br><span class="line">        <span class="keyword">if</span> <span class="built_in">any</span>(word <span class="keyword">in</span> key <span class="keyword">for</span> word <span class="keyword">in</span> forbidden):</span><br><span class="line">            <span class="keyword">raise</span> ValueError(<span class="string">f&quot;unsafe label: <span class="subst">&#123;key&#125;</span>&quot;</span>)</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">True</span></span><br></pre></td></tr></table></figure>
+
+<p>最省事的版本对齐做法是由编排层统一装配一个版本包标识，模型、提示词、检索配置各自的版本作为它的字段，任何一处单独热更新都必须产生新的包标识。</p>
+<h2 id="Trace-与日志的分工"><a href="#Trace-与日志的分工" class="headerlink" title="Trace 与日志的分工"></a>Trace 与日志的分工</h2><p>指标回答“这类请求整体怎么样”，trace 回答“这一次请求的时间花在哪一段”，日志回答“这一步当时为什么这么决定”，三者不能互相替代。</p>
+<pre class="mermaid">flowchart TD
+  A[客户端请求] --> B[网关埋点：TTFT、总耗时、状态]
+  B --> C[编排层埋点：阶段计时与轮次]
+  C --> D[检索埋点：召回与片段数]
+  C --> E[工具埋点：调用与返回状态]
+  E --> F[模型引擎埋点：排队、预填充、解码]
+  D --> F
+  F --> G[指标：计数器与直方图]
+  F --> H[链路：span 与阶段耗时]
+  F --> I[日志：决策点记录]
+  G --> J[看板与告警]
+  H --> J
+  I --> J</pre>
+
+<p>trace 把一次请求的各阶段耗时结构化：网关、编排、检索、工具、模型各成一段，段间是父子关系，排队与生成在模型这一段继续下探；有了这棵树，前文“两端对不上”的问题才有解。日志的规矩是只在处理点记一次：谁做决策谁记录，下游要引用就带 trace 标识去检索，不要把同一条决策在四层里各抄一遍。</p>
+<p>span 属性里不写用户原文。需要关联同一段会话时，用会话标识符加内容摘要哈希，并且必须清楚：哈希不能当唯一识别长期留存。摘要是输入空间的压缩，当用户输入较短或模板化程度高时，枚举与撞库在实践里成本很低；一旦某个哈希值被长期留存又与其它数据集并列出现，它就退化成识别码。所以摘要只用于短期排障关联，到期即删，且不进任何外部服务、日志归档或缓存键。“能定位到哪一层坏了”是本节唯一的验收标准，判定关系如下。</p>
+<table>
+<thead>
+<tr>
+<th>现象</th>
+<th>第一落点</th>
+<th>佐证</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TTFT 涨、引擎侧 TTFT 不涨</td>
+<td>网关到引擎之间的路径或排队</td>
+<td>网关与引擎两段 span 的差值分布</td>
+</tr>
+<tr>
+<td>引擎侧 TTFT 涨、排队不变</td>
+<td>模型版本、输入长度分布、预填充</td>
+<td>版本包标识与输入 token 分桶</td>
+</tr>
+<tr>
+<td>总耗时涨、TPOT 正常</td>
+<td>轮次变多或输出变长</td>
+<td>工具调用 span 数量、输出 token 数</td>
+</tr>
+<tr>
+<td>抽检分数跌、性能全绿</td>
+<td>检索配置或提示词变更</td>
+<td>检索配置版本与引用线索命中率</td>
+</tr>
+<tr>
+<td>单位成本涨、token 总数不变</td>
+<td>换算表版本或归因标签丢失</td>
+<td>换算表生效时间与归因缺失计数</td>
+</tr>
+</tbody></table>
+<h2 id="语义约定与厂商锁定"><a href="#语义约定与厂商锁定" class="headerlink" title="语义约定与厂商锁定"></a>语义约定与厂商锁定</h2><p>生成式 AI 的可观测语义约定正在快速成形。以开放遥测（OpenTelemetry）项目里的生成式 AI 语义约定这一主题为例，到本文写作时（2025 年 10 月）它仍在演进，字段名称与归属随时可能变化，因此本文刻意不写版本号也不抄字段清单。</p>
+<p>结论是结构性的而不是版本性的：在自己的系统里立一层内部契约，再在出口做一层导出映射。内部契约定义本文承认的指标名、span 名、属性名与单位，是看板、告警、成本换算唯一允许引用的层；导出映射把内部名字翻译成外部约定或某个后端的字段形状。上游改名时改的是映射层，看板与告警不动；换推理引擎、换可观测后端、换云厂商时也只有映射要重写，历史数据不断档。</p>
+<h2 id="告警设计：少而可行动"><a href="#告警设计：少而可行动" class="headerlink" title="告警设计：少而可行动"></a>告警设计：少而可行动</h2><p>告警只建立在两类信号上：用户可感知结果，例如端到端总耗时劣化、请求以错误收尾、答案被大量修正；早期信号，即在用户还没受影响时就能预示问题的量，例如取消率抬头、排队时间分布变宽、归因标签缺失比例上升、缓存命中占比下滑。每条告警必须自带四件套，缺一条就不要上线：触发条件写成可判定的表达式，并声明几个连续窗口满足才算；抑制规则声明同源风暴怎么压，至少按租户、按类别、按版本包三条聚合，同一根因在窗口内只发一次；通知分级声明这条走人工即时、走值班工单还是只进日终汇总；响应时限给出预期动作，本文所有分级与时限均为团队约定示例，不给具体分钟数与条数。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// alert.spec.ts —— 告警即文档：每条告警在仓库里都有这样一份声明</span></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">const</span> ttftDegraded = &#123;</span><br><span class="line">  <span class="attr">name</span>: <span class="string">&quot;llm.perf.ttft.p95_degraded&quot;</span>,</span><br><span class="line">  <span class="attr">basedOn</span>: <span class="string">&quot;userVisibleOutcome&quot;</span>,       <span class="comment">// 用户可感知结果</span></span><br><span class="line">  <span class="attr">window</span>: <span class="string">&quot;twoConsecutiveSlidingWindows&quot;</span>,</span><br><span class="line">  <span class="attr">condition</span>: <span class="string">&quot;bandExceededAgainstPreviousVersionBaseline&quot;</span>, <span class="comment">// 基线带宽为团队约定示例</span></span><br><span class="line">  <span class="attr">suppress</span>: [<span class="string">&quot;tenant&quot;</span>, <span class="string">&quot;route&quot;</span>, <span class="string">&quot;versionBundle&quot;</span>],</span><br><span class="line">  <span class="attr">severity</span>: <span class="string">&quot;oncallPage&quot;</span>,              <span class="comment">// 分级为团队约定示例</span></span><br><span class="line">  <span class="attr">responseExpectation</span>: <span class="string">&quot;acknowledgeThenCheckQueueingSplit&quot;</span>,</span><br><span class="line">  <span class="attr">runbook</span>: <span class="string">&quot;runbooks/llm-ttft.md&quot;</span>,</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>为什么不能给每条指标都配告警：序列数量是标签笛卡尔积的产物，给每条序列配阈值等于把统计波动全量转成人声；告警一旦失去意义，真故障就被淹没在自家噪声里。质量类告警还要更保守，三条理由叠加：质量信号多为抽样与评分，样本小方差大，天然抖动就足以触发阈值；质量难以自动定性，分数下滑到底是模型退化、流量结构变了还是评审器改版，机器判不出来；质量类告警的动作是今天必须有人去看二十条样本，做成即时惊动只会逼人把它静音。所以质量类只做日粒度趋势与版本对照，触发后走工单与例会；例外是线索型信号突然全部归零，那不是质量变好而是采集或校验器挂了，按可用性告警处理。</p>
+<h2 id="看板与复盘"><a href="#看板与复盘" class="headerlink" title="看板与复盘"></a>看板与复盘</h2><p>日常值班看板只放四五个可行动指标，判据是一句话：看到它变红，值班的人今天能做一个具体动作。常用组合是端到端总耗时分位、错误与中断占比、每任务模型调用轮次、归因缺失占比、线索命中样本积压数；质量分与成本趋势不进值班看板而进周会与日终汇总，因为值班同学对它们没有当场可做的动作。发布前后对照看板必须与发布前同一口径：同一指标名、同一分位档、同一抽样框、同一单位，任何“新版本换一套更好看的算法”都会让对照失效。故障复盘的验收标准是看板能还原到分钟级且能按租户切开看：做不到分钟级就说不清故障起点，做不到按租户切就说不清影响面；分钟级不等于永久保留，超过留存期限的高粒度数据要降采样后保留。</p>
+<table>
+<thead>
+<tr>
+<th>看板区块</th>
+<th>目的</th>
+<th>谁看</th>
+<th>出问题时的第一动作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>端到端时延分位与样本量</td>
+<td>判断用户体验是否劣化</td>
+<td>值班</td>
+<td>查排队与生成的拆分，确定瓶颈在哪一段</td>
+</tr>
+<tr>
+<td>错误、中断与取消占比</td>
+<td>区分服务故障与客户端行为</td>
+<td>值班</td>
+<td>看 SDK 版本与网络区域标签是否集中</td>
+</tr>
+<tr>
+<td>轮次与 token 方向分布</td>
+<td>发现成本异常放大</td>
+<td>平台负责人</td>
+<td>查工具失败重试计数与归因缺失</td>
+</tr>
+<tr>
+<td>安全拦截计数趋势</td>
+<td>观察风险面是否有异动</td>
+<td>安全值班</td>
+<td>核对检测器版本，排除升级引起的跳变</td>
+</tr>
+<tr>
+<td>抽检格子通过率</td>
+<td>定位质量劣化的具体类别</td>
+<td>算法负责人</td>
+<td>按格子调样本，人工看二十条</td>
+</tr>
+<tr>
+<td>版本包对照区</td>
+<td>发布后判断是否需要回滚</td>
+<td>发布负责人</td>
+<td>比对灰度双跑的对照指标</td>
+</tr>
+</tbody></table>
+<h2 id="上线前后的指标验收"><a href="#上线前后的指标验收" class="headerlink" title="上线前后的指标验收"></a>上线前后的指标验收</h2><p>灰度期只有一条纪律：双跑对照、同一口径。新旧版本在同一时间窗内接同类流量，两侧用完全相同的指标名、分位档、抽样框与单位计算。对照最小集合本文取四条：端到端时延分位、错误与中断占比、每任务模型调用轮次、抽检格子通过率，前三条是硬指标，最后一条按抽样进度看趋势。劣化到什么程度触发回滚，阈值一律是团队约定示例，本文不代各团队决定；但触发条件必须写成“连续几个窗口 + 哪几条指标 + 允许哪一条单独触发”的完整句子，写在发布单里。</p>
+<p>必须提前接受：离线通过不等于线上无事。一是分布漂移，离线题库的类别、长度、语言分布是人为配的，线上上下文更长、追问更多、表述更脏，同一版本在两侧分数不可比，只有各自趋势可比。二是上下文里多了检索内容，离线样本常是干净问答对，线上同一道题会被塞进检索片段、工具返回与历史会话，输入分布整体右移，这类退化离线复现不出来，只能靠线上抽检格子发现。三是上游参数被顺手改动，采样参数、重试策略、路由权重、超时配置往往不在发布单上，却直接改变输出分布。</p>
+<p>验收结论要落成一句可执行的话：哪几条指标、在连续几个窗口内、劣化超过约定示例幅度就回滚，回滚后由谁确认恢复。灰度期还要额外盯早期信号——取消率、归因缺失占比、线索命中样本积压数。</p>
+<h2 id="常见反模式清单"><a href="#常见反模式清单" class="headerlink" title="常见反模式清单"></a>常见反模式清单</h2><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">[ ] 只监控可用性与错误率，不看任何质量类信号</span><br><span class="line">[ ] 把用户提问原文当日志字段或指标标签，留存无期限、无访问控制</span><br><span class="line">[ ] 指标只上报均值，没有分位数，也没有样本量</span><br><span class="line">[ ] 每条指标都配一条告警，每个告警都发给所有人</span><br><span class="line">[ ] 看板无人认领：没有 owner 字段，出问题时没人知道该找谁</span><br><span class="line">[ ] 上线后没有对照基线，任何波动都无法归因</span><br><span class="line">[ ] 缓存命中率不算进成本口径，工具与检索的额外轮次不进账</span><br><span class="line">[ ] 评审模型打分无人工复核，评审器改版不在曲线上打点</span><br><span class="line">[ ] 把 token 数直接当成本，换算表没有版本与生效时间</span><br><span class="line">[ ] 高基数标识（文档 ID、用户 ID、会话 ID）进标签导致序列爆炸</span><br><span class="line">[ ] 日志在每一层重复记录同一决策，四层记录互相矛盾</span><br><span class="line">[ ] 抄外部语义约定的字段名当内部指标名，上游改名即看板全挂</span><br></pre></td></tr></table></figure>
+
+<h2 id="四层指标对照总表"><a href="#四层指标对照总表" class="headerlink" title="四层指标对照总表"></a>四层指标对照总表</h2><table>
+<thead>
+<tr>
+<th>指标族</th>
+<th>代表指标</th>
+<th>采集位置</th>
+<th>误报来源</th>
+<th>适合的告警形态</th>
+<th>留存与脱敏要求</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>质量</td>
+<td>格子抽检通过率、过拒比例、四类线索命中占比、修正轮次比例</td>
+<td>抽检与评审流水线、反馈埋点、输出侧校验器</td>
+<td>抽样框过期、评审器改版、解析变更、重试重复计数</td>
+<td>日粒度趋势与版本对照，走工单不走即时</td>
+<td>原文入独立域，白名单、访问控制、留存期限、脱敏优先</td>
+</tr>
+<tr>
+<td>性能</td>
+<td>TTFT 两路、TPOT、总耗时、排队与预填充、中断率、取消率、长尾占比</td>
+<td>网关、编排计时、引擎内部计数、客户端首帧</td>
+<td>起止边界不一致、时钟偏移、单位混用、样本不足使高分位抖</td>
+<td>可感知结果做阈值，取消与排队做早期信号</td>
+<td>只存数值与低基数标签，trace 属性不放原文</td>
+</tr>
+<tr>
+<td>成本</td>
+<td>输入输出分开的 token、缓存命中占比、每任务轮次、重试消耗、单位成本</td>
+<td>网关用量字段、引擎 token 计数、轮次记录、缓存层日志</td>
+<td>归因标签缺失、缓存键假命中、分母口径被改动</td>
+<td>突变检测为主，绝对阈值交给预算闸门</td>
+<td>用量可留、内容不留；缓存键不含用户数据与密钥</td>
+</tr>
+<tr>
+<td>安全</td>
+<td>注入拦截、越权工具调用、外泄拦截分类、校验失败率、限流与配额耗尽</td>
+<td>输入侧与工具权限检查点、输出侧校验、限流组件</td>
+<td>检测器版本跳变、误拦正常表达、把取消当失败</td>
+<td>低频事件用突变与聚合窗口，高危单条走人工登记</td>
+<td>只记类别、位置与版本，不记载荷</td>
+</tr>
+</tbody></table>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>请求返回 200 与回答可靠之间隔着一次语义判断，而这次判断无法在全路径上零成本完成，所以质量、性能、成本、安全四层必须同时存在。质量层要把信号分成结论与线索两档：抽检评分是结论，但只覆盖样本足够的格子；幻觉线索与负反馈是线索，正确用途是驱动抽样而不是充当分数；自动打分是筛子不是结论，人工复核与版本绑定是它唯一的使用前提。其余三层各有纪律：性能层是边界，TTFT 与 TPOT 精确到起止点，网关侧与引擎侧各是一路，两端对不上用链路串起来解释差值而绝不取平均；成本层是方向与分母，输入与输出分开算，缓存与轮次单独成指标，单位成本的分母必须是成功且有质量的任务；安全层是只计数不搬运内容，指标里出现类别、位置、版本与次数，永远不出现载荷。</p>
+<p>贯穿四层的是同一句话：监控体系自己也是数据处理者。最小必要采集、字段白名单、独立域存储、访问控制、留存期限、脱敏优先，不是合规部门加给监控的成本，而是决定它能不能长期跑下去的地基。落地顺序本文建议：先立内部契约与命名规范，再把网关与引擎两路时延打通成一条链路，然后补成本归因与安全计数，最后才动告警——指标可以慢慢加，告警一多就关不掉。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li>开放遥测项目仓库根：<a href="https://github.com/open-telemetry">open-telemetry</a></li>
+<li>语义约定仓库（本文写作时其生成式 AI 相关约定仍在演进，故不引用具体字段与版本）：<a href="https://github.com/open-telemetry/semantic-conventions">semantic-conventions</a></li>
+<li>开放遥测官方文档站，含指标、链路与日志三者关系总览：<a href="https://opentelemetry.io/docs/">OpenTelemetry Docs</a></li>
+<li>以下只给主题名，本文未核对具体页面地址：四个黄金信号与分布式系统监控、延迟分位数与直方图的度量口径、服务等级目标与服务等级指标的定义口径。</li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>大模型监控指标体系</p><p><a href="https://987763485.github.io/2025/10/11/大模型监控指标体系/">https://987763485.github.io/2025/10/11/大模型监控指标体系/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2025-10-11</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-20</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="link-muted mr-2" rel="tag" href="/tags/python/">python</a><a class="link-muted mr-2" rel="tag" href="/tags/typescript/">typescript</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2025/10/16/CrewAI%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E6%A1%86%E6%9E%B6%E5%AE%9E%E6%88%98/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">CrewAI 多智能体框架实战</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2025/10/09/Go%E8%AF%AD%E8%A8%80%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%BA%94%E7%94%A8%E5%BC%80%E5%8F%91/"><span class="level-item">Go 语言大模型应用开发</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

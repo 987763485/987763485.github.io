@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>分布式缓存一致性方案 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="缓存几乎是把读性能从数据库里“偷”出来的最便宜手段，可一旦同一份数据存了两处，读写顺序和失效时机就成了必须交代的问题。本文从商品详情的读接口出发，讲清不一致是怎么产生的，几种主流方案各把窗口压到多长，以及真实系统里最常踩的坑。"><meta property="og:type" content="blog"><meta property="og:title" content="分布式缓存一致性方案"><meta property="og:url" content="https://987763485.github.io/2021/02/26/%E5%88%86%E5%B8%83%E5%BC%8F%E7%BC%93%E5%AD%98%E4%B8%80%E8%87%B4%E6%80%A7%E6%96%B9%E6%A1%88/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="缓存几乎是把读性能从数据库里“偷”出来的最便宜手段，可一旦同一份数据存了两处，读写顺序和失效时机就成了必须交代的问题。本文从商品详情的读接口出发，讲清不一致是怎么产生的，几种主流方案各把窗口压到多长，以及真实系统里最常踩的坑。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2021-02-26T01:18:57.000Z"><meta property="article:modified_time" content="2026-10-18T15:35:49.816Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="golang"><meta property="article:tag" content="微服务"><meta property="article:tag" content="后端开发"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2021/02/26/%E5%88%86%E5%B8%83%E5%BC%8F%E7%BC%93%E5%AD%98%E4%B8%80%E8%87%B4%E6%80%A7%E6%96%B9%E6%A1%88/"},"headline":"分布式缓存一致性方案","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2021-02-26T01:18:57.000Z","dateModified":"2026-10-18T15:35:49.816Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"缓存几乎是把读性能从数据库里“偷”出来的最便宜手段，可一旦同一份数据存了两处，读写顺序和失效时机就成了必须交代的问题。本文从商品详情的读接口出发，讲清不一致是怎么产生的，几种主流方案各把窗口压到多长，以及真实系统里最常踩的坑。"}</script><link rel="canonical" href="https://987763485.github.io/2021/02/26/%E5%88%86%E5%B8%83%E5%BC%8F%E7%BC%93%E5%AD%98%E4%B8%80%E8%87%B4%E6%80%A7%E6%96%B9%E6%A1%88/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2021-02-26T01:18:57.000Z" title="2/26/2021, 9:18:57 AM">2021-02-26</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></span><span class="level-item">28 分钟读完 (大约4199个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">分布式缓存一致性方案</h1><nav class="series-nav" aria-label="系列文章导航"><div class="series-nav-meta"><i class="fas fa-book-open" aria-hidden="true"></i><span>本文属于《<a class="series-nav-title" href="/series/go-arch/">Go 微服务架构</a>》第 29/35 篇</span></div><div class="series-nav-links"><a class="series-nav-link series-nav-prev" href="/2023/04/07/Seata%E5%88%86%E5%B8%83%E5%BC%8F%E4%BA%8B%E5%8A%A1%E5%AE%9E%E6%88%98/"><i class="fas fa-chevron-left" aria-hidden="true"></i><span>上一篇</span></a><a class="series-nav-link series-nav-index" href="/series/go-arch/">系列目录</a><a class="series-nav-link series-nav-next" href="/2022/11/07/%E5%88%86%E5%B8%83%E5%BC%8FID%E7%94%9F%E6%88%90%E6%96%B9%E6%A1%88/"><span>下一篇</span><i class="fas fa-chevron-right" aria-hidden="true"></i></a></div></nav><div class="content"><p>缓存几乎是把读性能从数据库里“偷”出来的最便宜手段，可一旦同一份数据存了两处，读写顺序和失效时机就成了必须交代的问题。本文从商品详情的读接口出发，讲清不一致是怎么产生的，几种主流方案各把窗口压到多长，以及真实系统里最常踩的坑。</p>
+<p>本文面向已经会在业务里加一层 Redis、但还没系统整理过失效策略的开发者。读完之后，你应当能为一个具体接口选出合适的方案，并且知道它在什么情况下会退化成“看起来很快、偶尔返回旧数据”。</p>
+<h2 id="不一致是怎样产生的"><a href="#不一致是怎样产生的" class="headerlink" title="不一致是怎样产生的"></a>不一致是怎样产生的</h2><p>先从商品详情接口说起。读请求先查 Redis，未命中再查 MySQL，然后回填并设置过期时间；写请求更新 MySQL 的价格，同时让对应缓存失效。这就是 cache-aside（旁路缓存），绝大多数业务系统用的都是它。</p>
+<p>问题在于，MySQL 和 Redis 是两个独立系统，没有一个本地事务能同时覆盖两者。写操作必然被拆成“改库”和“动缓存”两步，两步之间只要有可能失败、有可能被其他请求插入，就会出现一段两种存储读数不同的时间。本文把这个时间段称为不一致窗口，一致性问题本质上就是如何把它压到业务可以接受的长度。</p>
+<p>那为什么不直接更新缓存，而要删除？原因有四条。</p>
+<p>第一，更新缓存会被并发写覆盖。两个写请求先后改同一行，库里最终是后者的值；若更新缓存的顺序反过来，缓存里留下的却是前者的值，要等过期才纠正。</p>
+<p>第二，更新缓存可能白算。缓存值常是多表拼装的结果，写多读少时每改一次就重算一次，算完可能没人读。</p>
+<p>第三，删除只表达“这份数据不可信了”，不关心缓存原来是什么；更新则要求写入者完整掌握缓存值的构造方式，多一条写入路径就容易写出残缺的值。</p>
+<p>第四，缓存里可能有本不该存在的值，比如被风控过滤掉的字段、空结果占位。它们只能靠重走读路径产生，删除后由读请求重建更可靠。</p>
+<p>代价也很明确：删除之后的第一次读必然未命中，回源压力集中在那一下。这与缓存击穿属于同一类问题，本文不展开，只提醒一句：删除策略必须和回源保护一起设计。</p>
+<h2 id="cache-aside：先更新数据库再删缓存"><a href="#cache-aside：先更新数据库再删缓存" class="headerlink" title="cache-aside：先更新数据库再删缓存"></a>cache-aside：先更新数据库再删缓存</h2><p>顺序上有四种组合，结论可以直接列成一张表。</p>
+<table>
+<thead>
+<tr>
+<th>顺序</th>
+<th>结果</th>
+<th>评价</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>先删缓存，再更新库</td>
+<td>删除后、更新前的读请求会把旧值回填，之后长期是旧值</td>
+<td>不可用</td>
+</tr>
+<tr>
+<td>先更新库，再删缓存</td>
+<td>窗口只在两步之间，窗口内读到旧值</td>
+<td>推荐</td>
+</tr>
+<tr>
+<td>先更新库，再更新缓存</td>
+<td>并发写时缓存可能停在较早的值</td>
+<td>不推荐</td>
+</tr>
+<tr>
+<td>先更新缓存，再更新库</td>
+<td>库写失败则缓存成为脏数据</td>
+<td>不可用</td>
+</tr>
+</tbody></table>
+<p>“先删缓存再更新库”之所以危险，是因为删除动作清空了唯一的正确副本，而数据库还没变。此时任何一个读请求都会把旧值重新装回缓存，等写完库也不再有人去删它，不一致会一直持续到过期。</p>
+<p>“先更新库再删缓存”的不一致窗口只有两步之间那一点时间，而且最坏情况是读到旧值，不会长期留脏。实现时要注意两点：删除必须发生在事务提交之后；删除失败不能把已经成功的写操作报成失败。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// UpdatePrice 更新价格：先落库，提交后再让缓存失效</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(s *Service)</span></span> UpdatePrice(ctx context.Context, id <span class="type">int64</span>, price <span class="type">int64</span>) <span class="type">error</span> &#123;</span><br><span class="line">	tx, err := s.db.BeginTx(ctx, <span class="literal">nil</span>)</span><br><span class="line">	<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> err</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">if</span> _, err = tx.ExecContext(ctx, <span class="string">&quot;UPDATE product SET price = ? WHERE id = ?&quot;</span>, price, id); err != <span class="literal">nil</span> &#123;</span><br><span class="line">		tx.Rollback()</span><br><span class="line">		<span class="keyword">return</span> err</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">if</span> err = tx.Commit(); err != <span class="literal">nil</span> &#123; <span class="comment">// 提交成功才算数据真的变了</span></span><br><span class="line">		<span class="keyword">return</span> err</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">if</span> err = s.cache.Del(ctx, cacheKey(id)).Err(); err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="comment">// 删除失败不影响写结果，交给补偿任务重试</span></span><br><span class="line">		<span class="keyword">return</span> s.retry.Enqueue(ctx, cacheKey(id))</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">return</span> <span class="literal">nil</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>读路径同样要克制：只回填完整对象；未命中回源要加保护，避免一次删除把数据库打穿；TTL 要有上限，它是所有兜底手段里最后生效的一层。</p>
+<h2 id="删除失败之后：重试与补偿"><a href="#删除失败之后：重试与补偿" class="headerlink" title="删除失败之后：重试与补偿"></a>删除失败之后：重试与补偿</h2><p>删除不是本地内存操作，而是一次跨网络的调用。Redis 抖动、连接池耗尽、key 恰好落在正在迁移的槽上，都会让 DEL 失败。此时数据库已经提交，缓存还是旧值，这一段就是纯亏损的不一致窗口。</p>
+<p>原则有三条：不回滚数据库，因为回滚会把一次成功的写入变成失败，而删除失败通常发生在提交之后；不把错误抛给调用方，因为写操作确实成功了，返回失败会诱导上游重试，产生重复写入；必须让删除有第二次机会。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// flush 由后台任务周期调用，重试未完成的删除</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(w *Invalidator)</span></span> flush(ctx context.Context) &#123;</span><br><span class="line">	keys, err := w.store.Pick(ctx, <span class="number">200</span>) <span class="comment">// 取出待删除的 key，按失败时间排序</span></span><br><span class="line">	<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span></span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">for</span> _, k := <span class="keyword">range</span> keys &#123;</span><br><span class="line">		<span class="keyword">if</span> err := w.cache.Del(ctx, k).Err(); err != <span class="literal">nil</span> &#123;</span><br><span class="line">			w.store.MarkFailed(ctx, k) <span class="comment">// 留在队列里，下一轮再试</span></span><br><span class="line">			<span class="keyword">continue</span></span><br><span class="line">		&#125;</span><br><span class="line">		w.store.Remove(ctx, k) <span class="comment">// 删除成功才出队</span></span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>待删除的 key 要落到一张表（或磁盘队列加副本），不能只放在进程内存里，否则重启后那批 key 就永远脏着。删除是幂等的，重复执行只是多一次 DEL，所以重试天然安全。</p>
+<p>重试要设上限与退避。超过若干次仍失败就告警，让人确认 Redis 是否整体不可用，而不是无休止空转。重试任务也要限速，否则 Redis 恢复瞬间，积压的删除会变成一次小流量冲击。</p>
+<p>如果读请求走的是从库，还有一个更隐蔽的问题：主库更新成功、缓存删除成功，但紧接着的读请求落到尚未同步的从库，读到旧值并回填。此时代码里没有任何一步失败，缓存却脏了。常见对策是写后一段时间内强制读主，或把第二次删除推迟到主从延迟之外。</p>
+<h2 id="延迟双删及其局限"><a href="#延迟双删及其局限" class="headerlink" title="延迟双删及其局限"></a>延迟双删及其局限</h2><p>延迟双删是对上面这个回填竞态的补丁：更新库之前删一次，提交之后再删一次，第二次删除延迟一小段时间执行。第一次删除让旧缓存提前消失，第二次删除负责清掉在更新期间被读请求塞回去的旧值。</p>
+<pre class="mermaid">sequenceDiagram
+    participant W as 写请求
+    participant R as 读请求
+    participant DB as MySQL
+    participant C as Redis
+    W->>DB: 更新并提交
+    R->>C: 读缓存，未命中
+    R->>DB: 回源，读到旧值
+    W->>C: 删除缓存
+    R->>C: 回填旧值
+    Note over C: 缓存留下旧值
+    W->>C: 延迟后再删一次
+    Note over C: 旧值被清掉，窗口结束</pre>
+
+<p>第二次删除不是万能的，效果完全取决于延迟时长：太短，读请求还没回填完，删了等于没删；太长，窗口被自己拉长。主从延迟本身在波动，一个固定值很难两头都占。</p>
+<p>现实中还有几处约束。第二次删除同样可能失败，仍需重试兜底；同步 sleep 会白占请求处理时间，应改成延迟任务；第一次删除收益有限时可以省掉，只留提交后删除加异步补偿。</p>
+<p>因此在方案选型里，延迟双删的定位是“用很小的改造成本把窗口压短一个量级”，而不是“解决一致性”。它不消除竞态，只让竞态发生在一个更短、更容易被 TTL 兜住的时间段里。</p>
+<h2 id="订阅-binlog：把失效从业务代码里移出去"><a href="#订阅-binlog：把失效从业务代码里移出去" class="headerlink" title="订阅 binlog：把失效从业务代码里移出去"></a>订阅 binlog：把失效从业务代码里移出去</h2><p>前面几种做法的共同点是“由写业务负责删缓存”，只要有一条写入路径忘了删，或者顺序写错，就留下脏数据。更彻底的做法是让失效不再依赖业务代码，而由数据库的变更日志驱动。</p>
+<p>MySQL 的 binlog 记录每一行变更。Canal 把自己伪装成一个从库，向主库注册并拉取 binlog，解析成结构化事件再投递出去。业务侧只负责写库，失效交给下游消费者。</p>
+<pre class="mermaid">flowchart LR
+    A[业务写入 MySQL] --> B[binlog]
+    B --> C[Canal 解析]
+    C --> D[Kafka 投递]
+    D --> E[失效消费者]
+    E --> F[Redis DEL]</pre>
+
+<p>这条链路有几个必须交代的细节。</p>
+<p>binlog 格式要设成 ROW。MySQL 5.7 和 8.0 都支持多种格式，只有 ROW 能拿到变更前后的完整行值；statement 记的是 SQL 语句，解析时无法还原“这一行变成了什么”，也就判断不出哪些缓存 key 受影响。</p>
+<p>分区要按主键做。同一行的多次变更必须进入同一个分区，消费者才能按顺序处理；一旦乱序，先发出的“更新”可能晚于后发出的“再更新”生效，缓存就停在一个中间值上。</p>
+<p>消费必须幂等。Kafka 2.6 的默认投递语义是至少一次，重复消息很常见。好在失效动作是删除，重复删除没有副作用，这正是选择“删除”而不是“写入新值”的又一个好处。</p>
+<p>多副本要各自失效。每个实例、每个机房都有本地缓存时，就用消费者组广播（每个实例独立 group）让所有副本收到同一条消息；本地缓存没有共享存储，广播往往是唯一可靠的办法。</p>
+<p>代价是链路变长。Canal 要高可用、维护位点、处理 DDL 变更；Kafka 要保证不丢消息；从写入到失效的耗时也从毫秒级变成秒级，具体取决于部署，必须实测。它适合写入路径多、缓存维度多的团队，不适合两三个写接口的小服务。</p>
+<p>还有一处容易漏：Canal 只知道“哪张表的哪一行变了”。若缓存值是三张表拼出来的，就得维护一张映射，说明哪些表影响哪个 key。这张表往往是方案里最先腐化的部分，要跟着代码一起评审。</p>
+<h2 id="版本号与逻辑过期"><a href="#版本号与逻辑过期" class="headerlink" title="版本号与逻辑过期"></a>版本号与逻辑过期</h2><p>不管是同步删除还是订阅 binlog，最终都要回答：回填时手里的值是不是最新的？版本号把这个判断显式化。</p>
+<p>给每行数据维护一个递增版本（自增的 version 字段，或用更新时间戳代替），读取时把版本一起带出来，回填前先比较缓存里记录的版本：手里的版本更旧，就放弃这次回填。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// fill 回填前校验版本，避免把旧值写回缓存</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">fill</span><span class="params">(ctx context.Context, key <span class="type">string</span>, ver <span class="type">int64</span>, v *Product)</span></span> <span class="type">error</span> &#123;</span><br><span class="line">	cur, err := cache.Get(ctx, key+<span class="string">&quot;:ver&quot;</span>).Int64()</span><br><span class="line">	<span class="keyword">if</span> err == <span class="literal">nil</span> &amp;&amp; cur &gt; ver &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="literal">nil</span> <span class="comment">// 缓存已有更新的版本，放弃本次回填</span></span><br><span class="line">	&#125;</span><br><span class="line">	pipe := cache.TxPipeline()</span><br><span class="line">	pipe.Set(ctx, key+<span class="string">&quot;:ver&quot;</span>, ver, <span class="number">10</span>*time.Minute)</span><br><span class="line">	pipe.Set(ctx, key, v, <span class="number">10</span>*time.Minute)</span><br><span class="line">	_, err = pipe.Exec(ctx)</span><br><span class="line">	<span class="keyword">return</span> err</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>比较与写入要用 Lua 或事务包起来，否则中间仍会被插进一次更新。版本号把“谁先谁后”从时间问题变成大小问题，不再依赖时钟；代价是每次写都要维护版本，读路径多一次判断。</p>
+<p>逻辑过期走的是另一条路：缓存不设 TTL 或设得很长，值内部带一个 expireAt 字段。读到已经逻辑过期的数据时，先把旧值返回给调用方，同时异步刷新。它把失效瞬间的回源压力摊平了，但也明确承认会返回旧值。</p>
+<p>刷新必须只由一个执行者做，常用一把短期分布式锁选主，持有时间短于业务超时，拿不到就放弃，等下次读再触发。锁在这里只是去重工具，不是一致性保证。</p>
+<p>这个取舍很直白：用“可能返回过期数据”换“不会因为失效而抖动”。商品描述、榜单这类能容忍几十秒旧值的读场景可以用；订单状态、库存余额这类字段不适合。</p>
+<h2 id="把窗口量化，再谈方案"><a href="#把窗口量化，再谈方案" class="headerlink" title="把窗口量化，再谈方案"></a>把窗口量化，再谈方案</h2><p>方案之间的差别，说到底是窗口长度和实现成本的差别。以“更新库后删缓存加失败重试”为例，从提交到缓存不再返回旧值，大致经过四段。</p>
+<table>
+<thead>
+<tr>
+<th>组成</th>
+<th>含义</th>
+<th>缩短手段</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>删除耗时</td>
+<td>一次 DEL 的网络往返</td>
+<td>同机房部署、复用连接</td>
+</tr>
+<tr>
+<td>重试等待</td>
+<td>失败到补偿成功的间隔</td>
+<td>提高重试频率、加告警</td>
+</tr>
+<tr>
+<td>主从延迟</td>
+<td>从库追上主库的时间</td>
+<td>关键读走主库、半同步复制</td>
+</tr>
+<tr>
+<td>回填竞态</td>
+<td>旧值回填后再次被清掉</td>
+<td>版本号校验、延迟删除</td>
+</tr>
+</tbody></table>
+<p>这张表要配上真实数据才有意义。可行的做法是在读路径埋点，统计“缓存版本落后于数据库”的请求比例与持续时长，看分布而不是平均值：平均值会被大量正常请求稀释，真正伤人的是尾部那几秒。</p>
+<p>剩下几个坑，几乎每个项目都会踩到其中一个。</p>
+<p>事务边界最常见。提交前删缓存，等于提前告诉别人“可以来回填了”，而新值还不可见，读请求填回去的必然是旧值。删除要挂在提交成功的回调上。</p>
+<p>批量失效要限速。更新上万条后逐条 DEL，或用 KEYS 按前缀扫描，都会占满 Redis 的单线程。应改为 SCAN 分批、控制并发，或合并成一次任务。</p>
+<p>热点 key 与批量失效叠加时最危险：一个被大量读的 key 刚被删，回源会同时涌向数据库。回源保护属于缓存击穿的话题，这里只强调一句：删除策略必须和它配套上线。</p>
+<p>最后是心态。跨两个存储的写不可能强一致，除非永远读主库。接受最终一致，并明确写出“允许多久的不一致”，比在代码里堆技巧有效。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>缓存一致性没有银弹，只有窗口长度和实现成本的权衡。多数系统从“先更新库、提交后删缓存、删除失败进重试队列”起步就够了。需要更短的窗口，再考虑延迟双删、binlog 订阅或版本号校验。无论选哪种，都要把窗口量化出来，并用带 TTL 的兜底守住下限。真正的护城河不是某个技巧，而是“所有写入路径都走同一个失效出口”这条纪律。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>分布式缓存一致性方案</p><p><a href="https://987763485.github.io/2021/02/26/分布式缓存一致性方案/">https://987763485.github.io/2021/02/26/分布式缓存一致性方案/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2021-02-26</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/golang/">golang</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/">微服务</a><a class="link-muted mr-2" rel="tag" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/">后端开发</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2021/03/03/TypeScript%E6%B3%9B%E5%9E%8B%E5%B7%A5%E5%85%B7%E7%B1%BB%E5%9E%8B%E5%AE%9E%E7%8E%B0/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">TypeScript 泛型工具类型实现</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2021/02/21/Rust%E9%94%99%E8%AF%AF%E5%A4%84%E7%90%86%E5%9C%A8%E4%B8%9A%E5%8A%A1%E4%BB%A3%E7%A0%81%E4%B8%AD%E7%9A%84%E7%BB%84%E7%BB%87/"><span class="level-item">Rust 错误处理在业务代码中的组织</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

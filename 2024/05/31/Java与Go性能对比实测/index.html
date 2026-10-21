@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>Java 与 Go 性能对比实测 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="“Java 和 Go 到底谁更快”是我在技术评审里被问过最多、也最难回答的问题。本文把它拆开重做一遍：固定被测运行时版本，设计三类互不覆盖的负载，把指标口径、环境一致性、预热窗口、压测脚本骨架和结果解读框架逐条落实，给出一个既可复现也可被推翻的实验设计。需要提前声明：文中所有数字都是本轮实验口径下的示意值，用来说明”数据长什么样才算讲清楚”，而不是说明”某语言应该有多快”。"><meta property="og:type" content="blog"><meta property="og:title" content="Java 与 Go 性能对比实测"><meta property="og:url" content="https://987763485.github.io/2024/05/31/Java%E4%B8%8EGo%E6%80%A7%E8%83%BD%E5%AF%B9%E6%AF%94%E5%AE%9E%E6%B5%8B/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="“Java 和 Go 到底谁更快”是我在技术评审里被问过最多、也最难回答的问题。本文把它拆开重做一遍：固定被测运行时版本，设计三类互不覆盖的负载，把指标口径、环境一致性、预热窗口、压测脚本骨架和结果解读框架逐条落实，给出一个既可复现也可被推翻的实验设计。需要提前声明：文中所有数字都是本轮实验口径下的示意值，用来说明”数据长什么样才算讲清楚”，而不是说明”某语言应该有多快”。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2024-05-30T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-21T00:24:50.705Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="java"><meta property="article:tag" content="kotlin"><meta property="article:tag" content="flutter"><meta property="article:tag" content="csharp"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2024/05/31/Java%E4%B8%8EGo%E6%80%A7%E8%83%BD%E5%AF%B9%E6%AF%94%E5%AE%9E%E6%B5%8B/"},"headline":"Java 与 Go 性能对比实测","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2024-05-30T16:00:00.000Z","dateModified":"2026-10-21T00:24:50.705Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"“Java 和 Go 到底谁更快”是我在技术评审里被问过最多、也最难回答的问题。本文把它拆开重做一遍：固定被测运行时版本，设计三类互不覆盖的负载，把指标口径、环境一致性、预热窗口、压测脚本骨架和结果解读框架逐条落实，给出一个既可复现也可被推翻的实验设计。需要提前声明：文中所有数字都是本轮实验口径下的示意值，用来说明”数据长什么样才算讲清楚”，而不是说明”某语言应该有多快”。"}</script><link rel="canonical" href="https://987763485.github.io/2024/05/31/Java%E4%B8%8EGo%E6%80%A7%E8%83%BD%E5%AF%B9%E6%AF%94%E5%AE%9E%E6%B5%8B/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2024-05-30T16:00:00.000Z" title="5/31/2024, 12:00:00 AM">2024-05-31</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/">全栈开发</a></span><span class="level-item">1 小时读完 (大约7629个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Java 与 Go 性能对比实测</h1><div class="content"><p>“Java 和 Go 到底谁更快”是我在技术评审里被问过最多、也最难回答的问题。本文把它拆开重做一遍：固定被测运行时版本，设计三类互不覆盖的负载，把指标口径、环境一致性、预热窗口、压测脚本骨架和结果解读框架逐条落实，给出一个既可复现也可被推翻的实验设计。需要提前声明：文中所有数字都是本轮实验口径下的示意值，用来说明”数据长什么样才算讲清楚”，而不是说明”某语言应该有多快”。</p>
+<h2 id="从”谁更快”到”在哪种负载下谁更快”"><a href="#从”谁更快”到”在哪种负载下谁更快”" class="headerlink" title="从”谁更快”到”在哪种负载下谁更快”"></a>从”谁更快”到”在哪种负载下谁更快”</h2><h3 id="这个问题为什么问错了形状"><a href="#这个问题为什么问错了形状" class="headerlink" title="这个问题为什么问错了形状"></a>这个问题为什么问错了形状</h3><p>这个问题难答，不是因为答案藏在细节里，而是问题本身缺了三个必要条件：负载形态、指标口径、资源约束。同一对运行时在这三个条件变动时会给出互相矛盾的排名。CPU 密集的素数筛在 1 个 CPU 配额上可能让 Go 领先，同样负载放到 8 个配额并给足预热后，被 JIT 充分编译过的 Java 热点循环反而更省 CPU 时间；而一个下游容量有限的扇出服务，两者吞吐几乎全由下游决定，运行时差异被压成噪声。把这种必然发生的名次互换压缩成一句”某语言更快”，结论没有行动价值。</p>
+<p>更麻烦的是”快”没有单位。启动快、吞吐高、尾延迟低、每请求 CPU 少、内存占用小是五个不同目标，且经常冲突：为吞吐调大堆，冷启动和内存水位变差；为尾延迟把回收调激进，吞吐和 CPU 开销上升。所以本文不使用”快”这个模糊词，只说”某负载下某指标的观测结果”。</p>
+<h3 id="对比要成立的三个”同”"><a href="#对比要成立的三个”同”" class="headerlink" title="对比要成立的三个”同”"></a>对比要成立的三个”同”</h3><p>本文的实验设计遵循三条纪律，缺一条结果就没有解释力。第一，同一负载形态：两类应用使用同一份请求生成逻辑、同一组请求分布、同一份数据集，业务代码写得等价，而不是各自”惯用写法”的极限优化版本。第二，同一指标口径：要么都看服务端记录的单请求 CPU 时间，要么都看压测端算出的 RPS，不能一边取服务端日志分位、另一边取压测工具的墙钟估计。第三，同一资源约束：两边放进完全相同的容器规格，CPU 限额、内存限额、副本数与网络策略一致。资源约束不等价时，测的是配置而不是语言。</p>
+<h3 id="本篇的范围边界"><a href="#本篇的范围边界" class="headerlink" title="本篇的范围边界"></a>本篇的范围边界</h3><p>有三件事本文不做，以避免与其他专文重复：单一语言内部的调优流程与剖析工具有专文；把既有服务改写为另一语言的迁移决策与步骤不在本文范围，这里只给性能层面的判断；跨语言对比的通用方法论另有专文。goroutine 调度模型的内部机制同样属于并发专文，本文只使用其栈开销与调度粒度的可观测后果。</p>
+<h2 id="被测口径与实验边界"><a href="#被测口径与实验边界" class="headerlink" title="被测口径与实验边界"></a>被测口径与实验边界</h2><h3 id="两侧的版本选择"><a href="#两侧的版本选择" class="headerlink" title="两侧的版本选择"></a>两侧的版本选择</h3><p>Java 侧本轮并行跑两个基线：Java 17 LTS 与 Java 21 LTS。选这两个而不是只取最新，是因为 17 仍是大量存量服务的生产版本，21 LTS 于 2023-09-19 发布，是当时最新的老版本支持线，且虚拟线程在这一版正式可用；把两者放进同一轮，也能直接看到同一种负载在新老 LTS 之间的差别。回收器两侧保持一致，都用当时默认的分区式回收器，ZGC 只在补充实验里单独标注，不与主结论混排。</p>
+<p>Go 侧取 1.22，发布于 2024-02-06，是本文写作当时的稳定版本。1.22 对 <code>for</code> 循环变量语义的变更会影响并发代码，这属于正确性范畴、不改变性能口径，但编写压测客户端时不能沿用旧的闭包捕获写法。两侧都用官方稳定版，不引入预发布构建，也不引入本文日期之后才发布的版本，避免把版本迭代收益误读成语言差异。</p>
+<h3 id="编译与构建口径"><a href="#编译与构建口径" class="headerlink" title="编译与构建口径"></a>编译与构建口径</h3><p>Java 侧用当时主流构建工具产出可执行 jar，启动参数固定后不再调整；Go 侧用标准工具链静态编译为单一二进制，编译目标与基础镜像架构一致。两侧都关闭与实验无关的后台任务：自动扩缩容、链路采样上报、热重载与高频指标打点。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 本轮实验的构建与运行口径（示意，参数不作为性能结论依据）</span></span><br><span class="line"><span class="comment"># Java 侧：固定堆与元空间上限，开启 GC 日志用于观察口径</span></span><br><span class="line">java -Xms2g -Xmx2g -XX:MaxMetaspaceSize=256m \</span><br><span class="line">  -Xlog:gc*:file=/var/log/app/gc.log:<span class="keyword">time</span>,<span class="built_in">uptime</span>:filecount=5,filesize=20m \</span><br><span class="line">  -jar workload.jar</span><br><span class="line"></span><br><span class="line"><span class="comment"># Go 侧：静态编译，运行期通过环境变量对齐容器限额</span></span><br><span class="line">CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o workload ./cmd/workload</span><br></pre></td></tr></table></figure>
+
+<p>判定”同一负载”要看请求语义、数据分布与失败语义三件事是否一致，而不是看代码行数是否接近：三件都对齐之后，差异才有资格被归因到运行时，否则一侧仅因重试更激进就显得”吞吐更高”，那属于配置差异。</p>
+<h2 id="负载设计：三类负载各自考验什么"><a href="#负载设计：三类负载各自考验什么" class="headerlink" title="负载设计：三类负载各自考验什么"></a>负载设计：三类负载各自考验什么</h2><h3 id="CPU-密集：考验稳态计算效率"><a href="#CPU-密集：考验稳态计算效率" class="headerlink" title="CPU 密集：考验稳态计算效率"></a>CPU 密集：考验稳态计算效率</h3><p>第一类负载做纯粹的计算，取三小项：一定区间内的素数筛选、小规模矩阵乘法、把固定结构的对象图序列化成 JSON 再反序列化回来。三项各有用意：素数筛循环体极简、几乎不产生垃圾，考验热点代码编译后的机器码质量；矩阵乘法有可观的数组访问压力，考验内存层次与边界检查开销；JSON 序列化同时考验对象布局访问、字符串处理与临时对象分配，是业务服务里最常见的 CPU 消耗形态。</p>
+<p>这一类负载上，结构性差异集中在编译模型：Java 的解释执行与分层编译意味着同一段代码在进程生命周期内的效率是变化的，未预热的数据不能代表稳态；Go 在构建期就产出机器码，进程一启动就是最终形态。第二个差异是分配与回收压力：Java 侧短命对象回收成本很低，Go 侧取决于逃逸分析结果，同样写法在两侧可能有不同量级的分配压力。</p>
+<h3 id="IO-密集：考验并发成本与排队"><a href="#IO-密集：考验并发成本与排队" class="headerlink" title="IO 密集：考验并发成本与排队"></a>IO 密集：考验并发成本与排队</h3><p>第二类负载自己几乎不计算，收到请求后向一个受控下游发起一到两次调用，把结果简单聚合后输出。下游用同语言的桩服务模拟，延迟分布固定，并明确限制总容量，使瓶颈可以按设计出现在下游、也可能出现在被测服务。这一类考验并发连接的代价与排队行为：每个进行中的请求占多少内存、多少句柄、调度上要等多久。</p>
+<p>结构性差异在这里最直观。Go 的并发单元起步栈很小、按需增长，创建与销毁成本低，高并发下能把大量进行中的请求保持在内存里而不让资源曲线急剧上升。Java 17 这条线上每个进行中的请求通常对应一个平台线程，线程栈是固定成本，常见做法是线程池加异步非阻塞客户端，把”并发度”与”线程数”解耦；Java 21 的虚拟线程提供了另一种解法，后面单独讨论。</p>
+<h3 id="混合负载：考验真实服务的耦合效应"><a href="#混合负载：考验真实服务的耦合效应" class="headerlink" title="混合负载：考验真实服务的耦合效应"></a>混合负载：考验真实服务的耦合效应</h3><p>第三类负载是带本地缓存的 HTTP 服务：命中缓存时走一段真实的序列化与少量计算，未命中时查数据库并写回缓存。它把前两类揉在一起，也最接近一般业务服务。设计目的是观察 CPU 压力、内存水位与 IO 等待互相掩盖的能力：命中率从示意值区间高端滑向低端时，两个运行时的吞吐曲线都会变形，但变形的位置和形状不一定相同。</p>
+<table>
+<thead>
+<tr>
+<th>负载类型</th>
+<th>主要考验点</th>
+<th>Java 侧敏感因素</th>
+<th>Go 侧敏感因素</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>素数与矩阵</td>
+<td>稳态机器码质量、边界检查</td>
+<td>预热是否充分、堆大小与回收</td>
+<td>循环写法产生的分配、CPU 配额</td>
+</tr>
+<tr>
+<td>JSON 序列化</td>
+<td>对象布局访问与临时分配</td>
+<td>分配速率触发回收的频率</td>
+<td>逃逸分析与缓冲区复用</td>
+</tr>
+<tr>
+<td>下游 RPC 扇出</td>
+<td>每请求并发成本</td>
+<td>线程模型与客户端是否非阻塞</td>
+<td>每并发单元栈开销与调度</td>
+</tr>
+<tr>
+<td>带缓存的 HTTP 服务</td>
+<td>三类压力耦合</td>
+<td>命中率变化时的堆水位与回收</td>
+<td>命中率变化时的分配与回收联动</td>
+</tr>
+</tbody></table>
+<h2 id="指标口径：把”快”拆成可测量的量"><a href="#指标口径：把”快”拆成可测量的量" class="headerlink" title="指标口径：把”快”拆成可测量的量"></a>指标口径：把”快”拆成可测量的量</h2><h3 id="六个必须同时记录的指标"><a href="#六个必须同时记录的指标" class="headerlink" title="六个必须同时记录的指标"></a>六个必须同时记录的指标</h3><p>本轮实验固定采集六项，缺一不可。吞吐用压测端统计的每秒完成请求数 RPS，只在采样窗口内统计，并按并发档位分别记录。延迟记录 P50、P99 与 P99.9 三个分位，来源是服务端为每个请求记录的处理耗时，而不是压测端看到的响应时间，两者只在没有排队时近似相等。单请求 CPU 时间由进程累计 CPU 时间除以完成请求数得到，这是最容易解释、也最不容易被机器抖动污染的一项。内存记录常驻内存 RSS 峰值，并同时记录它与容器限额的比值。冷启动与预热时间取进程启动到首次达到稳定吞吐的中点。错误率按请求记录，分成超时、连接类错误与被下游限流三类。</p>
+<h3 id="为什么-P99-不能取多次采样的平均值"><a href="#为什么-P99-不能取多次采样的平均值" class="headerlink" title="为什么 P99 不能取多次采样的平均值"></a>为什么 P99 不能取多次采样的平均值</h3><p>这是评审里最常见的一个方法错误：跑三轮压测，把三轮的 P99 相加除以三，报告”平均 P99”。分位数不是可加的量，它依赖整个样本集合的排序位置。三轮各有各的样本分布，取平均等于预设三次的尾部分布同形，而这恰恰是要检验的东西。更要命的是，尾部对极端值的出现次数极为敏感，平均会把”偶尔出现的尾巴”抹平成看起来稳定的数字。</p>
+<p>正确做法是把同一档位所有轮次的原始单请求耗时合并成一个样本池，在池上计算分位；至少也要按轮次分别报告，并说明轮次间的离散程度。P99.9 更极端，样本量不足时它没有统计意义，所以采样窗口必须保证尾部有足够事件数，且不要用只支持平均与最大值的直方图粗桶去推算尾分位。此外，单请求 CPU 时间乘上目标吞吐得到的所需总 CPU 量才是决定副本数的依据，RSS 只有除以容器限额之后才有意义，换算过程要写进报告，避免读者拿孤立数字做判断。</p>
+<h2 id="环境一致性：把噪声压到可解释的范围"><a href="#环境一致性：把噪声压到可解释的范围" class="headerlink" title="环境一致性：把噪声压到可解释的范围"></a>环境一致性：把噪声压到可解释的范围</h2><h3 id="硬件与调度层面"><a href="#硬件与调度层面" class="headerlink" title="硬件与调度层面"></a>硬件与调度层面</h3><p>同一对负载必须在同一台物理机器上跑，而不是两台”配置相同”的云主机：宿主负载、云盘性能与网络抖动都会进入结果。能绑核就绑核，被测服务限制在固定核集合，压测进程使用另一组核，两者不重叠。CPU 频率调节要么显式关闭，要么把调节策略记进报告，因为它会让前后段采样处在不同频率上。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">&#123;% raw %&#125;</span><br><span class="line"><span class="comment"># 环境与限额一致性检查（示意命令，输出不作为结论）</span></span><br><span class="line"><span class="built_in">nproc</span> &amp;&amp; <span class="built_in">cat</span> /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor</span><br><span class="line">swapoff -a 2&gt;/dev/null || <span class="built_in">echo</span> <span class="string">&quot;需 root 或改用容器内存限额&quot;</span></span><br><span class="line"><span class="comment"># 记录内核、容器运行时与宿主负载，两侧必须完全相同</span></span><br><span class="line"><span class="built_in">uname</span> -r &amp;&amp; docker version --format <span class="string">&#x27;&#123;&#123;.Server.Version&#125;&#125;&#x27;</span></span><br><span class="line">&#123;% endraw %&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="运行时参数与容器限额必须对齐"><a href="#运行时参数与容器限额必须对齐" class="headerlink" title="运行时参数与容器限额必须对齐"></a>运行时参数与容器限额必须对齐</h3><p>这是最容易失真的地方：给 Java 一个大内存容器却不设堆上限，或给 Go 一个 CPU 限额却不让可用并行度与之匹配。本轮把两侧都对齐到同一个容器规格，规格数值是团队约定示例，不是推荐值。</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 两侧共用的容器规格（团队约定示例，非推荐值）</span></span><br><span class="line"><span class="attr">resources:</span></span><br><span class="line">  <span class="attr">requests:</span></span><br><span class="line">    <span class="attr">cpu:</span> <span class="string">&quot;2&quot;</span></span><br><span class="line">    <span class="attr">memory:</span> <span class="string">&quot;2Gi&quot;</span></span><br><span class="line">  <span class="attr">limits:</span></span><br><span class="line">    <span class="attr">cpu:</span> <span class="string">&quot;2&quot;</span></span><br><span class="line">    <span class="attr">memory:</span> <span class="string">&quot;2Gi&quot;</span></span><br><span class="line"><span class="attr">env:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">GOMAXPROCS</span>    <span class="comment"># Go 侧与 CPU 限额对齐</span></span><br><span class="line">    <span class="attr">value:</span> <span class="string">&quot;2&quot;</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">GOMEMLIMIT</span>    <span class="comment"># Go 侧内存上限提示，留出非堆开销</span></span><br><span class="line">    <span class="attr">value:</span> <span class="string">&quot;1800MiB&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>Java 侧对应的做法是把堆上限设为容器限额减去元空间、线程栈、直接缓冲区与运行时自身开销之后的值，两侧都在启动脚本里断言实际读到的限额，不一致就拒绝启动，避免配置漂移污染整轮数据。</p>
+<h3 id="压测端自耗与其他干扰"><a href="#压测端自耗与其他干扰" class="headerlink" title="压测端自耗与其他干扰"></a>压测端自耗与其他干扰</h3><p>压测端与被测服务同机时，压测进程自己消耗 CPU 与页缓存，档位越高污染越重，尾延迟里会混入压测线程被抢占的时间。本轮把压测端放在同机另一组核上，并在高档位单独记录其 CPU 占用作为质量检查项。此外还要固定日志级别与输出目标（调试级日志足以改变结果）、指标导出频率、时钟同步方式、是否开启透明大页、宿主监控代理，以及数据集是否已进过页缓存。</p>
+<h2 id="预热与采样窗口：先约定时间线再谈数据"><a href="#预热与采样窗口：先约定时间线再谈数据" class="headerlink" title="预热与采样窗口：先约定时间线再谈数据"></a>预热与采样窗口：先约定时间线再谈数据</h2><h3 id="两类预热的不平等"><a href="#两类预热的不平等" class="headerlink" title="两类预热的不平等"></a>两类预热的不平等</h3><p>Java 的分层编译意味着同一段字节码在运行初期被解释执行、随后逐层编译为优化机器码，还要经过反优化与重新编译，启动后的前一段时间里吞吐与单请求 CPU 时间都在爬升。Go 没有编译带来的爬升，但依然有自己的预热：到下游与数据库的连接池要建立，DNS 与路由缓存要生效，页缓存里要有数据集，回收器也要按实际分配速率扩缩到工作堆大小。所以”预热”不是对 Java 的照顾，而是对两侧的公平：两侧使用同样的预热时长与预热流量，期间数据一律丢弃，不参与统计。</p>
+<h3 id="时间线设计"><a href="#时间线设计" class="headerlink" title="时间线设计"></a>时间线设计</h3><pre class="mermaid">flowchart LR
+    A[启动与配置断言] --> B[预热流量 固定时长]
+    B --> C[稳态确认 吞吐斜率趋平]
+    C --> D[采样窗口 每档位固定时长]
+    D --> E[冷却间隔]
+    E --> F[下一并发档位]</pre>
+
+<p>判定”可以开始采样”要有客观条件，而不是靠人眼看曲线顺眼。本轮做法是：连续若干个小时间片内吞吐的相对变化都落在阈值以内才算进入稳态，阈值按团队约定示例给出。采样窗口要覆盖足够多请求，让 P99.9 有样本支撑；档位之间插入冷却间隔，避免上一档位遗留的排队与回收压力渗进下一档。每个档位至少重复三轮，且每轮重新部署进程，而不是在同一进程上连续换档。</p>
+<h2 id="压测脚本骨架与并发档位扫描"><a href="#压测脚本骨架与并发档位扫描" class="headerlink" title="压测脚本骨架与并发档位扫描"></a>压测脚本骨架与并发档位扫描</h2><h3 id="压力生成思路"><a href="#压力生成思路" class="headerlink" title="压力生成思路"></a>压力生成思路</h3><p>压测器选一个能固定并发连接数、又能逐请求记录耗时的工具即可。常见思路有两类：wrk 这类常驻连接加固定并发的模式，适合找拐点；vegeta 这类按目标速率投递的模式，适合验容量。本轮三类负载都用前者，因为它直接对应选型时关心的问题：给定资源约束，这个服务能吃下多少并发。</p>
+<p>关键是不能只拿工具汇总的平均值，必须保留逐请求耗时。工具汇总常有两个坑：把连接建立与排队算进延迟却不区分；存在协调遗漏，即慢响应期间该发的请求没有发出，导致尾部被系统性低估。缓解方式是按固定节奏发起，把未发出的时刻记为错过的事件，或者在服务端独立记录到达时间。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Go 侧压测客户端骨架：固定并发间隔发起请求，逐请求记录耗时（示意片段）</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">fire</span><span class="params">(url <span class="type">string</span>, interval time.Duration, lat <span class="keyword">chan</span>&lt;- time.Duration)</span></span> &#123;</span><br><span class="line">    client := &amp;http.Client&#123;Timeout: <span class="number">800</span> * time.Millisecond&#125;</span><br><span class="line">    <span class="keyword">for</span> start := time.Now(); ; start += interval &#123;</span><br><span class="line">        t0 := time.Now()</span><br><span class="line">        resp, _ := client.Get(url)</span><br><span class="line">        <span class="keyword">if</span> resp != <span class="literal">nil</span> &#123;</span><br><span class="line">            resp.Body.Close()</span><br><span class="line">        &#125;</span><br><span class="line">        lat &lt;- time.Since(t0) <span class="comment">// 失败也入池，避免尾部样本被丢弃</span></span><br><span class="line">        time.Sleep(time.Until(start.Add(interval)))</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Java 侧压测客户端骨架：同一档位、同一超时口径（需 import java.net.http.*）</span></span><br><span class="line"><span class="keyword">static</span> <span class="keyword">final</span> <span class="type">HttpClient</span> <span class="variable">CLIENT</span> <span class="operator">=</span> HttpClient.newBuilder()</span><br><span class="line">        .connectTimeout(Duration.ofMillis(<span class="number">300</span>)).build();</span><br><span class="line"><span class="keyword">static</span> <span class="keyword">final</span> <span class="type">HttpRequest</span> <span class="variable">REQ</span> <span class="operator">=</span> HttpRequest.newBuilder(URI.create(URL))</span><br><span class="line">        .timeout(Duration.ofMillis(<span class="number">800</span>)).GET().build();</span><br><span class="line"></span><br><span class="line"><span class="keyword">static</span> <span class="type">long</span> <span class="title function_">fireOnce</span><span class="params">()</span> <span class="keyword">throws</span> Exception &#123;</span><br><span class="line">    <span class="type">long</span> <span class="variable">t0</span> <span class="operator">=</span> System.nanoTime();</span><br><span class="line">    CLIENT.send(REQ, HttpResponse.BodyHandlers.discarding());</span><br><span class="line">    <span class="keyword">return</span> Duration.ofNanos(System.nanoTime() - t0).toMillis();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="档位的设置与扫描"><a href="#档位的设置与扫描" class="headerlink" title="档位的设置与扫描"></a>档位的设置与扫描</h3><p>本轮使用 8、32、128、512 四个示意档位：8 观察低并发下的单请求成本，此时差异更接近运行时固有开销；32 观察线程池或调度器开始承载并发的时刻；128 让 IO 型负载进入下游受限区间；512 暴露高并发下的每请求并发成本，而且常常是内存水位先出问题。扫描顺序从低到高、每档重新部署，并补一次反向扫描检查顺序偏差：正反差异明显说明采样窗口有问题，应该回到时间线而不是修改数据。</p>
+<h2 id="结果呈现：看趋势和拐点，不看单点谁快"><a href="#结果呈现：看趋势和拐点，不看单点谁快" class="headerlink" title="结果呈现：看趋势和拐点，不看单点谁快"></a>结果呈现：看趋势和拐点，不看单点谁快</h2><h3 id="一张负载与指标的汇总表"><a href="#一张负载与指标的汇总表" class="headerlink" title="一张负载与指标的汇总表"></a>一张负载与指标的汇总表</h3><p>下表的数值列全部是本轮实验口径下的示意值，用来说明报告应该长什么样，不构成基准结论：换负载形态、换数据集、换机器规格，趋势都可能反转。</p>
+<table>
+<thead>
+<tr>
+<th>负载类型</th>
+<th>指标</th>
+<th>Java 17</th>
+<th>Java 21</th>
+<th>Go 1.22</th>
+<th>观察结论（示意）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>素数筛</td>
+<td>单请求 CPU 时间</td>
+<td>示意值 A</td>
+<td>与 A 同量级</td>
+<td>未预热时更优</td>
+<td>预热充分后差距缩小到噪声区间</td>
+</tr>
+<tr>
+<td>JSON 序列化</td>
+<td>P99</td>
+<td>示意值 B</td>
+<td>与 B 同量级、离散更小</td>
+<td>冷启动阶段更平稳</td>
+<td>差异主要来自分配速率与回收节奏</td>
+</tr>
+<tr>
+<td>下游 RPC 扇出</td>
+<td>吞吐 RPS</td>
+<td>受下游容量限制</td>
+<td>受下游容量限制</td>
+<td>受下游容量限制</td>
+<td>档位越高越趋同，运行时差异被掩盖</td>
+</tr>
+<tr>
+<td>带缓存服务</td>
+<td>P99.9</td>
+<td>命中率下滑时抬升</td>
+<td>同左</td>
+<td>同左</td>
+<td>关注拐点出现在哪个命中率</td>
+</tr>
+</tbody></table>
+<h3 id="报告里必须出现的三类图"><a href="#报告里必须出现的三类图" class="headerlink" title="报告里必须出现的三类图"></a>报告里必须出现的三类图</h3><p>第一类是吞吐随档位变化的曲线，两侧叠画，看拐点落在哪个档位；第二类是尾延迟随档位变化的曲线，它常比吞吐更早暴露排队与回收互相放大的区间；第三类是资源归因图，把单请求 CPU 时间、RSS 与限额比值、错误率并排在同一档位轴上，让读者看到这个吞吐是用什么换来的。写结论只描述形状、拐点与离散程度，不做跨轮次名次宣布；任何”某侧更快”都要附带负载、档位、预热与硬件四个限定条件。</p>
+<h2 id="停顿与垃圾回收：只写观察口径"><a href="#停顿与垃圾回收：只写观察口径" class="headerlink" title="停顿与垃圾回收：只写观察口径"></a>停顿与垃圾回收：只写观察口径</h2><h3 id="观察入口两侧不同，但要换算到同一口径"><a href="#观察入口两侧不同，但要换算到同一口径" class="headerlink" title="观察入口两侧不同，但要换算到同一口径"></a>观察入口两侧不同，但要换算到同一口径</h3><p>Java 侧入口是回收日志：记下每次回收的暂停时间与时间戳，与同时间轴的单请求耗时对齐，看尾部抬升能否落到回收事件上、哪一类回收事件与尾延迟相关。Go 侧没有同形态日志，本轮通过运行时暴露的指标接口读取回收周期的暂停分布与堆增长趋势。两侧最终换算成同一个问题：尾延迟里有多大比例能与回收事件建立时间对应关系。</p>
+<p>有个说法需要纠正：Go 的回收并不是没有停顿。它用三色标记并发推进，大部分标记工作与用户代码同时进行，但标记起止阶段需要所有正在执行的并发单元参与协调，这段时间极短，仍然是对全部并发单元的协助式停顿。说成”零停顿”或断言某个具体毫秒数都不准确；能说的是它被设计成把单次停顿压得很短，代价由并发单元协助承担。Java 侧同样是并发阶段与短暂停顿的组合，两侧比较必须建立在如何测量一致之上，而不是宣传口径上。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 观察入口（示意）：Java 侧回收日志与 Go 侧运行时指标的采集起点</span></span><br><span class="line"><span class="comment"># Java：启动参数已在前面给出，重点是把日志时间轴与请求日志对齐</span></span><br><span class="line"><span class="comment"># Go：读取进程导出的运行时指标序列，关注回收周期暂停与堆目标的变化</span></span><br><span class="line">curl -s http://127.0.0.1:6060/debug/vars | <span class="built_in">head</span> -20</span><br></pre></td></tr></table></figure>
+
+<h3 id="调参数是为了看敏感度，不是为了找最优值"><a href="#调参数是为了看敏感度，不是为了找最优值" class="headerlink" title="调参数是为了看敏感度，不是为了找最优值"></a>调参数是为了看敏感度，不是为了找最优值</h3><p>本轮刻意做参数敏感度实验：Java 侧改堆大小，Go 侧改回收触发阈值与内存上限提示，看同一负载下尾延迟与吞吐如何移动。目的不是挑一个最好看的配置，而是回答这个结论离最优配置有多远——名次在参数小幅移动后就反转，它就不该被写成结论。单语言内部如何系统调优有专门文章，本文不重复那套流程。</p>
+<h2 id="内存与部署形态：三条常见结论各自的反例"><a href="#内存与部署形态：三条常见结论各自的反例" class="headerlink" title="内存与部署形态：三条常见结论各自的反例"></a>内存与部署形态：三条常见结论各自的反例</h2><h3 id="三条常见说法与它们的翻转条件"><a href="#三条常见说法与它们的翻转条件" class="headerlink" title="三条常见说法与它们的翻转条件"></a>三条常见说法与它们的翻转条件</h3><p>第一条，Go 的产物是单一二进制、镜像小、冷启动快：这在形态上成立、不必实测，但启动时要加载大数据集或预热大量连接时，进程时间被数据加载与依赖握手主导，Java 侧若已提前加载，两者启动时间可能拉平。第二条，Java 启动慢但稳态吞吐高：若流量是短时突发后长期空闲，进程进不了充分编译的稳态；容器内存限额逼得紧时，稳态吞吐也会被回收频率拉下来。第三条，Go 的常驻内存通常更低：工作集很大且大量长期存活时，紧凑对象布局的优势被分配器与元数据开销抵掉，RSS 差距缩小甚至反转。</p>
+<p>这一节真正能说的是：部署形态的差异是结构性的、可按定义确认；内存与启动的差距是条件性的、必须按负载重测，把两者混进同一条结论是这类对比最常犯的错误。</p>
+<h2 id="虚拟线程：改了成本模型，不是免费并发"><a href="#虚拟线程：改了成本模型，不是免费并发" class="headerlink" title="虚拟线程：改了成本模型，不是免费并发"></a>虚拟线程：改了成本模型，不是免费并发</h2><p>Java 21 的虚拟线程削弱了 IO 密集并发里”每个等待中的请求占一个平台线程”这项固定成本：阻塞不再长期霸占载体线程，同一份资源约束下能同时挂起的请求数显著提高。这在本次扇出负载上可观察，但它改的是成本模型而不是计算速度——CPU 密集负载里几乎没有等待可摊薄，虚拟线程基本不带来收益。</p>
+<p>更要紧的是，把档位从 128 推到 512 时，若下游容量本身就那么大，多出的并发只会变成下游队列与自身超时，吞吐不再上升、错误率反而抬升。所以本轮把三项保护与虚拟线程同时开启：到每个下游的并发上限、每请求超时预算、入口侧速率控制。缺一项，测到的就是”把压力转移给下游之后的假高吞吐”。同样基于这个理由，本报告拒绝给出”虚拟线程让 Java 与 Go 在并发上等价”这类结论：机制相似，但依赖治理与既有代码的阻塞习惯差别很大，只能按具体服务测。</p>
+<h2 id="选型判断与结论边界"><a href="#选型判断与结论边界" class="headerlink" title="选型判断与结论边界"></a>选型判断与结论边界</h2><table>
+<thead>
+<tr>
+<th>情形</th>
+<th>倾向</th>
+<th>判断依据（非性能结论）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>已有大量服务端代码、治理体系与中间件围绕既有框架构建</td>
+<td>Java 线</td>
+<td>迁移成本与治理资产的价值远大于运行时差异</td>
+</tr>
+<tr>
+<td>团队长期以该语言招聘与培养，代码评审与规范成熟</td>
+<td>保持原语言</td>
+<td>组织熟练度是性能之外的第一变量</td>
+</tr>
+<tr>
+<td>新建轻量网关、代理、边车、CLI 与短生命周期进程</td>
+<td>Go 线</td>
+<td>产物形态、启动与内存结构更契合这类进程</td>
+</tr>
+<tr>
+<td>稳态高吞吐的复杂计算或重度依赖成熟生态的服务</td>
+<td>Java 线</td>
+<td>预热后的稳态表现与生态成熟度</td>
+</tr>
+<tr>
+<td>瓶颈在慢查询、下游容量或数据访问路径的服务</td>
+<td>都别换语言</td>
+<td>换语言不会移动真正的瓶颈</td>
+</tr>
+</tbody></table>
+<p>最后一条是本篇最重要的反直觉结论：多数业务服务的性能问题出在依赖与数据访问上——一个缺索引的查询、一次未合并的循环调用、一个容量不足的下游，代价远超两种运行时在同一负载上的差距。本轮实验中 IO 密集负载在高并发档位下两侧吞吐趋同，瓶颈已经落到下游容量上，这就是”换语言解决不了排队”的直接体现。反过来，若测出的差异能被一行索引或一处批量调用抹平，它就不该作为选型理由。换负载、换硬件、换依赖拓扑，结论都会变，这是本篇所有示意值的共同限定。</p>
+<h2 id="对比实验自查清单"><a href="#对比实验自查清单" class="headerlink" title="对比实验自查清单"></a>对比实验自查清单</h2><ul>
+<li>两侧是否同机、同容器规格、同核集合且与压测端不重叠？</li>
+<li>Java 堆与 Go 的内存上限提示是否都按同一容器限额推导？</li>
+<li>请求语义、数据分布与失败语义三项是否逐条对齐？</li>
+<li>预热窗口是否两侧等长，预热数据是否全部丢弃？</li>
+<li>P99 与 P99.9 是否在合并后的原始样本池上计算？</li>
+<li>是否保留逐请求耗时并检查了协调遗漏与压测端自耗？</li>
+<li>每个名次是否附带负载、档位、预热与硬件四个限定条件？</li>
+<li>是否至少做过一次参数敏感度与一次反向档位扫描？</li>
+</ul>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>本文把”Java 还是 Go 快”改写成可复现的实验设计：固定版本口径，三类负载分别考验稳态计算、并发等待与混合耦合，六个指标代替模糊的”快”，再用环境一致性清单、预热时间线、档位扫描与汇总表把结果约束在可解释范围内。停顿与内存两节给出的是观察入口和翻转条件，不构成数字结论；虚拟线程一节强调的是它改了成本模型而非计算速度，且必须与限流、超时一起评估。真正该带走的是方法论：多数服务瓶颈在依赖与数据访问上，别把跨语言改写当性能方案。换负载与换硬件，结论会变——这句话不是免责，而是本篇唯一希望读者记住的东西。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li>OpenJDK 官方站点的 Java 发布版本说明与垃圾回收日志文档页面</li>
+<li>Go 官方站点的 Go 1.22 发布说明、运行时指标包与执行追踪相关页面</li>
+<li>容器运行时关于 CPU 与内存限额的官方文档页面</li>
+<li>常用 HTTP 压测工具主页及其逐请求统计选项说明</li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>Java 与 Go 性能对比实测</p><p><a href="https://987763485.github.io/2024/05/31/Java与Go性能对比实测/">https://987763485.github.io/2024/05/31/Java与Go性能对比实测/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2024-05-31</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-21</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/java/">java</a><a class="link-muted mr-2" rel="tag" href="/tags/kotlin/">kotlin</a><a class="link-muted mr-2" rel="tag" href="/tags/flutter/">flutter</a><a class="link-muted mr-2" rel="tag" href="/tags/csharp/">csharp</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2024/06/05/Flutter%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA%E4%B8%8EWidget%E4%BD%93%E7%B3%BB/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Flutter 环境搭建与 Widget 体系</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2024/05/29/Java%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8BJUC%E6%A0%B8%E5%BF%83/"><span class="level-item">Java 并发编程：JUC 核心</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>TCP 连接状态与排障 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="线上排障时，ss -tan 或 netstat -ant 输出的那一列状态，往往比任何日志都更早暴露问题：CLOSE_WAIT 持续上涨意味着应用忘了关连接，SYN_RECV 堆积意味着握手没走完，TIME_WAIT 铺满则可能把可用端口耗尽。本文从 TCP 的十一种状态出发，把三次握手、四次挥手、backlog 队列、TIME_WAIT 与 CLOSE_WAIT 放回同一张状态机里解释，再落到"><meta property="og:type" content="blog"><meta property="og:title" content="TCP 连接状态与排障"><meta property="og:url" content="https://987763485.github.io/2020/09/14/TCP%E8%BF%9E%E6%8E%A5%E7%8A%B6%E6%80%81%E4%B8%8E%E6%8E%92%E9%9A%9C/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="线上排障时，ss -tan 或 netstat -ant 输出的那一列状态，往往比任何日志都更早暴露问题：CLOSE_WAIT 持续上涨意味着应用忘了关连接，SYN_RECV 堆积意味着握手没走完，TIME_WAIT 铺满则可能把可用端口耗尽。本文从 TCP 的十一种状态出发，把三次握手、四次挥手、backlog 队列、TIME_WAIT 与 CLOSE_WAIT 放回同一张状态机里解释，再落到"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2020-09-14T09:17:27.000Z"><meta property="article:modified_time" content="2026-10-18T15:05:16.193Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="网络安全"><meta property="article:tag" content="计算机网络"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2020/09/14/TCP%E8%BF%9E%E6%8E%A5%E7%8A%B6%E6%80%81%E4%B8%8E%E6%8E%92%E9%9A%9C/"},"headline":"TCP 连接状态与排障","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2020-09-14T09:17:27.000Z","dateModified":"2026-10-18T15:05:16.193Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"线上排障时，ss -tan 或 netstat -ant 输出的那一列状态，往往比任何日志都更早暴露问题：CLOSE_WAIT 持续上涨意味着应用忘了关连接，SYN_RECV 堆积意味着握手没走完，TIME_WAIT 铺满则可能把可用端口耗尽。本文从 TCP 的十一种状态出发，把三次握手、四次挥手、backlog 队列、TIME_WAIT 与 CLOSE_WAIT 放回同一张状态机里解释，再落到"}</script><link rel="canonical" href="https://987763485.github.io/2020/09/14/TCP%E8%BF%9E%E6%8E%A5%E7%8A%B6%E6%80%81%E4%B8%8E%E6%8E%92%E9%9A%9C/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2020-09-14T09:17:27.000Z" title="9/14/2020, 5:17:27 PM">2020-09-14</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a></span><span class="level-item">1 小时读完 (大约8307个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">TCP 连接状态与排障</h1><div class="content"><p>线上排障时，<code>ss -tan</code> 或 <code>netstat -ant</code> 输出的那一列状态，往往比任何日志都更早暴露问题：CLOSE_WAIT 持续上涨意味着应用忘了关连接，SYN_RECV 堆积意味着握手没走完，TIME_WAIT 铺满则可能把可用端口耗尽。本文从 TCP 的十一种状态出发，把三次握手、四次挥手、backlog 队列、TIME_WAIT 与 CLOSE_WAIT 放回同一张状态机里解释，再落到 <code>ss</code>、<code>netstat -s</code>、<code>nstat</code> 与 <code>tcpdump</code> 的读法，以及一套按症状排查的流程。读者读完应当能做到：看到一个状态数字，先判断它是正常相位还是故障信号，再决定查内核参数、查应用代码还是查中间设备。</p>
+<h2 id="十一种状态：一张状态机的地图"><a href="#十一种状态：一张状态机的地图" class="headerlink" title="十一种状态：一张状态机的地图"></a>十一种状态：一张状态机的地图</h2><p>TCP 是面向连接的协议，但“连接”在内核里不是一根实在的线，而是一对套接字加上一组状态。双方各自维护状态，同一时刻两边看到的并不总是一致：一端停在 FIN_WAIT_2 时，另一端很可能在 CLOSE_WAIT。排障的第一步，是接受“状态永远是单边的”，再学着从一侧推断另一侧。</p>
+<p>RFC 793 定义了十一条状态，之后的实现基本没有增删。按生命周期可以分成三组：建立前、传输中、关闭中。</p>
+<table>
+<thead>
+<tr>
+<th>状态</th>
+<th>含义</th>
+<th>通常谁停在这里</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CLOSED</td>
+<td>没有任何连接的初始与终结状态</td>
+<td>双方</td>
+</tr>
+<tr>
+<td>LISTEN</td>
+<td>被动打开，等待对端 SYN</td>
+<td>服务端</td>
+</tr>
+<tr>
+<td>SYN_SENT</td>
+<td>已发出 SYN，等待 SYN+ACK</td>
+<td>客户端</td>
+</tr>
+<tr>
+<td>SYN_RECV</td>
+<td>已收到 SYN 并回了 SYN+ACK，等待最后一个 ACK</td>
+<td>服务端</td>
+</tr>
+<tr>
+<td>ESTABLISHED</td>
+<td>双向可收发数据，正常传输态</td>
+<td>双方</td>
+</tr>
+<tr>
+<td>FIN_WAIT_1</td>
+<td>已发出 FIN，等待对端 ACK</td>
+<td>主动关闭方</td>
+</tr>
+<tr>
+<td>FIN_WAIT_2</td>
+<td>已收到对自己 FIN 的 ACK，等待对方的 FIN</td>
+<td>主动关闭方</td>
+</tr>
+<tr>
+<td>CLOSE_WAIT</td>
+<td>已收到对端 FIN 并回 ACK，等待本端应用调用 close</td>
+<td>被动关闭方</td>
+</tr>
+<tr>
+<td>CLOSING</td>
+<td>双方几乎同时发 FIN，各自等待对方的 ACK</td>
+<td>双方（少见）</td>
+</tr>
+<tr>
+<td>LAST_ACK</td>
+<td>本端应用已 close 并发出 FIN，等待最后一个 ACK</td>
+<td>被动关闭方</td>
+</tr>
+<tr>
+<td>TIME_WAIT</td>
+<td>主动关闭方收到对端 FIN 并回 ACK 后，等待 2MSL</td>
+<td>主动关闭方</td>
+</tr>
+</tbody></table>
+<p>把这十一条串起来，就是下面这张迁移图。图中省略了异常路径（收到 RST 直接回 CLOSED），只保留正常握手、正常挥手与同时关闭三条主线。</p>
+<pre class="mermaid">flowchart TD
+    CLOSED -->|被动打开| LISTEN
+    CLOSED -->|主动打开 发 SYN| SYN_SENT
+    LISTEN -->|收到 SYN 回 SYN+ACK| SYN_RECV
+    SYN_SENT -->|收到 SYN+ACK 回 ACK| ESTABLISHED
+    SYN_RECV -->|收到 ACK| ESTABLISHED
+    ESTABLISHED -->|应用 close 发 FIN| FIN_WAIT_1
+    ESTABLISHED -->|收到 FIN 回 ACK| CLOSE_WAIT
+    FIN_WAIT_1 -->|收到 ACK| FIN_WAIT_2
+    FIN_WAIT_1 -->|收到 FIN 回 ACK| CLOSING
+    FIN_WAIT_1 -->|收到 FIN+ACK| TIME_WAIT
+    FIN_WAIT_2 -->|收到 FIN 回 ACK| TIME_WAIT
+    CLOSING -->|收到 ACK| TIME_WAIT
+    CLOSE_WAIT -->|应用 close 发 FIN| LAST_ACK
+    LAST_ACK -->|收到 ACK| CLOSED
+    TIME_WAIT -->|2MSL 超时| CLOSED</pre>
+
+<p>图里有两条容易忽略的边。ESTABLISHED 可以直奔 CLOSE_WAIT：被动关闭方收到 FIN 并不经过 FIN_WAIT 系列，只是标记“对端不再发数据”，本端仍可发。FIN_WAIT_1 也能直奔 TIME_WAIT：对端的 FIN 与自身 FIN 的 ACK 合并到达时，就省掉了 FIN_WAIT_2 这一站。</p>
+<p>初学者常问“为什么服务端会有 TIME_WAIT，不是客户端才主动关吗”。答案在表里：TIME_WAIT 属于主动关闭方，与角色无关。HTTP&#x2F;1.0 时代服务端发完响应就关连接，TIME_WAIT 堆在服务端；长连接普及后，客户端常在空闲超时后先关，TIME_WAIT 就转移到客户端和 NAT 设备上。</p>
+<h3 id="握手与挥手：只看状态怎么走"><a href="#握手与挥手：只看状态怎么走" class="headerlink" title="握手与挥手：只看状态怎么走"></a>握手与挥手：只看状态怎么走</h3><p>三次握手的每一步都对应一次状态迁移。客户端发出 SYN 进入 SYN_SENT；服务端从 LISTEN 进入 SYN_RECV，同时把这条半开连接放进未完成队列；客户端收到 SYN+ACK 后回 ACK 进入 ESTABLISHED；服务端收到这个 ACK 才进入 ESTABLISHED，并把连接移入已完成队列等待 <code>accept()</code>。注意最后一句话：对服务端而言，握手完成和应用拿到连接是两件事，这个差别就是下一节要讲的队列问题。</p>
+<p>四次挥手同样只是两条状态链。主动关闭方调用 close，发 FIN 进入 FIN_WAIT_1；收到 ACK 进入 FIN_WAIT_2，此时它这一半已经关了，但还能收；收到对端 FIN 后回 ACK，进入 TIME_WAIT。被动关闭方收到 FIN 时进入 CLOSE_WAIT，把“对端关了”这个事件交给应用；应用调用 close 后发 FIN 进入 LAST_ACK；收到最后那个 ACK 才回到 CLOSED。所谓半关闭，指的就是 FIN_WAIT_2 与 CLOSE_WAIT 这一对状态：一个方向关了，另一个方向还开着。</p>
+<p>报文层面的序号、确认号、选项协商与超时重传不在本文展开。本文关心的是：这些状态各自意味着谁在等谁，以及哪一个状态的数字持续上涨时，应该去查什么。</p>
+<h2 id="backlog-与两个队列：SYN-RECV-从哪里来"><a href="#backlog-与两个队列：SYN-RECV-从哪里来" class="headerlink" title="backlog 与两个队列：SYN_RECV 从哪里来"></a>backlog 与两个队列：SYN_RECV 从哪里来</h2><p>服务端的监听套接字背后有两个队列，常被混为一谈。未完成连接队列存放处于 SYN_RECV 的半开连接，长度上限由 <code>net.ipv4.tcp_max_syn_backlog</code> 约束；已完成连接队列存放握手完成、但应用还没来得及 <code>accept()</code> 的连接，上限取 <code>listen(fd, backlog)</code> 实参与 <code>net.core.somaxconn</code> 的较小值。</p>
+<p>由此得出一条常被忽略的结论：握手成功不等于业务能处理。应用若因为慢查询、GC 或单线程处理而迟迟不调用 <code>accept()</code>，已完成队列就会堆满。堆满后内核默认丢弃新到的 ACK，客户端以为自己握手完成了，服务端却当没看见，于是重传、超时、再重试，表现出来的就是“端口通、CPU 不高，但请求慢半拍”。</p>
+<p><code>ss -lnt</code> 是观察这两个队列最直接的工具，但它的列名对监听套接字有特殊含义，误读的人很多。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">ss -lnt</span><br><span class="line"><span class="comment"># State   Recv-Q  Send-Q  Local Address:Port</span></span><br><span class="line"><span class="comment"># LISTEN  0       128     0.0.0.0:8080</span></span><br></pre></td></tr></table></figure>
+
+<p>对 LISTEN 状态的套接字，Recv-Q 是当前已完成队列里的连接数，Send-Q 是队列上限；对 ESTABLISHED 等非监听套接字，这两列才表示接收与发送缓冲区里尚未被应用读走的字节数。同一个列名两种含义，是 <code>ss</code> 输出最经典的坑。上面这行说明队列上限为 128、当前为空；如果 Recv-Q 长期贴着 Send-Q，就说明 <code>accept()</code> 的速度跟不上建连速度。</p>
+<p>队列溢出的次数由内核计数器记录，这是判断“是否真的溢出过”的唯一可靠证据。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">netstat -s | grep -iE <span class="string">&#x27;listen|syn&#x27;</span></span><br><span class="line"><span class="comment">#    12345 times the listen queue of a socket overflowed</span></span><br><span class="line"><span class="comment">#       67 SYNs to LISTEN sockets dropped</span></span><br></pre></td></tr></table></figure>
+
+<p>第一行是已完成队列溢出（accept 队列满），第二行是未完成队列因满而丢 SYN。用 <code>nstat</code> 可以按名字精确取值，适合写进监控脚本：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">nstat -az | grep -E <span class="string">&#x27;ListenOverflows|ListenDrops&#x27;</span></span><br><span class="line"><span class="comment"># TcpExtListenOverflows           12345</span></span><br><span class="line"><span class="comment"># TcpExtListenDrops                  67</span></span><br></pre></td></tr></table></figure>
+
+<p>两个计数器的语义不同，处理方式也不同。ListenOverflows 增长，说明应用 accept 太慢或 backlog 太小，先查应用线程模型与单次处理耗时，再考虑调大 <code>somaxconn</code>；ListenDrops 增长，说明 SYN 阶段就撑不住了，可能是突发流量、SYN 洪水，也可能是 <code>tcp_max_syn_backlog</code> 过小。</p>
+<p>SYN_RECV 堆积是最容易被误判为“被攻击”的现象。常见成因有三类：真实的连接突增超过队列容量；伪造源地址的 SYN 洪水，半开连接永远等不到最后的 ACK；以及上游重试放大，客户端超时后不断重发 SYN。判断方法很简单，看来源是否分散：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">ss -tan state syn-recv | <span class="built_in">wc</span> -l</span><br><span class="line">ss -tan state syn-recv | awk <span class="string">&#x27;&#123;print $4&#125;&#x27;</span> | <span class="built_in">cut</span> -d: -f1 | <span class="built_in">sort</span> | <span class="built_in">uniq</span> -c | <span class="built_in">sort</span> -rn | <span class="built_in">head</span></span><br></pre></td></tr></table></figure>
+
+<p>来源集中且数量有限，多半是队列太小或 accept 太慢；来源极度分散且源端口随机，才更像洪水。此时可以确认 <code>net.ipv4.tcp_syncookies</code> 是否开启，它让内核在队列满时不分配半开连接、改用 cookie 完成握手，代价是失去部分 TCP 选项的协商能力。</p>
+<h2 id="TIME-WAIT：为什么必须等-2MSL"><a href="#TIME-WAIT：为什么必须等-2MSL" class="headerlink" title="TIME_WAIT：为什么必须等 2MSL"></a>TIME_WAIT：为什么必须等 2MSL</h2><p>TIME_WAIT 是主动关闭方在发出最后一个 ACK 之后停留的状态，时长是 2MSL（Maximum Segment Lifetime，报文最大生存时间）。Linux 并没有把 MSL 做成可调参数，实际实现里 TIME_WAIT 的停留时间是固定的 60 秒，这一点与很多教材里“2 乘以 30 秒”的说法对得上，但不要指望通过 <code>tcp_fin_timeout</code> 去改它，那个参数管的是别的状态。</p>
+<p>RFC 793 给了两个不能省的理由。第一是保证最后的 ACK 能到达：这个 ACK 一旦丢失，被动关闭方会重传 FIN，而主动方若已消失就没人能回 ACK，对端只能卡在 LAST_ACK 直到超时；留在 TIME_WAIT 里就能补一个。第二是让旧报文自然消亡：同一四元组重新建连时，网络上滞留的旧数据段可能被新连接误收，等够 2MSL 才能确保它们过期。</p>
+<p>TIME_WAIT 本身不是故障，它是协议正确性的一部分。真正的问题是它的数量与分布。排查时先分清它堆在哪一侧：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">ss -tan state time-wait | <span class="built_in">wc</span> -l</span><br><span class="line"><span class="comment"># 按本地端口统计，看是服务端口还是临时端口</span></span><br><span class="line">ss -tan state time-wait | awk <span class="string">&#x27;&#123;print $4&#125;&#x27;</span> | <span class="built_in">cut</span> -d: -f2 | <span class="built_in">sort</span> | <span class="built_in">uniq</span> -c | <span class="built_in">sort</span> -rn | <span class="built_in">head</span></span><br></pre></td></tr></table></figure>
+
+<p>如果大量 TIME_WAIT 的本地端口是 80、443 这类服务端口，说明服务端在主动关连接，通常来自短连接模式或长连接的空闲超时设置；如果本地端口落在 <code>ip_local_port_range</code> 区间内，说明是客户端侧，问题会以“连不上新地址”的形式出现。</p>
+<p>客户端视角的 TIME_WAIT 会直接消耗临时端口。默认约 2.8 万个临时端口，一条 TIME_WAIT 连接会把对应四元组占住 60 秒；每秒新建上千个短连接时，回收速度跟不上消耗，<code>connect()</code> 便失败并报 <code>Cannot assign requested address</code>。调大端口范围只能缓解，根本办法是用连接池或长连接减少短连接总量。</p>
+<p>服务端视角的 TIME_WAIT 主要消耗内存与端口表项，通常不致命；但反向代理若频繁主动关闭上游连接，TIME_WAIT 会在代理机堆积，配合 NAT 还会引出下面的问题。</p>
+<h3 id="复用、回收与-NAT-的坑"><a href="#复用、回收与-NAT-的坑" class="headerlink" title="复用、回收与 NAT 的坑"></a>复用、回收与 NAT 的坑</h3><p>围绕 TIME_WAIT，Linux 提供了两个容易混淆的开关。<code>net.ipv4.tcp_tw_reuse</code> 允许出站连接复用仍处于 TIME_WAIT 的四元组，前提是开启 TCP 时间戳且新连接的时间戳更大。它只影响主动发起连接的一方，监听端口不受影响，风险相对可控，但仍建议只在确有端口压力的客户端或代理上开启。</p>
+<p><code>net.ipv4.tcp_tw_recycle</code> 则是另一回事。它试图更快地回收 TIME_WAIT，做法是依据对端时间戳做判断，这在中间存在 NAT 时就会出错：同一个 NAT 后面的多台主机时间戳不同，服务端会把时间戳较小的那台主机的 SYN 当成旧报文直接丢弃，表现为“部分客户端时好时坏、抓包看不到 SYN+ACK”。这个参数在较新的内核里已经被移除，老系统上如果还开着，应当优先关掉而不是继续依赖它，因为它带来的是不可预测的丢包，而不是可观测的收益。</p>
+<p>NAT 与负载均衡还会让 TIME_WAIT 的归属变得模糊。连接在网关上分两段维护，网关若先关，服务端看到的主动关闭方就是网关，TIME_WAIT 也留在网关上。这也是同一套服务在办公网正常、经过专线或云负载均衡后偶发重置的原因：问题不在两端，而在中间设备的空闲超时更短。</p>
+<h2 id="CLOSE-WAIT：应用没有关的那一半"><a href="#CLOSE-WAIT：应用没有关的那一半" class="headerlink" title="CLOSE_WAIT：应用没有关的那一半"></a>CLOSE_WAIT：应用没有关的那一半</h2><p>CLOSE_WAIT 的含义只有一个：对端发了 FIN，内核回了 ACK，接下来等本端应用调用 <code>close()</code>。这个状态本身不设超时，内核不会替应用做决定，所以它会一直停留，直到进程退出或应用补上关闭动作。换句话说，CLOSE_WAIT 堆积从来不是网络问题，而是应用问题。</p>
+<p>它的危害是间接但确定的。每个套接字占一个文件描述符，而 <code>ulimit -n</code> 是硬上限；CLOSE_WAIT 只增不减，描述符迟早耗尽，新的 <code>accept()</code> 与 <code>open()</code> 开始失败，日志里出现 <code>Too many open files</code>，客户端侧则表现为请求挂住直到超时。</p>
+<p>定位的第一步是把状态和进程对应起来。<code>ss</code> 的 <code>-p</code> 选项能显示持有套接字的进程，需要 root 或同用户权限：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">ss -tanp state close-wait | <span class="built_in">head</span></span><br><span class="line"><span class="comment"># CLOSE-WAIT  0  0  10.0.3.17:51234  10.0.2.9:8080  users:((&quot;app&quot;,pid=2311,fd=87))</span></span><br><span class="line"><span class="comment"># 统计每个进程的 CLOSE_WAIT 数量</span></span><br><span class="line">ss -tanp state close-wait | awk <span class="string">&#x27;&#123;print $NF&#125;&#x27;</span> | <span class="built_in">sort</span> | <span class="built_in">uniq</span> -c | <span class="built_in">sort</span> -rn | <span class="built_in">head</span></span><br></pre></td></tr></table></figure>
+
+<p><code>ss</code> 只给出套接字层面的信息，要确认是哪个文件描述符、对应哪个下游地址，还得看进程本身：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">pid=2311</span><br><span class="line"><span class="built_in">ls</span> /proc/<span class="variable">$pid</span>/fd | <span class="built_in">wc</span> -l                 <span class="comment"># 描述符总数，对照 ulimit -n</span></span><br><span class="line">lsof -p <span class="variable">$pid</span> -a -i tcp | <span class="built_in">head</span>            <span class="comment"># 列出该进程的 TCP 连接</span></span><br></pre></td></tr></table></figure>
+
+<p>如果 CLOSE_WAIT 的对端地址集中在一两个 IP 和端口上，基本可以锁定是哪一个下游依赖；如果对端地址五花八门，说明是本端某个通用客户端组件没有正确释放连接。</p>
+<p>代码层面的成因有几种典型形态。第一种是拿到了响应却没有关闭响应体：只读了状态码就返回，响应体对象没有 <code>close()</code>，底层连接既不复用也不释放。第二种是异常路径提前返回，<code>close()</code> 写在正常分支而没有放进 <code>defer</code> 或 <code>finally</code>。第三种是连接池使用不当：借出的连接超时后没有归还，池子不断新建，旧连接卡在 CLOSE_WAIT。第四种是半关闭误用，调用了 <code>shutdown(SHUT_WR)</code> 却没有 <code>close()</code>。</p>
+<h3 id="案例：一次-CLOSE-WAIT-缓慢上涨的排查"><a href="#案例：一次-CLOSE-WAIT-缓慢上涨的排查" class="headerlink" title="案例：一次 CLOSE_WAIT 缓慢上涨的排查"></a>案例：一次 CLOSE_WAIT 缓慢上涨的排查</h3><p>有一个内部服务，上线两周后开始出现零星超时，重启即恢复，因此长期被当成“偶发”。转折点是监控把 CLOSE_WAIT 画成曲线：它呈阶梯状上涨，每次发布后归零，随后每天增加几百条，与流量高低无关。</p>
+<p>第一步确认归属。<code>ss -tanp state close-wait</code> 显示这些套接字全部属于同一个进程，对端固定为下游用户服务的地址和端口，本地端口则在临时端口区间内。这说明本端是客户端，问题出在调用下游的那条链路上。</p>
+<p>第二步确认不是对端异常。在下游机器上按四元组反查，对应的连接早已不存在，说明下游正常关闭了连接，是本端没有跟上关闭动作。同一时刻 <code>ls /proc/2311/fd | wc -l</code> 已经接近 <code>ulimit -n</code>，与“每天几百条”的增速吻合。</p>
+<p>第三步回到代码。该服务用 Go 编写，调用下游的封装大致如下：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">fetchUser</span><span class="params">(id <span class="type">string</span>)</span></span> (*User, <span class="type">error</span>) &#123;</span><br><span class="line">    resp, err := client.Get(<span class="string">&quot;http://user-svc/profile?id=&quot;</span> + id)</span><br><span class="line">    <span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">nil</span>, err</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> resp.StatusCode != http.StatusOK &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">nil</span>, fmt.Errorf(<span class="string">&quot;unexpected status: %d&quot;</span>, resp.StatusCode)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 只解码了 JSON，没有关闭 resp.Body</span></span><br><span class="line">    <span class="keyword">var</span> u User</span><br><span class="line">    <span class="keyword">if</span> err := json.NewDecoder(resp.Body).Decode(&amp;u); err != <span class="literal">nil</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">nil</span>, err</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> &amp;u, <span class="literal">nil</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>两处问题叠在一起：正常路径没有 <code>resp.Body.Close()</code>，非 200 的分支更是直接返回。<code>http.Client</code> 只有在响应体读完并关闭之后才会把连接放回空闲池；否则连接既不复用也不关闭，直到下游因空闲超时发来 FIN，本端进入 CLOSE_WAIT 并永久停留。流量不大时每天泄漏几百条，正好对应观测到的斜率。</p>
+<p>修复只需在正确的位置补上关闭与读净两步：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">resp, err := client.Get(url)</span><br><span class="line"><span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">nil</span>, err</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">defer</span> resp.Body.Close()</span><br><span class="line"><span class="comment">// 即使不关心响应体，也要读干净，连接才可能复用</span></span><br><span class="line">io.Copy(ioutil.Discard, resp.Body)</span><br></pre></td></tr></table></figure>
+
+<p><code>defer</code> 保证异常路径也会关闭，<code>io.Copy</code> 保证读干净。修复上线后 CLOSE_WAIT 曲线在一天内回落到个位数，请求超时同步消失。事后补了两条防线：一是把 CLOSE_WAIT 数量按进程做成告警，阈值取描述符上限的百分之十；二是在代码评审清单里加一条“所有 HTTP 响应体是否关闭”，这比事后重启有效得多。</p>
+<h2 id="RST、FIN-WAIT-2-与保活"><a href="#RST、FIN-WAIT-2-与保活" class="headerlink" title="RST、FIN_WAIT_2 与保活"></a>RST、FIN_WAIT_2 与保活</h2><p>状态机里只有一条“异常捷径”：收到 RST 就直接回到 CLOSED，中间状态一概跳过。RST 是 TCP 唯一的强制复位手段，它不协商、不等确认，收到就立即销毁连接并通知应用。理解 RST 的几种来源，等于理解了大部分“连接被重置”的工单。</p>
+<p>第一种是连了一个没有监听的端口。目标主机收到 SYN，发现没有对应的 LISTEN 套接字，按 RFC 793 的要求回 RST，客户端立刻得到 <code>Connection refused</code>。这与超时的区别极其重要：拒绝说明包来回都通，问题在端口；超时说明包没到或回程断了。</p>
+<p>第二种是进程崩溃或被强制杀死。内核会替死去的进程关闭套接字，如果接收缓冲区里还有未读数据，或者套接字设置了 <code>SO_LINGER</code> 且超时为 0，内核发的是 RST 而非常规的 FIN。客户端因此看到 <code>Connection reset by peer</code>。</p>
+<p>第三种是应用主动用 RST 关闭。设置 <code>SO_LINGER</code> 的 <code>l_onoff=1</code>、<code>l_linger=0</code> 后调用 <code>close()</code>，内核会丢弃缓冲区、直接发 RST。代价是对端可能丢数据并看到重置，只适合主动踢掉异常连接，不要用于正常关闭。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">linger</span> <span class="title">lg</span> =</span> &#123;<span class="number">1</span>, <span class="number">0</span>&#125;;   <span class="comment">// 开启 linger，超时为 0：close 直接发 RST</span></span><br><span class="line">setsockopt(fd, SOL_SOCKET, SO_LINGER, &amp;lg, <span class="keyword">sizeof</span>(lg));</span><br></pre></td></tr></table></figure>
+
+<p>第四种是防火墙用拒绝代替丢弃。<code>iptables -j REJECT --reject-with tcp-reset</code> 会回 RST，让客户端立刻失败；默认的 <code>icmp-port-unreachable</code> 则是另一种错误。云上 ACL 的表现可能是重置也可能是超时，取决于实现，以抓包为准。</p>
+<p>第五种是半开连接。一端重启或断网，另一端仍认为连接健在并继续发数据；重启后的主机收到不属于任何套接字的数据段，回 RST。这也是为什么“服务端重启后客户端第一次请求必然失败一次”，除非客户端有健康检查或重试。</p>
+<p>第六种是协议不匹配。明文 HTTP 客户端去连 TLS 端口，或者 TLS 客户端去连明文端口，服务端解析到非法数据后关闭，常见表现同样是 RST。这类问题抓包一眼可辨：TLS 端口收到明文的 GET 请求，或者明文端口收到二进制握手字节。</p>
+<p>与 RST 形成对照的是 FIN_WAIT_2。主动关闭方发完 FIN 并收到 ACK 后就停在这里，它已经不再发数据，但仍然可以收，这就是半关闭。如果对端永远不发 FIN，连接就悬着；内核用 <code>net.ipv4.tcp_fin_timeout</code> 控制停留时间，默认 60 秒，注意它管的是 FIN_WAIT_2 而不是 TIME_WAIT。大量 FIN_WAIT_2 说明对端收到了 FIN 却不调用 close，与本端观测到的 CLOSE_WAIT 是同一件事的两面。</p>
+<p>半关闭本身是合法能力，问题出在两端对语义的理解不一致：有的应用只做单向推送，收到 FIN 后仍要继续发；更多应用把“对端关了”当成整条连接作废，却又不主动关闭。解决办法是统一关闭语义，要么收到 EOF 就关闭，要么明确约定由哪一方负责最终关闭。</p>
+<h3 id="keepalive-与应用层心跳"><a href="#keepalive-与应用层心跳" class="headerlink" title="keepalive 与应用层心跳"></a>keepalive 与应用层心跳</h3><p>保活机制要解决的是“对端已经消失但本端不知道”。TCP 自带的 keepalive 由 <code>SO_KEEPALIVE</code> 开启，空闲一段时间后发探测包，连续失败若干次就判定连接死亡。三个参数决定它的节奏：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">sysctl net.ipv4.tcp_keepalive_time    <span class="comment"># 7200，连接空闲多久后开始探测</span></span><br><span class="line">sysctl net.ipv4.tcp_keepalive_intvl   <span class="comment"># 75，探测间隔</span></span><br><span class="line">sysctl net.ipv4.tcp_keepalive_probes  <span class="comment"># 9，失败多少次判定断开</span></span><br></pre></td></tr></table></figure>
+
+<p>按默认值计算，从对端消失到本端发现，最长约两小时十一分钟。这个量级适合清理长期闲置的连接，完全不适合业务上的故障发现。更麻烦的是它只检查链路，不检查应用：对端进程死锁、线程池耗尽、数据库连不上，内核照样回 ACK，keepalive 一路成功，连接看起来好得很。</p>
+<p>因此生产环境更常用应用层心跳：定期发一个带超时的轻量请求，超时即判定不可用并重建连接，频率由对故障发现的敏感度决定。keepalive 仍值得开，它负责兜底清理僵尸连接，尤其是经过 NAT 或负载均衡的长连接，避免中间设备丢掉表项后两端还在傻等。两者职责不同。</p>
+<h2 id="观测：把计数器读成证据"><a href="#观测：把计数器读成证据" class="headerlink" title="观测：把计数器读成证据"></a>观测：把计数器读成证据</h2><p>排障最忌讳凭感觉调参，而证据来自三个层次：状态快照、累计计数器、报文流。三者对应不同的问题尺度，混用会得出错误结论。</p>
+<p>状态快照回答“现在长什么样”。<code>ss</code> 直接读内核套接字表，比逐行解析 <code>/proc</code> 的 <code>netstat</code> 快得多，连接数上万时差距明显。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">ss -s                                    <span class="comment"># 按状态汇总，先看全局</span></span><br><span class="line">ss -tan | awk <span class="string">&#x27;&#123;print $1&#125;&#x27;</span> | <span class="built_in">sort</span> | <span class="built_in">uniq</span> -c | <span class="built_in">sort</span> -rn   <span class="comment"># 按状态计数</span></span><br><span class="line">ss -tan state time-wait | <span class="built_in">wc</span> -l          <span class="comment"># 单状态过滤</span></span><br><span class="line">ss -tan state close-wait sport = :8080   <span class="comment"># 过滤条件可以叠加</span></span><br></pre></td></tr></table></figure>
+
+<p><code>ss -s</code> 的输出要关注两点：estab 数量是否与业务量相符，timewait 是否持续增长。前者异常通常是连接池或长连接策略的问题，后者要么是短连接太多，要么是某一方在频繁主动关闭。</p>
+<p>累计计数器回答“发生过多少次”，从开机起累加，绝对值没有意义，要看增速。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">nstat -az | grep -E <span class="string">&#x27;TcpExt|Tcp:&#x27;</span> | <span class="built_in">head</span> -20</span><br><span class="line">netstat -s | grep -iE <span class="string">&#x27;reset|retrans|overflow|drop&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p>几个值得记住的计数器如下。判断时统一取两次、算差值，单点读数只能参考。</p>
+<table>
+<thead>
+<tr>
+<th>计数器</th>
+<th>含义</th>
+<th>异常时的指向</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ListenOverflows</td>
+<td>已完成队列溢出次数</td>
+<td>accept 太慢或 backlog 太小</td>
+</tr>
+<tr>
+<td>ListenDrops</td>
+<td>未完成队列丢 SYN 次数</td>
+<td>队列太小或 SYN 洪水</td>
+</tr>
+<tr>
+<td>TCPAbortOnClose</td>
+<td>因带未读数据关闭而发 RST 的次数</td>
+<td>应用未读完就关闭</td>
+</tr>
+<tr>
+<td>TCPTimeouts</td>
+<td>重传超时次数</td>
+<td>链路丢包或拥塞</td>
+</tr>
+<tr>
+<td>TCPLostRetransmit</td>
+<td>重传包再次丢失</td>
+<td>严重拥塞或链路故障</td>
+</tr>
+</tbody></table>
+<p>报文流回答“具体哪一步错了”。抓包不必抓全量，按标志位过滤能把噪声降到可读的程度：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 只看带 SYN、FIN、RST 的包，足以还原状态迁移</span></span><br><span class="line">tcpdump -nn -i eth0 <span class="string">&#x27;tcp[tcpflags] &amp; (tcp-syn|tcp-fin|tcp-rst) != 0&#x27;</span> -c 50</span><br><span class="line"><span class="comment"># 只看某条连接，含两端</span></span><br><span class="line">tcpdump -nn -i eth0 <span class="string">&#x27;host 10.0.2.9 and port 8080&#x27;</span> -w /tmp/tcp.pcap</span><br></pre></td></tr></table></figure>
+
+<p>第一条命令的输出本身就是一部状态迁移史：SYN、SYN+ACK、ACK 是建立，FIN、ACK、FIN、ACK 是关闭，任何位置出现 R 就是被复位。看到 SYN 之后紧跟 R，说明端口没开或被策略拒绝；看到 SYN 反复重发没有回应，说明包在去或回的路上丢了；看到 FIN 之后对方迟迟不回 FIN，说明应用侧没有关闭。</p>
+<p>抓包本身有成本。高流量机器上不加过滤会迅速占满磁盘，<code>-s 0</code> 抓全包还会放大 CPU 开销；生产环境优先用 <code>-c</code> 限制包数、用过滤器缩小范围，并确认磁盘余量。</p>
+<h2 id="按症状排查：六种常见现场"><a href="#按症状排查：六种常见现场" class="headerlink" title="按症状排查：六种常见现场"></a>按症状排查：六种常见现场</h2><p>排障的入口通常是用户报出的一句话，而不是状态名。下面把六种最常见的描述映射到最可能的原因与第一条命令，作为拿到工单后的起手式。</p>
+<table>
+<thead>
+<tr>
+<th>症状</th>
+<th>最可能的原因</th>
+<th>第一条命令</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Connection refused</td>
+<td>端口没监听、只监听了回环、防火墙 REJECT</td>
+<td><code>ss -lntp</code></td>
+</tr>
+<tr>
+<td>Connection timed out</td>
+<td>SYN 被丢弃、路由或安全组阻断、队列满</td>
+<td><code>tcpdump</code> 看 SYN 是否有回应</td>
+</tr>
+<tr>
+<td>Connection reset by peer</td>
+<td>进程崩溃、<code>SO_LINGER</code> 0、中间设备超时、协议不匹配</td>
+<td><code>ss -tanp</code> 配合抓包</td>
+</tr>
+<tr>
+<td>请求挂住不返回</td>
+<td>半开连接、无保活、对端不关也不发</td>
+<td><code>ss -tanoi</code> 看 timer 与重传</td>
+</tr>
+<tr>
+<td>Too many open files</td>
+<td>CLOSE_WAIT 泄漏、连接池无上限</td>
+<td><code>ls /proc/PID/fd</code> 计数</td>
+</tr>
+<tr>
+<td>Cannot assign requested address</td>
+<td>临时端口被 TIME_WAIT 耗尽</td>
+<td><code>ss -s</code> 与端口范围</td>
+</tr>
+</tbody></table>
+<p>连接被拒时不要急着重启服务。先确认监听地址：<code>ss -lntp</code> 里如果只有 <code>127.0.0.1:8080</code>，外部访问必然被拒，这是容器化之后最常见的配置失误。再确认端口是否被另一个进程占用，以及防火墙是否用了拒绝策略。</p>
+<p>连接超时时先区分方向。在服务端抓包，连 SYN 都看不到，说明问题在到达之前，查路由、安全组与负载均衡的后端健康检查；看得到 SYN 但没有 SYN+ACK，查监听队列与内核参数；SYN+ACK 发出去了而客户端没收到，查回程路径。这三个分支指向不同的团队，先分清能省掉大量扯皮。</p>
+<p>连接重置时优先看谁发的 RST。抓包直接给出源地址：来自服务端，多半是进程异常或主动复位；来自中间设备，多半是会话表超时或策略拦截；来自客户端，可能是客户端主动取消。再看服务端进程是否刚重启过，<code>dmesg</code> 里有没有 OOM 记录。</p>
+<p>请求挂住最难，因为没有任何错误。<code>ss -tanoi</code> 能给出重传次数与定时器：重传持续增长说明对端不可达；定时器显示 <code>timer:(keepalive,...)</code> 说明连接空闲很久却没有心跳。此时抓包看是否有零窗口或大量重传，能区分“对端不读”与“网络丢了”。</p>
+<p>描述符耗尽与端口耗尽都属于资源类问题，思路一致：先止血，再定位。前者可临时调大 <code>ulimit -n</code>，根因一定是泄漏；后者可临时扩大 <code>ip_local_port_range</code>，根因则是短连接太多。</p>
+<h2 id="内核参数：能调什么，为什么不能盲调"><a href="#内核参数：能调什么，为什么不能盲调" class="headerlink" title="内核参数：能调什么，为什么不能盲调"></a>内核参数：能调什么，为什么不能盲调</h2><p>网上流传的“TCP 优化十条”大多是把参数一次性写进 <code>sysctl.conf</code>，既不区分角色，也不记录依据。危险之处在于调错了不会立刻报错，只会在某个流量高峰以另一种形式暴露，而那时已没人记得改过什么。下面只列与状态直接相关的参数，说明作用与代价。</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>常见默认值</th>
+<th>作用</th>
+<th>代价与注意</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>net.core.somaxconn</td>
+<td>128（新内核更高）</td>
+<td>已完成队列上限</td>
+<td>内存占用增加，掩盖 accept 慢</td>
+</tr>
+<tr>
+<td>net.ipv4.tcp_max_syn_backlog</td>
+<td>128 至 1024</td>
+<td>未完成队列上限</td>
+<td>半开连接占用更多内存</td>
+</tr>
+<tr>
+<td>net.ipv4.tcp_fin_timeout</td>
+<td>60</td>
+<td>FIN_WAIT_2 停留秒数</td>
+<td>调小会提前回收，可能导致对端异常</td>
+</tr>
+<tr>
+<td>net.ipv4.tcp_tw_reuse</td>
+<td>0</td>
+<td>出站连接复用 TIME_WAIT</td>
+<td>仅在有时间戳时生效，不解决端口总量</td>
+</tr>
+<tr>
+<td>net.ipv4.ip_local_port_range</td>
+<td>32768 至 60999</td>
+<td>临时端口范围</td>
+<td>与已有服务端口冲突的风险</td>
+</tr>
+<tr>
+<td>net.ipv4.tcp_abort_on_overflow</td>
+<td>0</td>
+<td>队列满时是否回 RST</td>
+<td>短暂抖动会直接变成用户可见错误</td>
+</tr>
+</tbody></table>
+<p><code>somaxconn</code> 与 <code>tcp_max_syn_backlog</code> 常被一起调。起点应是让队列容量与 accept 速率匹配：每秒能 accept 一千次，队列留几百就够吸收抖动；队列调到几万而 accept 依旧是瓶颈，只是把溢出推迟几分钟。两者还受 <code>listen()</code> 实参约束，只改内核不改代码会被较小值截断。</p>
+<p><code>tcp_abort_on_overflow</code> 值得单独说。默认值 0 表示队列满时静默丢弃 ACK，客户端会重传，给服务端一个喘息的机会，代价是延迟升高；改成 1 之后内核直接回 RST，客户端立刻收到错误。它把“慢”换成了“错”，只在宁愿快速失败时才用，多数服务不该动它。</p>
+<p><code>tcp_tw_reuse</code> 的适用场景很窄：本机作为客户端或反向代理、出站短连接多、且内核开启了时间戳。它是缓解端口压力的手段，不是消除 TIME_WAIT 的手段。真正减少 TIME_WAIT 的办法只有一个，就是减少主动关闭的次数，也就是用连接池和长连接。</p>
+<p>调参的纪律比参数本身重要。一次只改一个，改前记录当前值与指标，改后观察至少一个业务高峰；没有指标支撑的改动一律回滚。更要分清层次：CLOSE_WAIT 归应用，SYN_RECV 归队列与流量，TIME_WAIT 归连接生命周期，参数只能影响后两者。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>TCP 的十一种状态是排障的坐标系，先定位状态再决定查什么，比一上来就调参数有效得多。CLOSE_WAIT 只增不减一定是应用没有关闭连接，顺着 <code>ss -tanp</code> 与 <code>lsof</code> 找到进程再查资源释放路径；SYN_RECV 堆积要区分队列太小、accept 太慢与 SYN 洪水，用 <code>ListenOverflows</code> 与 <code>ListenDrops</code> 看方向。TIME_WAIT 属于主动关闭方，客户端侧防端口耗尽，服务端侧防短连接过多。RST 的来源无非端口未开、进程退出、<code>SO_LINGER</code> 0、中间设备与协议不匹配，抓包看源地址即可定性。内核参数只能在理解代价的前提下做防御性微调，绕过测量的“一键优化”都值得怀疑。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://tools.ietf.org/html/rfc793">RFC 793: Transmission Control Protocol</a></li>
+<li><a href="https://www.iana.org/assignments/tcp-parameters/tcp-parameters.xhtml">IANA TCP Parameters</a></li>
+<li><a href="https://man7.org/linux/man-pages/man7/tcp.7.html">tcp(7) - Linux manual page</a></li>
+<li><a href="https://www.kernel.org/doc/Documentation/networking/ip-sysctl.txt">ip-sysctl.txt - Linux kernel documentation</a></li>
+<li><a href="https://man7.org/linux/man-pages/man8/ss.8.html">ss(8) - Linux manual page</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>TCP 连接状态与排障</p><p><a href="https://987763485.github.io/2020/09/14/TCP连接状态与排障/">https://987763485.github.io/2020/09/14/TCP连接状态与排障/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2020-09-14</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-18</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a><a class="link-muted mr-2" rel="tag" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/">计算机网络</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2020/09/16/ELK%E6%97%A5%E5%BF%97%E5%B9%B3%E5%8F%B0%E6%90%AD%E5%BB%BA%E5%AE%9E%E8%B7%B5/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">ELK 日志平台搭建实践</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2020/09/07/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%89%E8%8C%83%E5%BC%8F%E4%B8%8E%E5%8F%8D%E8%8C%83%E5%BC%8F/"><span class="level-item">数据库设计三范式与反范式</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

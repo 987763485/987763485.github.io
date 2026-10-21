@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>AI 应用的数据隐私保护 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="AI 应用的隐私事故，多半不是模型”记住”了谁的数据，而是管道把原文放到了不该放的地方：一次拼接进提示词、一行异常日志、一个缓存键、一份被反复复用的评测集。本文按应用侧的动作顺序给一份清单，从字段准入一直写到供应商条款；法条义务与合规流程另有专文，这里只谈能落到代码和配置里的那部分。"><meta property="og:type" content="blog"><meta property="og:title" content="AI 应用的数据隐私保护"><meta property="og:url" content="https://987763485.github.io/2026/05/19/AI%E5%BA%94%E7%94%A8%E7%9A%84%E6%95%B0%E6%8D%AE%E9%9A%90%E7%A7%81%E4%BF%9D%E6%8A%A4/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="AI 应用的隐私事故，多半不是模型”记住”了谁的数据，而是管道把原文放到了不该放的地方：一次拼接进提示词、一行异常日志、一个缓存键、一份被反复复用的评测集。本文按应用侧的动作顺序给一份清单，从字段准入一直写到供应商条款；法条义务与合规流程另有专文，这里只谈能落到代码和配置里的那部分。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2026-05-18T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-20T16:54:31.142Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="大模型"><meta property="article:tag" content="python"><meta property="article:tag" content="rust"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2026/05/19/AI%E5%BA%94%E7%94%A8%E7%9A%84%E6%95%B0%E6%8D%AE%E9%9A%90%E7%A7%81%E4%BF%9D%E6%8A%A4/"},"headline":"AI 应用的数据隐私保护","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2026-05-18T16:00:00.000Z","dateModified":"2026-10-20T16:54:31.142Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"AI 应用的隐私事故，多半不是模型”记住”了谁的数据，而是管道把原文放到了不该放的地方：一次拼接进提示词、一行异常日志、一个缓存键、一份被反复复用的评测集。本文按应用侧的动作顺序给一份清单，从字段准入一直写到供应商条款；法条义务与合规流程另有专文，这里只谈能落到代码和配置里的那部分。"}</script><link rel="canonical" href="https://987763485.github.io/2026/05/19/AI%E5%BA%94%E7%94%A8%E7%9A%84%E6%95%B0%E6%8D%AE%E9%9A%90%E7%A7%81%E4%BF%9D%E6%8A%A4/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2026-05-18T16:00:00.000Z" title="5/19/2026, 12:00:00 AM">2026-05-19</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></span><span class="level-item">29 分钟读完 (大约4359个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">AI 应用的数据隐私保护</h1><div class="content"><p>AI 应用的隐私事故，多半不是模型”记住”了谁的数据，而是管道把原文放到了不该放的地方：一次拼接进提示词、一行异常日志、一个缓存键、一份被反复复用的评测集。本文按应用侧的动作顺序给一份清单，从字段准入一直写到供应商条款；法条义务与合规流程另有专文，这里只谈能落到代码和配置里的那部分。</p>
+<h2 id="风险不在模型里，在管道里"><a href="#风险不在模型里，在管道里" class="headerlink" title="风险不在模型里，在管道里"></a>风险不在模型里，在管道里</h2><p>一次看似干净的调用会派生出多份副本：请求体进了服务商的入站日志，提示词进了自家的可观测性后端，中间态被检查点写进磁盘，会话原文被采样进评测集，缓存按键存了半小时。模型只是这些副本的读者之一。</p>
+<p>由此得到一条结论：隐私设计的主体工作不是给模型加约束，而是给每条支路设默认拒绝。凡是能让数据多待一个地方的组件，都要单独问四句：存了什么、存多久、谁能读到、到期后发生什么。</p>
+<p>组件生态把这条规律放大得很快：Model Context Protocol 让一次代理调用可能触达多个第三方数据源（2025-11-25 修订过一轮），Agent Skills 形态（2025-10-16 提出）把指令、脚本与资源打包成可分发单元，技能内部若携带上报逻辑，数据流向就不再只由你的服务决定；编排框架的重试、检查点与状态回放（LangChain 1.x 按 1.2 口径、LangGraph 1.0&#x2F;1.1）本质都是在往某个介质里写中间态，保留策略属于隐私配置。</p>
+<h2 id="字段级最小必要：先画一张上下文准入表"><a href="#字段级最小必要：先画一张上下文准入表" class="headerlink" title="字段级最小必要：先画一张上下文准入表"></a>字段级最小必要：先画一张上下文准入表</h2><p>数据分类分级的方法与标准另有专文，这里只取它对模型上下文的那一条投影：一个字段能不能进上下文，是产品决定，不是模型决定。</p>
+<p>做法分三步。第一步盘点，把进入模型的每个字段列出来，包括被”顺手”塞进去的：拼接的用户历史、解析器输出的整页文本、工具返回的整段 JSON、错误信息里的请求体。第二步裁决，三选一：进上下文（模型必须看到才能完成任务）、只在本地（用于路由、计费、限流）、直接丢弃（既不上传也不落盘）。第三步把裁决写进代码而不是文档：渲染提示词时只允许从这张表取变量。</p>
+<p>下面这张表是模板，不是结论：字段、脱敏方式、留存期与责任角色都要按自己的产品重填，天数是团队约定示例。</p>
+<table>
+<thead>
+<tr>
+<th>字段（模板）</th>
+<th>是否进上下文</th>
+<th>脱敏方式（模板）</th>
+<th>留存期（团队约定示例）</th>
+<th>责任角色</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>user_id_hash</code></td>
+<td>进（作为关联键）</td>
+<td>加盐哈希，非匿名化</td>
+<td>与会话同生命周期</td>
+<td>数据负责人</td>
+</tr>
+<tr>
+<td><code>&lt;PHONE&gt;</code> &#x2F; <code>&lt;ID&gt;</code></td>
+<td>不进</td>
+<td>命中即阻断，只保留字段名</td>
+<td>不落盘</td>
+<td>客户端负责人</td>
+</tr>
+<tr>
+<td>上传文档正文</td>
+<td>仅本轮进</td>
+<td>段落切分，敏感段本地抽取</td>
+<td>30 天</td>
+<td>算法</td>
+</tr>
+<tr>
+<td>工具调用返回体</td>
+<td>抽取字段后进入</td>
+<td>字段白名单</td>
+<td>24 小时</td>
+<td>平台</td>
+</tr>
+<tr>
+<td>错误堆栈</td>
+<td>不进</td>
+<td>只带上请求 ID 与字段名</td>
+<td>14 天</td>
+<td>运维</td>
+</tr>
+</tbody></table>
+<p>关于哈希要说清楚：换成摘要值之后，手机号并不因此不再是个人信息。可枚举的取值域能被穷举重算，只要 ID 体系在内部可反查，摘要值就是反查键，跨表关联时两个”匿名”标识拼起来往往足够定位到个人。哈希是降低关联风险的处置，不是匿名化，表里要如实写成”哈希（非匿名化）”。</p>
+<p>准入表要能落地，靠的是这组默认规则：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">- 未在白名单里声明的字段，渲染时取不到值，取用即报错而不是静默忽略</span><br><span class="line">- 一进上下文就必然多活的派生数据（日志、缓存、trace）继承同一份裁决</span><br><span class="line">- 每一次裁决变更走代码评审，评审人里必须有数据负责人</span><br></pre></td></tr></table></figure>
+
+<h2 id="上传前脱敏与-PII-检测：默认拒绝"><a href="#上传前脱敏与-PII-检测：默认拒绝" class="headerlink" title="上传前脱敏与 PII 检测：默认拒绝"></a>上传前脱敏与 PII 检测：默认拒绝</h2><p>自由文本一旦离开进程边界就无法收回，所以拦截点必须在上传前。三类手段各有漏法，得叠着用：规则与正则便宜、可解释，适合形态稳定的标识符，漏检来自变体，例如分隔符换掉、全半角混用、跨行断裂；NER 覆盖面广，但领域黑话、低频实体、非主要语种的召回会掉，而且它本质是分类器，一定有误报，送敏感文本去做检测的这条链路自己也得不留存，否则检测本身成了泄漏面；第三种是结构约束，能不用自由文本承载字段就不用，检测压力会小一个量级。</p>
+<p>默认动作必须是”检测不通过就不上传”，而不是”上传但打个标记”。命中后的降级路径有三种：转成模板化摘要，保留最小语义、丢掉标识符；只上传问题类型与字段名；先在本地抽取，只上传抽取结果。每种降级都会损失一点效果，这笔账要在产品评审时算。反过来，”为排查线上问题全量留存用户提问原文”不是正面做法；真要保留，就得是脱敏样本、显式开关、限定人员范围，外加可审计的读取记录。</p>
+<p>开关是现实需要，但要绑定四件事：谁能开、开多久、开启期间哪些字段仍然零准入、事件进审计，并默认过期回落到拒绝。凭据与令牌在本文所有清单里都是零准入字段，其处置规范另文已述。</p>
+<h2 id="提示词、日志与-trace：四个泄漏面及改法"><a href="#提示词、日志与-trace：四个泄漏面及改法" class="headerlink" title="提示词、日志与 trace：四个泄漏面及改法"></a>提示词、日志与 trace：四个泄漏面及改法</h2><p><strong>模板里带用户原文。</strong> 最省事的写法是把历史消息原样回填，于是第 1 轮用户粘贴的整段合同文本一路跟到第 30 轮，跟着进每一家服务商的入站日志。改法：历史消息进上下文前再过一道字段级重检，只有声明为可回放的轮次保留原文，其余换成抽取后的结构化状态；裁剪与压缩策略要作为隐私配置评审，不只是成本优化。</p>
+<p><strong>异常堆栈带请求体。</strong> 调试期随手写的 <code>raise ValueError(f&quot;invalid request: {payload}&quot;)</code> 是最常见的意外上传：异常被上报到错误监控平台，而平台在另一条信任边界之外。改法：异常消息只带请求 ID、字段名与失败原因，不带取值，把请求体格式化进异常串按缺陷处理；确需留存原始请求时走独立、默认关闭、带过期的诊断通道。</p>
+<p><strong>调试开关长期开着。</strong> <code>DEBUG=1</code>、<code>--verbose</code>、框架的”打印完整提示词”选项一旦进了生产镜像，输出就被采集器捞进日志索引留上几个月。改法：输出等级与运行环境绑定，生产构建强制为关，能编译期移除的分支就移除；启动时打印当前生效的数据相关开关，作为部署检查项。</p>
+<p><strong>trace 属性带原文。</strong> 在 span 属性上直接挂完整 prompt 和 completion 最快，也最难清理：它被索引、被查询、被复制粘贴进工单。改法：属性字段做白名单，原文位置只挂指针（存储地址与摘要值），看原文走单独授权；工具调用的参数与返回同样属于原文，最容易漏。采样与属性语义约定见可观测性专文，此处不复述。</p>
+<h2 id="留存周期与删除：写机制，不写承诺"><a href="#留存周期与删除：写机制，不写承诺" class="headerlink" title="留存周期与删除：写机制，不写承诺"></a>留存周期与删除：写机制，不写承诺</h2><p>三类数据的生命周期不同，混在一份保留策略里必然出事。下表天数是团队约定示例，只为让”到期动作”有地方落地。</p>
+<table>
+<thead>
+<tr>
+<th>数据类别</th>
+<th>默认留存（团队约定示例）</th>
+<th>到期动作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>会话原文</td>
+<td>30 天</td>
+<td>到期删除，聚合指标继续保留</td>
+</tr>
+<tr>
+<td>评测样本</td>
+<td>随数据集版本，90 天复审</td>
+<td>移除并按新种子重建版本</td>
+</tr>
+<tr>
+<td>缓存条目</td>
+<td>数小时到一天</td>
+<td>按派生键主动失效</td>
+</tr>
+<tr>
+<td>脱敏后排查样本</td>
+<td>14 天</td>
+<td>物理删除并留审计记录</td>
+</tr>
+</tbody></table>
+<p>删除的难点从来不在主表，而在副本。可落地的机制有四件：删除意图先落成事件（tombstone），由扇出作业在各副本、检索索引、向量库、物化视图上执行，而不是靠一次性脚本手删，事件要能重放也能核查；备份不可原地修改，所以给的是机制承诺而非时间承诺，恢复流程里”重放删除事件”是必经步骤，要有演练记录；派生数据按派生键失效，缓存键、嵌入向量、抽出的中间结果都要能被主键反查；供应商侧的删除请求要在合同里预先约定，并回收书面结果。</p>
+<p>留存要写成”到期动作”而不是”到期时间”：到期之后是删除、是收敛到不可逆粒度、还是按更严格权限继续保留，必须选一个并让作业真的在跑。只在文档里写”只保留 30 天”而系统里没有任何到期作业，是最常见的自我欺骗。</p>
+<h2 id="训练与评测数据的授权链"><a href="#训练与评测数据的授权链" class="headerlink" title="训练与评测数据的授权链"></a>训练与评测数据的授权链</h2><p>来源可追、用途可限、可撤回，这三条听起来像文档语言，落到系统上是三个可实现的东西。</p>
+<p>来源可追意味着授权信息随数据走：每条样本携带来源标识、用途标签、可撤回标记与版本，打包数据集时一起带上，否则三个月后没人能回答”这批数据当初同意用于什么”。用途可限意味着标签在读取处校验：作业申请数据时声明用途，存储层核对后放行或拒绝，而不是靠目录权限约定”这个目录别拿去训练”。可撤回意味着撤回有作用范围：撤回后新作业必须看不到该样本，已训练产物如何处理要预先定口径，重训、下线还是接受残留，并把口径记录下来。</p>
+<p>“我们只是拿来做评测”是需要证据的说法，不是可以自证的解释。要能回答：评测集与训练集是否共用同一份读取权限；评测样本会不会被二级分发，比如同事导出、内部工具复用、写进演示材料；撤回是否覆盖评测副本与已参与的模型版本。数据集建设与评测泄漏检测另有专文，这里只强调授权链是它们的前置条件。</p>
+<h2 id="部署形态与跨地域：数据流向是架构决定的"><a href="#部署形态与跨地域：数据流向是架构决定的" class="headerlink" title="部署形态与跨地域：数据流向是架构决定的"></a>部署形态与跨地域：数据流向是架构决定的</h2><p>同一款产品，三种形态的隐私画像差别很大：自托管时数据流向由你自己的集群和日志管道决定；私有化推理把服务商从路径里拿掉，但运维与升级通道还在；第三方 API 把原文交到另一条信任边界之外。管用的是把”哪些请求允许走哪一档”做成可评审的路由策略，按字段敏感度、租户、地域设上限，而不是全局默认最远那一档。</p>
+<p>出境判定不是工程师能单独下的结论，需要法务按当期监管口径核对；工程侧要提供可核对的事实：某条链路经过哪些地域、哪些落点、每个落点存什么存多久。拿不出这张事实表，任何结论都只是猜测。集群与训练侧也有落点：Kubernetes 1.35 下的容器日志与持久卷、PyTorch 2.x 微调的检查点文件，都是容易被忽略的副本。</p>
+<p>当期口径有两组。中国侧，《个人信息保护法》《数据安全法》是既有法律，《网络数据安全管理条例》自 2025-01-01 施行；《人工智能生成合成内容标识办法》由网信办等四部门于 2025-03-07 印发、2025-09-01 施行，配套强制性国家标准 GB 45438-2025《网络安全技术 人工智能生成合成内容标识方法》于 2025-02-28 发布、2025-09-01 实施。标识义务属于内容治理，但有个隐私侧面容易被忽略：元数据里的标识字段应当只带服务提供者标识与内容编号这类最小信息，顺手塞进用户标识、会话标识或设备标识，会让”可溯源”变成”可关联”。欧盟侧，生成式通用模型的义务自 2025-08-02 起适用，一般适用日 2026-08-02 即将到来；欧委会 2025-11-19 提出数字 Omnibus 提案（COM(2025) 837），有提案试图调整部分高风险义务的适用时间，尚未定案，不宜按既成事实排产品计划。</p>
+<h2 id="供应商条款核对清单"><a href="#供应商条款核对清单" class="headerlink" title="供应商条款核对清单"></a>供应商条款核对清单</h2><table>
+<thead>
+<tr>
+<th>核对项</th>
+<th>要拿到什么</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>是否用客户数据训练</td>
+<td>关闭项的位置与出厂默认值</td>
+</tr>
+<tr>
+<td>留存与删除</td>
+<td>可配置期限、删除接口与结果证明</td>
+</tr>
+<tr>
+<td>子处理者</td>
+<td>名单、变更通知与异议窗口</td>
+</tr>
+<tr>
+<td>日志访问权</td>
+<td>谁能读到含原文的日志、怎么导出</td>
+</tr>
+<tr>
+<td>地域与加密</td>
+<td>具体存储区域与密钥归属</td>
+</tr>
+<tr>
+<td>事故通知与终止迁移</td>
+<td>通知时间上限、导出格式、删除的验收动作</td>
+</tr>
+</tbody></table>
+<p>判断标准只有一句：凡是在合同 PDF 里读到、却在系统里找不到对应位置的承诺，都当成未落实。地域与加密最容易写成”符合最佳实践”这类无法核验的表述，要追问到具体区域与密钥归属；删除与导出要给出可执行动作。</p>
+<h2 id="端侧与本地处理：什么时候值得"><a href="#端侧与本地处理：什么时候值得" class="headerlink" title="端侧与本地处理：什么时候值得"></a>端侧与本地处理：什么时候值得</h2><p>值得的场景有一个共同点：原文一旦离开设备代价就不可逆，而任务对能力上限不敏感，例如本地目录上的检索与摘要、只在设备内做字段抽取、敏感文档先在本机过一遍脱敏再决定是否上传。代价要如实算：能力与长上下文上限、权重与模板怎么升级回滚、同一套评测集在端侧模型上分数不可直接比较、能耗与首次响应时间。端侧也有自己的隐私问题：模型文件落到设备就成了可提取资产，与云端”服务商读到原文”是两类风险，不宜互相折算。端侧形态的完整讨论另有专文。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><ul>
+<li>风险在管道不在权重：提示词、日志、缓存、评测集、供应商侧五处落点，逐条设默认拒绝。</li>
+<li>字段准入表要写进代码，未声明的字段取不到值才算生效；哈希不是匿名化。</li>
+<li>检测不通过就不上传，降级路径要写清损失了什么；放宽只能靠带过期的显式开关并留审计。</li>
+<li>模板、堆栈、调试开关、trace 属性四处泄漏面，改法都在自家代码里。</li>
+<li>留存写成到期动作，删除写成机制，包括备份恢复时重放删除事件；授权链可实现三件事：来源可追、用途在读取处校验、撤回有作用范围。</li>
+<li>数据流向由部署形态决定，出境交给法务但工程要拿出事实表；供应商承诺要能在系统里找到对应位置，端侧适合原文不可离设备的场景。</li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>AI 应用的数据隐私保护</p><p><a href="https://987763485.github.io/2026/05/19/AI应用的数据隐私保护/">https://987763485.github.io/2026/05/19/AI应用的数据隐私保护/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2026-05-19</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-21</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="link-muted mr-2" rel="tag" href="/tags/python/">python</a><a class="link-muted mr-2" rel="tag" href="/tags/rust/">rust</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2026/05/21/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E6%9C%8D%E5%8A%A1%E5%8C%96%E4%B8%8E%E7%BD%91%E5%85%B3%E8%AE%BE%E8%AE%A1/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">大模型服务化与网关设计</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2026/05/17/LLM%E9%A9%B1%E5%8A%A8%E7%9A%84%E6%95%B0%E6%8D%AE%E5%88%86%E6%9E%90Agent/"><span class="level-item">LLM 驱动的数据分析 Agent</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

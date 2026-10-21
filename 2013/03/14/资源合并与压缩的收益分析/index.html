@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>资源合并与压缩的收益分析 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="上个月把一个运营活动的落地页做了一次瘦身，动作只有两个：把散落的 JS 和 CSS 合并成少数几个文件，再对产物做 minify 和 gzip。事后 YSlow 评分从 D 升到 B。这篇文章把当时的思路、数据和踩过的坑摊开来讲，重点回答一个问题：资源合并与压缩到底赚到了什么，又在哪些地方不赚。"><meta property="og:type" content="blog"><meta property="og:title" content="资源合并与压缩的收益分析"><meta property="og:url" content="https://987763485.github.io/2013/03/14/%E8%B5%84%E6%BA%90%E5%90%88%E5%B9%B6%E4%B8%8E%E5%8E%8B%E7%BC%A9%E7%9A%84%E6%94%B6%E7%9B%8A%E5%88%86%E6%9E%90/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="上个月把一个运营活动的落地页做了一次瘦身，动作只有两个：把散落的 JS 和 CSS 合并成少数几个文件，再对产物做 minify 和 gzip。事后 YSlow 评分从 D 升到 B。这篇文章把当时的思路、数据和踩过的坑摊开来讲，重点回答一个问题：资源合并与压缩到底赚到了什么，又在哪些地方不赚。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2013-03-14T09:38:18.000Z"><meta property="article:modified_time" content="2026-10-17T09:27:36.232Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="web前端"><meta property="article:tag" content="性能优化"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2013/03/14/%E8%B5%84%E6%BA%90%E5%90%88%E5%B9%B6%E4%B8%8E%E5%8E%8B%E7%BC%A9%E7%9A%84%E6%94%B6%E7%9B%8A%E5%88%86%E6%9E%90/"},"headline":"资源合并与压缩的收益分析","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2013-03-14T09:38:18.000Z","dateModified":"2026-10-17T09:27:36.232Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"上个月把一个运营活动的落地页做了一次瘦身，动作只有两个：把散落的 JS 和 CSS 合并成少数几个文件，再对产物做 minify 和 gzip。事后 YSlow 评分从 D 升到 B。这篇文章把当时的思路、数据和踩过的坑摊开来讲，重点回答一个问题：资源合并与压缩到底赚到了什么，又在哪些地方不赚。"}</script><link rel="canonical" href="https://987763485.github.io/2013/03/14/%E8%B5%84%E6%BA%90%E5%90%88%E5%B9%B6%E4%B8%8E%E5%8E%8B%E7%BC%A9%E7%9A%84%E6%94%B6%E7%9B%8A%E5%88%86%E6%9E%90/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2013-03-14T09:38:18.000Z" title="3/14/2013, 5:38:18 PM">2013-03-14</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/">前端开发</a></span><span class="level-item">24 分钟读完 (大约3623个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">资源合并与压缩的收益分析</h1><div class="content"><p>上个月把一个运营活动的落地页做了一次瘦身，动作只有两个：把散落的 JS 和 CSS 合并成少数几个文件，再对产物做 minify 和 gzip。事后 YSlow 评分从 D 升到 B。这篇文章把当时的思路、数据和踩过的坑摊开来讲，重点回答一个问题：资源合并与压缩到底赚到了什么，又在哪些地方不赚。</p>
+<h2 id="前端资源的开销模型"><a href="#前端资源的开销模型" class="headerlink" title="前端资源的开销模型"></a>前端资源的开销模型</h2><p>浏览器渲染一个页面，成本并不只发生在下载 HTML 那一刻。每一个 JS 或 CSS 文件都要单独走一遍 DNS 查询、TCP 三次握手、发送请求、等待响应、下载内容这几步。2013 年前后的主流浏览器对同一个域名的并发连接数一般限制在 6 个左右，多出来的请求只能在队列里等位。这些步骤里，除了最后一步之外，都与文件大小无关。</p>
+<pre class="mermaid">flowchart TD
+    A[解析到资源引用] --> B{并发连接是否已满}
+    B -->|已满| C[排队等待]
+    B -->|未满| D[TCP 三次握手]
+    C --> D
+    D --> E[发送请求]
+    E --> F[等待响应 RTT]
+    F --> G[下载并解析执行]</pre>
+
+<p>这里最容易被忽略的是固定开销。假设服务器在广州，用户在北京，RTT 约 60 毫秒，那么一个请求光是握手加等待就吃掉 60 毫秒以上，而这跟文件大小几乎没有关系：一个 1 KB 的 JS 和一个 100 KB 的 JS，在握手这一项上的花费是一样的。业界经验也支持这个判断：Yahoo 早年发布的性能规则里，「减少 HTTP 请求数」常年排在第一位，终端用户感受到的响应时间里大约有 80% 花在前端。</p>
+<p>还有一个细节常被问到：既然浏览器会缓存，那请求多也无所谓吧？这个说法只对了一半。缓存解决的是「第二次之后不再下载」，但浏览器在复用本地副本之前，仍然可能向服务器发一次条件请求（带 <code>If-Modified-Since</code> 或 <code>If-None-Match</code>），等服务器回一个 304 Not Modified 才算确认。这一次确认同样要占一个连接、等一个 RTT。所以请求数多不光影响冷启动，也会持续拖累热访问，只是代价小一些。</p>
+<p>所以前端优化要盯的是两个互相独立的变量：请求数量和传输体积。合并主要作用于前者，压缩主要作用于后者，两者的收益算法完全不同，下面分开说。</p>
+<h2 id="合并：把请求数压下来"><a href="#合并：把请求数压下来" class="headerlink" title="合并：把请求数压下来"></a>合并：把请求数压下来</h2><p>先说合并，也就是把多个小文件拼成少数几个大文件。当时这个页面一共有 23 个请求，其中 JS 14 个、CSS 6 个、图片 2 个。14 个 JS 里有 9 个是各业务方自己带上来的小插件，每个只有几 KB，加起来不到 60 KB，却要占掉 9 个请求位。</p>
+<p>我的处理办法是先分类再合并：</p>
+<ul>
+<li>按加载时机分：首屏必须用的合成一个文件，可以延迟的比如浮层交互、日志上报单独放一个文件，页面 onload 后再加载。</li>
+<li>按稳定性分：jQuery 这类第三方库改动极少，单独成文件，让它的缓存尽量长期有效；业务代码经常改，单独成文件。</li>
+<li>CSS 合并成一个文件，同时清理掉里面的 <code>@import</code>。<code>@import</code> 看起来是「在 CSS 里引 CSS」，实际上它会把请求串行化，比用 <code>&lt;link&gt;</code> 并排写更慢。</li>
+<li>JS 统一放到 <code>&lt;/body&gt;</code> 前。放在 <code>&lt;head&gt;</code> 里时，浏览器必须把它下载并执行完才会继续解析后面的 DOM，首屏会被直接堵住。</li>
+</ul>
+<p>这四条里，第四条性价比最高，也最容易被忽视。很多时候页面慢不是因为文件太大，而是因为一个几十 KB 的脚本堵在 <code>&lt;head&gt;</code> 里，把后面整页的解析都挡住了。把脚本挪到页面底部，往往不花一分钟就能拿到立竿见影的改善。</p>
+<p>合并之后请求数从 23 降到 8。这里要强调一点：合并的顺序必须手工确认。依赖 jQuery 的插件一定要排在 jQuery 之后，否则压缩产物语法是对的，运行时会直接报 <code>undefined is not a function</code>，而这种错误在压缩文件里几乎没法定位。</p>
+<h2 id="压缩：把字节数压下来"><a href="#压缩：把字节数压下来" class="headerlink" title="压缩：把字节数压下来"></a>压缩：把字节数压下来</h2><p>代码层面的 minify 工具在当年已经相当成熟：JSMin 从 2001 年就有了，YUI Compressor 2007 年发布，两者都能安全地删除注释、空白和换行；后者还支持缩短局部变量名，压得更狠一些。CSS 侧同样是删注释、删空白、合并简写属性。用 Node 写一个极简的合并脚本并不难，当年我们项目里就是十几行 CommonJS 代码，把目录下的文件按顺序读进来拼成一个字符串，再交给外部命令去压缩：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 仅支持 Node 0.8/0.10 时代的 CommonJS 写法</span></span><br><span class="line"><span class="keyword">var</span> fs = <span class="built_in">require</span>(<span class="string">&#x27;fs&#x27;</span>);</span><br><span class="line"><span class="keyword">var</span> path = <span class="built_in">require</span>(<span class="string">&#x27;path&#x27;</span>);</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">concat</span>(<span class="params">dir, files</span>) &#123;</span><br><span class="line">  <span class="keyword">return</span> files.<span class="title function_">map</span>(<span class="keyword">function</span> (<span class="params">name</span>) &#123;</span><br><span class="line">    <span class="comment">// 每个文件前加一行注释，压缩时会被删掉，方便排查</span></span><br><span class="line">    <span class="keyword">return</span> <span class="string">&#x27;/* ---- &#x27;</span> + name + <span class="string">&#x27; ---- */\n&#x27;</span> + fs.<span class="title function_">readFileSync</span>(path.<span class="title function_">join</span>(dir, name), <span class="string">&#x27;utf-8&#x27;</span>);</span><br><span class="line">  &#125;).<span class="title function_">join</span>(<span class="string">&#x27;\n&#x27;</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 输出给 YUI Compressor 处理</span></span><br><span class="line">fs.<span class="title function_">writeFileSync</span>(<span class="string">&#x27;dist/app.src.css&#x27;</span>, <span class="title function_">concat</span>(<span class="string">&#x27;src/css&#x27;</span>, [<span class="string">&#x27;reset.css&#x27;</span>, <span class="string">&#x27;layout.css&#x27;</span>, <span class="string">&#x27;widget.css&#x27;</span>]), <span class="string">&#x27;utf-8&#x27;</span>);</span><br></pre></td></tr></table></figure>
+
+<p>要注意的是，拼接顺序不能乱：依赖 jQuery 的插件必须排在 jQuery 之后，否则压缩之后虽然语法正确，运行时会直接报错。压缩前的源文件要单独留档，线上出问题时对着源文件看，比在压缩产物里反推要快得多。</p>
+<p>接下来是 jQuery 的 ready 等待。如果合并后的文件里同时有初始化逻辑，别忘了 DOM 尚未构建完成时是不能直接查询节点的。jQuery 1.9 的写法是：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// jQuery 1.9 起推荐用 on 绑定事件，bind/unbind 已被标记为弃用</span></span><br><span class="line">$(<span class="variable language_">document</span>).<span class="title function_">ready</span>(<span class="keyword">function</span> (<span class="params"></span>) &#123;</span><br><span class="line">  $(<span class="string">&#x27;#list&#x27;</span>).<span class="title function_">on</span>(<span class="string">&#x27;click&#x27;</span>, <span class="string">&#x27;a&#x27;</span>, <span class="keyword">function</span> (<span class="params">e</span>) &#123;</span><br><span class="line">    e.<span class="title function_">preventDefault</span>();</span><br><span class="line">    <span class="title function_">alert</span>($(<span class="variable language_">this</span>).<span class="title function_">text</span>());</span><br><span class="line">  &#125;);</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>传输层面的 gzip 走 HTTP 的内容协商：浏览器发 <code>Accept-Encoding: gzip</code>，服务端返回时带上 <code>Content-Encoding: gzip</code>。文本类资源的压缩比很高，实测这个页面的 JS 压到了原体积的 24%，CSS 压到 21%。这里有两个常见误区要避开：</p>
+<ul>
+<li>已经压缩过的格式不要指望 gzip。JPEG、PNG 本身就是压缩格式，gzip 之后通常只小 1% 到 2%，有时反而会因为头部体积略微变大。这类文件该做的是换更好的编码参数，或者改用更合适的格式。WebP 在 2010 年 9 月发布，Chrome 当时已经支持，做渐进增强是可行的。</li>
+<li>太小的文件不值得 gzip。几百字节的文本，gzip 头部（约 20 字节）加上分块信息，可能比原文件还大。</li>
+</ul>
+<p>判断一个页面该不该上 CDN，标准也很朴素：静态资源多、用户地域分散、峰值流量有规律的页面，收益最明显；反过来，一个全部走同域内嵌样式的后台页面，上了 CDN 也只是多一层缓存管理成本。CDN 真正的价值不只是「加速」，还包括把静态流量从应用服务器上摘下来，让应用服务器的连接数留给动态请求。</p>
+<pre class="mermaid">flowchart TD
+    A[源 JS 与 CSS 文件] --> B[按加载时机合并]
+    B --> C[minify 删除注释空白]
+    C --> D[文件名加时间戳]
+    D --> E[上传 CDN]
+    E --> F[服务端开启 gzip]
+    F --> G[浏览器请求]
+    G --> H[命中缓存则直接复用]</pre>
+
+<h2 id="收益到底怎么算"><a href="#收益到底怎么算" class="headerlink" title="收益到底怎么算"></a>收益到底怎么算</h2><p>把两个变量拆开算，才能判断一个页面值不值得做。估算模型很朴素：传输时间等于体积除以下行带宽，排队与握手时间等于批次数乘以 RTT。这个页面按 2 Mbps（约每秒 250 KB）带宽、60 毫秒 RTT 测算：</p>
+<table>
+<thead>
+<tr>
+<th>项目</th>
+<th>优化前</th>
+<th>合并后</th>
+<th>再 minify</th>
+<th>再 gzip</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>JS 请求数</td>
+<td>14</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+</tr>
+<tr>
+<td>CSS 请求数</td>
+<td>6</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr>
+<td>总请求数</td>
+<td>23</td>
+<td>8</td>
+<td>8</td>
+<td>8</td>
+</tr>
+<tr>
+<td>JS 体积</td>
+<td>486 KB</td>
+<td>486 KB</td>
+<td>214 KB</td>
+<td>62 KB</td>
+</tr>
+<tr>
+<td>CSS 体积</td>
+<td>126 KB</td>
+<td>126 KB</td>
+<td>88 KB</td>
+<td>19 KB</td>
+</tr>
+<tr>
+<td>传输耗时估算</td>
+<td>2.8 秒</td>
+<td>2.8 秒</td>
+<td>1.2 秒</td>
+<td>0.7 秒</td>
+</tr>
+<tr>
+<td>排队握手估算</td>
+<td>0.24 秒</td>
+<td>0.12 秒</td>
+<td>0.12 秒</td>
+<td>0.12 秒</td>
+</tr>
+</tbody></table>
+<p>表格里「再 minify」一列的字节数完全没变，变的只有请求数。合并本身一点字节都没省，它省的是那 0.12 秒的排队和握手，以及浏览器解析更多标签的开销；真正把 2.8 秒打到 1.2 秒的是 minify，486 KB 的 JS 压到 214 KB，主要来自删注释和缩短变量名；最后 gzip 把文本再砍掉七成以上。图片有 96 KB，全程没参与压缩，这也是为什么优化后总量还有 0.7 秒左右。</p>
+<p>反过来看更直观：一个只有 3 KB 的小插件，下载时间几乎全是固定开销，砍掉它的请求位就是纯粹的收益。这正是合并的收益来源，它消灭的是那些不产生任何有用字节的握手与等待。</p>
+<p>如果换到弱网环境，收益结构会明显不同。3G 网络下 RTT 常到 300 毫秒，带宽也只有每秒几十 KB，此时合并省下的排队时间会从 0.12 秒放大到 0.6 秒，甚至超过压缩的收益。所以不能拿一个固定结论套所有页面，移动端页面要更重视请求数，桌面端则可以放松一些。</p>
+<p>还有一个容易被忽略的变量是缓存命中率。上面的表算的是冷启动场景，也就是缓存全空。真实用户里老客占比很高，第二次访问时那 8 个文件可能一个都不下载，页面时间只取决于 HTML 本身。这意味着优化收益在不同用户群体间的分布极不均匀：首次访问的用户拿到了全部收益，回访用户几乎没有变化。做汇报的时候要把这两类用户分开统计，否则数据会很难看，也会低估优化的价值。</p>
+<h2 id="坑在哪"><a href="#坑在哪" class="headerlink" title="坑在哪"></a>坑在哪</h2><p>最后是这次实际踩到的坑，按代价从大到小排。</p>
+<p>第一，缓存失效。合并之后业务代码改一个字符，整个文件的缓存就作废了。当时的做法是在文件名后加时间戳，例如 <code>app.20130310.js</code>，让 URL 变化直接对应内容变化。但如果只改查询串而不改文件名，一部分代理服务器和 CDN 节点不会把它当成新资源，缓存刷新会被拖延，这一点后来花了很久才排查出来。</p>
+<p>第二，过度合并。我一开始图省事把第三方库和业务代码打成一个文件，结果业务代码每次发版都会让 jQuery 的缓存一起失效。拆开之后，jQuery 那个文件几乎不再下载，这一项就吃掉了总收益里相当大的一块。</p>
+<p>第三，minify 的安全边界。JS 里依赖自动分号插入的写法，比如 <code>return</code> 后面直接换行写返回值，压缩时可能被拼成一行导致语义变化；CSS 里针对 IE 的 hack 也可能被误判成注释删掉。压缩产物必须回归测试，不能直接上线。我们后来的做法是在构建脚本里跑一遍单元测试，压缩产物单独起一个静态服务，用抓包工具确认响应头里的 <code>Content-Encoding</code> 和 <code>Content-Length</code> 符合预期，再切换流量。</p>
+<p>第四，单文件过大的反效果。把请求数压到极限之后，首页 JS 变成一个 200 KB 的文件，它会长时间占满连接，首屏可交互时间并没有跟着下降。合理的分片比极端合并更实用。</p>
+<p>第五，Sprite 的维护成本。改一个图标要重新拼图，拼图位置一变，所有用到这张图的 <code>background-position</code> 都要跟着改。后来我们的约定是只往图末尾追加，不调整已有位置，才把这项成本压住。</p>
+<p>第六，忘了发缓存头。文件合并得再好，如果响应里既没有 <code>Expires</code> 也没有 <code>Cache-Control</code>，浏览器每次都要回源验证一次，合并省下的握手时间会被重新吐回去。静态资源至少要给一个未来一年的过期时间，配合文件名变更来主动失效。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>资源合并与压缩是两个独立的手段：合并消灭的是请求的固定开销，压缩消灭的是传输体积，两者要分开度量。这次的结论是，minify 拿走了大头，gzip 是稳定的第二级收益，合并在桌面端收益有限但在弱网上会被放大。真正容易翻车的地方不在技术，而在缓存策略和拆分粒度：合并得越激进，缓存失效的代价越大。所以我的建议是先量化再动手，用 YSlow 或 Page Speed 出一份基线，改完再跑一次，让每个决定都有数据支撑，而不是凭感觉合并。最后再补一句：合并与压缩解决的是「把资源送到浏览器」这一段的成本，代码本身的执行效率是另一条战线，那是下一篇要谈的事。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>资源合并与压缩的收益分析</p><p><a href="https://987763485.github.io/2013/03/14/资源合并与压缩的收益分析/">https://987763485.github.io/2013/03/14/资源合并与压缩的收益分析/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2013-03-14</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-17</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/web%E5%89%8D%E7%AB%AF/">web前端</a><a class="link-muted mr-2" rel="tag" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/">性能优化</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2013/03/16/DOM%E5%A2%9E%E5%88%A0%E6%94%B9%E6%9F%A5%E4%B8%8E%E6%96%87%E6%A1%A3%E7%A2%8E%E7%89%87DocumentFragment/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">DOM 增删改查与文档碎片 DocumentFragment</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2013/03/07/JavaScript%E4%B8%A5%E6%A0%BC%E6%A8%A1%E5%BC%8Fstrict%E7%9A%84%E4%BD%9C%E7%94%A8/"><span class="level-item">JavaScript 严格模式 strict 的作用</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

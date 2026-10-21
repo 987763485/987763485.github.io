@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>办公网终端安全 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="办公网终端是企业里数量最多、变化最快、也最容易被忽视的一类资产。服务器可以关在机房里看护，笔记本却每天出现在会议室、咖啡馆和出差途中，既连着内网，又连着互联网，还会插上员工自己的手机与数据线。本文面向负责企业安全与终端运维的读者，讨论办公终端自身的安全建设：从责任边界与资产归属谈起，落到基线、检测响应、补丁排期、外设管控、钓鱼防护、准入隔离与数据外发，最后给出可度量的指标与常见失败模式。"><meta property="og:type" content="blog"><meta property="og:title" content="办公网终端安全"><meta property="og:url" content="https://987763485.github.io/2023/09/17/%E5%8A%9E%E5%85%AC%E7%BD%91%E7%BB%88%E7%AB%AF%E5%AE%89%E5%85%A8/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="办公网终端是企业里数量最多、变化最快、也最容易被忽视的一类资产。服务器可以关在机房里看护，笔记本却每天出现在会议室、咖啡馆和出差途中，既连着内网，又连着互联网，还会插上员工自己的手机与数据线。本文面向负责企业安全与终端运维的读者，讨论办公终端自身的安全建设：从责任边界与资产归属谈起，落到基线、检测响应、补丁排期、外设管控、钓鱼防护、准入隔离与数据外发，最后给出可度量的指标与常见失败模式。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2023-09-16T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-19T05:32:37.447Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="网络安全"><meta property="article:tag" content="等级保护"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2023/09/17/%E5%8A%9E%E5%85%AC%E7%BD%91%E7%BB%88%E7%AB%AF%E5%AE%89%E5%85%A8/"},"headline":"办公网终端安全","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2023-09-16T16:00:00.000Z","dateModified":"2026-10-19T05:32:37.447Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"办公网终端是企业里数量最多、变化最快、也最容易被忽视的一类资产。服务器可以关在机房里看护，笔记本却每天出现在会议室、咖啡馆和出差途中，既连着内网，又连着互联网，还会插上员工自己的手机与数据线。本文面向负责企业安全与终端运维的读者，讨论办公终端自身的安全建设：从责任边界与资产归属谈起，落到基线、检测响应、补丁排期、外设管控、钓鱼防护、准入隔离与数据外发，最后给出可度量的指标与常见失败模式。"}</script><link rel="canonical" href="https://987763485.github.io/2023/09/17/%E5%8A%9E%E5%85%AC%E7%BD%91%E7%BB%88%E7%AB%AF%E5%AE%89%E5%85%A8/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2023-09-16T16:00:00.000Z" title="9/17/2023, 12:00:00 AM">2023-09-17</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a></span><span class="level-item">1 小时读完 (大约7460个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">办公网终端安全</h1><div class="content"><p>办公网终端是企业里数量最多、变化最快、也最容易被忽视的一类资产。服务器可以关在机房里看护，笔记本却每天出现在会议室、咖啡馆和出差途中，既连着内网，又连着互联网，还会插上员工自己的手机与数据线。本文面向负责企业安全与终端运维的读者，讨论办公终端自身的安全建设：从责任边界与资产归属谈起，落到基线、检测响应、补丁排期、外设管控、钓鱼防护、准入隔离与数据外发，最后给出可度量的指标与常见失败模式。</p>
+<p>本文只讨论办公终端本身，勒索软件防护、红蓝对抗与安全运营中心的建设各有专文。全文口径是防御与建设，不提供任何绕过终端防护、卸载检测组件或窃取凭据的方法。</p>
+<h2 id="威胁从哪里来，责任归到谁身上"><a href="#威胁从哪里来，责任归到谁身上" class="headerlink" title="威胁从哪里来，责任归到谁身上"></a>威胁从哪里来，责任归到谁身上</h2><h3 id="终端为什么天生薄弱"><a href="#终端为什么天生薄弱" class="headerlink" title="终端为什么天生薄弱"></a>终端为什么天生薄弱</h3><p>办公终端与其他资产的差别不在于软件更落后，而在于它同时具备三个属性。一是物理暴露：终端离开受控机房的每一分钟，都在承受遗失、被盗、被短暂接触、被旁观屏幕的风险，一块未加密的磁盘被人拿走十几分钟就足以把整机数据拷走。二是混合使用：同一台机器既是办公入口也是个人设备，员工在上面登录私人邮箱、装来路不明的小工具，浏览器与邮件因此成为最主要的两条外部输入通道。三是身份与会话的落点：单点登录的令牌、浏览器保存的凭据、聊天工具记住的会话，全都落在这块磁盘和这段内存里，拿下一台终端往往不需要再攻破边界。三个属性叠加，决定了思路不是把它围起来，而是假设它随时可能被命中、随时可能丢失，然后让可损失半径尽可能小。</p>
+<h3 id="资产归属决定责任边界"><a href="#资产归属决定责任边界" class="headerlink" title="资产归属决定责任边界"></a>资产归属决定责任边界</h3><p>技术手段能不能落地，取决于一个管理前提：这台设备我们有没有权利管。配发设备最干净，公司有完整处置权，可以强制基线、加密与检测代理，也可以在员工离职时远程锁定与擦除。员工自有设备用于办公就是常说的 BYOD，矛盾在于公司希望在自己那部分数据周围建一道墙，而员工不希望公司看见私人照片和私人消息；两边都合理，所以任何策略都必须写进书面政策与知情同意。外包与驻场人员设备常被漏掉，人员流动更快、管理关系更弱，务实做法是不接受自带电脑进来办公。归属清楚了，责任才能落到纸上：谁负责打补丁，谁负责报失，设备丢失后由谁在什么时限内执行远程锁定。结论只有一条：每台终端必须有一个在职的、明确的责任人。</p>
+<h3 id="BYOD-的三条路线"><a href="#BYOD-的三条路线" class="headerlink" title="BYOD 的三条路线"></a>BYOD 的三条路线</h3><p>面对自有设备办公，企业通常只有三条路。禁止：只允许配发设备接入办公资源；它最容易讲清楚，也最容易在研发、高管、外勤这类岗位撞墙，一旦撞墙而管理层不出面维持，政策就变成纸面文章，实际状态是人人在违规、无人被追究。容器化：设备仍归员工，公司划出一块受管区域，企业邮箱、企业网盘与内网应用被关在里面，区域之间不共享剪贴板与文件，离职时只移除这个区域；它在移动端相对成熟，桌面端体验一般。完全管理：基线、补丁、代理全装，实质是把员工设备当作公司设备，沟通成本最高。无论选哪条，原则是共同的：不因为设备归个人，就让它以管理员身份自由接入核心系统。</p>
+<h2 id="基线：先把基本功做扎实"><a href="#基线：先把基本功做扎实" class="headerlink" title="基线：先把基本功做扎实"></a>基线：先把基本功做扎实</h2><p>基线说的是一台终端至少满足哪些条件，才算合格地上线办公。它是所有终端安全投入里性价比最高的一层：不依赖任何高级检测能力，却能挡住绝大多数低水平的攻击与事故。工具可以后买，基线不能后补。</p>
+<h3 id="磁盘加密与屏幕锁定"><a href="#磁盘加密与屏幕锁定" class="headerlink" title="磁盘加密与屏幕锁定"></a>磁盘加密与屏幕锁定</h3><p>整盘加密解决的是设备离开控制之后的问题：设备丢失、送修或硬盘被拆下，只要磁盘处于加密状态且恢复密钥由公司托管，这些场景就不会直接演变成数据泄漏事件。Windows 侧常见的是 BitLocker，macOS 侧是 FileVault，Linux 桌面通常是 LUKS。落地时有三个容易漏掉的细节：加密要配合可信启动并加 PIN 或密码，否则开机自动解锁形同虚设；恢复密钥要托管到企业可控之处并按人核对；加密状态必须可持续核查，而不是装机时人工勾选一次。屏幕锁定是同一主题下成本最低的一项：闲置若干分钟自动锁屏、唤醒必须重新认证，由平台强制下发而不是靠员工自觉。</p>
+<h3 id="补丁窗口与更新权"><a href="#补丁窗口与更新权" class="headerlink" title="补丁窗口与更新权"></a>补丁窗口与更新权</h3><p>基线里的补丁项不是有没有开自动更新，而是从厂商发布到这台机器真正装上最长允许多少天，这就是补丁窗口，通常写成安全更新与功能更新两个最大容忍天数。一个常见难点是：员工关掉自动重启后，补丁处于已下载而未生效的状态，报表上却显示已安装。核查必须区分计划到位、已下载、已重启生效三种状态，否则补丁及时率会被自己的报表骗过。</p>
+<h3 id="本地管理员权限"><a href="#本地管理员权限" class="headerlink" title="本地管理员权限"></a>本地管理员权限</h3><p>本地管理员是终端上最高危的权限，也是最容易被业务需要磨掉的基线：它一开，检测代理就可能被停用或篡改、加密状态可能被关掉、任何从浏览器下载的程序都能安静地常驻。</p>
+<p>务实的口径是默认拒绝、按需短时授予：常规办公账号不是本地管理员；软件安装走公司软件中心，或提交申请由运维远程执行；确有特殊需要的岗位走例外流程，授予有时限的提升权限并留痕到人。收紧这项权限会遇阻力，降低摩擦的正确做法不是把权限还回去，而是先把没有权限时的替代路径建起来。</p>
+<h3 id="软件白名单与安装管控"><a href="#软件白名单与安装管控" class="headerlink" title="软件白名单与安装管控"></a>软件白名单与安装管控</h3><p>软件管控有两种写法。黑名单维护一份不许装的列表，它永远落后于新出现的软件；白名单维护一份允许装的列表，其余一律不许，更适合岗位软件种类有限的办公终端。关键在于名单够用且更新够快：如果装一个 PDF 批注工具也要走一周流程，业务侧就会改用网页版和私人设备绕开。下面的策略片段说明基线应该是什么样子，字段依平台而定，数值均为示意。</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 办公笔记本基线策略片段（示意）</span></span><br><span class="line"><span class="attr">baseline:</span></span><br><span class="line">  <span class="attr">name:</span> <span class="string">office-laptop-2023q3</span></span><br><span class="line">  <span class="attr">disk_encryption:</span> <span class="string">required</span>          <span class="comment"># 整盘加密，恢复密钥由平台托管</span></span><br><span class="line">  <span class="attr">screen_lock:</span></span><br><span class="line">    <span class="attr">idle_minutes:</span> <span class="number">10</span>                 <span class="comment"># 闲置自动锁屏</span></span><br><span class="line">    <span class="attr">auth_on_wake:</span> <span class="literal">true</span>               <span class="comment"># 唤醒必须重新认证</span></span><br><span class="line">  <span class="attr">patch:</span></span><br><span class="line">    <span class="attr">security_max_days:</span> <span class="number">14</span>            <span class="comment"># 安全更新最大容忍天数</span></span><br><span class="line">    <span class="attr">feature_max_days:</span> <span class="number">45</span></span><br><span class="line">    <span class="attr">reboot_required_check:</span> <span class="literal">true</span>      <span class="comment"># 区分&quot;已下载&quot;与&quot;已生效&quot;</span></span><br><span class="line">  <span class="attr">local_admin:</span> <span class="string">deny_by_default</span></span><br><span class="line">  <span class="attr">software_control:</span> <span class="string">allowlist</span></span><br><span class="line">  <span class="attr">edr_agent:</span> <span class="string">required_and_running</span>    <span class="comment"># 代理存在且处于运行状态</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="基线必须可核查"><a href="#基线必须可核查" class="headerlink" title="基线必须可核查"></a>基线必须可核查</h3><p>没有核查手段的基线等于没有基线。判断标准是能不能在任何一天早上给出一张清单：应满足多少台、实际满足多少台、不满足的是谁。</p>
+<table>
+<thead>
+<tr>
+<th>基线项</th>
+<th>建议口径</th>
+<th>核查方式</th>
+<th>常见偏差</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>整盘加密</td>
+<td>全部配发设备强制开启</td>
+<td>平台状态报告</td>
+<td>送修后重装漏开</td>
+</tr>
+<tr>
+<td>屏幕锁定</td>
+<td>10 分钟闲置、唤醒重认证</td>
+<td>平台策略比对</td>
+<td>员工改回本地设置</td>
+</tr>
+<tr>
+<td>安全补丁</td>
+<td>14 天内生效</td>
+<td>重启后版本核对</td>
+<td>只下载未生效</td>
+</tr>
+<tr>
+<td>本地管理员</td>
+<td>默认拒绝，时限授予</td>
+<td>组成员审计</td>
+<td>长期授出未回收</td>
+</tr>
+<tr>
+<td>软件管控</td>
+<td>岗位族白名单</td>
+<td>安装事件与清单比对</td>
+<td>走网页版与私人设备</td>
+</tr>
+<tr>
+<td>检测代理</td>
+<td>在线且运行</td>
+<td>心跳与版本报告</td>
+<td>长期关机后掉线</td>
+</tr>
+</tbody></table>
+<h2 id="终端检测与响应：EDR-的定位与部署注意"><a href="#终端检测与响应：EDR-的定位与部署注意" class="headerlink" title="终端检测与响应：EDR 的定位与部署注意"></a>终端检测与响应：EDR 的定位与部署注意</h2><p>终端检测与响应（Endpoint Detection and Response，下文简称 EDR）在终端上常驻一个采集与响应组件，把进程创建、网络连接、外设接入等行为上报，由服务端做检测与关联，必要时允许远程隔离与回溯。</p>
+<h3 id="它解决什么，不解决什么"><a href="#它解决什么，不解决什么" class="headerlink" title="它解决什么，不解决什么"></a>它解决什么，不解决什么</h3><p>EDR 的价值有两块：可见性，即事后能回答这台机器这两周做过什么；响应速度，即隔离动作可以在几分钟内完成。但靠 EDR 挡住所有威胁是不切实际的期待，它不替代基线，也替代不了邮件网关与准入——等到它报告可疑进程时，钓鱼那一步已经成功了。合理的定位是：基线负责让事故不发生或发生后损失有限，EDR 负责让已经发生的事故尽早被发现。</p>
+<h3 id="覆盖率是第一指标"><a href="#覆盖率是第一指标" class="headerlink" title="覆盖率是第一指标"></a>覆盖率是第一指标</h3><p>最常见的错误，是用我们上了 EDR 代替我们覆盖了多少终端。检测效果几乎线性地依赖覆盖率，而覆盖率上不去的原因很朴素：台账不全、长期关机的机器从不装、外包与共享设备被漏掉。顺序应当是先把台账做准，再谈覆盖率；报表要区分注册了与最近若干天有心跳，后者才是真的在线，新入职也应以代理心跳正常作为开通办公网权限的前提。</p>
+<h3 id="性能预算要提前算"><a href="#性能预算要提前算" class="headerlink" title="性能预算要提前算"></a>性能预算要提前算</h3><p>EDR 装在员工日常使用的机器上，性能问题会直接转化为安全政策的失败：表现明显时，员工的第一反应不是报障，而是想办法让它安静下来。务实做法是在采购与试点阶段就把约束写清楚——试点选负载最重的岗位，比较真实工作负载并给出可接受的退化上限；策略变更先几十台再全量，并保留回滚能力。</p>
+<h3 id="误报处理要有流程"><a href="#误报处理要有流程" class="headerlink" title="误报处理要有流程"></a>误报处理要有流程</h3><p>任何检测系统都会误报，关键在于误报如何被处理，一个健康的流程大致如下。</p>
+<pre class="mermaid">sequenceDiagram
+    participant A as 终端代理
+    participant B as 检测平台
+    participant C as 一线值守
+    participant D as 终端责任人
+    A->>B: 上报行为数据
+    B->>C: 生成告警并附上下文
+    C->>C: 判定误报或真实风险
+    C->>D: 需要处置时通知责任人并说明原因
+    D->>A: 在授权下配合隔离或补充取证
+    C->>B: 回填结论、规则反馈与处置动作</pre>
+
+<p>流程里有三个容易忽视的点：告警上下文要完整，只有一行规则名的一线无法判断；误报要有出口，确认误报后必须有人推动规则调整并帮终端恢复原状；处置动作要分级，应保留只阻断外联这类更轻的手段，把整机隔离留给高置信度场景。</p>
+<h3 id="数据留存的合规约束"><a href="#数据留存的合规约束" class="headerlink" title="数据留存的合规约束"></a>数据留存的合规约束</h3><p>EDR 采集的是员工设备上的行为数据，天然落在个人信息保护的射程内。《个人信息保护法》确立的最小必要、目的限定与公开透明原则在这里非常具体：采集什么、留存多久、谁能看、为什么看，都要有答案。落地口径是四条：采集范围按目的收敛，检测所需的进程与网络元数据可以采，键盘记录、屏幕截图这类高侵入手段默认不开；留存期分级，明细数据保留较短周期满足追溯即可，超期要有自动清理；访问要受控，安全团队内部也按角色限制可查询的设备范围，查询行为本身留日志；告知要到位，在员工手册或知情同意里说明监控的存在与边界。</p>
+<h2 id="补丁与漏洞修复排期：按暴露面而不是分数排序"><a href="#补丁与漏洞修复排期：按暴露面而不是分数排序" class="headerlink" title="补丁与漏洞修复排期：按暴露面而不是分数排序"></a>补丁与漏洞修复排期：按暴露面而不是分数排序</h2><p>通用漏洞评分系统给出的分数，描述的是漏洞本身的技术严重性，不是它在我们环境里造成的后果。两个同分漏洞的实际风险可以差一个量级：一个需要用户先打开特定文件，另一个只要访问到恶意页面就能命中。完全按分数排序，结果往往是修了一堆不影响我们的问题，真正会被命中的那个还在队列里。判断优先级更有用的是回答四个问题：能否远程触发、是否需要用户交互、办公网里有多少台终端暴露在它的适用面上、修好之前是否已有基线或网关侧的缓解在起作用。</p>
+<pre class="mermaid">flowchart TD
+    S[收到漏洞通告] --> P1{是否可远程触发}
+    P1 -->|否| L[降级排队，季度内处理]
+    P1 -->|是| P2{办公网暴露面有多大}
+    P2 -->|范围很小| M[按月度排期]
+    P2 -->|主流终端普遍受影响| P3{是否已有缓解}
+    P3 -->|是| H[两周内完成]
+    P3 -->|否| U[72 小时内热修或临时管控]
+    L --> D[台账记录结论与依据]
+    M --> D
+    H --> D
+    U --> D</pre>
+
+<p>图中的时限是示意值，真正重要的是表达方式：优先级必须写成最大容忍天数乘以适用终端范围，而不是尽快修复。确实无法按期完成时走豁免而不是沉默，写清原因、影响评估、临时缓解措施、责任人与复核日期，到期必须重新打开。另一类容易被漏掉的来源是浏览器、办公套件这些第三方应用，它们不在系统更新通道里，却同样需要进入排期与统计。</p>
+<h2 id="外设与移动介质管控"><a href="#外设与移动介质管控" class="headerlink" title="外设与移动介质管控"></a>外设与移动介质管控</h2><p>外设是一类攻击成本极低、业务必要性又极高的风险面，最容易被一刀切。先把东西分开看：移动存储的风险是内部数据被一次性带走以及恶意文件在内网之间摆渡；网络类外设，比如 USB 网卡与手机热点，能把未受控设备接进内网，是最难察觉的一类风险；输入类设备通常不必限制，但任何被识别成键盘的设备都会走系统最信任的输入通道；投屏、扩展坞这类接口更适合用流程而不是技术硬拦。</p>
+<p>策略上建议对移动存储默认拒绝、按需例外：例外通过申请单受理，明确到哪台设备、什么用途、谁批准、什么时候失效，全过程留痕可审计。申请记录至少应包含以下字段（示意）。</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;requestId&quot;</span><span class="punctuation">:</span> <span class="string">&quot;USB-2023-0917-0042&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;assetTag&quot;</span><span class="punctuation">:</span> <span class="string">&quot;LT-0117&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;applicant&quot;</span><span class="punctuation">:</span> <span class="string">&quot;zhang.san&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;reasonCode&quot;</span><span class="punctuation">:</span> <span class="string">&quot;field-service&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;scope&quot;</span><span class="punctuation">:</span> <span class="string">&quot;single-device&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;expiresAt&quot;</span><span class="punctuation">:</span> <span class="string">&quot;2023-09-24&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;approver&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span><span class="string">&quot;itsm-owner&quot;</span><span class="punctuation">,</span> <span class="string">&quot;data-security&quot;</span><span class="punctuation">]</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;auditEvents&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span><span class="string">&quot;mount&quot;</span><span class="punctuation">,</span> <span class="string">&quot;unmount&quot;</span><span class="punctuation">,</span> <span class="string">&quot;copy&quot;</span><span class="punctuation">]</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>关键在最后那条失效时间：例外必须会过期。实务中最常见的漂移是三年前的临时授权一直留在系统里，审批人早已离职，策略却仍生效。建议例外以天为单位设置有效期，长期需要的场景要么转成岗位基线，要么到期重新申请。</p>
+<h2 id="钓鱼与社会工程防护"><a href="#钓鱼与社会工程防护" class="headerlink" title="钓鱼与社会工程防护"></a>钓鱼与社会工程防护</h2><p>前面几节处理的是设备，而办公终端最常见的入口是人。钓鱼邮件、电话与聊天工具伪装的社会工程，针对的都是同一个弱点：一个被信任的身份在错误的场景里提出了看似合理的要求。2022 年 LastPass 披露的事件、2023 年 MOVEit 相关的一连串事件都说明同一件事：初始入口往往不是什么高深技术，而是一次看起来正常的登录。</p>
+<h3 id="邮件侧先做分层拦截"><a href="#邮件侧先做分层拦截" class="headerlink" title="邮件侧先做分层拦截"></a>邮件侧先做分层拦截</h3><p>邮件网关是第一道，也是必须真正配置过的那一道。值得做的几层依次是：校验发域身份凭据，SPF、DKIM、DMARC 到 2023 年已足够成熟，策略要渐进收紧，先看报告再提升到拒绝；对正文与附件中的链接做改写或预检，把“点开就走”变成“经过一次检查”；识别仿冒域名，并把可疑的外部发件人显式标记出来。网关拦不住所有钓鱼，它的作用是把明显问题挡在外面、给剩下的打上标记，从而降低判断负担。</p>
+<h3 id="培训与演练都要有边界"><a href="#培训与演练都要有边界" class="headerlink" title="培训与演练都要有边界"></a>培训与演练都要有边界</h3><p>安全意识培训最常见的失败是形式化：全员看一遍年度课件、签收一个回执。有效的做法差别在几件具体的事上——内容要用本行业本岗位真实会遇到的场景，比一张通用示意图有用得多；频次要高于一年一次；入职当天就该完成第一次；高权限岗位承担更高要求。还有一点常被忽略：培训与演练的结论不应作为处罚依据，把命中率变成个人考核，员工很快学会的是“中了也不吭声”，而这恰恰摧毁了上报意愿。一个便捷的一键举报入口加上快速反馈，能让员工成为分布式的传感器，举报量往往比命中率更能说明安全状态是否健康。</p>
+<p>内部钓鱼演练是合理手段，但边界必须清楚：它应当是书面授权的活动，事先约定参与范围、时间窗、责任人与中止条件；只面向本公司员工与本公司系统，不扩展到其他单位；结果只用于统计与改进，不针对个人；不采集任何真实凭据，不投放真实的恶意程序。具体如何设计诱饵与话术模板不在本文讨论范围，也不应作为可复制素材在内部文档里流传。演练之后要有闭环：命中率高的部门补针对性培训，被举报最多的邮件类型反馈给网关规则。</p>
+<p>还要承认社会工程的成功率不可能压到零，所以要假设它会成功，然后在终端侧限制后果：多因素认证让即使被提交的口令也不足以单独完成登录，而收紧过的本地管理员权限使误点后落地的程序难以持久化，两者合起来才是第二道防线。</p>
+<h2 id="准入与网络隔离"><a href="#准入与网络隔离" class="headerlink" title="准入与网络隔离"></a>准入与网络隔离</h2><p>最基础也最容易被偷懒的一条是：来客的设备不该进办公网。访客网络应当是独立的逻辑区段，默认只能出到互联网，不能访问内网资源，与办公网段之间不路由可达；临时演示或联调走有时限的临时授权。</p>
+<p>有线与无线都应当走基于端口的网络访问控制，即 802.1X，用证书或账号证明“谁的设备在接入”。常见偏差是只做了用户认证、没做设备认证，或者有线网仍在用 MAC 地址白名单——MAC 地址可被观察与改写，不足以作为准入凭据。在认证之上再加一层终端状态核验：接入时检查这台设备是否纳管、基线是否达标，达标则按角色放通，不达标则落到受限区段。</p>
+<pre class="mermaid">flowchart TD
+    A[终端发起入网] --> B{身份与设备认证是否通过}
+    B -->|否| X[拒绝接入]
+    B -->|是| C{终端状态核验}
+    C -->|合规| D[办公网段，按角色最小放通]
+    C -->|不合规| E[受限网段，仅放行补丁与特征更新]
+    C -->|未纳管或外部设备| F[访客网段，与办公网隔离]
+    E -->|整改完成后复核| C</pre>
+
+<p>受限网段的要点是给它一条自我修复的路：只放行补丁源、恶意代码特征源与帮助台地址，让不合规终端自动补齐再复核，而不是简单切断。</p>
+<p>零信任的整体架构属于专门主题，本文只取它与办公终端相关的那一半：把终端状态当作访问决策的必要输入。位置不再自动授予权限，每次访问应用时都要重新评估这个人、这台设备与当前状态是否满足该应用的策略。对终端建设的直接影响是，加密状态、基线达标、代理在线、补丁到位这些字段要能以接口形式提供给接入策略引擎。</p>
+<h2 id="数据外发与离职处置"><a href="#数据外发与离职处置" class="headerlink" title="数据外发与离职处置"></a>数据外发与离职处置</h2><p>终端上的数据外发通道比想象中多：邮件与附件、网盘与个人邮箱、即时通讯的文件传输、浏览器上传。技术管控能覆盖其中一部分，但真正决定风险量级的是数据在终端上是否落地，因此优先级最高的原则是能让数据不落终端就不落：能用虚拟桌面就不发本地文件，能用带权限的在线文档就不发附件，能用受管网盘就不要让员工改用个人网盘。移动设备与云同步要单独划界：手机作为查看与沟通的通道是合理的，作为办公文件的存放地则应当限制；个人云盘与设备自带的自动同步会绕过所有终端管控，因为它根本不经过公司网络，这一点只能在应用层的访问控制上解决。</p>
+<p>离职是终端风险最集中的时点，靠临时提醒必然漏项，需要一张固定清单：账号在约定时点停用，已发放的令牌与会话被撤销，设备在约定期限内回收，磁盘擦除被执行并留下回执，该员工名下所有例外授权被关闭，共享文档所有权完成移交，个人设备上的公司数据按容器约定移除并由本人书面确认。清单的关键是每项有责任人和时限、能事后核查。</p>
+<h2 id="指标、监控边界与常见失败"><a href="#指标、监控边界与常见失败" class="headerlink" title="指标、监控边界与常见失败"></a>指标、监控边界与常见失败</h2><p>终端安全最容易犯的汇报错误，是把工作描述成能力建设：上了什么工具、发了什么制度。四个指标通常够用。</p>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>含义</th>
+<th>常见陷阱</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>补丁及时率</td>
+<td>在窗口内完成修复的终端占比</td>
+<td>只统计已下载，不统计已生效</td>
+</tr>
+<tr>
+<td>基线达标率</td>
+<td>全部基线项均满足的终端占比</td>
+<td>分项都好看，合起来没人看</td>
+</tr>
+<tr>
+<td>终端覆盖率</td>
+<td>检测代理在线终端占台账的比例</td>
+<td>拿注册数代替心跳数</td>
+</tr>
+<tr>
+<td>事件响应时长</td>
+<td>从发现到完成处置的耗时</td>
+<td>只统计闭环工单，漏掉未上报</td>
+</tr>
+</tbody></table>
+<p>指标要按台账口径计算并能被复核。下面这段脚本示意最常见的做法：从平台导出的核查结果算出达标率，字段均为示意值。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 输入列：资产编号,责任人,结果(pass 或 fail)</span></span><br><span class="line">awk -F<span class="string">&#x27;,&#x27;</span> <span class="string">&#x27;NR&gt;1 &#123; total++; if ($3 == &quot;pass&quot;) ok++ &#125;</span></span><br><span class="line"><span class="string">     END &#123; if (total)</span></span><br><span class="line"><span class="string">             printf &quot;基线达标率 %.2f%%（达标 %d / 应查 %d）\n&quot;,</span></span><br><span class="line"><span class="string">                    ok / total * 100, ok, total &#125;&#x27;</span> baseline-2023-09.csv</span><br></pre></td></tr></table></figure>
+
+<p>每个未达标的终端要能追到一个在职的责任人和一个期限，否则报表会常年停在同一组数值上。</p>
+<h3 id="监控的最小必要"><a href="#监控的最小必要" class="headerlink" title="监控的最小必要"></a>监控的最小必要</h3><p>终端上可以做的监控远比该做的多：上网记录、屏幕水印、位置信息、剪贴板内容都能采。判断标准不是技术上能不能，而是最小必要——每一项监控都要能回答目的、必要性、告知、留存期、访问控制这五个问题，答不出来的那一项就不要开。等级保护与个人信息保护对此分别有要求，以现行有效的标准与法规原文为准；工程上的落法是把已开启的监控项列成清单，逐项写明谁有权看、看多久，并定期复核这张清单。</p>
+<h3 id="两类典型失败"><a href="#两类典型失败" class="headerlink" title="两类典型失败"></a>两类典型失败</h3><p>第一类是只买工具不管基线。EDR、网关、准入设备一件不缺，但终端上没有强制加密、用户仍是本地管理员、补丁拖延数月。这种情况下工具的效果会被大量抵消：代理可被停用，告警里挤满基线缺失产生的噪声，最后以工具没用为由砍掉预算。判断终端安全成熟度，先看基线达标率的数字是否存在，而不是采购清单的长度。</p>
+<p>第二类是策略一刀切导致绕过。所有外设一律禁、所有软件一律审批、所有网站一律拦，短期内报表非常漂亮，业务侧的反应却是把工作搬到私人手机和家庭网络上完成，那里既没有终端管控也没有日志留痕，风险反而更大。健康的策略承认例外并管理例外：给出可接受的例外路径、给申请一个明确时限、给例外留下可审计的记录，并定期清掉。策略的目标是让合规的路比不合规的路更省事，做不到这一点的政策，最终都会在现实里被绕过。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>办公终端安全的重心不在高级能力，而在基本事实是否成立：设备归谁管、数据是否加密、权限是否收紧、补丁是否在窗口内生效、代理是否真的在线、例外是否有期限。基线是地基，EDR 与准入是地基之上的可见性与控制手段，钓鱼防护处理无法用技术消除的人的环节，数据外发与监控边界决定事故后的代价。把这些落到补丁及时率、基线达标率、终端覆盖率、事件响应时长这四个可复核的数字上，终端建设才能从一组工具变成可管理的对象。务实的顺序通常是：先做台账与责任人，再做基线与核查，然后谈覆盖率与响应流程，最后才是叠加更复杂的检测与接入策略。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://www.cisecurity.org/controls/">CIS Controls</a></li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/53/r5/final">NIST SP 800-53 Revision 5</a></li>
+<li><a href="https://csrc.nist.gov/pubs/sp/800/61/r2/final">NIST SP 800-61 Revision 2</a></li>
+<li>ISO&#x2F;IEC 27001:2022</li>
+<li>GB&#x2F;T 22239-2019《信息安全技术 网络安全等级保护基本要求》</li>
+<li>《中华人民共和国个人信息保护法》（2021 年 11 月 1 日施行）</li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>办公网终端安全</p><p><a href="https://987763485.github.io/2023/09/17/办公网终端安全/">https://987763485.github.io/2023/09/17/办公网终端安全/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2023-09-17</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-19</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a><a class="link-muted mr-2" rel="tag" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/">等级保护</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2023/09/24/%E7%AD%89%E4%BF%9D%E6%B5%8B%E8%AF%84%E9%A1%B9%E8%AF%A6%E8%A7%A3%E5%AE%89%E5%85%A8%E5%8C%BA%E5%9F%9F%E8%BE%B9%E7%95%8C/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">等保测评项详解：安全区域边界</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2023/09/10/API%E5%AE%89%E5%85%A8%E8%AE%BE%E8%AE%A1%E4%B8%8E%E6%B5%8B%E8%AF%95/"><span class="level-item">API 安全设计与测试</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

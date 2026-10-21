@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>密码应用方案编制 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="本文面向要动手编写密码应用方案的安全工程师、系统集成商与建设方项目负责人。读完你会知道这份文档在商用密码应用安全性评估（下文简称密评）全流程里处于什么位置、应当包含哪些章节，以及每一章具体怎么写才能经得起评审。与讲算法合规要求、密钥管理要求、评估要点与改造复盘的同系列文章不同，本篇只回答一个问题：密码应用方案到底该怎么落到纸面上。"><meta property="og:type" content="blog"><meta property="og:title" content="密码应用方案编制"><meta property="og:url" content="https://987763485.github.io/2023/05/23/%E5%AF%86%E7%A0%81%E5%BA%94%E7%94%A8%E6%96%B9%E6%A1%88%E7%BC%96%E5%88%B6/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="本文面向要动手编写密码应用方案的安全工程师、系统集成商与建设方项目负责人。读完你会知道这份文档在商用密码应用安全性评估（下文简称密评）全流程里处于什么位置、应当包含哪些章节，以及每一章具体怎么写才能经得起评审。与讲算法合规要求、密钥管理要求、评估要点与改造复盘的同系列文章不同，本篇只回答一个问题：密码应用方案到底该怎么落到纸面上。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2023-05-22T16:00:00.000Z"><meta property="article:modified_time" content="2026-10-19T03:35:30.092Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="网络安全"><meta property="article:tag" content="等级保护"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2023/05/23/%E5%AF%86%E7%A0%81%E5%BA%94%E7%94%A8%E6%96%B9%E6%A1%88%E7%BC%96%E5%88%B6/"},"headline":"密码应用方案编制","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2023-05-22T16:00:00.000Z","dateModified":"2026-10-19T03:35:30.092Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"本文面向要动手编写密码应用方案的安全工程师、系统集成商与建设方项目负责人。读完你会知道这份文档在商用密码应用安全性评估（下文简称密评）全流程里处于什么位置、应当包含哪些章节，以及每一章具体怎么写才能经得起评审。与讲算法合规要求、密钥管理要求、评估要点与改造复盘的同系列文章不同，本篇只回答一个问题：密码应用方案到底该怎么落到纸面上。"}</script><link rel="canonical" href="https://987763485.github.io/2023/05/23/%E5%AF%86%E7%A0%81%E5%BA%94%E7%94%A8%E6%96%B9%E6%A1%88%E7%BC%96%E5%88%B6/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2023-05-22T16:00:00.000Z" title="5/23/2023, 12:00:00 AM">2023-05-23</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a></span><span class="level-item">1 小时读完 (大约7642个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">密码应用方案编制</h1><div class="content"><p>本文面向要动手编写密码应用方案的安全工程师、系统集成商与建设方项目负责人。读完你会知道这份文档在商用密码应用安全性评估（下文简称密评）全流程里处于什么位置、应当包含哪些章节，以及每一章具体怎么写才能经得起评审。与讲算法合规要求、密钥管理要求、评估要点与改造复盘的同系列文章不同，本篇只回答一个问题：密码应用方案到底该怎么落到纸面上。</p>
+<h2 id="密码应用方案在密评流程中的位置"><a href="#密码应用方案在密评流程中的位置" class="headerlink" title="密码应用方案在密评流程中的位置"></a>密码应用方案在密评流程中的位置</h2><p>要写好一份方案，先得想清楚它在整条流程里被谁、在什么时候、用来做什么。密评不是一次性的考试，而是围绕一个信息系统从设计到运行的连续过程。把它拆开看，大致是四个阶段串起来的闭环。</p>
+<pre class="mermaid">flowchart TD
+    A[规划设计<br/>编制密码应用方案] --> B[建设整改<br/>采购部署与改造]
+    B --> C[系统测评<br/>第三方机构现场评估]
+    C --> D[运行复评<br/>变更触发与周期性复评]
+    D --> A</pre>
+
+<p>方案落在第一个阶段，是后面三个阶段的共同基线：对建设方，它是采购与改造的依据，买什么密码产品、改哪些接口、密钥放在哪里都由它定口径；对测评机构，它是取证的对照物，测评时会把系统实际状态与方案承诺的设计逐条比对，看措施是否落地、是否达标；对合规，它是向监管与主管方说明本系统密码应用思路的正式载体。</p>
+<p>也就是说，方案是要对上（合规）、对内（建设）、对外（测评取证）三线交代的文件。写的时候脑子里要始终挂着一个问题：这一句将来拿什么证据来验证？凡是写不出验证方式的句子，多半是空话。</p>
+<p>本文不展开密评现场的评估要点，也不复盘改造过程中的坑，那些是同系列其它篇目的主题，本篇只聚焦把方案这份文档本身写扎实。还要交代年代背景：修订后的《商用密码管理条例》已于 2023 年 4 月 27 日公布、2023 年 7 月 1 日施行，本文写作时它尚未生效，行文按“已公布、即将施行”表述，但已公布的条文取向足以指导我们组织方案的合规依据。</p>
+<h2 id="方案文档的整体结构"><a href="#方案文档的整体结构" class="headerlink" title="方案文档的整体结构"></a>方案文档的整体结构</h2><p>一份能用的方案，章节不是随意堆出来的，而是沿着“要保护什么→需要什么样的密码能力→怎么设计→怎么落地→怎么验证”这条可追溯的线索展开。常见的骨架如下：</p>
+<ol>
+<li>应用系统与业务分析：把系统边界、网络结构、数据流、资产和业务重要性讲清楚。</li>
+<li>密码需求分析：从合规、业务、威胁三个来源提炼出可编号的密码安全需求。</li>
+<li>总体设计：给出密码应用总体架构、信任来源、密码保障体系的分层视图。</li>
+<li>技术安全措施：按物理和环境、网络和通信、设备和计算、应用和数据四个层面分别写。</li>
+<li>密钥管理设计：把密钥全生命周期的技术与管理动作落进方案。</li>
+<li>管理与运维、实施计划：制度与人员、建设与运行流程、应急处置、改造排期与风险。</li>
+<li>验证方法与附录：每条措施怎么验证，以及拓扑图、资产清单、需求对应矩阵等佐证材料。</li>
+</ol>
+<p>这个结构的关键不在分了八章还是九章，而在“可追溯”三个字。评审人翻方案时最想确认的是三个跳转：技术措施能否回溯到密码需求、需求能否回溯到业务或合规约束、措施能否前推到具体的验证方法。这三条线只要断一处，方案就露怯。下表把每章目的与评审人最关心的点列出来，可对照自查。</p>
+<table>
+<thead>
+<tr>
+<th>章节</th>
+<th>目的</th>
+<th>评审人最关心</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>系统与业务分析</td>
+<td>界定保护对象</td>
+<td>边界是否闭合、关键资产有无漏列</td>
+</tr>
+<tr>
+<td>密码需求分析</td>
+<td>转成可编号需求</td>
+<td>需求是否来自真实约束、能否被措施满足</td>
+</tr>
+<tr>
+<td>总体设计</td>
+<td>给出体系化蓝图</td>
+<td>信任根是否明确、分层是否自洽</td>
+</tr>
+<tr>
+<td>四类技术措施</td>
+<td>逐层落地密码能力</td>
+<td>措施与需求的对应、强度与合规论证</td>
+</tr>
+<tr>
+<td>密钥管理设计</td>
+<td>覆盖密钥全生命周期</td>
+<td>生成、存储、使用、销毁是否闭环</td>
+</tr>
+<tr>
+<td>管理与运维</td>
+<td>让措施长期运转</td>
+<td>制度是否配套、职责是否落到岗</td>
+</tr>
+<tr>
+<td>实施计划</td>
+<td>让方案可执行</td>
+<td>排期是否合理、风险是否被识别</td>
+</tr>
+<tr>
+<td>验证方法</td>
+<td>让措施可被证明</td>
+<td>是否给出可操作的验证手段</td>
+</tr>
+</tbody></table>
+<h2 id="应用系统与业务分析"><a href="#应用系统与业务分析" class="headerlink" title="应用系统与业务分析"></a>应用系统与业务分析</h2><p>方案的第一章最容易被人写得草率，但它恰恰决定了后面所有内容的地基。这一章的任务，是把“我们要保护的东西”从模糊的印象变成一张清晰的图。</p>
+<p>先写系统边界与网络结构。应用系统往往横跨多个区域：对外服务的前置区、承载业务逻辑的应用区、存放核心数据的存储区、运维管理的接入区，还可能有与上级单位或第三方机构互联的专线。要把区域间的连接关系、访问方向、边界设备画出来，标注哪些边界是需要密码防护的关键点——配一张网络拓扑图比写三段话都有用。</p>
+<p>再写数据流与业务场景。密码措施保护的是数据在流动与静止时的安全，要顺着业务把数据的来龙去脉走一遍：从哪个入口提交、经过哪些处理节点、敏感字段在哪一步被读写、最终存到哪里又被谁调取。每识别出一条涉及个人信息、重要业务数据或控制指令的数据流，就为后面的密码需求埋下一条线索。</p>
+<p>然后是资产与业务重要性。把服务器、终端、数据库、中间件、网络设备、密码设备列成清单，标注承载业务和数据的重要程度。这一步不是走形式：等级保护定级结果决定系统的整体安全等级，密码应用的强度设计要与之匹配——越核心越要安排更强的密码保障，而不是平均用力。这一章的落点是“哪里需要被密码保护”，凡涉及数据安全、身份真实、操作不可抵赖的点都要显式圈出来。</p>
+<h2 id="密码需求提炼与需求矩阵"><a href="#密码需求提炼与需求矩阵" class="headerlink" title="密码需求提炼与需求矩阵"></a>密码需求提炼与需求矩阵</h2><p>有了系统分析，接下来把它翻译成系统需要什么样的密码能力，这就是密码需求分析。需求不要拍脑袋写，可靠来源有三类。</p>
+<p>第一类是合规来源。等级保护的相关要求、《密码法》、即将施行的修订版《商用密码管理条例》对特定系统使用商用密码并开展密评的总体要求，以及行业主管部门规范性文件中的约定，都会转化为硬性需求，特点是“不做就不合规”。第二类是业务来源，从上一章的数据流里提炼：哪些数据传输时必须防窃听防篡改，哪些关键操作必须确认发起人身份并留下不可抵赖证据，哪些存量数据落盘就必须加密，特点是“不做业务就有风险”。第三类是威胁来源，结合攻击面考虑外部链路被监听、身份凭据被冒用、审计记录被删改、密钥被非法获取等，特点是“后果会在事故时暴露”。</p>
+<p>把这三类需求逐条编号，例如按 C（合规）、B（业务）、T（威胁）加序号编排。编号的价值在于可追溯——后面每一条技术措施都要挂上它满足的需求编号。下面这个把需求、措施层与验证串起来的矩阵，通常直接放进方案附录：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">需求编号  来源  需求描述              对应措施层      验证方法</span><br><span class="line">C-01     合规  关键身份需真实可靠      应用和数据      核查身份凭据签发记录</span><br><span class="line">B-01     业务  敏感数据落盘需加密      应用和数据      抽查存储介质密文</span><br><span class="line">B-02     业务  关键操作需防抵赖        应用和数据      验证签名与审计关联</span><br><span class="line">T-01     威胁  外部链路需防窃听        网络和通信      抓包确认链路加密生效</span><br></pre></td></tr></table></figure>
+
+<p>这张表把需求来源、对应措施层和验证方法串成一条线，是方案的脊柱。中间的对应措施层会在总体设计和四类措施里被逐层展开。</p>
+<h2 id="总体设计"><a href="#总体设计" class="headerlink" title="总体设计"></a>总体设计</h2><p>密码需求立起来后，总体设计要回答用一套什么样的体系去满足这些需求，先给出全局骨架，再进入四类措施的细节。</p>
+<p>总体设计的第一个关键决定是信任根从哪里来。系统里的身份真实性与数据完整性，追到底都要依赖某个被无条件信任的起点：可能是统一的数字证书体系，可能是集中管理的密钥基础设施，也可能是由持牌机构提供的签名验签或密钥托管服务。信任根一旦确定，所有涉及身份和完整性的措施都要向它靠拢，绝不能出现两处互相矛盾的信任假设。</p>
+<p>第二个关键决定是密码保障体系的分层：底层是物理与环境，往上依次是网络通信链路、设备与计算节点、应用与数据，密钥管理像一条纵线贯穿所有层，管理与运维在体系之外兜住运行。这种分层贴合测评的指标结构，也方便评审人判断每层有没有被照顾到。</p>
+<p>第三个关键决定是密码服务的供给形态：哪些能力由内部署的密码产品提供，哪些通过调用外部密码服务获得。它直接影响后面的选型与排期。</p>
+<p>总体设计宜配一张总体架构图，层次要与四类措施、密钥管理对应；但不要写成产品部署图，那是实施计划的事，这里表达的是逻辑结构与信任关系。</p>
+<h2 id="现状分析与差距识别"><a href="#现状分析与差距识别" class="headerlink" title="现状分析与差距识别"></a>现状分析与差距识别</h2><p>方案不能凭空画饼，必须站在“系统现在是什么样”的地基上。现状分析与差距识别这一章，就是把地基探清楚，把目标与现状之间的距离量出来。</p>
+<p>现状分析要盘点系统当前真实的密码应用状态，而不是理想状态：已部署哪些密码产品或模块、各用在什么位置；在用的算法与协议是自主商用密码算法还是仍在沿用的旧算法；密钥在哪里生成、存在哪里、由谁掌握、多久轮换一次；身份鉴别、传输加密、存储加密、签名哪些已有、哪些还是空白。</p>
+<p>盘现状要基于证据，不能靠访谈里的一句话。可靠做法是几路并进：核查设备与中间件的实际配置，确认声称启用的加密确实生效；在网络关键节点观察流量，判断链路是否真的加密；查阅密码设备的型号与证书材料确认合规性；与运维和业务人员分别访谈，把配置上的事实与流程上的习惯分开记录。访谈得到的说法，只有能落到配置或日志上的才算数。</p>
+<p>摸清现状后与方案目标逐条对照就得到差距。对照的坐标系有两个：需求矩阵里的每条需求，以及四类措施各自的保护目标。每条都给出明确判定，不要含糊：未覆盖、部分覆盖、已覆盖但不合规、已覆盖且达标。差距表是这一章最有价值的产出，直接决定实施计划里要改什么、按什么顺序改。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">目标项           现状                     判定           需补措施</span><br><span class="line">外部链路加密     仍用旧算法明文传输         不合规         改造为国密链路加密</span><br><span class="line">管理员登录鉴别   仅静态口令                 部分覆盖       增加证书或强鉴别</span><br><span class="line">核心数据落盘     明文存储                   未覆盖         引入存储加密与密钥管理</span><br><span class="line">关键操作留痕     有日志但未防篡改           部分覆盖       日志完整性保护</span><br></pre></td></tr></table></figure>
+
+<p>判定差距时要敢写“未覆盖”，别用“基本具备”“大体合规”这类含混词蒙过去——恰恰是这些空白，才证明了方案的必要性。</p>
+<h2 id="四类技术安全措施怎么写"><a href="#四类技术安全措施怎么写" class="headerlink" title="四类技术安全措施怎么写"></a>四类技术安全措施怎么写</h2><p>方案的技术主体是把密码能力按四个层面分别落地。这四层贴合测评的指标结构，下面按层说清要写什么、怎么写才和前面的需求对得上。</p>
+<h3 id="物理和环境安全"><a href="#物理和环境安全" class="headerlink" title="物理和环境安全"></a>物理和环境安全</h3><p>这一层保护承载系统的物理空间本身，典型对象是出入口控制的门禁记录和视频监控记录两类。它们本身也可能成为攻击目标——谁在什么时间进过机房，如果记录能被随意删改，物理安全的追溯就形同虚设。所以这一层的措施落点常在记录防篡改与存储完整性保护：保证门禁与监控的留存数据在保存期内不被篡改，访问这些记录的行为本身也被保护。要写到“哪个区域的哪类记录、用什么密码手段、保护到什么程度”，别停留在“加强物理安全”的口号上。</p>
+<h3 id="网络和通信安全"><a href="#网络和通信安全" class="headerlink" title="网络和通信安全"></a>网络和通信安全</h3><p>这一层管数据在网络里跑起来之后的安全，重点是边界和链路：跨不可信网络通信时启用的信道加密与完整性保护、网络边界设备建立连接时的身份鉴别、需要时的通信实体双向鉴别。写法上要把“哪条链路、用什么协议、达到什么强度、由哪类产品或服务支撑”说清楚；凡是声称链路已加密的，都要能回答用什么加密、抓包能否验证。不要罗列一堆协议名词却不指明用在哪条链路上。</p>
+<h3 id="设备和计算安全"><a href="#设备和计算安全" class="headerlink" title="设备和计算安全"></a>设备和计算安全</h3><p>这一层关注承载业务的服务器、终端、网络设备与操作系统本身：设备管理员登录的身份鉴别强度（是否从静态口令升级到基于密码技术的强鉴别）、远程管理通道的加密保护、设备启动与运行环境的完整性保护、运行日志与关键配置的完整性保护。写法上要把“哪一类设备、哪几个高危入口、对应哪条需求”对齐，并明确鉴别能力提升到什么程度、先在哪些设备上落地。</p>
+<h3 id="应用和数据安全"><a href="#应用和数据安全" class="headerlink" title="应用和数据安全"></a>应用和数据安全</h3><p>这是最直接关系业务数据的一层，也是密评里最容易被重点核查的一层。措施围绕四件事：应用用户的身份鉴别、重要访问控制信息的完整性、重要数据在传输和存储时的保密性与完整性、关键操作行为的不可否认性。写这一层务必把“什么是重要数据”回到第一章的数据流里去指认——个人信息、业务核心数据、控制指令各自的保密性和完整性由什么措施保证、和密钥怎么关联、防抵赖靠签名还是审计。只写“对敏感数据加密”却不说是哪一类数据、存在哪里、密钥谁管，评审人无法判定措施是否成立。</p>
+<p>四层写完要回看一眼：每条需求是不是都能在某一层的某条措施上找到落点，每条措施是不是都能回溯到某条需求。</p>
+<h2 id="算法与协议选型的论证写法"><a href="#算法与协议选型的论证写法" class="headerlink" title="算法与协议选型的论证写法"></a>算法与协议选型的论证写法</h2><p>四类措施里凡涉及“用什么算法、走什么协议”的地方，都要给出论证，而不是直接甩一个名字。论证缺失是方案评审里最常被挑的问题，因为它同时关系到合规与强度两件事。</p>
+<p>算法选型要同时过三道筛子。第一道是合规性：需要密码算法的位置优先考虑自主的商用密码算法——非对称场景常用 SM2，杂凑与完整性常用 SM3，对称加密常用 SM4，用了自主算法，合规方向才站得住。第二道是强度匹配：算法强度要和被保护数据的敏感程度、系统的生命周期相称，核心数据用弱算法不行，次要场景过度用力也属浪费。第三道是场景适配：加密、签名、杂凑、消息鉴别、密钥派生各有用途，选错类型的算法比选错算法更糟——用加密算法去做本该由签名承担的不可否认场景，逻辑上就不成立。</p>
+<p>论证要成一个完整的因果链，避免倒因为果：这个位置要解决什么问题→有哪些候选→为什么选它→强度与合规依据是什么。最常见的错误顺序是“因为采购的设备只支持某算法，所以这里就用它”——这是拿供给迁就需要，评审人一眼就能看出需求没被真正论证。关键用途的论证结构可按下表示例。</p>
+<table>
+<thead>
+<tr>
+<th>用途</th>
+<th>选用</th>
+<th>论证要点</th>
+<th>依据标准</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>用户身份与关键操作签名</td>
+<td>SM2</td>
+<td>非对称、支持不可否认，匹配防抵赖需求</td>
+<td>GB&#x2F;T 32918 系列</td>
+</tr>
+<tr>
+<td>数据完整性与杂凑</td>
+<td>SM3</td>
+<td>杂凑强度足够，配合签名或消息鉴别</td>
+<td>GB&#x2F;T 32905-2016</td>
+</tr>
+<tr>
+<td>重要数据存储加密</td>
+<td>SM4</td>
+<td>对称分组、性能与强度匹配批量加密</td>
+<td>GB&#x2F;T 32907-2016</td>
+</tr>
+<tr>
+<td>传输信道加密</td>
+<td>支持国密算法套的协议</td>
+<td>保障链路保密性与完整性</td>
+<td>GB&#x2F;T 39786-2021 对应层面</td>
+</tr>
+</tbody></table>
+<p>协议选型同理：传输加密要指明用的是哪种协议、配置了哪套密码算法套件，别只写“启用加密”；身份鉴别要说明是基于证书还是对称密钥、证书由哪个信任根签发。遗留兼容要特别处理：若短期内要和暂不支持国密算法的外部单位或旧接口对接，方案里不能悄悄把强度降级了事，而要显式写清哪些链路采用何种过渡方案、过渡的风险与何时收敛，并列入实施计划。至于算法本身合规性的细粒度口径，属于算法合规专题，本篇只强调选型必须带论证怎么写进方案。</p>
+<h2 id="密码产品与服务的选型口径"><a href="#密码产品与服务的选型口径" class="headerlink" title="密码产品与服务的选型口径"></a>密码产品与服务的选型口径</h2><p>有了算法与协议选型，接下来要回答这些能力靠什么支撑。形态无非三种：集成在系统内的密码模块、独立部署的密码产品、向外部机构调用的密码服务（如密钥托管、签名验签、时间戳）。每项关键措施都应写明由哪种形态支撑并给出理由。</p>
+<p>选型口径有四条。一是合规资质：采购的密码产品应通过商用密码产品认证、具备合规的型号与证书材料，这是支撑合规需求的前提，不能只图便宜买无资质的设备。二是能力匹配：产品或服务支持的算法、协议、性能与接口，要满足对应措施的强度与吞吐要求，核心链路的处理能力要经得起业务峰值。三是集成与密钥边界：部署在哪个位置、如何做高可用、密钥是否可导出、由谁掌握，都要写清楚，它直接连着密钥管理设计。四是服务的责任划分：调用外部密码服务时，要说明哪些责任由服务方承担、哪些仍由本方负责，以及可用性与数据边界约束，避免“买了服务就等于合规”的错觉。</p>
+<p>要提醒的是，这一节写的是选型口径与理由，不是一份产品品牌清单或报价单；产品与服务的具体合规认定细节另有专题，本篇只讲选型理由怎么写进方案。</p>
+<h2 id="密钥全生命周期设计怎么写进方案"><a href="#密钥全生命周期设计怎么写进方案" class="headerlink" title="密钥全生命周期设计怎么写进方案"></a>密钥全生命周期设计怎么写进方案</h2><p>四类措施用到的每项密码能力背后都牵着密钥，密钥一旦失控，算法与协议选得再好也白搭。密钥管理像一条纵线贯穿物理、网络、设备、应用四层，写作时要把它和措施对应起来：链路加密用什么密钥、存储加密的主密钥放在哪里、签名私钥由谁掌管、不同用途的密钥如何隔离。</p>
+<p>生命周期要逐环节落地，每个环节都回答“谁做、在哪做、用什么做、留下什么记录”这四问。下表把技术动作与管理动作分开列，可直接套用，避免只写技术、漏掉治理。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">环节     技术要点                         管理要点</span><br><span class="line">生成     由合规密码模块产生，保证随机性    生成环境与责任人记录</span><br><span class="line">分发注入 安全通道下发，不落地明文          分发交接留痕</span><br><span class="line">存储     加密保护，私钥不外泄              访问授权与双人控制</span><br><span class="line">使用     按用途隔离，最小授权              使用审批与审计</span><br><span class="line">更新轮换 定期或事件触发轮换                轮换计划与例外审批</span><br><span class="line">归档销毁 到期安全销毁、不可恢复            销毁登记与双人见证</span><br></pre></td></tr></table></figure>
+
+<p>除了技术生命周期，管理侧也要成体系：有没有密钥管理与密码使用的成文制度，关键岗位的职责与相互制衡是否明确，建设与日常运行阶段的密钥操作是否有规范流程，密钥泄露或设备故障时的应急处置与恢复路径怎么走。至于密钥管理本身应当达到的详细技术要求，另有专题展开，本篇不重复。</p>
+<h2 id="管理与运维、实施计划与风险"><a href="#管理与运维、实施计划与风险" class="headerlink" title="管理与运维、实施计划与风险"></a>管理与运维、实施计划与风险</h2><p>方案要能长期运转，也要能被真正建起来，这两件事分别由管理与运维、实施计划两章承担。</p>
+<p>管理与运维写的是措施上线之后靠什么维持，核心是把制度、职责、流程、审计落到岗位上：谁负责密钥日常操作、谁审批、谁监督，避免同一人既操作又监督；运行日志与审计记录如何留存与定期核查；密码设备巡检升级、证书与密钥到期提醒如何组织；发生密码相关安全事件时如何上报与处置。要写到具体到岗、到动作，而不是抄一段泛泛的制度条文。</p>
+<p>实施计划是把差距表里的待补措施排成一条可执行的时间线，合理做法是按阶段推进：先补不合规且高风险的空白（比如明文传输的核心链路），再做需要业务配合改造的应用层措施，最后收尾管理类与运维类动作。每个阶段给出里程碑与依赖——采购的产品何时到货、需要业务停机的改造排在哪个窗口、与外部系统对接的过渡期何时收敛。</p>
+<pre class="mermaid">flowchart LR
+    S1[阶段一<br/>先补高风险链路] --> S2[阶段二<br/>应用层与存储改造]
+    S2 --> S3[阶段三<br/>管理制度与复测]</pre>
+
+<p>风险要单独评估。常见的是过渡期新旧并存带来的强度下降、密钥迁移期的双密钥空档、停机窗口不足压缩改造、以及外部对接方进度不可控，每项都要配上缓解措施。</p>
+<h2 id="方案评审的常见问题"><a href="#方案评审的常见问题" class="headerlink" title="方案评审的常见问题"></a>方案评审的常见问题</h2><p>方案初稿送评审时反复出现三类通病，提前对照自查能省不少来回。</p>
+<p>第一个通病是需求与措施对不上。措施写了一堆，却找不到它满足哪条需求；或者需求列在那里，四类措施里没有任何一条来承接。解法是回到需求对应矩阵逐条做双向核对，凡是断了线的要么补措施要么删冗余。</p>
+<p>第二个通病是只有产品清单没有场景。方案通篇是采购了哪些密码设备、什么型号什么数量，却没写这些设备在哪条链路、哪个业务场景里解决什么密码问题，评审人据此无法判断密码应用是否真的覆盖到位。解法是把每一项能力都落到具体的应用场景，产品只是支撑形态而非主体。</p>
+<p>第三个通病是缺少验证方法。措施写得很满，却没说明将来怎么证明它生效——是核查配置、抽查密文、抓包确认还是验证签名；缺了验证方法，措施就停留在承诺层面。解法是在对应矩阵里为每条措施补上可操作的验证手段，写不出验证方法的措施本身就可疑。</p>
+<p>此外，算法选型只给名字不给强度与合规论证、现状判定通篇“基本具备”这类含混措辞，也常被评审挑出，值得在定稿前逐句过一遍。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>密码应用方案不是一次性交差的材料，而是密评全流程的基线：向上承接合规约束，向内指导建设与采购，向外供测评取证。写扎实的关键是可追溯——从系统与业务分析提炼出可编号的需求，让四类措施逐层承接需求，把密钥全生命周期与组织管理一并纳入，再用验证方法与实施计划把设计落到执行。避开需求与措施脱节、只有产品没有场景、缺少验证方法这三个坑，方案质量会有明显提升。动手之前，先把那张需求对应矩阵立在手边，它是整份文档最值钱的骨架。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li>《中华人民共和国密码法》，2020 年 1 月 1 日施行。</li>
+<li>《商用密码管理条例》（修订），2023 年 4 月 27 日公布，2023 年 7 月 1 日施行。</li>
+<li>GB&#x2F;T 39786-2021《信息安全技术 信息系统密码应用基本要求》。</li>
+<li>GB&#x2F;T 22239-2019《信息安全技术 网络安全等级保护基本要求》。</li>
+<li>GM&#x2F;T 0054-2018《信息系统密码应用测评要求》。</li>
+<li>GM&#x2F;T 0115-2021《信息系统密码应用测评过程指南》。</li>
+<li>GM&#x2F;T 0116-2021《信息系统密码应用高风险判定指引》。</li>
+<li>GB&#x2F;T 32905-2016《信息安全技术 SM3 密码杂凑算法》。</li>
+<li>GB&#x2F;T 32907-2016《信息安全技术 SM4 分组密码算法》。</li>
+<li>GB&#x2F;T 32918《信息安全技术 SM2 椭圆曲线公钥密码算法》系列。</li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>密码应用方案编制</p><p><a href="https://987763485.github.io/2023/05/23/密码应用方案编制/">https://987763485.github.io/2023/05/23/密码应用方案编制/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2023-05-23</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-10-19</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a><a class="link-muted mr-2" rel="tag" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/">等级保护</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2023/05/28/Rust%E6%89%80%E6%9C%89%E6%9D%83%E4%B8%8E%E7%A7%BB%E5%8A%A8%E8%AF%AD%E4%B9%89/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Rust 所有权与移动语义</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2023/05/21/%E8%81%94%E9%82%A6%E5%AD%A6%E4%B9%A0%E4%B8%8E%E9%9A%90%E7%A7%81%E8%AE%A1%E7%AE%97/"><span class="level-item">联邦学习与隐私计算</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1063</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">35</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">133</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-25T16:00:00.000Z">2026-09-26</time></p><p class="title"><a href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/">RLHF 到 RLVR 的对齐演进</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-20T16:00:00.000Z">2026-09-21</time></p><p class="title"><a href="/2026/09/21/%E5%90%88%E6%88%90%E6%95%B0%E6%8D%AE%E4%B8%8E%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83/">合成数据与模型训练</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-15T16:00:00.000Z">2026-09-16</time></p><p class="title"><a href="/2026/09/16/%E5%A4%9A%E6%99%BA%E8%83%BD%E4%BD%93%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%AE%9E%E8%B7%B5/">多智能体系统架构与实践</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-13T16:00:00.000Z">2026-09-14</time></p><p class="title"><a href="/2026/09/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%B8%8E%E5%AE%89%E5%85%A8%E5%90%88%E8%A7%84/">大模型与安全合规</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-09-06T16:00:00.000Z">2026-09-07</time></p><p class="title"><a href="/2026/09/07/Rust%E5%9C%A8%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">Rust 在大模型基础设施中的应用</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/01/"><span class="level-start"><span class="level-item">一月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2025/11/"><span class="level-start"><span class="level-item">十一月 2025</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">30</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">133</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">24</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>
