@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>下一代 Harness：多模型异构 Agent 的开放调度设计 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="把 Claude Code、Codex、Pi Agent 这类执行器，和 DeepSeek、千问、ChatGLM 这类模型拆开看，会发现一个被单模型绑定掩盖的问题：同一个 Agent 换模型，产出质量会变；同一个模型换执行器，稳定性也会变。本文讨论下一代 Harness 应有的形态，一个不绑定单一模型生态的调度层，用能力画像、成本路由、统一执行器接口和组织化协作，把「谁来做、用什么做、花多少钱」变"><meta property="og:type" content="blog"><meta property="og:title" content="下一代 Harness：多模型异构 Agent 的开放调度设计"><meta property="og:url" content="https://987763485.github.io/2026/10/07/%E4%B8%8B%E4%B8%80%E4%BB%A3Harness%E5%A4%9A%E6%A8%A1%E5%9E%8B%E5%BC%82%E6%9E%84Agent%E7%9A%84%E5%BC%80%E6%94%BE%E8%B0%83%E5%BA%A6%E8%AE%BE%E8%AE%A1/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="把 Claude Code、Codex、Pi Agent 这类执行器，和 DeepSeek、千问、ChatGLM 这类模型拆开看，会发现一个被单模型绑定掩盖的问题：同一个 Agent 换模型，产出质量会变；同一个模型换执行器，稳定性也会变。本文讨论下一代 Harness 应有的形态，一个不绑定单一模型生态的调度层，用能力画像、成本路由、统一执行器接口和组织化协作，把「谁来做、用什么做、花多少钱」变"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2026-10-07T06:50:12.000Z"><meta property="article:modified_time" content="2026-11-15T14:37:03.766Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="大模型"><meta property="article:tag" content="agent"><meta property="article:tag" content="架构设计"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2026/10/07/%E4%B8%8B%E4%B8%80%E4%BB%A3Harness%E5%A4%9A%E6%A8%A1%E5%9E%8B%E5%BC%82%E6%9E%84Agent%E7%9A%84%E5%BC%80%E6%94%BE%E8%B0%83%E5%BA%A6%E8%AE%BE%E8%AE%A1/"},"headline":"下一代 Harness：多模型异构 Agent 的开放调度设计","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2026-10-07T06:50:12.000Z","dateModified":"2026-11-15T14:37:03.766Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"把 Claude Code、Codex、Pi Agent 这类执行器，和 DeepSeek、千问、ChatGLM 这类模型拆开看，会发现一个被单模型绑定掩盖的问题：同一个 Agent 换模型，产出质量会变；同一个模型换执行器，稳定性也会变。本文讨论下一代 Harness 应有的形态，一个不绑定单一模型生态的调度层，用能力画像、成本路由、统一执行器接口和组织化协作，把「谁来做、用什么做、花多少钱」变"}</script><link rel="canonical" href="https://987763485.github.io/2026/10/07/%E4%B8%8B%E4%B8%80%E4%BB%A3Harness%E5%A4%9A%E6%A8%A1%E5%9E%8B%E5%BC%82%E6%9E%84Agent%E7%9A%84%E5%BC%80%E6%94%BE%E8%B0%83%E5%BA%A6%E8%AE%BE%E8%AE%A1/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><script>var _hmt = _hmt || [];
+        (function() {
+            var hm = document.createElement("script");
+            hm.src = "//hm.baidu.com/hm.js?96433e30ee22a64cb0977a9badd6098f";
+            var s = document.getElementsByTagName("script")[0];
+            s.parentNode.insertBefore(hm, s);
+        })();</script><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2026-10-07T06:50:12.000Z" title="10/7/2026, 2:50:12 PM">2026-10-07</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></span><span class="level-item">1 小时读完 (大约8032个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">下一代 Harness：多模型异构 Agent 的开放调度设计</h1><div class="content"><p>把 Claude Code、Codex、Pi Agent 这类执行器，和 DeepSeek、千问、ChatGLM 这类模型拆开看，会发现一个被单模型绑定掩盖的问题：同一个 Agent 换模型，产出质量会变；同一个模型换执行器，稳定性也会变。本文讨论下一代 Harness 应有的形态，一个不绑定单一模型生态的调度层，用能力画像、成本路由、统一执行器接口和组织化协作，把「谁来做、用什么做、花多少钱」变成可计算、可复盘的决策。适合正在把 Agent 从演示推向生产、同时被效果与成本拉扯的工程师与架构师。</p>
+<h2 id="问题不在-Agent，而在绑定关系"><a href="#问题不在-Agent，而在绑定关系" class="headerlink" title="问题不在 Agent，而在绑定关系"></a>问题不在 Agent，而在绑定关系</h2><p>在演示环境里，给一个通用 Agent 配上一档强模型，再写几段角色提示词，就能跑出像样的结果。到了生产环境，这套结构很快会遇到四个现象。</p>
+<p>第一个现象是同一 Agent 接入不同模型，能力表现不同。系统提示词、工具调用格式、上下文裁剪策略，往往都是围绕某个模型调过的。换一个模型之后，函数调用可能从结构化 JSON 变成夹着解释的自然语言，长上下文里的关键约束被忽略，拒答边界也变了。这种变化不是简单的「更聪明或更笨」，而是能力结构发生了变化：原来擅长的那一类任务可能还凑合，原来不出错的那一类反而开始出错。</p>
+<p>第二个现象是同一模型接入不同执行器，能力表现不同。执行器决定工具面、沙箱、重试策略、补丁格式和上下文组织方式。同一个模型在 A 执行器里能连续修改三个文件并跑通测试，在 B 执行器里可能改完一个文件就停下来等指令。因此，能力是「模型 × 执行器 × 任务」三元组的属性，不是模型单点属性。比较模型时如果不固定执行器，结论几乎没有意义；反过来，比较执行器时如果不固定模型，也一样。</p>
+<p>第三个现象是领域专精。在笔者维护的评测集里，千问在需求整理、设计说明和中文长文上更稳定；DeepSeek 在代码修改、测试补齐上首轮通过率更高，单位成本也更低；ChatGLM 在中文短文本和结构化抽取上够用。这些差异不会直接出现在公开排行榜上，因为排行榜的任务分布和自己的业务分布并不一致。而且结论会随模型版本变化，今天测出来的优势，下一个版本可能就消失了。</p>
+<p>第四个现象是成本梯度明显。高能力档位（如 Claude Fable 5、Codex 的 Astra）与低价档位之间，单位 token 成本往往差一个数量级以上；低价档位多来自 DeepSeek、千问、ChatGLM 这类国内模型。更麻烦的是，账面 token 成本只是总成本的一部分，返工、校验、人工复核、等待时间都要计入。一个便宜模型如果把返工率抬高了一倍，最终账可能比贵的模型还难看。</p>
+<p>四个现象指向同一个矛盾：怎样在任务粒度上，把模型能力、调用成本和执行形态匹配起来。单模型多角色的封闭结构做不到这一点。它在设计时就把模型和执行器绑死了，运行时既没有可替换的候选，也没有可比较的账本。所谓「换模型」，只能靠改配置、重启流程，靠人的经验重新调一遍提示词。</p>
+<p>本文把 Harness 定义为任务进入执行器之前和之后的那层控制面：拆解任务、选择执行器与模型、分配预算、收集产物、组织协作、记录账本。它不是模型，不是执行器，也不是又一个 Agent 框架。框架解决的是「怎么把一次调用串起来」，Harness 解决的是「这次调用该由谁、用什么、花多少来完成，失败之后怎么办」。</p>
+<h2 id="分层：调度层到底管什么"><a href="#分层：调度层到底管什么" class="headerlink" title="分层：调度层到底管什么"></a>分层：调度层到底管什么</h2><p>把 Harness 拆开，通常可以分成五层。接入层负责模型 API 的兼容、鉴权、限流、重试和计费口径统一；执行层由 Claude Code、Codex、Pi Agent 这类执行器组成，负责真正的文件操作、命令执行和沙箱隔离；调度层是本文的重点，负责能力画像、路由、预算、升级和熔断；组织层由领导 Agent、执行 Agent 和人工审批构成，决定任务如何流转；观测层用 trace、账本和评测数据，让前面四层的决策可以复盘。</p>
+<p>层与层之间靠五个核心对象传递信息。</p>
+<ul>
+<li>Task：目标、输入、约束、验收标准、预算和截止时间。</li>
+<li>CapabilityProfile：某个模型在某个执行器上、针对某类任务的历史表现。</li>
+<li>Executor：统一的执行接口，屏蔽不同执行器的调用差异。</li>
+<li>Policy：路由规则、升级条件、审批门槛、熔断策略。</li>
+<li>Ledger：每一次调用的成本、耗时、结果和人工介入记录。</li>
+</ul>
+<p>这五个对象里，最容易做错的是 CapabilityProfile。很多团队把它做成了一个静态的「模型能力表」，写着某某模型擅长代码、某某模型擅长写作。这种表在选型阶段有用，在运行阶段几乎没用，因为它没有区分任务类型、执行器和版本，也没有记录方差。真正可用的画像必须是三维的：模型、执行器、任务类型，再加上时间和样本量。</p>
+<pre class="mermaid">flowchart TD
+    H[人的目标与验收标准] --> L[领导 Agent]
+    L --> R[调度层：能力画像 / 成本路由 / 预算]
+    R --> X1[执行器 A]
+    R --> X2[执行器 B]
+    R --> X3[执行器 C]
+    X1 --> M[模型池]
+    X2 --> M
+    X3 --> M
+    X1 --> A[产物契约：diff / 测试报告 / 未决问题]
+    X2 --> A
+    X3 --> A
+    A --> V[独立校验]
+    V --> L
+    L --> G{需要人工审批}
+    G -->|是| P[人工审批]
+    G -->|否| N[合并或进入下一任务]
+    P --> N</pre>
+
+<p>设计调度层时，有四条原则值得先定下来。</p>
+<p>第一，控制面与数据面分离。Harness 不直接执行命令，也不直接操作仓库。它只做决策，把执行交给执行器。这样执行器可以替换，沙箱边界也不会被调度逻辑绕过。</p>
+<p>第二，配置即代码。路由表、提示词、预算、审批规则都要进版本库。线上出现效果回退时，需要能回答「昨天改了什么」，而不是靠翻聊天记录。</p>
+<p>第三，硬约束先过滤，软指标再排序。上下文窗口、工具支持、数据驻留区域、供应商白名单，这些是过滤器，不参与打分。先保证候选可用，再比较谁更合适。</p>
+<p>第四，不重复造协议。工具接入优先用 MCP，执行器之间共享同一套工具服务器。Harness 只定义任务和产物的契约，不定义工具协议的另一套方言。</p>
+<p>一个常见的误区是把 Harness 做成提示词仓库，里面堆满角色设定和任务模板。提示词当然重要，但它属于执行器或 Agent 的内部实现，不是调度层的核心。调度层真正要回答的是经济问题：这类任务，用哪一档能力、哪一个执行器、在多少预算内完成，才最划算。</p>
+<h2 id="模型能力画像：把「擅长」变成可比较的信号"><a href="#模型能力画像：把「擅长」变成可比较的信号" class="headerlink" title="模型能力画像：把「擅长」变成可比较的信号"></a>模型能力画像：把「擅长」变成可比较的信号</h2><p>公开排行榜不能直接拿来路由，原因有三个。一是数据污染，训练集和评测集可能有重叠；二是分布不一致，排行榜偏向通用问答和竞赛题，生产任务多是仓库里的缺陷修复和小步重构；三是版本漂移，供应商会在不改变模型名称的情况下更新权重。用自己的任务分布建评测集，是唯一可靠的办法。</p>
+<p>评测集不需要很大，两百到五百条真实任务就足以看出差异，关键是分层。按缺陷修复、新功能、重构、补测试、写文档、代码评审这几类分别采样，每类保留一部分作为留出集。验收标准尽量做成可执行的检查：测试是否通过、类型检查是否干净、接口是否符合约定、文档是否包含指定章节。无法自动检查的任务，用双人盲评，记录分歧。评测集本身也要版本化，每季度复核一次，剔除已经失效的任务。</p>
+<p>画像至少要记录七个维度。</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>度量方式</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>首轮通过率</td>
+<td>一次通过验收的比例</td>
+<td>直接决定返工成本</td>
+</tr>
+<tr>
+<td>工具调用合规率</td>
+<td>schema 合法且参数完整的比例</td>
+<td>决定能否无人值守</td>
+</tr>
+<tr>
+<td>格式稳定性</td>
+<td>结构化输出解析失败率</td>
+<td>决定流水线能否组合</td>
+</tr>
+<tr>
+<td>长上下文保持</td>
+<td>关键约束的召回率</td>
+<td>决定大仓库任务是否可用</td>
+</tr>
+<tr>
+<td>延迟</td>
+<td>p50 与 p95</td>
+<td>决定交互体验与并发容量</td>
+</tr>
+<tr>
+<td>成本</td>
+<td>每次被接受任务的总成本</td>
+<td>决定经济性</td>
+</tr>
+<tr>
+<td>方差</td>
+<td>同一任务多次运行的波动</td>
+<td>决定是否需要多重采样</td>
+</tr>
+</tbody></table>
+<p>方差这一项经常被忽略。同一个模型跑同一个任务三次，有时一次就过，有时三次都不过，这种不稳定性比平均通过率更能说明问题。对高方差的任务，要么增加采样次数再择优，要么换更稳定的模型，要么把任务拆得更小。只看平均值，会把「偶尔能用」误判成「稳定可用」。</p>
+<p>把画像落到角色上，会得到类似下面的示例配置。</p>
+<table>
+<thead>
+<tr>
+<th>角色</th>
+<th>主要任务</th>
+<th>能力权重</th>
+<th>成本档位</th>
+<th>候选模型</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>产品 &#x2F; 设计</td>
+<td>需求澄清、文档、交互说明</td>
+<td>长文理解与表达</td>
+<td>中</td>
+<td>千问</td>
+</tr>
+<tr>
+<td>前后端工程师</td>
+<td>编码、重构、补测试</td>
+<td>代码通过率、工具调用</td>
+<td>低到中</td>
+<td>DeepSeek</td>
+</tr>
+<tr>
+<td>架构 &#x2F; 评审</td>
+<td>方案权衡、风险识别</td>
+<td>推理、长上下文</td>
+<td>高</td>
+<td>Claude Fable 5、Codex 的 Astra</td>
+</tr>
+<tr>
+<td>测试</td>
+<td>用例、复现、报告</td>
+<td>指令遵循、格式稳定</td>
+<td>低</td>
+<td>DeepSeek、ChatGLM</td>
+</tr>
+</tbody></table>
+<p>这张表的价值不在于把某个模型钉死在某个角色上，而在于把「角色需要什么能力」写清楚。模型版本更新或价格变化时，只需要重跑评测、更新分数，角色映射可以跟着调整，不需要重写整套流程。</p>
+<p>有了画像，就可以算路由分数。一个实用的做法是先用硬约束过滤，再用「质量减去成本惩罚」排序：</p>
+<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> <span class="title class_">TaskType</span> = <span class="string">&#x27;bugfix&#x27;</span> | <span class="string">&#x27;feature&#x27;</span> | <span class="string">&#x27;refactor&#x27;</span> | <span class="string">&#x27;test&#x27;</span> | <span class="string">&#x27;docs&#x27;</span> | <span class="string">&#x27;review&#x27;</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">interface</span> <span class="title class_">ModelProfile</span> &#123;</span><br><span class="line">  <span class="attr">id</span>: <span class="built_in">string</span>;</span><br><span class="line">  <span class="attr">costPerMTokIn</span>: <span class="built_in">number</span>;   <span class="comment">// 按实际账单换算的相对成本</span></span><br><span class="line">  <span class="attr">costPerMTokOut</span>: <span class="built_in">number</span>;</span><br><span class="line">  <span class="attr">contextWindow</span>: <span class="built_in">number</span>;</span><br><span class="line">  <span class="attr">supportsTools</span>: <span class="built_in">boolean</span>;</span><br><span class="line">  <span class="comment">// 按任务类型记录的首轮通过率，来自自有评测集</span></span><br><span class="line">  <span class="attr">acceptance</span>: <span class="title class_">Record</span>&lt;<span class="title class_">TaskType</span>, <span class="built_in">number</span>&gt;;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">interface</span> <span class="title class_">RouteCandidate</span> &#123;</span><br><span class="line">  <span class="attr">model</span>: <span class="title class_">ModelProfile</span>;</span><br><span class="line">  <span class="attr">executor</span>: <span class="built_in">string</span>;</span><br><span class="line">  <span class="attr">acceptance</span>: <span class="built_in">number</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> lambda = <span class="number">0.35</span>; <span class="comment">// 成本权重，按业务阶段调整</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">routeScore</span>(<span class="params"><span class="attr">candidate</span>: <span class="title class_">RouteCandidate</span>, <span class="attr">task</span>: <span class="title class_">TaskType</span></span>): <span class="built_in">number</span> &#123;</span><br><span class="line">  <span class="keyword">const</span> quality = candidate.<span class="property">acceptance</span>;</span><br><span class="line">  <span class="keyword">const</span> cost = (candidate.<span class="property">model</span>.<span class="property">costPerMTokIn</span> + candidate.<span class="property">model</span>.<span class="property">costPerMTokOut</span>) / <span class="number">2</span>;</span><br><span class="line">  <span class="keyword">const</span> normalizedCost = <span class="title class_">Math</span>.<span class="title function_">log10</span>(cost + <span class="number">1</span>) / <span class="number">3</span>; <span class="comment">// 压缩数量级差异</span></span><br><span class="line">  <span class="keyword">return</span> quality - lambda * normalizedCost;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">pick</span>(<span class="params"><span class="attr">candidates</span>: <span class="title class_">RouteCandidate</span>[], <span class="attr">task</span>: <span class="title class_">TaskType</span></span>): <span class="title class_">RouteCandidate</span> &#123;</span><br><span class="line">  <span class="keyword">const</span> usable = candidates.<span class="title function_">filter</span>(<span class="function"><span class="params">c</span> =&gt;</span></span><br><span class="line">    c.<span class="property">model</span>.<span class="property">supportsTools</span> &amp;&amp; c.<span class="property">model</span>.<span class="property">contextWindow</span> &gt;= <span class="number">128_000</span></span><br><span class="line">  );</span><br><span class="line">  <span class="keyword">if</span> (usable.<span class="property">length</span> === <span class="number">0</span>) &#123;</span><br><span class="line">    <span class="keyword">throw</span> <span class="keyword">new</span> <span class="title class_">Error</span>(<span class="string">&#x27;没有满足硬约束的候选&#x27;</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> usable.<span class="title function_">sort</span>(<span class="function">(<span class="params">a, b</span>) =&gt;</span> <span class="title function_">routeScore</span>(b, task) - <span class="title function_">routeScore</span>(a, task))[<span class="number">0</span>];</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这段代码只是骨架，真实系统还要处理几个细节。成本不能简单取输入输出的平均值，要按任务的输入输出比例加权；通过率要带置信区间，样本少于三十条时不要让它主导路由；执行器的差异要作为候选的一部分，同一个模型在不同执行器上的通过率不能混在一起算。最后，路由结果要保留帕累托前沿，而不是只留一个最高分。前沿上的候选代表不同的质量与成本组合，业务阶段变化时可以快速切换。</p>
+<h2 id="成本路由：按「被接受的任务」算账"><a href="#成本路由：按「被接受的任务」算账" class="headerlink" title="成本路由：按「被接受的任务」算账"></a>成本路由：按「被接受的任务」算账</h2><p>成本核算最容易犯的错，是只看 token 账单。一次任务的总成本至少包括五部分：模型调用、执行器开销、失败重试、独立校验，以及人工复核的时间。把这些加在一起，再除以被接受的任务数，才是可比较的单位成本。</p>
+<p>用公式表达就是：每次被接受任务的成本，等于模型调用、执行器开销、重试、校验和人工时间之和，除以通过验收的任务数。这个口径会把「便宜但常返工」的模型打回原形，也会让「贵但一次过」的模型显出价值。</p>
+<p>一个关键的不对称性决定了级联策略是否成立：代码类任务有测试、类型检查和构建可以作为廉价验收器，文档和设计类任务没有。代码可以先让便宜模型生成，再用测试验证，失败再升级；文档如果让便宜模型先写，人工审阅的成本往往高于直接让强模型写一遍。所以级联不是通用策略，它只适用于验收成本低、错误可被判定的任务。</p>
+<p>常见的路由策略有四种。</p>
+<table>
+<thead>
+<tr>
+<th>策略</th>
+<th>适用场景</th>
+<th>主要代价</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>静态映射</td>
+<td>任务类型稳定、模型数量少</td>
+<td>无法应对版本波动</td>
+</tr>
+<tr>
+<td>级联升级</td>
+<td>有可靠且廉价的验收器</td>
+<td>延迟叠加，需要独立校验</td>
+</tr>
+<tr>
+<td>预算约束</td>
+<td>成本敏感、任务可中断</td>
+<td>可能提前终止或降级</td>
+</tr>
+<tr>
+<td>竞价分配</td>
+<td>多供应商、指标稳定</td>
+<td>调度开销大，容易过拟合</td>
+</tr>
+</tbody></table>
+<p>级联升级是最常用的一种。设计时有几条纪律：最多升级两次，避免无限追高；校验器尽量独立，不要用同一个模型家族做校验，否则盲区会相关；升级时把失败原因带进下一轮上下文，不做无信息重试；每一次升级都要记录原因和成本，否则无法判断级联到底省没省钱。</p>
+<p>用一组示意数据可以看清账。假设三档模型的相对单位成本分别是 1、8、40，首轮通过率分别是 0.62、0.81、0.88，校验成本记为 0.5。</p>
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>期望调用成本</th>
+<th>总体通过率</th>
+<th>每次被接受任务成本</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>只用低档</td>
+<td>1.00</td>
+<td>0.62</td>
+<td>1.61</td>
+</tr>
+<tr>
+<td>只用中档</td>
+<td>8.00</td>
+<td>0.81</td>
+<td>9.88</td>
+</tr>
+<tr>
+<td>只用高档</td>
+<td>40.00</td>
+<td>0.88</td>
+<td>45.45</td>
+</tr>
+<tr>
+<td>低档失败后升中档</td>
+<td>1.00 + 0.38 × 8.50</td>
+<td>0.93</td>
+<td>约 4.56</td>
+</tr>
+</tbody></table>
+<p>级联的总体通过率按「低档直接通过，或低档失败后中档通过」计算，约等于 0.62 加上 0.38 乘以 0.81。它的单位成本不到单用中档的一半，通过率还更高。这个结论成立的前提是校验足够便宜且足够准。如果校验本身要花 5 个单位，级联的优势就会被吃掉。</p>
+<p>路由循环可以写得很朴素：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> dataclasses <span class="keyword">import</span> dataclass, field</span><br><span class="line"><span class="keyword">from</span> typing <span class="keyword">import</span> <span class="type">Callable</span>, Protocol</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="meta">@dataclass</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Budget</span>:</span><br><span class="line">    limit: <span class="built_in">float</span></span><br><span class="line">    spent: <span class="built_in">float</span> = <span class="number">0.0</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">charge</span>(<span class="params">self, amount: <span class="built_in">float</span></span>) -&gt; <span class="literal">None</span>:</span><br><span class="line">        <span class="keyword">if</span> <span class="variable language_">self</span>.spent + amount &gt; <span class="variable language_">self</span>.limit:</span><br><span class="line">            <span class="keyword">raise</span> RuntimeError(<span class="string">&quot;任务预算耗尽&quot;</span>)</span><br><span class="line">        <span class="variable language_">self</span>.spent += amount</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="meta">@dataclass</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Task</span>:</span><br><span class="line">    prompt: <span class="built_in">str</span></span><br><span class="line">    feedback: <span class="built_in">list</span>[<span class="built_in">str</span>] = field(default_factory=<span class="built_in">list</span>)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">with_feedback</span>(<span class="params">self, reason: <span class="built_in">str</span></span>) -&gt; <span class="string">&quot;Task&quot;</span>:</span><br><span class="line">        <span class="keyword">return</span> Task(<span class="variable language_">self</span>.prompt, <span class="variable language_">self</span>.feedback + [reason])</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Tier</span>(<span class="title class_ inherited__">Protocol</span>):</span><br><span class="line">    name: <span class="built_in">str</span></span><br><span class="line">    estimated_cost: <span class="built_in">float</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">run</span>(<span class="params">self, task: Task</span>) -&gt; <span class="built_in">object</span>: ...</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="meta">@dataclass</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Attempt</span>:</span><br><span class="line">    model: <span class="built_in">str</span></span><br><span class="line">    cost: <span class="built_in">float</span></span><br><span class="line">    accepted: <span class="built_in">bool</span></span><br><span class="line">    reason: <span class="built_in">str</span> = <span class="string">&quot;&quot;</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">run_cascade</span>(<span class="params"></span></span><br><span class="line"><span class="params">    task: Task,</span></span><br><span class="line"><span class="params">    tiers: <span class="built_in">list</span>[Tier],</span></span><br><span class="line"><span class="params">    verify: <span class="type">Callable</span>[[Task, <span class="built_in">object</span>], <span class="built_in">tuple</span>[<span class="built_in">bool</span>, <span class="built_in">str</span>]],</span></span><br><span class="line"><span class="params">    budget: Budget,</span></span><br><span class="line"><span class="params">    max_escalation: <span class="built_in">int</span> = <span class="number">2</span>,</span></span><br><span class="line"><span class="params"></span>) -&gt; <span class="built_in">tuple</span>[<span class="built_in">object</span> | <span class="literal">None</span>, <span class="built_in">list</span>[Attempt]]:</span><br><span class="line">    attempts: <span class="built_in">list</span>[Attempt] = []</span><br><span class="line">    <span class="keyword">for</span> tier <span class="keyword">in</span> tiers[: max_escalation + <span class="number">1</span>]:</span><br><span class="line">        budget.charge(tier.estimated_cost)  <span class="comment"># 先扣预算，避免失败重试导致超支</span></span><br><span class="line">        result = tier.run(task)</span><br><span class="line">        accepted, reason = verify(task, result)  <span class="comment"># 独立校验，不接受执行器自评</span></span><br><span class="line">        attempts.append(Attempt(tier.name, tier.estimated_cost, accepted, reason))</span><br><span class="line">        <span class="keyword">if</span> accepted:</span><br><span class="line">            <span class="keyword">return</span> result, attempts</span><br><span class="line">        task = task.with_feedback(reason)  <span class="comment"># 带上失败原因，避免无信息重试</span></span><br><span class="line">    <span class="keyword">return</span> <span class="literal">None</span>, attempts</span><br></pre></td></tr></table></figure>
+
+<p>这段代码把预算、升级和失败反馈放在同一个循环里，好处是每次升级都能带上上一轮的错误原因。真实系统还要补三件事：超时与取消、并发限流、失败原因的脱敏。尤其是失败原因，它可能包含仓库路径或业务信息，进入下一轮上下文之前要过滤。</p>
+<h2 id="执行器抽象：让不同-Coding-Agent-可替换"><a href="#执行器抽象：让不同-Coding-Agent-可替换" class="headerlink" title="执行器抽象：让不同 Coding Agent 可替换"></a>执行器抽象：让不同 Coding Agent 可替换</h2><p>模型可以换，执行器也要能换。但执行器之间的差异比模型更大，因为它们暴露的是完全不同的交互面。选型时要逐项确认：调用方式是 CLI、SDK 还是 HTTP，是否支持无头运行；工具面覆盖文件、命令、浏览器还是 MCP；沙箱是容器、进程还是远端环境，网络出口是否受限；产物是 diff、patch、测试报告还是日志；事件流是结构化事件还是人类可读文本；计费按 token、按席位还是按调用；是否支持中断、取消和人工确认。</p>
+<p>把这些差异收敛成一个统一接口，Harness 才可能做运行时替换。接口不需要很复杂，五件事就够：准备工作区、执行任务、流式返回事件、收集产物、取消执行。</p>
+<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">interface</span> <span class="title class_">TaskEnvelope</span> &#123;</span><br><span class="line">  <span class="attr">id</span>: <span class="built_in">string</span>;</span><br><span class="line">  <span class="attr">goal</span>: <span class="built_in">string</span>;</span><br><span class="line">  <span class="attr">inputs</span>: <span class="built_in">string</span>[];</span><br><span class="line">  <span class="attr">constraints</span>: <span class="built_in">string</span>[];</span><br><span class="line">  <span class="attr">acceptance</span>: <span class="built_in">string</span>[];</span><br><span class="line">  <span class="attr">budget</span>: &#123; <span class="attr">tokens</span>: <span class="built_in">number</span>; <span class="attr">minutes</span>: <span class="built_in">number</span> &#125;;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">interface</span> <span class="title class_">Workspace</span> &#123;</span><br><span class="line">  <span class="attr">dir</span>: <span class="built_in">string</span>;</span><br><span class="line">  <span class="attr">baseCommit</span>: <span class="built_in">string</span>;</span><br><span class="line">  <span class="attr">branch</span>: <span class="built_in">string</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">type</span> <span class="title class_">ExecutorEvent</span> =</span><br><span class="line">  | &#123; <span class="attr">kind</span>: <span class="string">&#x27;status&#x27;</span>; <span class="attr">message</span>: <span class="built_in">string</span> &#125;</span><br><span class="line">  | &#123; <span class="attr">kind</span>: <span class="string">&#x27;tool_call&#x27;</span>; <span class="attr">name</span>: <span class="built_in">string</span>; <span class="attr">input</span>: <span class="built_in">unknown</span> &#125;</span><br><span class="line">  | &#123; <span class="attr">kind</span>: <span class="string">&#x27;message&#x27;</span>; <span class="attr">text</span>: <span class="built_in">string</span> &#125;</span><br><span class="line">  | &#123; <span class="attr">kind</span>: <span class="string">&#x27;usage&#x27;</span>; <span class="attr">inputTokens</span>: <span class="built_in">number</span>; <span class="attr">outputTokens</span>: <span class="built_in">number</span> &#125;</span><br><span class="line">  | &#123; <span class="attr">kind</span>: <span class="string">&#x27;error&#x27;</span>; <span class="attr">code</span>: <span class="built_in">string</span>; <span class="attr">message</span>: <span class="built_in">string</span> &#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">interface</span> <span class="title class_">Artifact</span> &#123;</span><br><span class="line">  <span class="attr">taskId</span>: <span class="built_in">string</span>;          <span class="comment">// 幂等键，重放时用于去重</span></span><br><span class="line">  <span class="attr">patch</span>: <span class="built_in">string</span>;           <span class="comment">// 统一 diff，不解析自然语言 stdout</span></span><br><span class="line">  <span class="attr">changedFiles</span>: <span class="built_in">string</span>[];</span><br><span class="line">  <span class="attr">testReport</span>: &#123; <span class="attr">command</span>: <span class="built_in">string</span>; <span class="attr">passed</span>: <span class="built_in">number</span>; <span class="attr">failed</span>: <span class="built_in">number</span> &#125;[];</span><br><span class="line">  <span class="attr">openQuestions</span>: <span class="built_in">string</span>[];</span><br><span class="line">  <span class="attr">usage</span>: &#123; <span class="attr">inputTokens</span>: <span class="built_in">number</span>; <span class="attr">outputTokens</span>: <span class="built_in">number</span> &#125;;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">interface</span> <span class="title class_">Executor</span> &#123;</span><br><span class="line">  <span class="keyword">readonly</span> <span class="attr">name</span>: <span class="built_in">string</span>;</span><br><span class="line">  <span class="title function_">prepare</span>(<span class="attr">task</span>: <span class="title class_">TaskEnvelope</span>): <span class="title class_">Promise</span>&lt;<span class="title class_">Workspace</span>&gt;;</span><br><span class="line">  <span class="title function_">run</span>(<span class="attr">workspace</span>: <span class="title class_">Workspace</span>, <span class="attr">signal</span>: <span class="title class_">AbortSignal</span>): <span class="title class_">AsyncIterable</span>&lt;<span class="title class_">ExecutorEvent</span>&gt;;</span><br><span class="line">  <span class="title function_">collect</span>(<span class="attr">workspace</span>: <span class="title class_">Workspace</span>): <span class="title class_">Promise</span>&lt;<span class="title class_">Artifact</span>&gt;;</span><br><span class="line">  <span class="title function_">cancel</span>(<span class="attr">workspace</span>: <span class="title class_">Workspace</span>): <span class="title class_">Promise</span>&lt;<span class="built_in">void</span>&gt;;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个接口有三个隐含要求。</p>
+<p>第一，产物契约必须结构化。不要让调度层去解析执行器的自然语言输出，那等于把稳定性建立在文案不会变上。diff、变更文件、测试结果、未决问题、token 用量，都应该是独立字段。</p>
+<p>第二，执行必须幂等。同一个 taskId 重放时，要么返回已有产物，要么在干净的工作区重跑，不能把两次修改叠在一起。工作区要记录基线 commit 和分支，取消之后能回滚。</p>
+<p>第三，取消语义要明确。是停止生成、终止进程，还是等待当前工具调用结束？不同执行器的行为不同，Harness 要在适配器里统一成「尽快停止并保留已产生的产物」，否则超时和预算熔断会失效。</p>
+<p>适配器还有几个工程坑。命令行输出格式会随版本变化，必须固定版本并做契约测试；鉴权和限流策略各不相同，要在接入层统一；文件系统不一定共享，远端执行器需要显式上传和下载；并发度受席位和配额限制，调度层要把并发当成资源来分配。最后，执行器与模型的支持关系通常不是全连接，有些执行器只支持自家模型，有些可以通过兼容接口接第三方模型。路由之前要先查兼容矩阵，否则会选出无法执行的组合。</p>
+<h2 id="组织化协作：领导角色不是转发消息"><a href="#组织化协作：领导角色不是转发消息" class="headerlink" title="组织化协作：领导角色不是转发消息"></a>组织化协作：领导角色不是转发消息</h2><p>当 Agent 数量超过三个，点对点指派任务很快就会失控。沟通路径按平方增长，上下文在多次转述中失真，优先级冲突没有人裁决，预算也被各自为战地消耗。设置领导角色的意义，不是领导更聪明，而是它掌握全局信息：目标、优先级、预算、依赖关系和验收标准。</p>
+<p>领导 Agent 的职责可以列成七条：拆解目标，分配任务，裁决冲突，合并产物，控制预算，处理升级，决定哪些事情必须交给人。它不应该做的事同样明确：不亲自写代码，不微调每个执行 Agent 的提示词，不替执行 Agent 做局部技术决策。领导一旦陷入执行，全局视角就没了，整个团队会退化成一条串行流水线。</p>
+<p>同级 Agent 之间的协作，靠产物契约而不是自由聊天。它们可以互相提问、请求澄清、共享中间产物，但不能直接把新任务派给同事。需要别人承接时，把请求上报给领导，由领导判断优先级、预算和依赖，再统一分配。这条规则看起来增加了往返，实际上避免了三个问题：任务重复分配、上下文重复传输、紧急任务插队导致的全局失序。</p>
+<p>一次交接至少要说清楚八件事：任务标识、目标、输入产物、约束条件、验收标准、预算、截止时间、升级路径。缺一项，承接方就要靠猜，猜错之后返工的成本远高于一次写清楚。上下文包也要克制，只带最小充分信息，产物用路径或哈希引用，不要复制整段对话。把「已经否决的方案」和「关键决策」带上，比带上全部历史更有用。</p>
+<pre class="mermaid">sequenceDiagram
+    participant E as 执行 Agent
+    participant L as 领导 Agent
+    participant P as 同级 Agent
+    participant H as 人工审批
+    E->>L: 提交产物、自检结果与未决问题
+    L->>L: 校验契约、预算与优先级
+    L->>P: 下发联调任务与上下文包
+    P-->>L: 返回联调报告
+    L->>H: 申请不可逆变更审批
+    H-->>L: 批准或驳回
+    L-->>E: 合并、返工或关闭</pre>
+
+<p>这套结构和真人团队很像，但差异也要说清楚。Agent 不会疲劳，可以并行，但也更容易在上下文里迷路；Agent 不会因为职级而服从，只会因为契约清晰而配合；Agent 之间的「信任」不能靠默契，只能靠校验和账本。把真人团队的隐喻直接照搬，容易忽略这些差异。</p>
+<p>组织化协作还有几个反模式。领导变成瓶颈，所有任务都排队等它；同级 Agent 陷入无休止的协商，谁也不肯先产出；两个 Agent 的任务也强行套三层架构，沟通成本高于执行成本；领导只会转发消息，不做裁决，那它就没有存在的价值。判断是否需要多 Agent，标准不是「听起来更先进」，而是任务是否真的可以拆成独立验收的子任务，以及并行带来的收益是否覆盖协调成本。</p>
+<h2 id="人机混编：80-20-是结果，不是指标"><a href="#人机混编：80-20-是结果，不是指标" class="headerlink" title="人机混编：80&#x2F;20 是结果，不是指标"></a>人机混编：80&#x2F;20 是结果，不是指标</h2><p>「八成由 Agent 自主推进，两成由人工引导校验」是一个合理的目标形态，但它只能是结果，不能当成硬性配额。为了凑够 80% 的自动化率而放行未经校验的产物，最后会在事故里把省下的时间连本带利还回去。</p>
+<p>真正需要人介入的，通常是这几类：需求本身有歧义，验收标准无法写成可执行检查；动作不可逆，比如生产部署、数据迁移、对外发送；变更涉及安全边界，比如权限、密钥、网络策略；高风险改动的最终验收；以及没有历史数据支撑的新架构决策。把这五类划出来，人工介入点就有了依据，而不是靠感觉。</p>
+<p>审批门槛要设计成「人做判断，不做搬运」。审批界面应该给出变更摘要、风险点、测试结果、回滚方案和影响范围，人只需要批准、驳回或要求修改。如果人要在几个 Agent 之间复制粘贴上下文，那说明 Harness 的产物契约没做好。默认拒绝、限时审批、批量复核，是避免人工成为瓶颈的三个常用手段。</p>
+<p>衡量人机混编是否健康，可以看五个指标：自动化完成率、首轮验收通过率、返工率、每个被接受任务消耗的人工分钟数、以及事故率。单看自动化率会误导，必须和返工率、事故率一起看。一个团队把自动化率从 60% 提到 85%，但返工率翻倍、事故率上升，这不是进步。</p>
+<p>信任要按任务类型逐步校准。缺陷修复和补测试可以先放开，让 Agent 自主推进；数据库迁移和权限变更则长期保留人工闸门。每个任务类型单独积累证据，单独调整门槛，不要用一个全局比例管理所有风险。</p>
+<h2 id="观测、账本与落地路径"><a href="#观测、账本与落地路径" class="headerlink" title="观测、账本与落地路径"></a>观测、账本与落地路径</h2><p>没有账本的调度系统无法优化，因为它连「上一次为什么选这个模型」都回答不了。一次任务至少要记录一条 trace：任务类型、候选集合、路由决策与理由、执行器、模型、输入输出 token、耗时、重试次数、升级原因、校验结果、人工介入、最终是否被接受。把这些字段落到只追加的账本里，才能做成本归集、回放和离线分析。</p>
+<p>如果团队已经在用 OpenTelemetry，可以直接沿用 GenAI 语义约定，把模型、token、操作类型挂到 span 上，不必另造一套埋点体系。关键是字段口径统一：同一个「被接受任务」的定义，路由、财务和复盘要用同一套，否则数字对不上。</p>
+<p>上线之前，先用影子路由验证。把一部分真实任务复制一份，用新策略跑，不合并产物，只比较通过率、成本和延迟。等差异稳定，再逐步放量。护栏指标至少要有三个：事故率、p95 延迟、每次被接受任务成本。任何一项恶化，都先回滚策略，再查原因。</p>
+<p>落地路径建议分四步。</p>
+<p>第一步，选一个任务类型，比如缺陷修复；选一个执行器；接两个模型；建评测集和账本。目标不是全自动，而是把「能力画像」和「单位成本」两个数字跑通。</p>
+<p>第二步，加独立校验和级联升级。先用测试和类型检查做验收器，测出级联的真实收益。如果校验成本高于节省的模型成本，就退回静态映射，不要为了架构好看而硬上级联。</p>
+<p>第三步，接第二个执行器，统一产物契约。这一步会暴露很多适配问题，也会验证「模型 × 执行器」的组合假设。此时再决定哪些任务需要多 Agent，哪些单 Agent 就够。</p>
+<p>第四步，引入领导 Agent 和人工闸门，扩展到更多任务类型。每扩展一类，重新校准能力画像和审批门槛，不要复制上一类的配置。</p>
+<p>有几样东西不适合早期做：通用的 Agent 市场、复杂的竞价机制、会自我修改提示词的调度器、以及自研的工具协议。它们都建立在「能力画像稳定、账本可信」的前提上，前提没成立之前，投入大概率打水漂。</p>
+<p>最后是组织问题。路由配置要有版本和评审，关键决策要有 ADR，评测集要有明确 owner，Agent 引发的线上问题要进入现有的事故流程。Harness 看起来是一个技术系统，实际约束它的是组织的反馈速度：谁能定义验收标准，谁对成本负责，谁有权批准不可逆动作。这些问题不解决，再精致的调度器也只是一个更贵的演示。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>下一代 Harness 的核心不是「让一个 Agent 更聪明」，而是把模型、执行器和任务拆开，在运行时做匹配。能力是「模型 × 执行器 × 任务」三元组的属性，必须用自有评测集测量，不能照搬排行榜。成本要按「被接受的任务」核算，级联只在验收便宜且可靠时成立。执行器要通过统一接口和产物契约变得可替换，领导 Agent 的职责是全局调度而不是转发消息。人机混编的 80&#x2F;20 是结果，不是配额，审批要基于风险而不是比例。先把一个任务类型、两个模型和一本账跑通，再谈多 Agent 团队。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://www.anthropic.com/research/building-effective-agents">Building effective agents</a></li>
+<li><a href="https://docs.claude.com/en/docs/claude-code/overview">Claude Code 官方文档</a></li>
+<li><a href="https://github.com/openai/codex">OpenAI Codex（GitHub）</a></li>
+<li><a href="https://modelcontextprotocol.io/">Model Context Protocol</a></li>
+<li><a href="https://api-docs.deepseek.com/">DeepSeek API 文档</a></li>
+<li><a href="https://qwen.readthedocs.io/">Qwen 文档</a></li>
+<li><a href="https://open.bigmodel.cn/">智谱开放平台</a></li>
+<li><a href="https://opentelemetry.io/docs/specs/semconv/gen-ai/">OpenTelemetry GenAI Semantic Conventions</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>下一代 Harness：多模型异构 Agent 的开放调度设计</p><p><a href="https://987763485.github.io/2026/10/07/下一代Harness多模型异构Agent的开放调度设计/">https://987763485.github.io/2026/10/07/下一代Harness多模型异构Agent的开放调度设计/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2026-10-07</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-11-15</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="link-muted mr-2" rel="tag" href="/tags/agent/">agent</a><a class="link-muted mr-2" rel="tag" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/">架构设计</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2026/10/11/%E4%B8%8A%E4%B8%8B%E6%96%87%E5%B7%A5%E7%A8%8B%E7%9A%84%E4%B8%89%E5%B1%82%E6%B2%BB%E7%90%86%E6%A8%A1%E5%9E%8B%E4%BB%8E%E6%A6%82%E5%BF%B5%E6%B8%85%E5%8D%95%E5%88%B0%E5%88%86%E5%B1%82%E6%A1%86%E6%9E%B6/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">上下文工程的三层治理模型：从概念清单到分层框架</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2026/09/28/%E6%87%92%E8%A1%A8%E8%BF%B0%E4%B8%8E%E7%B2%BE%E5%87%86%E7%90%86%E8%A7%A3%E7%94%A8%E6%88%B7%E4%B8%8EAgent%E5%85%B3%E7%B3%BB%E7%9A%84%E6%A0%B8%E5%BF%83%E5%BC%A0%E5%8A%9B/"><span class="level-item">懒表述与精准理解：用户与 Agent 关系的核心张力</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1071</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">36</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">141</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-11-15T14:30:47.000Z">2026-11-15</time></p><p class="title"><a href="/2026/11/15/Agent%E5%B7%A5%E7%A8%8B%E4%B8%AD%E7%9A%84%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8E%8B%E7%BC%A9%E8%A7%A6%E5%8F%91%E4%BA%A4%E6%8E%A5%E4%B8%8E%E6%89%BE%E5%9B%9E/">Agent 工程中的上下文压缩：触发、交接与找回</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-11-12T22:29:18.000Z">2026-11-13</time></p><p class="title"><a href="/2026/11/13/%E5%A6%82%E4%BD%95%E6%8A%8AGoogleA2UI%E6%8E%A5%E5%85%A5Harness/">如何把 Google A2UI 接入 Harness：从协议到渲染与动作回传</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-11-02T03:08:35.000Z">2026-11-02</time></p><p class="title"><a href="/2026/11/02/%E5%A4%9AAgent%E5%8D%8F%E4%BD%9C%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%E5%85%B1%E4%BA%AB%E8%AE%B0%E5%BF%86/">多 Agent 协作如何实现共享记忆：四个开源项目的架构拆解</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-10-23T13:56:09.000Z">2026-10-23</time></p><p class="title"><a href="/2026/10/23/%E4%B8%80%E6%96%87%E6%90%9E%E6%87%82Agent%E9%80%9A%E4%BF%A1%E5%8D%8F%E8%AE%AE/">一文搞懂 Agent 通信协议：MCP、A2A 与 ACP</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-10-13T19:17:42.000Z">2026-10-14</time></p><p class="title"><a href="/2026/10/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E8%83%BD%E5%8A%9B%E4%B8%8E%E9%80%9F%E5%BA%A6%E7%9A%84%E4%B8%A4%E6%9C%AC%E8%B4%A6%E5%85%AB%E7%A7%8D%E6%89%8B%E6%AE%B5%E7%9A%84%E9%80%82%E7%94%A8%E8%BE%B9%E7%95%8C/">大模型能力与速度的两本账：八种手段的适用边界</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/11/"><span class="level-start"><span class="level-item">十一月 2026</span></span><span class="level-end"><span class="level-item tag">3</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/10/"><span class="level-start"><span class="level-item">十月 2026</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">37</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E4%B8%8A%E4%B8%8B%E6%96%87%E5%B7%A5%E7%A8%8B/"><span class="tag">上下文工程</span><span class="tag">4</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">141</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">25</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">35</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

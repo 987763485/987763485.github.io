@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>懒表述与精准理解：用户与 Agent 关系的核心张力 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="用户对 Agent 的表述正在变短：从一整段需求，变成一句「照上次那样改」。这不是能力退化，而是表达成本与纠错成本被重新计算之后的结果。本文把这种「懒」拆成三层信息损失，讨论 Skill、MCP 与长期记忆为什么最终都落到同一件事上：用上下文工程补全用户没说出口的部分。适合做 Agent 产品、交互设计和上下文系统的工程师。"><meta property="og:type" content="blog"><meta property="og:title" content="懒表述与精准理解：用户与 Agent 关系的核心张力"><meta property="og:url" content="https://987763485.github.io/2026/09/28/%E6%87%92%E8%A1%A8%E8%BF%B0%E4%B8%8E%E7%B2%BE%E5%87%86%E7%90%86%E8%A7%A3%E7%94%A8%E6%88%B7%E4%B8%8EAgent%E5%85%B3%E7%B3%BB%E7%9A%84%E6%A0%B8%E5%BF%83%E5%BC%A0%E5%8A%9B/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="用户对 Agent 的表述正在变短：从一整段需求，变成一句「照上次那样改」。这不是能力退化，而是表达成本与纠错成本被重新计算之后的结果。本文把这种「懒」拆成三层信息损失，讨论 Skill、MCP 与长期记忆为什么最终都落到同一件事上：用上下文工程补全用户没说出口的部分。适合做 Agent 产品、交互设计和上下文系统的工程师。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2026-09-28T01:30:24.000Z"><meta property="article:modified_time" content="2026-11-15T14:48:13.812Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="大模型"><meta property="article:tag" content="agent"><meta property="article:tag" content="上下文工程"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2026/09/28/%E6%87%92%E8%A1%A8%E8%BF%B0%E4%B8%8E%E7%B2%BE%E5%87%86%E7%90%86%E8%A7%A3%E7%94%A8%E6%88%B7%E4%B8%8EAgent%E5%85%B3%E7%B3%BB%E7%9A%84%E6%A0%B8%E5%BF%83%E5%BC%A0%E5%8A%9B/"},"headline":"懒表述与精准理解：用户与 Agent 关系的核心张力","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2026-09-28T01:30:24.000Z","dateModified":"2026-11-15T14:48:13.812Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"用户对 Agent 的表述正在变短：从一整段需求，变成一句「照上次那样改」。这不是能力退化，而是表达成本与纠错成本被重新计算之后的结果。本文把这种「懒」拆成三层信息损失，讨论 Skill、MCP 与长期记忆为什么最终都落到同一件事上：用上下文工程补全用户没说出口的部分。适合做 Agent 产品、交互设计和上下文系统的工程师。"}</script><link rel="canonical" href="https://987763485.github.io/2026/09/28/%E6%87%92%E8%A1%A8%E8%BF%B0%E4%B8%8E%E7%B2%BE%E5%87%86%E7%90%86%E8%A7%A3%E7%94%A8%E6%88%B7%E4%B8%8EAgent%E5%85%B3%E7%B3%BB%E7%9A%84%E6%A0%B8%E5%BF%83%E5%BC%A0%E5%8A%9B/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><script>var _hmt = _hmt || [];
+        (function() {
+            var hm = document.createElement("script");
+            hm.src = "//hm.baidu.com/hm.js?96433e30ee22a64cb0977a9badd6098f";
+            var s = document.getElementsByTagName("script")[0];
+            s.parentNode.insertBefore(hm, s);
+        })();</script><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2026-09-28T01:30:24.000Z" title="9/28/2026, 9:30:24 AM">2026-09-28</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></span><span class="level-item">42 分钟读完 (大约6305个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">懒表述与精准理解：用户与 Agent 关系的核心张力</h1><div class="content"><p>用户对 Agent 的表述正在变短：从一整段需求，变成一句「照上次那样改」。这不是能力退化，而是表达成本与纠错成本被重新计算之后的结果。本文把这种「懒」拆成三层信息损失，讨论 Skill、MCP 与长期记忆为什么最终都落到同一件事上：用上下文工程补全用户没说出口的部分。适合做 Agent 产品、交互设计和上下文系统的工程师。</p>
+<h2 id="用户不是变懒，是在算一笔账"><a href="#用户不是变懒，是在算一笔账" class="headerlink" title="用户不是变懒，是在算一笔账"></a>用户不是变懒，是在算一笔账</h2><p>「懒」这个词带有道德判断，但在交互系统里，它更像一个理性信号。用户每次开口，都在心里算三笔账：表达成本、认知成本和社交成本。表达成本是把想法组织成语言要花的时间；认知成本是判断哪些信息重要、哪些可以省略；社交成本是担心自己说得太细显得啰嗦，或者说得太粗显得不专业。三笔账加在一起，用户自然会选择「最小可行表述」：能用一句话解决，就不写一段话；能说「老样子」，就不重新列一遍要求。</p>
+<p>同一个系统里，专家和新手的「懒」也不一样。专家省略的是自己熟悉的细节，期待系统懂行话、懂默认流程；新手省略的是自己不知道怎么描述的细节，期待系统给方向、给示例。前者需要的是术语和可调整的默认值，后者需要的是选项和渐进式引导。把两者都当成同一种「用户懒」来处理，系统就会在专家面前显得啰嗦，在新手面前显得武断。</p>
+<p>模型越强，这个选择越明显。因为多写一句的边际收益在下降：用户发现只给一个模糊指令，模型也能给出七八十分的结果。于是表述继续缩短，直到某一次结果偏离预期，纠错成本突然升高。此时用户很少归因于「我没有说清楚」，更常见的反应是「你不懂我」。这不是用户不讲道理，而是交互系统长期训练出来的预期：既然你能猜对大部分，为什么这一次猜不对？</p>
+<p>这里有一个容易被忽略的细节：用户的「懒」并不是均匀分布的。对于低风险、高频次的任务，比如改一段文案、整理一份会议纪要，用户愿意把表述压缩到极简；对于高风险、低频次的任务，比如数据迁移、合同条款、生产发布，用户反而会反复确认。真正决定表述长度的，不是用户的性格，而是错误的代价。Agent 如果只在所有场景里追求「更主动地猜」，就会在低风险场景显得聪明，在高风险场景显得危险。</p>
+<p>把这件事翻译成设计语言：不要试图教育用户写更完整的提示词，而要降低「被理解」的成本。前者把责任推回用户，后者才是系统该做的事。一个成熟的 Agent，应该能接住一句含糊的话，把它变成几个可验证的假设，再用最低的交互成本确认其中最关键的那一两个。</p>
+<table>
+<thead>
+<tr>
+<th>用户说出口的</th>
+<th>可能的意思</th>
+<th>缺失的信息</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>「帮我写个周报」</td>
+<td>汇总本周进展，面向直属上级</td>
+<td>格式、篇幅、语气、哪些事不能写</td>
+</tr>
+<tr>
+<td>「把这个改得专业一点」</td>
+<td>调整措辞与结构，不改变事实</td>
+<td>目标读者、行业术语、禁忌表达</td>
+</tr>
+<tr>
+<td>「照上次那样做」</td>
+<td>复用上一次的流程与参数</td>
+<td>哪一次、哪些条件已经变化</td>
+</tr>
+</tbody></table>
+<h2 id="表达赤字：说出来的、想说的、真正需要的"><a href="#表达赤字：说出来的、想说的、真正需要的" class="headerlink" title="表达赤字：说出来的、想说的、真正需要的"></a>表达赤字：说出来的、想说的、真正需要的</h2><p>用户的一句话里，至少叠着三层信息。最外面是「说出口的表述」，中间是「想完成的任务」，最里面是「真正需要的约束与偏好」。三层之间不是翻译关系，而是持续丢失的关系。</p>
+<p>以「帮我写个周报」为例。说出口的只有六个字；想完成的任务是汇总本周工作、暴露风险、让上级快速掌握进度；真正需要的可能还包括：沿用上周的三段式结构，语气克制，不点名批评同事，把尚未解决的问题写成待办而不是结论。后面这些信息，用户往往不会主动说，因为在他的语境里它们是「显然的」。但对一个没有共享语境的模型来说，它们一点都不显然。</p>
+<p>模型只能用一个东西去填补这些空白：训练数据里的总体先验。它知道大多数周报长什么样，知道大多数职场表达偏向什么语气，但它不知道你的上级喜欢看结论还是看过程，也不知道你们团队上周刚刚因为一个线上问题被批评过。于是它给出一个「平均正确」的周报：结构完整、语气得体、放在任何公司都不会出错，但放在你这里就是不够用。</p>
+<p>本文把这段差距称为「表达赤字」：从用户说出口的表述，到系统真正需要的信息之间，那段没有被说出来的部分。表达赤字不是提示词写得不够好，而是信息根本不在那句话里。继续优化提示词，只是在要求用户多写一点；而用户之所以少写，恰恰是因为他不想承担这部分成本。真正的解法，是让系统自己去获取、推断和验证这段缺失的信息。</p>
+<pre class="mermaid">flowchart LR
+    A[真实意图：目标、偏好、约束] --> B[说出口的表述]
+    B --> C[模型可见的上下文]
+    C --> D[模型先验补全]
+    D --> E[输出结果]
+    A -.信息丢失.-> B
+    B -.信息丢失.-> C
+    C -.猜测补全.-> D</pre>
+
+<p>这张图里，每一次箭头都可能丢信息，也都可能加噪声。上下文工程要做的，不是让用户把 A 完整写出来，而是让系统在 B 到 D 之间多几条可靠的获取通道：查一下历史记录、读一下项目文档、调用一次工具、问一个关键问题。每一条通道，都是在替用户补上他懒得说的那部分。</p>
+<h2 id="通用模型的极限：越强，越容易「平均正确」"><a href="#通用模型的极限：越强，越容易「平均正确」" class="headerlink" title="通用模型的极限：越强，越容易「平均正确」"></a>通用模型的极限：越强，越容易「平均正确」</h2><p>通用大模型的能力，本质上来自对总体分布的压缩。它见过足够多的代码、文档、对话和决策，因此能在缺乏具体信息时给出一个统计上合理的答案。能力越强，这个「合理」的上限越高，但它仍然是总体意义上的合理，不是针对某一个用户的合理。</p>
+<p>个性化需求是典型的长尾。你的代码风格、命名习惯、风险偏好、汇报口径、对哪些词敏感、在什么情况下希望被追问，这些都不在总体分布的中心。模型可以用先验去逼近，但逼近得越好，越容易产生一种危险的错觉：它看起来很懂你，实际上只是懂「像你这样的人」。</p>
+<p>「平均正确」有四种常见表现。第一种是风格不符：内容没错，但语气、结构、详略不是你要的。第二种是约束遗漏：模型不知道你们有一条「对外文档不写内部代号」的规定，于是写了。第三种是过度泛化：把一个具体场景的建议，套用到另一个约束完全不同的场景。第四种是置信度错配：模型用同样肯定的语气，给出正确和错误的答案，用户无法从语气里判断哪一句该信。</p>
+<p>举个具体的例子。让 Agent 改一段 Go 代码，用户只说「优化一下」。模型可能把循环改成并发，性能确实上去了，但引入了竞态；也可能把错误处理简化了，代码短了，可观测性没了。它给出的是通用意义上的「优化」，而用户想要的可能只是少一次内存分配。缺的不是模型能力，而是「优化」这个词在这位用户、这个项目里的定义。</p>
+<p>面对这些问题，很多团队的第一反应是微调，训练一个「专属模型」。微调当然有价值，但它不是默认答案。微调需要稳定的数据、明确的评价标准、可承受的训练和推理成本，还要面对版本老化：用户的习惯会变，业务规则会变，模型权重却不会自动跟着变。更现实的问题是隐私：把用户的个人偏好写进权重，删除和纠错都会变得困难。</p>
+<p>所以「专属模型」更准确的理解，是一个系统，而不是一份权重。基础模型提供通用能力，上下文层提供用户的世界，工具层提供事实，策略层决定什么时候该猜、什么时候该问。专属感来自这四者的组合，而不一定来自重新训练。把「专属」等同于「微调」，是把一个上下文问题误判成了训练问题。</p>
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>成本</th>
+<th>新鲜度</th>
+<th>隐私可控性</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>通用模型加通用提示词</td>
+<td>低</td>
+<td>高</td>
+<td>高</td>
+<td>低频、低风险任务</td>
+</tr>
+<tr>
+<td>微调专属模型</td>
+<td>高</td>
+<td>低</td>
+<td>中</td>
+<td>数据稳定、风格固定的高频任务</td>
+</tr>
+<tr>
+<td>上下文专属化</td>
+<td>中</td>
+<td>高</td>
+<td>高</td>
+<td>大多数个性化 Agent 场景</td>
+</tr>
+</tbody></table>
+<h2 id="专属化的三条路径：Skill、记忆与-MCP"><a href="#专属化的三条路径：Skill、记忆与-MCP" class="headerlink" title="专属化的三条路径：Skill、记忆与 MCP"></a>专属化的三条路径：Skill、记忆与 MCP</h2><p>当下被讨论最多的三种能力，恰好对应三类缺失的信息。</p>
+<p>Skill 补的是「流程性知识」，也就是「这件事在我们这里怎么做」。它不是一段更长的提示词，而是一组可复用的步骤、约束和验收标准。比如一个周报 Skill，会规定先收集哪些数据、按什么结构组织、哪些内容必须标注风险、写完用什么清单自检。用户下一次只需要说「写周报」，系统就能把这一整套流程装进上下文。Skill 的关键是版本化与可组合：流程会变，变了要能回滚；不同 Skill 之间要能拼装，而不是互相覆盖。</p>
+<p>长期记忆补的是「稳定偏好与历史决策」，也就是「我是谁、我以前怎么选的」。它至少可以分为三类：偏好记忆，比如语气、格式、禁忌词；事实记忆，比如项目背景、团队结构、长期目标；经验记忆，比如上一次为什么否决了某个方案。记忆的价值不在于存得多，而在于取得准。把所有对话原样塞进上下文，既贵又吵；真正有用的是经过提炼、带时间和来源、可以更新和删除的条目。记忆还需要衰减：三个月前的项目偏好，今天可能已经反转；一次临时决定，不应该变成永久规则。给记忆设置有效期和置信度，比不断增加条目更重要。</p>
+<p>MCP 补的是「环境事实」，也就是「现在到底是什么情况」。用户说「把那个失败的构建修一下」，模型不知道「那个」指哪个仓库、哪条流水线、哪次提交。MCP 把文件系统、工单系统、日历、数据库这些真实环境接进来，让模型从「猜」变成「查」。它的价值不只是多几个工具，而是把用户的省略号替换成可验证的事实。</p>
+<table>
+<thead>
+<tr>
+<th>能力</th>
+<th>补全的缺失</th>
+<th>典型载体</th>
+<th>常见失效</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Skill</td>
+<td>流程、规范、验收标准</td>
+<td>版本化的步骤与检查清单</td>
+<td>写成超长提示词，无法维护</td>
+</tr>
+<tr>
+<td>长期记忆</td>
+<td>偏好、历史决策、项目状态</td>
+<td>结构化条目加检索</td>
+<td>存成聊天记录，噪声淹没信号</td>
+</tr>
+<tr>
+<td>MCP</td>
+<td>环境事实与实时状态</td>
+<td>标准化的工具与资源接口</td>
+<td>当成万能插件，权限失控</td>
+</tr>
+</tbody></table>
+<p>这三种能力看起来分别属于流程、记忆和工具，但它们的共同点是一样的：决定模型在这一次调用里能看到什么。Skill 改变上下文的结构，记忆改变上下文的内容，MCP 改变上下文的来源。它们都不是模型能力的直接提升，而是上下文工程的不同侧面。</p>
+<h2 id="上下文工程：把没说出口的变成可计算的输入"><a href="#上下文工程：把没说出口的变成可计算的输入" class="headerlink" title="上下文工程：把没说出口的变成可计算的输入"></a>上下文工程：把没说出口的变成可计算的输入</h2><p>如果把上下文工程压缩成四个问题，大概是：该放什么、该去掉什么、按什么顺序放、什么时候刷新。四个问题都围绕一个约束：模型的上下文窗口有限，用户的耐心也有限。放得越多不一定越好，噪声会稀释信号；放得越久不一定越好，过期的记忆比没有记忆更危险。</p>
+<p>具体手段并不神秘。检索负责从大量资料里找出相关片段；摘要负责把长历史压缩成可读的决策记录；结构化画像负责把偏好写成字段，而不是散落在对话里；工具调用负责在需要时获取实时事实；澄清负责在信息不足时向用户要一个关键答案。它们的共同目标，是把「用户没说出口的」变成「模型可以计算的」。</p>
+<p>澄清值得单独说。很多系统把「多问一句」当成笨拙，其实问得对，比猜错便宜得多。关键在问法：不要问「你想要什么」，那等于把表达成本又推回给用户；要给选项、给默认值、给可见的假设。比如「我按上周的三段式写，重点放风险和下周计划，可以吗？」用户只需要回「可以」或者改一个点。一次低成本确认，往往比一次高成本返工更划算。追问的次数也要有预算：一次任务最多问一到两个问题，超过这个数量，用户会觉得自己在填表，而不是在委托。</p>
+<p>自主程度也应该由置信度决定，而不是由产品经理的偏好决定。高置信、低风险的任务，直接执行；中等置信的任务，执行但把假设写在结果里；低置信或高风险的任务，先给方案再等确认。把这条规则写进系统，比在每个场景里临时判断更稳定。</p>
+<table>
+<thead>
+<tr>
+<th>置信度与风险</th>
+<th>系统行为</th>
+<th>用户成本</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信、低风险</td>
+<td>直接执行，结果附假设</td>
+<td>最低</td>
+</tr>
+<tr>
+<td>中置信、低风险</td>
+<td>执行并显式标注推断</td>
+<td>低</td>
+</tr>
+<tr>
+<td>低置信或高风险</td>
+<td>给选项或方案，等待确认</td>
+<td>中</td>
+</tr>
+<tr>
+<td>信息严重不足</td>
+<td>只问一个最关键的问题</td>
+<td>可控</td>
+</tr>
+</tbody></table>
+<p>个性化不是一次性的配置，而是一个闭环：用户修正一次，系统提取一条偏好，存进记忆，下一次检索出来用，再观察是否被接受。闭环的关键是克制：不能因为用户改了一次标点，就认定他讨厌所有标点；也不能因为一次否决，就永久降低某类方案的优先级。偏好要有置信度、有适用范围、有失效时间。</p>
+<pre class="mermaid">flowchart TD
+    U[用户表述] --> A[Agent 执行]
+    A --> R[用户接受或修正]
+    R --> P[提取偏好与决策]
+    P --> M[更新记忆或 Skill]
+    M --> A
+    R --> E[记录验收结果]
+    E --> P</pre>
+
+<p>一个可用的上下文包，通常长这样：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">user_profile:</span></span><br><span class="line">  <span class="attr">language:</span> <span class="string">zh-CN</span></span><br><span class="line">  <span class="attr">tone:</span> <span class="string">concise</span></span><br><span class="line">  <span class="attr">avoid:</span> [<span class="string">emoji</span>, <span class="string">marketing</span>]</span><br><span class="line"><span class="attr">session:</span></span><br><span class="line">  <span class="attr">goal:</span> <span class="string">写周报</span></span><br><span class="line">  <span class="attr">deadline:</span> <span class="number">2026-09-28</span></span><br><span class="line"><span class="attr">memory:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">上周周报采用三段式</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">团队当前重点是稳定性</span></span><br><span class="line"><span class="attr">skills:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">weekly-report</span></span><br><span class="line"><span class="attr">tools:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">mcp://jira</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">mcp://git</span></span><br></pre></td></tr></table></figure>
+
+<p>这份配置本身不聪明，但它把「用户是谁、这次要做什么、以前怎么做的、现在能查什么」拆成了可维护的字段。上下文工程的价值，就藏在这些字段的选择和更新里。</p>
+<h2 id="专属化的代价：过度揣测、隐私与依赖"><a href="#专属化的代价：过度揣测、隐私与依赖" class="headerlink" title="专属化的代价：过度揣测、隐私与依赖"></a>专属化的代价：过度揣测、隐私与依赖</h2><p>专属化不是免费的。系统越懂用户，越容易越界。</p>
+<p>第一重代价是过度揣测。用户一次的偏好，可能被系统固化成长期标签；一个标签一旦进入画像，就会影响后续所有推荐。更糟的是反馈闭环：系统按画像给结果，用户在同一条路上修正，系统又把这个修正当成新证据，最后把用户困在一个越来越窄的假设里。避免这件事的办法，是让画像始终可解释、可反驳、可过期，而不是变成一个黑箱。</p>
+<p>第二重代价是隐私。记忆里可能包含项目代号、客户信息、个人习惯，甚至健康和政治倾向。存得越多，泄露的收益和风险同时变大。数据最小化、明确授权、保留期限、删除能力、本地优先，这些不是合规装饰，而是专属化的前提。一个不能忘记的系统，不配拥有长期记忆。一个常见的误区是把「记住用户」当成默认开启的能力；更稳妥的做法是默认不记，只有用户明确授权或任务确实需要时才记，并定期提醒清理。</p>
+<p>第三重代价是依赖与能力退化。用户越习惯一句话交付，越不愿意组织自己的需求；越依赖系统补全，越难发现系统补全错了。自动化偏差会让用户在大部分正确的结果里，失去对少数错误的敏感。系统应该主动打破这种惯性：在关键节点展示依据，在不确定时明确说不确定，在用户长期不检查时提醒复核。</p>
+<p>透明是这三重代价的共同解药。用户需要知道系统假设了什么、依据是什么、哪些信息来自记忆、哪些来自工具、置信度大概多高。更重要的是，用户要能改：改一条记忆、删一段历史、关掉某类推断、要求下次重新问。专属化的目标，是扩大用户的控制感，而不是替用户做决定。</p>
+<h2 id="设计原则：让「懒」变得安全"><a href="#设计原则：让「懒」变得安全" class="headerlink" title="设计原则：让「懒」变得安全"></a>设计原则：让「懒」变得安全</h2><p>把前面的讨论收敛成几条可以直接执行的原则。</p>
+<p>第一，先补全，再追问。能用记忆、工具和历史补上的，不要问用户；必须问的，只问一个最关键的问题，并且带上选项和默认值。</p>
+<p>第二，让假设可见。结果里标出「我假设你希望沿用上周格式」「我没有找到上周的数据，因此用了本周的估算」。可见的假设可以被纠正，隐藏的假设只会变成争吵。</p>
+<p>第三，记忆要可查、可改、可忘。每条记忆带来源、时间、适用范围和置信度；提供查看、编辑、删除入口；默认不记录敏感信息。</p>
+<p>第四，Skill 要版本化、可组合、可回滚。流程变更要像代码一样评审；不同 Skill 之间定义清晰的输入输出；失效时能退回上一版。</p>
+<p>第五，能查就不猜。环境事实优先走 MCP 或等价工具；工具不可用时，明确告诉用户「这是推测」，不要把猜测包装成事实。</p>
+<p>第六，用置信度决定自主程度。高置信低风险直接做，中置信标注假设，低置信或高风险先确认；把这条规则写进调度，而不是留给临场判断。</p>
+<p>第七，用「被接受的任务」衡量效果，而不是用生成字数或对话轮数。真正有价值的指标是首轮接受率、修正率、每个被接受任务消耗的人工时间，以及出错之后的恢复成本。</p>
+<table>
+<thead>
+<tr>
+<th>原则</th>
+<th>机制</th>
+<th>观测指标</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>先补全再追问</td>
+<td>记忆检索、工具调用、默认值</td>
+<td>追问次数、追问后的接受率</td>
+</tr>
+<tr>
+<td>假设可见</td>
+<td>结果内标注推断与依据</td>
+<td>假设纠正率、误解投诉率</td>
+</tr>
+<tr>
+<td>记忆可管理</td>
+<td>条目化、来源、过期、删除</td>
+<td>记忆命中率、过期条目比例</td>
+</tr>
+<tr>
+<td>Skill 可维护</td>
+<td>版本、组合、回滚</td>
+<td>Skill 复用率、回滚次数</td>
+</tr>
+<tr>
+<td>能查就不猜</td>
+<td>MCP 工具优先</td>
+<td>工具调用成功率、事实错误率</td>
+</tr>
+<tr>
+<td>置信度驱动</td>
+<td>分级自主策略</td>
+<td>高风险任务误执行率</td>
+</tr>
+<tr>
+<td>以接受为准</td>
+<td>验收与人工复核</td>
+<td>首轮接受率、单位任务人工分钟</td>
+</tr>
+</tbody></table>
+<p>这些原则有一个共同方向：把模糊性留在系统内部消化，而不是原样退还给用户。用户的「懒」不会消失，也不应该被指责。它是人对工具的正常期待：我少说一点，你多想一点；但你想错的时候，要让我容易发现、容易纠正。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>用户的极简表述不是能力问题，而是在表达成本、认知成本和错误代价之间做出的理性选择。通用模型的「平均正确」来自总体先验，无法自动变成对单个用户的理解，表达赤字只能靠系统补全。Skill 补流程，长期记忆补偏好与历史，MCP 补环境事实，三者本质都是上下文工程。专属化的关键不是训练一份新权重，而是把模型、上下文、工具和策略组合成用户可控制的理解系统。越懂用户的系统，越要克制揣测、保护隐私、保留用户的纠错能力。衡量它是否成功，最终看「被接受的任务」，而不是「生成的内容」。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents">Effective context engineering for AI agents</a></li>
+<li><a href="https://www.anthropic.com/research/building-effective-agents">Building effective agents</a></li>
+<li><a href="https://www.anthropic.com/news/skills">Agent Skills</a></li>
+<li><a href="https://modelcontextprotocol.io/">Model Context Protocol</a></li>
+<li><a href="https://arxiv.org/abs/2307.03172">Lost in the Middle: How Language Models Use Long Contexts</a></li>
+<li><a href="https://arxiv.org/abs/2310.08560">MemGPT: Towards LLMs as Operating Systems</a></li>
+<li><a href="https://www.nngroup.com/articles/progressive-disclosure/">Progressive Disclosure</a></li>
+<li><a href="https://www.microsoft.com/en-us/haxtoolkit/">Microsoft HAX Toolkit</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>懒表述与精准理解：用户与 Agent 关系的核心张力</p><p><a href="https://987763485.github.io/2026/09/28/懒表述与精准理解用户与Agent关系的核心张力/">https://987763485.github.io/2026/09/28/懒表述与精准理解用户与Agent关系的核心张力/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2026-09-28</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-11-15</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="link-muted mr-2" rel="tag" href="/tags/agent/">agent</a><a class="link-muted mr-2" rel="tag" href="/tags/%E4%B8%8A%E4%B8%8B%E6%96%87%E5%B7%A5%E7%A8%8B/">上下文工程</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2026/10/07/%E4%B8%8B%E4%B8%80%E4%BB%A3Harness%E5%A4%9A%E6%A8%A1%E5%9E%8B%E5%BC%82%E6%9E%84Agent%E7%9A%84%E5%BC%80%E6%94%BE%E8%B0%83%E5%BA%A6%E8%AE%BE%E8%AE%A1/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">下一代 Harness：多模型异构 Agent 的开放调度设计</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2026/09/26/RLHF%E5%88%B0RLVR%E7%9A%84%E5%AF%B9%E9%BD%90%E6%BC%94%E8%BF%9B/"><span class="level-item">RLHF 到 RLVR 的对齐演进</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1071</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">36</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">141</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-11-15T14:30:47.000Z">2026-11-15</time></p><p class="title"><a href="/2026/11/15/Agent%E5%B7%A5%E7%A8%8B%E4%B8%AD%E7%9A%84%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8E%8B%E7%BC%A9%E8%A7%A6%E5%8F%91%E4%BA%A4%E6%8E%A5%E4%B8%8E%E6%89%BE%E5%9B%9E/">Agent 工程中的上下文压缩：触发、交接与找回</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-11-12T22:29:18.000Z">2026-11-13</time></p><p class="title"><a href="/2026/11/13/%E5%A6%82%E4%BD%95%E6%8A%8AGoogleA2UI%E6%8E%A5%E5%85%A5Harness/">如何把 Google A2UI 接入 Harness：从协议到渲染与动作回传</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-11-02T03:08:35.000Z">2026-11-02</time></p><p class="title"><a href="/2026/11/02/%E5%A4%9AAgent%E5%8D%8F%E4%BD%9C%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%E5%85%B1%E4%BA%AB%E8%AE%B0%E5%BF%86/">多 Agent 协作如何实现共享记忆：四个开源项目的架构拆解</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-10-23T13:56:09.000Z">2026-10-23</time></p><p class="title"><a href="/2026/10/23/%E4%B8%80%E6%96%87%E6%90%9E%E6%87%82Agent%E9%80%9A%E4%BF%A1%E5%8D%8F%E8%AE%AE/">一文搞懂 Agent 通信协议：MCP、A2A 与 ACP</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-10-13T19:17:42.000Z">2026-10-14</time></p><p class="title"><a href="/2026/10/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E8%83%BD%E5%8A%9B%E4%B8%8E%E9%80%9F%E5%BA%A6%E7%9A%84%E4%B8%A4%E6%9C%AC%E8%B4%A6%E5%85%AB%E7%A7%8D%E6%89%8B%E6%AE%B5%E7%9A%84%E9%80%82%E7%94%A8%E8%BE%B9%E7%95%8C/">大模型能力与速度的两本账：八种手段的适用边界</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/11/"><span class="level-start"><span class="level-item">十一月 2026</span></span><span class="level-end"><span class="level-item tag">3</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/10/"><span class="level-start"><span class="level-item">十月 2026</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">37</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E4%B8%8A%E4%B8%8B%E6%96%87%E5%B7%A5%E7%A8%8B/"><span class="tag">上下文工程</span><span class="tag">4</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">141</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">25</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">35</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

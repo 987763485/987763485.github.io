@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>大模型能力与速度的两本账：八种手段的适用边界 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="很多团队把「模型不够好」和「模型太慢太贵」当成同一个问题，结果选错了手段。能力不足，可能需要数据、微调或检索；速度不足，可能需要量化、推理引擎或部署架构。两本账的优化目标不同，混在一起谈，容易得出「换更强的模型」这种正确但昂贵的结论。本文把八类手段拆成三个杠杆，分别算清能力账和速度账，再给出按约束选型的顺序。"><meta property="og:type" content="blog"><meta property="og:title" content="大模型能力与速度的两本账：八种手段的适用边界"><meta property="og:url" content="https://987763485.github.io/2026/10/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E8%83%BD%E5%8A%9B%E4%B8%8E%E9%80%9F%E5%BA%A6%E7%9A%84%E4%B8%A4%E6%9C%AC%E8%B4%A6%E5%85%AB%E7%A7%8D%E6%89%8B%E6%AE%B5%E7%9A%84%E9%80%82%E7%94%A8%E8%BE%B9%E7%95%8C/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="很多团队把「模型不够好」和「模型太慢太贵」当成同一个问题，结果选错了手段。能力不足，可能需要数据、微调或检索；速度不足，可能需要量化、推理引擎或部署架构。两本账的优化目标不同，混在一起谈，容易得出「换更强的模型」这种正确但昂贵的结论。本文把八类手段拆成三个杠杆，分别算清能力账和速度账，再给出按约束选型的顺序。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2026-10-13T19:17:42.000Z"><meta property="article:modified_time" content="2026-11-15T14:58:26.136Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="大模型"><meta property="article:tag" content="架构设计"><meta property="article:tag" content="性能优化"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2026/10/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E8%83%BD%E5%8A%9B%E4%B8%8E%E9%80%9F%E5%BA%A6%E7%9A%84%E4%B8%A4%E6%9C%AC%E8%B4%A6%E5%85%AB%E7%A7%8D%E6%89%8B%E6%AE%B5%E7%9A%84%E9%80%82%E7%94%A8%E8%BE%B9%E7%95%8C/"},"headline":"大模型能力与速度的两本账：八种手段的适用边界","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2026-10-13T19:17:42.000Z","dateModified":"2026-11-15T14:58:26.136Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"很多团队把「模型不够好」和「模型太慢太贵」当成同一个问题，结果选错了手段。能力不足，可能需要数据、微调或检索；速度不足，可能需要量化、推理引擎或部署架构。两本账的优化目标不同，混在一起谈，容易得出「换更强的模型」这种正确但昂贵的结论。本文把八类手段拆成三个杠杆，分别算清能力账和速度账，再给出按约束选型的顺序。"}</script><link rel="canonical" href="https://987763485.github.io/2026/10/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E8%83%BD%E5%8A%9B%E4%B8%8E%E9%80%9F%E5%BA%A6%E7%9A%84%E4%B8%A4%E6%9C%AC%E8%B4%A6%E5%85%AB%E7%A7%8D%E6%89%8B%E6%AE%B5%E7%9A%84%E9%80%82%E7%94%A8%E8%BE%B9%E7%95%8C/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><script>var _hmt = _hmt || [];
+        (function() {
+            var hm = document.createElement("script");
+            hm.src = "//hm.baidu.com/hm.js?96433e30ee22a64cb0977a9badd6098f";
+            var s = document.getElementsByTagName("script")[0];
+            s.parentNode.insertBefore(hm, s);
+        })();</script><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2026-10-13T19:17:42.000Z" title="10/14/2026, 3:17:42 AM">2026-10-14</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></span><span class="level-item">42 分钟读完 (大约6270个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">大模型能力与速度的两本账：八种手段的适用边界</h1><div class="content"><p>很多团队把「模型不够好」和「模型太慢太贵」当成同一个问题，结果选错了手段。能力不足，可能需要数据、微调或检索；速度不足，可能需要量化、推理引擎或部署架构。两本账的优化目标不同，混在一起谈，容易得出「换更强的模型」这种正确但昂贵的结论。本文把八类手段拆成三个杠杆，分别算清能力账和速度账，再给出按约束选型的顺序。</p>
+<h2 id="先分清两本账"><a href="#先分清两本账" class="headerlink" title="先分清两本账"></a>先分清两本账</h2><p>能力账衡量的是「做对多少」。它至少包含任务成功率、事实准确性、指令遵循、长上下文理解、工具调用可靠性，以及特定领域的风格与规范。不同任务对这些维度的权重不同，一个在通用问答上更强的模型，未必在你们的合同审阅或工单分类上更强。</p>
+<p>速度账衡量的是「多快、多贵、能扛多少」。它至少包含首 token 延迟、单 token 生成时间、吞吐量、p95 延迟、显存占用，以及每个被接受任务的综合成本。只看平均延迟会掩盖长尾抖动，只看单请求速度会忽略并发吞吐，只看 token 单价会漏掉重试和人工复核。</p>
+<p>两本账并不独立。量化能同时降低显存和延迟，但可能损伤长尾精度；RAG 能提升事实性，却增加一次检索往返；蒸馏能加快推理，但能力上限受教师约束；LoRA 能低成本适配领域，却可能带来遗忘；全量微调能抬高能力上限，但成本和风险都高；架构优化可能同时改善能力和速度，却需要重新训练并承担生态适配风险。</p>
+<p>所以第一步不是选手段，而是测量：当前瓶颈到底在能力还是速度，具体落在哪个指标上。没有测量，后面的选型都是在猜。</p>
+<p>测量的最低要求，是建立一个能重复运行的基线。基线要固定模型版本、推理参数、硬件环境和请求分布；否则今天测出来的提升，可能只是环境变化带来的噪声。能力基线用黄金任务集，速度基线用生产流量的采样回放；两者都要记录 p50 与 p95，而不是只记平均值。</p>
+<h2 id="八种手段的分层：三个杠杆"><a href="#八种手段的分层：三个杠杆" class="headerlink" title="八种手段的分层：三个杠杆"></a>八种手段的分层：三个杠杆</h2><p>把常见手段按「改什么」归类，会得到三个杠杆：改权重、改上下文、改计算图与部署。八种手段可以对应到这三个杠杆上。</p>
+<table>
+<thead>
+<tr>
+<th>手段</th>
+<th>杠杆</th>
+<th>改什么</th>
+<th>主要收益</th>
+<th>主要代价</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>LoRA 微调</td>
+<td>改权重</td>
+<td>插入低秩适配矩阵</td>
+<td>领域适配、风格对齐</td>
+<td>可能遗忘、需要数据</td>
+</tr>
+<tr>
+<td>知识蒸馏</td>
+<td>改权重</td>
+<td>用教师指导小学生</td>
+<td>能力下沉、推理变快</td>
+<td>上限受教师约束</td>
+</tr>
+<tr>
+<td>RAG</td>
+<td>改上下文</td>
+<td>外挂知识库与检索</td>
+<td>事实性、时效性、私有知识</td>
+<td>检索延迟与工程质量</td>
+</tr>
+<tr>
+<td>全量指令微调</td>
+<td>改权重</td>
+<td>更新全部参数</td>
+<td>通用能力与多任务上限</td>
+<td>算力、数据、遗忘风险</td>
+</tr>
+<tr>
+<td>架构优化</td>
+<td>改权重</td>
+<td>注意力、位置编码、结构</td>
+<td>长上下文、吞吐与建模</td>
+<td>重训成本、生态适配</td>
+</tr>
+<tr>
+<td>模型轻量化</td>
+<td>改计算图</td>
+<td>量化、剪枝、换结构</td>
+<td>显存下降、延迟下降</td>
+<td>精度损失、硬件限制</td>
+</tr>
+<tr>
+<td>推理引擎优化</td>
+<td>改执行</td>
+<td>KV 缓存、批处理、融合</td>
+<td>吞吐提升、首 token 降低</td>
+<td>实现复杂、调参成本</td>
+</tr>
+<tr>
+<td>部署架构优化</td>
+<td>改部署</td>
+<td>并行、调度、请求拆分</td>
+<td>大模型落地、并发承载</td>
+<td>通信开销、运维复杂</td>
+</tr>
+</tbody></table>
+<p>这张表里有两点容易被忽略。第一，蒸馏同时出现在能力账和速度账里：它既是能力迁移手段，也是轻量化手段；本文把它归在改权重，速度收益视为派生结果。第二，RAG 不改权重，所以它提升的是「可获得的事实」，不是「模型本身的推理能力」；把 RAG 当成能力升级，会在需要复杂推理时失望。</p>
+<p>还有一个隐含前提：三个杠杆的改动成本不同。改上下文最快，通常几天到几周就能上线；改权重需要数据、训练和评测，周期以周或月计；改计算图与部署介于两者之间，但强依赖硬件和推理框架。选型时先考虑低成本杠杆，不是为了省事，而是为了让反馈更快。</p>
+<p>八种手段也不是互斥的。RAG 可以和 LoRA 组合，前者补事实，后者补行为；蒸馏之后可以再量化，进一步压缩端侧模型；推理引擎优化和部署架构优化通常一起做。但组合的顺序会影响结果：先蒸馏再量化，学生模型可能同时承受两种损失；先量化再蒸馏，教师和学生的数值精度又可能不一致。组合方案要按「先改能力、再改速度、最后调部署」的顺序验证，避免误差叠加。</p>
+<h2 id="能力账：五种提升手段的边界"><a href="#能力账：五种提升手段的边界" class="headerlink" title="能力账：五种提升手段的边界"></a>能力账：五种提升手段的边界</h2><p>LoRA 微调冻结主干权重，只在注意力层等位置插入低秩适配矩阵，只训练少量新增参数。它的优势是数据需求小、单卡可跑、可以保留原模型通用能力，适合垂直领域适配、固定对话风格、特定输出格式。它的边界也很清楚：低秩容量有限，复杂推理和大规模知识注入不是它的强项；数据质量差时会过拟合；多个 LoRA 叠加可能互相干扰；部署时要考虑是否合并权重，以及多适配器如何路由。</p>
+<p>实际落地时，LoRA 的效果很大程度取决于数据而不是秩。几百条高质量、覆盖边界情况的样本，往往比几万条重复样本更有用；rank 从 8 提到 64，收益可能远小于把标注错误清理一遍。目标模块的选择也很关键：只调注意力层的 q、v，和同时调所有线性层，容量与稳定性不一样。上线前要测合并权重后的推理一致性，避免训练环境和 serving 环境的数值差异。</p>
+<p>知识蒸馏用一个高能力教师模型指导小模型，传递输出概率分布、中间特征或生成的训练数据。它适合把能力下沉到端侧、低算力环境，或者把一个昂贵的大模型压缩成可承受的推理服务。蒸馏的边界是教师：教师会的，学生未必学得会；教师错的，学生会学得更像。容量差距过大时，蒸馏会退化成模仿表面措辞；教师数据还涉及授权和合规问题。</p>
+<p>蒸馏有两种常见路线：一种传 logits，让学生学习教师的概率分布，信息量更大，但需要教师和学生的词表对齐；另一种传思维链或生成数据，工程上更简单，但容易把教师的错误一起复制。前者适合同架构压缩，后者适合跨架构迁移。无论哪种，都要保留一个独立的学生评测集，不能用教师打过分的数据同时训练和验收。</p>
+<p>RAG 在推理时先检索相关文档片段，再交给模型生成回答。它适合实时、私有、专业领域知识，比如企业内部问答、最新政策、产品文档。RAG 的边界不在生成，而在检索：分块是否合理、嵌入是否匹配、召回是否覆盖、重排是否准确、引用是否可回溯。检索质量不行，生成模型再强也只能在错误材料上加工。RAG 还会增加一次检索延迟，并带来权限与数据隔离问题。</p>
+<p>RAG 的验收要拆成检索和生成两段。检索看召回率、命中率、排序质量；生成看引用是否支持结论、是否遗漏关键条件、是否在证据不足时拒答。只测最终答案，会把检索错误和生成错误混在一起，无法定位。工程上还要处理文档更新、删除和权限继承，否则知识库会变成新的技术债。</p>
+<p>全量指令微调用大规模高质量指令数据更新模型全部权重。它适合有充足算力、希望系统性提升通用能力与多任务表现的团队，也是旗舰模型迭代的核心方式。它的边界是成本和风险：数据清洗与配比要求高，训练不稳定，容易发生灾难性遗忘和安全对齐回退；一次全量训练的代价，往往不是小团队能承担的。</p>
+<p>全量微调真正难的是数据配比。通用能力、领域知识、指令遵循、安全对齐，需要按比例混合；某一类数据过多，模型就会在其他维度退化。训练过程中要持续跑回归集，而不是只观察训练损失。对于大多数业务团队，全量微调的投入产出比不如 LoRA 加 RAG；它更适合有明确模型迭代目标的团队。</p>
+<p>架构优化改进注意力机制、位置编码或整体结构，比如用更高效的注意力降低长序列的显存与计算，或换用线性复杂度结构。它可能同时改善长上下文能力和推理吞吐。但它的代价最高：通常需要重新训练，甚至重新预训练；新结构需要算子、框架和推理引擎的配套支持；生态不成熟时，纸面收益很难在生产环境兑现。</p>
+<p>架构优化的判断标准，不只是论文指标，而是端到端收益：新结构在目标硬件上的实际吞吐、显存、延迟，以及训练稳定性。位置编码的改动尤其容易影响长上下文外推能力，必须用真实长文档验证，而不是只看短序列的损失曲线。没有训练和推理全链路支持时，架构优化应该放在最后考虑。</p>
+<table>
+<thead>
+<tr>
+<th>手段</th>
+<th>数据门槛</th>
+<th>算力门槛</th>
+<th>能力上限</th>
+<th>主要风险</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>LoRA</td>
+<td>低到中</td>
+<td>低</td>
+<td>中</td>
+<td>遗忘、适配器冲突</td>
+</tr>
+<tr>
+<td>知识蒸馏</td>
+<td>中到高</td>
+<td>中</td>
+<td>受教师约束</td>
+<td>教师偏差、容量不足</td>
+</tr>
+<tr>
+<td>RAG</td>
+<td>中</td>
+<td>低</td>
+<td>受检索质量约束</td>
+<td>召回错误、权限泄露</td>
+</tr>
+<tr>
+<td>全量指令微调</td>
+<td>高</td>
+<td>高</td>
+<td>高</td>
+<td>成本、遗忘、对齐回退</td>
+</tr>
+<tr>
+<td>架构优化</td>
+<td>高</td>
+<td>很高</td>
+<td>高</td>
+<td>重训风险、生态适配</td>
+</tr>
+</tbody></table>
+<h2 id="速度账：三类提速手段的边界"><a href="#速度账：三类提速手段的边界" class="headerlink" title="速度账：三类提速手段的边界"></a>速度账：三类提速手段的边界</h2><p>模型轻量化包括 4&#x2F;8 比特量化、结构化剪枝、知识蒸馏和换线性注意力架构。量化把权重和激活压到更低比特，直接降低显存和带宽压力，是端侧和成本敏感场景的常用手段；它的风险是精度损失，尤其是在长尾任务、数值敏感任务和多语言任务上。结构化剪枝删除整块通道或层，硬件友好，但通常需要再训练恢复精度。蒸馏在前面说过，速度收益来自更小的学生模型。线性注意力把序列交互的复杂度从平方降到线性，长文本场景收益明显，但可能损失一部分建模能力。</p>
+<p>推理引擎优化包括 KV 缓存复用、连续批处理、算子融合和动态解码。KV 缓存复用避免重复计算历史 token，前缀缓存还能让相同系统提示词的请求共享计算结果；连续批处理在请求结束时立刻插入新请求，显著提升吞吐；算子融合减少内核启动和显存往返；动态解码根据置信度或投机采样调整生成策略，降低单 token 时间。这些手段的共同点是「不改模型权重」，因此能力损失通常最小，但实现和调参成本不低。</p>
+<p>推理引擎的收益高度依赖请求形态。短请求、高并发时，连续批处理收益最大；长上下文、重复系统提示词时，前缀缓存收益最大；小 batch、低延迟场景，算子融合和动态解码更直接。反过来，如果请求长度差异很大，批处理可能拉高 p95；如果缓存命中率低，KV 复用只是增加复杂度。</p>
+<p>部署架构优化包括多卡张量并行、流水线并行、动态批处理调度，以及把 RAG 的长问答拆成检索加短生成。张量并行把单层计算切到多卡，降低单卡显存压力，适合大模型低延迟；流水线并行把不同层放到不同卡，吞吐更高，但气泡和通信开销需要调优；动态批处理调度根据请求长度和优先级组批，兼顾吞吐与 p95；RAG 短生成拆分则通过减少输出 token 来降低整体耗时，代价是回答可能更简短。</p>
+<p>并行的选择也要看目标：张量并行降低单请求延迟，适合在线交互；流水线并行提升吞吐，适合离线批处理；两者混用时，通信和气泡会吃掉一部分收益。部署架构的调整往往牵动容量规划、故障域和成本模型，不能只按 benchmark 的 tokens&#x2F;s 决策。</p>
+<table>
+<thead>
+<tr>
+<th>类别</th>
+<th>具体手段</th>
+<th>主要改善</th>
+<th>主要代价</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>模型轻量化</td>
+<td>4&#x2F;8 比特量化、结构化剪枝、蒸馏、线性注意力</td>
+<td>显存、延迟、端侧可行</td>
+<td>精度损失、重训、生态限制</td>
+</tr>
+<tr>
+<td>推理引擎</td>
+<td>KV 缓存复用、连续批处理、算子融合、动态解码</td>
+<td>吞吐、首 token、单 token 时间</td>
+<td>实现复杂、调参成本</td>
+</tr>
+<tr>
+<td>部署架构</td>
+<td>张量&#x2F;流水线并行、动态批处理、RAG 短生成</td>
+<td>大模型落地、并发承载、整体耗时</td>
+<td>通信开销、运维复杂</td>
+</tr>
+</tbody></table>
+<p>行业里常见的「延迟降 30%—70%」「吞吐提升 2—4 倍」「长问答耗时降 40% 以上」都是量级参考，不是承诺。同样的优化，在不同模型、不同硬件、不同请求分布下，结果可能差很远。验收必须用你们自己的流量和任务集。</p>
+<h2 id="两本账互相影响：没有免费的加速"><a href="#两本账互相影响：没有免费的加速" class="headerlink" title="两本账互相影响：没有免费的加速"></a>两本账互相影响：没有免费的加速</h2><p>所有提速手段都在某个维度上付费。量化用精度换显存和带宽；剪枝用结构完整性换计算量；蒸馏用能力上限换模型规模；并行用通信开销换单卡显存；批处理用排队时间换吞吐；RAG 短生成用回答完整度换延迟。</p>
+<p>能力手段也一样。LoRA 用适配器容量换训练成本，可能牺牲通用能力；RAG 用检索工程换知识更新，可能引入错误材料；全量微调用算力换能力上限，可能牺牲对齐与稳定性；架构优化用重训风险换长期收益。</p>
+<p>因此不要问「哪个手段最好」，而要问「在当前约束下，哪个手段的代价我可以接受」。一个团队能接受 1% 的精度损失换取一半的显存，另一个团队可能一分都不能丢；一个团队能接受 200 毫秒的检索延迟换取事实性，另一个团队可能要求首 token 在 100 毫秒内。约束不同，答案就不同。</p>
+<p>举一个具体的组合例子：一个团队想把客服问答的首 token 延迟压到 300 毫秒，同时要求政策准确率不下降。单做量化，延迟可能达标但准确率掉两个点；单做 RAG 短生成，准确率保住了但检索延迟又加回来。可行的组合是前缀缓存加连续批处理，先把引擎层的水分挤掉，再对非政策类问题做小范围量化。每一步都单独评测，才能知道收益和代价分别来自哪里。</p>
+<p>顺序还会影响可观测性。先做引擎优化，通常不影响模型输出，适合作为第一步；再做量化或蒸馏，能力变化更容易归因；最后动架构或全量微调，风险最高，也最应该单独评估。把改动按「输出不变、输出微变、输出可能大变」排序，能让团队在每一步都有可回退的基线。</p>
+<h2 id="怎么选：按约束排序的决策流程"><a href="#怎么选：按约束排序的决策流程" class="headerlink" title="怎么选：按约束排序的决策流程"></a>怎么选：按约束排序的决策流程</h2><p>选型可以按五步走。第一步，测量瓶颈：是任务成功率不够，还是首 token、p95、吞吐或成本不达标。第二步，列出硬约束：数据能否出域、算力预算、延迟 SLO、精度红线、知识更新频率。第三步，按约束筛掉不可行的杠杆。第四步，用黄金任务集做小规模验证，同时看两本账。第五步，灰度上线，保留回滚。</p>
+<p>验证阶段要设计对照：同一批任务，用基线和新方案各跑一次，固定随机种子和推理参数；能力指标看任务成功率与失败类型，速度指标看 p50、p95 和吞吐，成本指标看每个被接受任务的总成本。灰度阶段先放小流量，观察错误率、降级率和人工介入率，再逐步放量。</p>
+<pre class="mermaid">flowchart TD
+    A[先测量瓶颈] --> B{能力不足还是速度不足}
+    B -->|能力| C{知识是否高频变化}
+    C -->|是| D[RAG]
+    C -->|否| E{是否有高质量领域数据}
+    E -->|少| F[LoRA]
+    E -->|多且算力足| G[全量指令微调]
+    B -->|速度| H{能否接受精度损失}
+    H -->|能| I[量化 / 剪枝 / 蒸馏]
+    H -->|不能| J[推理引擎 / 并行 / 调度]
+    D --> K[黄金任务集验证]
+    F --> K
+    G --> K
+    I --> K
+    J --> K
+    K --> L{两本账是否都达标}
+    L -->|是| M[灰度上线]
+    L -->|否| A</pre>
+
+<table>
+<thead>
+<tr>
+<th>约束</th>
+<th>优先考虑</th>
+<th>尽量避免</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>知识高频变化、私有</td>
+<td>RAG、权限隔离、引用回溯</td>
+<td>用全量微调追知识</td>
+</tr>
+<tr>
+<td>领域风格与行为</td>
+<td>LoRA、少量高质量示范</td>
+<td>用 RAG 解决风格问题</td>
+</tr>
+<tr>
+<td>通用能力系统性提升</td>
+<td>全量指令微调、数据配比</td>
+<td>数据未清洗就开训</td>
+</tr>
+<tr>
+<td>端侧、低算力</td>
+<td>蒸馏、量化、小模型</td>
+<td>直接部署大模型</td>
+</tr>
+<tr>
+<td>高并发在线服务</td>
+<td>连续批处理、KV 缓存、并行</td>
+<td>只优化单请求延迟</td>
+</tr>
+<tr>
+<td>长上下文</td>
+<td>KV 缓存、注意力优化、线性结构</td>
+<td>无脑扩上下文窗口</td>
+</tr>
+<tr>
+<td>精度红线高</td>
+<td>推理引擎优化、算子融合</td>
+<td>激进量化与剪枝</td>
+</tr>
+</tbody></table>
+<p>有一个常见的错误，是同时上多个手段，然后无法判断收益来自哪里。正确做法是一次只改一个变量，保留基线，记录能力、速度、成本三组指标，再做下一个。另一个错误是只在空载环境测速度，生产环境的请求长度分布、并发模式和缓存命中率，会彻底改变结论。</p>
+<h2 id="常见误区与验收指标"><a href="#常见误区与验收指标" class="headerlink" title="常见误区与验收指标"></a>常见误区与验收指标</h2><p>第一个误区是用困惑度代替任务成功率。困惑度下降不代表业务指标变好，尤其在分类、抽取、工具调用这类结构化任务上。第二个误区是只看平均延迟，不看 p95 和 p99；用户感知到的卡顿，往往在长尾。第三个误区是忽略输出长度：首 token 很快，但生成很长，整体体验依然差。第四个误区是量化或剪枝后只测通用集，不测长尾、对抗和安全用例。第五个误区是把蒸馏当成免费的能力复制，忽略教师偏差和容量差距。第六个误区是全量微调后不做回归测试，导致安全对齐和格式遵循悄悄退化。</p>
+<p>验收指标建议分成四组。能力组：任务成功率、事实准确率、指令遵循率、长上下文召回率。速度组：首 token 延迟、单 token 时间、吞吐、p95 延迟。成本组：每千 token 成本、每个被接受任务成本、显存占用。可靠性组：错误率、重试率、降级率、人工介入率。四组一起看，才能避免「优化了一个数字，恶化了整体体验」。</p>
+<p>验收集也要分层：通用能力、领域任务、长尾与对抗、安全与合规。每类保留基线，每次改动都跑同一套。对于生成类任务，自动指标不够时加人工盲评；对于工具调用类任务，重点看 schema 合规与执行成功率，而不是措辞。</p>
+<p>还有一个容易忽略的验收维度：稳定性。同一个任务重复运行多次，结果是否一致；模型版本升级后，行为是否漂移；长尾输入是否触发异常。能力提升如果以稳定性为代价，生产环境往往得不偿失。</p>
+<p>第七个误区是只看公开 benchmark。公开集的分布和你们的业务分布往往不同，榜单上的提升不一定能复现到生产。用自有任务集做验收，是最低要求。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>能力账和速度账是两套目标，不能用同一个手段包打天下。八种手段可以归到改权重、改上下文、改计算图与部署三个杠杆，每个杠杆都有自己的收益和代价。选型的顺序是先测量瓶颈，再列硬约束，然后用黄金任务集小规模验证，最后灰度上线。所有加速都在某个维度上付费，所有能力提升也都有成本；关键是明确当前最不能妥协的指标。一次只改一个变量，两本账一起看，比追逐单点最优更可靠。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://arxiv.org/abs/2106.09685">LoRA: Low-Rank Adaptation of Large Language Models</a></li>
+<li><a href="https://arxiv.org/abs/2305.14314">QLoRA: Efficient Finetuning of Quantized LLMs</a></li>
+<li><a href="https://arxiv.org/abs/2005.11401">Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks</a></li>
+<li><a href="https://arxiv.org/abs/1503.02531">Distilling the Knowledge in a Neural Network</a></li>
+<li><a href="https://arxiv.org/abs/2210.17323">GPTQ: Accurate Post-Training Quantization for Generative Pre-trained Transformers</a></li>
+<li><a href="https://arxiv.org/abs/2306.00978">AWQ: Activation-aware Weight Quantization for LLM Compression and Acceleration</a></li>
+<li><a href="https://arxiv.org/abs/2309.06180">Efficient Memory Management for Large Language Model Serving with PagedAttention</a></li>
+<li><a href="https://arxiv.org/abs/2205.14135">FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>大模型能力与速度的两本账：八种手段的适用边界</p><p><a href="https://987763485.github.io/2026/10/14/大模型能力与速度的两本账八种手段的适用边界/">https://987763485.github.io/2026/10/14/大模型能力与速度的两本账八种手段的适用边界/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2026-10-14</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-11-15</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="link-muted mr-2" rel="tag" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/">架构设计</a><a class="link-muted mr-2" rel="tag" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/">性能优化</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2026/10/23/%E4%B8%80%E6%96%87%E6%90%9E%E6%87%82Agent%E9%80%9A%E4%BF%A1%E5%8D%8F%E8%AE%AE/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">一文搞懂 Agent 通信协议：MCP、A2A 与 ACP</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2026/10/11/%E4%B8%8A%E4%B8%8B%E6%96%87%E5%B7%A5%E7%A8%8B%E7%9A%84%E4%B8%89%E5%B1%82%E6%B2%BB%E7%90%86%E6%A8%A1%E5%9E%8B%E4%BB%8E%E6%A6%82%E5%BF%B5%E6%B8%85%E5%8D%95%E5%88%B0%E5%88%86%E5%B1%82%E6%A1%86%E6%9E%B6/"><span class="level-item">上下文工程的三层治理模型：从概念清单到分层框架</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1071</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">36</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">141</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-11-15T14:30:47.000Z">2026-11-15</time></p><p class="title"><a href="/2026/11/15/Agent%E5%B7%A5%E7%A8%8B%E4%B8%AD%E7%9A%84%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8E%8B%E7%BC%A9%E8%A7%A6%E5%8F%91%E4%BA%A4%E6%8E%A5%E4%B8%8E%E6%89%BE%E5%9B%9E/">Agent 工程中的上下文压缩：触发、交接与找回</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-11-12T22:29:18.000Z">2026-11-13</time></p><p class="title"><a href="/2026/11/13/%E5%A6%82%E4%BD%95%E6%8A%8AGoogleA2UI%E6%8E%A5%E5%85%A5Harness/">如何把 Google A2UI 接入 Harness：从协议到渲染与动作回传</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-11-02T03:08:35.000Z">2026-11-02</time></p><p class="title"><a href="/2026/11/02/%E5%A4%9AAgent%E5%8D%8F%E4%BD%9C%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%E5%85%B1%E4%BA%AB%E8%AE%B0%E5%BF%86/">多 Agent 协作如何实现共享记忆：四个开源项目的架构拆解</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-10-23T13:56:09.000Z">2026-10-23</time></p><p class="title"><a href="/2026/10/23/%E4%B8%80%E6%96%87%E6%90%9E%E6%87%82Agent%E9%80%9A%E4%BF%A1%E5%8D%8F%E8%AE%AE/">一文搞懂 Agent 通信协议：MCP、A2A 与 ACP</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-10-13T19:17:42.000Z">2026-10-14</time></p><p class="title"><a href="/2026/10/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E8%83%BD%E5%8A%9B%E4%B8%8E%E9%80%9F%E5%BA%A6%E7%9A%84%E4%B8%A4%E6%9C%AC%E8%B4%A6%E5%85%AB%E7%A7%8D%E6%89%8B%E6%AE%B5%E7%9A%84%E9%80%82%E7%94%A8%E8%BE%B9%E7%95%8C/">大模型能力与速度的两本账：八种手段的适用边界</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/11/"><span class="level-start"><span class="level-item">十一月 2026</span></span><span class="level-end"><span class="level-item tag">3</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/10/"><span class="level-start"><span class="level-item">十月 2026</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">37</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E4%B8%8A%E4%B8%8B%E6%96%87%E5%B7%A5%E7%A8%8B/"><span class="tag">上下文工程</span><span class="tag">4</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">141</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">25</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">35</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>

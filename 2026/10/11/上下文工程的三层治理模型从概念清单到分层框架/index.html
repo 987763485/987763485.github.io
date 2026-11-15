@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>上下文工程的三层治理模型：从概念清单到分层框架 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="一个 Agent 给出了看起来完全合理的答案，直到用户发现它引用的是三个月前已经废止的退款规则。排查下来，Memory 里的旧规则盖过了 RAG 检索到的新文档，而 Harness 只检查了权限，没有检查上下文冲突。这类故障不是某个组件坏了，而是组件之间的接缝没有设计。本文用一个三层治理模型，把 RAG、Memory、Skill、MCP、Prompt、Agent 与 Harness 放回它们真正的"><meta property="og:type" content="blog"><meta property="og:title" content="上下文工程的三层治理模型：从概念清单到分层框架"><meta property="og:url" content="https://987763485.github.io/2026/10/11/%E4%B8%8A%E4%B8%8B%E6%96%87%E5%B7%A5%E7%A8%8B%E7%9A%84%E4%B8%89%E5%B1%82%E6%B2%BB%E7%90%86%E6%A8%A1%E5%9E%8B%E4%BB%8E%E6%A6%82%E5%BF%B5%E6%B8%85%E5%8D%95%E5%88%B0%E5%88%86%E5%B1%82%E6%A1%86%E6%9E%B6/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="一个 Agent 给出了看起来完全合理的答案，直到用户发现它引用的是三个月前已经废止的退款规则。排查下来，Memory 里的旧规则盖过了 RAG 检索到的新文档，而 Harness 只检查了权限，没有检查上下文冲突。这类故障不是某个组件坏了，而是组件之间的接缝没有设计。本文用一个三层治理模型，把 RAG、Memory、Skill、MCP、Prompt、Agent 与 Harness 放回它们真正的"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2026-10-11T11:30:08.000Z"><meta property="article:modified_time" content="2026-11-15T14:52:26.743Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="大模型"><meta property="article:tag" content="agent"><meta property="article:tag" content="上下文工程"><meta property="article:tag" content="架构设计"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2026/10/11/%E4%B8%8A%E4%B8%8B%E6%96%87%E5%B7%A5%E7%A8%8B%E7%9A%84%E4%B8%89%E5%B1%82%E6%B2%BB%E7%90%86%E6%A8%A1%E5%9E%8B%E4%BB%8E%E6%A6%82%E5%BF%B5%E6%B8%85%E5%8D%95%E5%88%B0%E5%88%86%E5%B1%82%E6%A1%86%E6%9E%B6/"},"headline":"上下文工程的三层治理模型：从概念清单到分层框架","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2026-10-11T11:30:08.000Z","dateModified":"2026-11-15T14:52:26.743Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"一个 Agent 给出了看起来完全合理的答案，直到用户发现它引用的是三个月前已经废止的退款规则。排查下来，Memory 里的旧规则盖过了 RAG 检索到的新文档，而 Harness 只检查了权限，没有检查上下文冲突。这类故障不是某个组件坏了，而是组件之间的接缝没有设计。本文用一个三层治理模型，把 RAG、Memory、Skill、MCP、Prompt、Agent 与 Harness 放回它们真正的"}</script><link rel="canonical" href="https://987763485.github.io/2026/10/11/%E4%B8%8A%E4%B8%8B%E6%96%87%E5%B7%A5%E7%A8%8B%E7%9A%84%E4%B8%89%E5%B1%82%E6%B2%BB%E7%90%86%E6%A8%A1%E5%9E%8B%E4%BB%8E%E6%A6%82%E5%BF%B5%E6%B8%85%E5%8D%95%E5%88%B0%E5%88%86%E5%B1%82%E6%A1%86%E6%9E%B6/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><script>var _hmt = _hmt || [];
+        (function() {
+            var hm = document.createElement("script");
+            hm.src = "//hm.baidu.com/hm.js?96433e30ee22a64cb0977a9badd6098f";
+            var s = document.getElementsByTagName("script")[0];
+            s.parentNode.insertBefore(hm, s);
+        })();</script><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2026-10-11T11:30:08.000Z" title="10/11/2026, 7:30:08 PM">2026-10-11</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></span><span class="level-item">1 小时读完 (大约7268个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">上下文工程的三层治理模型：从概念清单到分层框架</h1><div class="content"><p>一个 Agent 给出了看起来完全合理的答案，直到用户发现它引用的是三个月前已经废止的退款规则。排查下来，Memory 里的旧规则盖过了 RAG 检索到的新文档，而 Harness 只检查了权限，没有检查上下文冲突。这类故障不是某个组件坏了，而是组件之间的接缝没有设计。本文用一个三层治理模型，把 RAG、Memory、Skill、MCP、Prompt、Agent 与 Harness 放回它们真正的位置。</p>
+<h2 id="一次看似合理的错误回答"><a href="#一次看似合理的错误回答" class="headerlink" title="一次看似合理的错误回答"></a>一次看似合理的错误回答</h2><p>事情发生在一个客服 Agent 上。用户问：买了两周的商品还能不能退。Agent 回答得很流畅：按照七天无理由规则，已经超过期限，不能退。语气、结构、引用都像模像样，用户差点就信了。</p>
+<p>问题在于，这类商品的政策半个月前刚改过，退货窗口从七天延长到了十五天。新政策写在一份对外公告里，RAG 也检索到了，但它的排序低于 Memory 里那条旧规则。Memory 里的规则来自三个月前的一次人工录入，带着较高的置信度，也没有设置过期时间。Agent 看到两条互相矛盾的信息，选择了它认为更可信的那一条。</p>
+<p>Harness 在这一步没有发挥作用。它配置了工具权限、调用了审计日志，也限制了单次任务的 token 预算，唯独没有做上下文冲突检测。于是系统一路放行：检索正常、记忆正常、生成正常、权限正常，最后输出错误。</p>
+<p>事后复盘时，团队先怀疑模型，换了更强的模型，问题依旧；又怀疑检索，把 RAG 的召回数量翻倍，错误率反而上升。真正的原因直到有人把三条上下文来源并排打印出来才显现：Memory 里的旧规则、RAG 里的新公告、Prompt 里的「按公司政策回答」，三者互相矛盾，而系统没有任何机制决定谁优先。</p>
+<p>这个案例值得反复看，因为每一个组件都在按自己的规则正常工作。RAG 做了召回，Memory 做了持久化，Agent 做了取舍，Harness 做了权限控制。失败发生在它们之间：没有人定义「当记忆和检索结果冲突时，谁说了算」，也没有人规定「这种冲突必须被看见」。</p>
+<p>这正是上下文工程真正困难的地方。它不是把七个概念分别讲清楚，而是决定它们在同一个系统里如何分工、如何制衡、冲突时如何收敛。</p>
+<h2 id="并列解释为什么不够"><a href="#并列解释为什么不够" class="headerlink" title="并列解释为什么不够"></a>并列解释为什么不够</h2><p>把 RAG、Memory、Skill、MCP、Prompt、Agent、Harness 平铺成七个章节，读起来很顺，因为每个概念都能独立成篇。但这种写法回答的是「它是什么」，回答不了「它和别的机制冲突时怎么办」。前者是词典，后者才是架构。</p>
+<p>这七个概念并不在同一层。它们控制的对象不同，作用的粒度也不同。RAG 控制外部知识，Memory 控制跨会话状态，Skill 控制流程与标准，MCP 控制工具接入，Prompt 控制单次指令，Agent 控制运行时调度，Harness 控制边界与风险。把它们并列，容易制造三种错误类比。</p>
+<p>第一种是把 RAG 和 Memory 都当成「检索」。RAG 检索的是外部事实，Memory 检索的是历史状态；前者的正确性取决于知识库，后者的正确性取决于写入策略。第二种是把 Prompt 和 Skill 都当成「指令」。Prompt 是一次性的，Skill 是可复用的；Prompt 靠措辞起作用，Skill 靠流程和验收标准起作用。第三种是把 MCP 和 Agent 都当成「工具调用」。MCP 解决连接方式，Agent 解决调用决策；协议不负责判断该不该用，编排才负责。</p>
+<p>并列清单还会掩盖依赖关系。RAG 的结果可能被写进 Memory，Skill 可能调用 MCP，Agent 的决策又受 Harness 约束；这些关系不是单向的知识点，而是带反馈的供应链。一次错误可能沿着链条放大：检索到旧文档，写进记忆，下一次被当成事实复用，最后固化成团队共识。分层的目的，就是让这些反馈路径可见，并在关键节点设置检查点。</p>
+<p>按「谁在控制上下文、控制什么、控制到什么粒度」重新分组，会得到三层：</p>
+<table>
+<thead>
+<tr>
+<th>概念</th>
+<th>所属层</th>
+<th>控制对象</th>
+<th>作用粒度</th>
+<th>典型失效</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RAG</td>
+<td>生产与封装</td>
+<td>外部事实</td>
+<td>知识库与文档片段</td>
+<td>召回错误、内容过时、来源不可信</td>
+</tr>
+<tr>
+<td>Memory</td>
+<td>生产与封装</td>
+<td>持久状态</td>
+<td>会话与跨会话</td>
+<td>旧规则污染、写入失控、无法过期</td>
+</tr>
+<tr>
+<td>Skill</td>
+<td>生产与封装</td>
+<td>流程与标准</td>
+<td>任务类型</td>
+<td>流程过时、封装过厚、误用</td>
+</tr>
+<tr>
+<td>MCP</td>
+<td>接入与执行</td>
+<td>工具与环境</td>
+<td>单次工具调用</td>
+<td>权限过宽、schema 漂移、服务不可用</td>
+</tr>
+<tr>
+<td>Prompt</td>
+<td>接入与执行</td>
+<td>单次指令</td>
+<td>单轮或单任务</td>
+<td>注入、指令冲突、上下文挤占</td>
+</tr>
+<tr>
+<td>Agent</td>
+<td>接入与执行</td>
+<td>调度策略</td>
+<td>任务全流程</td>
+<td>规划错误、取多或取少、死循环</td>
+</tr>
+<tr>
+<td>Harness</td>
+<td>治理与边界</td>
+<td>策略与风险</td>
+<td>系统级</td>
+<td>规则缺失、过度拦截、审计缺口</td>
+</tr>
+</tbody></table>
+<p>这张表的价值不在于分类本身，而在于它揭示了一个事实：<strong>不同层的问题，不能用同一层的办法解决</strong>。Memory 被污染，加长 Prompt 没用；Agent 规划错了，换更强的模型也可能只是错得更快；Harness 缺少冲突检测，RAG 做得再好也拦不住错误输出。</p>
+<pre class="mermaid">flowchart TD
+    subgraph 生产与封装层
+        R[RAG：外部事实]
+        M[Memory：偏好与历史]
+        S[Skill：流程与标准]
+    end
+    subgraph 接入与执行层
+        A[Agent：编排与调度]
+        P[Prompt：单次指令]
+        X[MCP：工具与环境]
+    end
+    subgraph 治理与边界层
+        H[Harness：策略、权限、预算、审计]
+    end
+    R --> A
+    M --> A
+    S --> A
+    A --> P
+    A --> X
+    H -.约束.-> A
+    H -.约束.-> X</pre>
+
+<h2 id="第一层：上下文的生产与封装"><a href="#第一层：上下文的生产与封装" class="headerlink" title="第一层：上下文的生产与封装"></a>第一层：上下文的生产与封装</h2><p>生产层回答的是：上下文从哪里来，以什么形态进入系统。它包含 RAG、Memory 和 Skill，三者都是供给侧。</p>
+<p>RAG 负责从外部知识库中检索事实性上下文。它的核心问题不是「能不能检索」，而是「检索回来的东西是否可信、是否过时、是否与当前任务真正相关」。一个能召回十篇文档的 RAG，如果其中三篇是旧版本、两篇是别的产品线，那它带来的不是知识，而是干扰。判断 RAG 是否可靠，至少要回答四个问题：文档来源是谁、最后更新时间是什么、适用范围到哪里、有没有引用可以回溯。</p>
+<p>检索本身可以拆成召回、排序、装配三段。召回决定有没有；排序决定先给模型看什么；装配决定以什么形式呈现。三段里任何一段出错，都会表现成「模型胡说」。一个常见的误判是把召回数量当成质量：召回从五条加到二十条，相关文档的排名可能反而下降，模型的注意力被无关内容稀释。更稳妥的做法是保留少量高置信片段，附上来源与时间，并在证据不足时允许系统拒答，而不是硬凑一个答案。</p>
+<p>Memory 负责跨会话的持久化状态。短期记忆服务当前任务，长期记忆沉淀项目规范、用户偏好和历史决策。它的关键设计点不是存储容量，而是写入策略与过期机制。什么东西值得记、谁来写、写完谁来复核、多久失效、冲突时如何覆盖，这些决定了记忆是资产还是负债。记忆不是越多越好，错误经验会污染后续判断，而且污染往往比缺失更难发现。</p>
+<p>记忆至少可以分成三层：工作记忆保存当前任务的临时状态，会话记忆保存这一轮对话的共识，长期记忆保存跨项目的偏好与决策。三层的写入权限应该不同：工作记忆可以自动写，会话记忆要经过摘要与确认，长期记忆最好由用户显式确认或由系统定期提议。写入来源也要区分：用户亲口说的、模型推断的、系统事件产生的、人工录入的，可信度完全不同。把模型推断直接写成长期事实，是记忆污染最常见的入口。</p>
+<p>Skill 负责把团队经验封装成可复用的能力模块。它不同于 Prompt 的单次指令，而是「以后遇到这类任务都这么做」的标准作业程序，包含流程、模板、工具使用方法和质量标准。Skill 的价值在于把分散在个人脑子里的隐性知识结构化，让系统在没有人反复解释的情况下，仍然按团队的方式做事。它的风险也同样明显：流程会过时，封装会变厚，适用范围会被误判。</p>
+<p>一个可维护的 Skill 至少包含四部分：触发条件，说明什么任务该用它；步骤与模板，说明怎么做；工具与权限，说明能调用什么；验收标准，说明做完如何判断合格。缺了触发条件，Skill 会被误用；缺了验收标准，Skill 无法迭代。Skill 还需要版本化和组合能力：流程变更要能回滚，多个 Skill 之间要定义清晰的输入输出，而不是互相复制粘贴。一个周报 Skill 如果既管数据收集、又管排版、又管发送，最后会变成无法维护的黑盒，正确做法是拆成收集、写作、发送三个可组合的模块。</p>
+<p>三者的共同点是都需要「来源与时效」的元数据。每一条进入上下文的内容，最好都能回答：谁生产的、什么时候生产的、适用于什么范围、置信度多少。没有这四项，生产层就只是一个堆料场，检索、记忆和技能都在往模型面前搬东西，却没有人对这些东西的可靠性负责。</p>
+<table>
+<thead>
+<tr>
+<th>来源</th>
+<th>提供什么</th>
+<th>可信度取决于</th>
+<th>过期信号</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RAG</td>
+<td>外部事实、制度、文档</td>
+<td>来源权威性与更新时间</td>
+<td>文档版本、公告日期</td>
+</tr>
+<tr>
+<td>Memory</td>
+<td>偏好、历史决策、项目状态</td>
+<td>写入策略与复核机制</td>
+<td>有效期、反例出现</td>
+</tr>
+<tr>
+<td>Skill</td>
+<td>流程、模板、质量标准</td>
+<td>版本管理与实际验收</td>
+<td>流程变更、连续失败</td>
+</tr>
+</tbody></table>
+<h2 id="第二层：上下文的接入与执行"><a href="#第二层：上下文的接入与执行" class="headerlink" title="第二层：上下文的接入与执行"></a>第二层：上下文的接入与执行</h2><p>执行层回答的是：准备好的上下文如何被 Agent 在运行时调用。它包含 MCP、Prompt 和 Agent，三者都是消费侧。</p>
+<p>MCP 是工具接入的标准化协议。它解决的是「Agent 如何以统一方式连接外部系统」的问题，而不是「该不该用某个工具」的策略问题。MCP 让工具生态可组合，但它本身不决定上下文的质量。一个接入了二十个系统的 Agent，如果不知道在什么场景该调用哪一个，接口再标准也只是增加了选择困难。MCP 的常见失效包括权限过宽、schema 漂移、服务不可用，以及把「能调用」误当成「应该调用」。</p>
+<p>工具描述本身就是上下文。工具名称、参数说明、返回结构，都会影响模型的选择。工具太多、描述太像，模型就会犹豫或选错；工具太少，Agent 又会退回到猜测。MCP 让接入变便宜，但也让工具膨胀变容易，所以治理层要控制工具白名单和可见范围，执行层要根据任务阶段动态暴露工具，而不是一次性把几十个工具全塞给模型。</p>
+<p>Prompt 是单次任务中人类对模型的直接指令。在上下文工程的视角下，Prompt 是最窄、最即时的控制手段。它能精确表达这一次的意图，却无法承载跨任务的一致性，也无法管理持久状态。Prompt 的局限性恰恰是其他机制存在的理由：需要跨任务一致，就写进 Skill；需要跨会话记住，就写进 Memory；需要实时事实，就走 RAG 或 MCP。把所有东西都塞进 Prompt，最后会得到一个又长又脆、无法维护的超级提示词。</p>
+<p>Prompt 通常承担三种角色：任务说明、约束条件和示例。任务说明告诉模型做什么，约束条件告诉它不能做什么，示例告诉它做到什么程度。三者混在一起，模型容易把示例当成硬性要求，或者把约束当成建议。更稳妥的写法是把指令与数据分开，把稳定约束放进系统层，把可变输入放进用户层，并对可能包含注入内容的数据做隔离。Prompt 不是越长越好，超过一定长度后，新增指令的边际收益会快速下降，反而挤占真正重要的上下文。</p>
+<p>Agent 是编排层。它根据任务目标，决定调用哪个 Skill、检索哪类 RAG 结果、写入或读取哪段 Memory、通过 MCP 使用哪个工具。Agent 是上下文的消费者和调度者，而不是生产者。它不拥有知识，也不拥有记忆，它做的是在正确的时间把正确的来源组装起来。用编译器的比喻可能更好理解：Agent 把「目标 + 可用来源 + 约束」编译成一次上下文装配方案。装配方案的质量，决定了模型看到的世界。</p>
+<p>执行层的核心矛盾是调度策略如何影响输出质量。取多了，上下文被噪声稀释；取少了，关键约束缺失；取错了，模型会自信地沿着错误前提推理。一个成熟的 Agent，应该能说明自己为什么选了这个来源、为什么排除了那个来源，以及在信息不足时准备问什么。</p>
+<p>编排可以拆成四个决策：选源，决定这次任务需要哪些上下文来源；取量，决定每个来源取多少；排序，决定模型先看到什么、后看到什么；刷新，决定哪些信息在任务中途需要重新获取。四个决策都受预算约束，也都需要可解释。Agent 最常见的失败不是不会调用工具，而是过度检索：为了保险把所有相关文档都拉进来，结果关键约束被淹没。另一个常见失败是过早收敛：第一轮拿到一个看似合理的答案就停止，没有验证反例。</p>
+<table>
+<thead>
+<tr>
+<th>机制</th>
+<th>运行时角色</th>
+<th>控制粒度</th>
+<th>不负责什么</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MCP</td>
+<td>连接工具与环境</td>
+<td>单次调用</td>
+<td>不判断该不该用、不保证结果可信</td>
+</tr>
+<tr>
+<td>Prompt</td>
+<td>表达单次意图</td>
+<td>单轮或单任务</td>
+<td>不承载跨任务一致性、不管理持久状态</td>
+</tr>
+<tr>
+<td>Agent</td>
+<td>编排来源与工具</td>
+<td>任务全流程</td>
+<td>不生产知识、不替代治理规则</td>
+</tr>
+</tbody></table>
+<h2 id="第三层：上下文的治理与边界"><a href="#第三层：上下文的治理与边界" class="headerlink" title="第三层：上下文的治理与边界"></a>第三层：上下文的治理与边界</h2><p>治理层回答的是：谁来保证上下文的使用是可控、安全、可审计的。这一层的核心是 Harness。</p>
+<p>业界常把 Harness 描述为围绕基础模型的 wrapper：它不改变模型权重，而是约束模型能做什么、不能做什么、什么时候必须停下来等人。它不生产上下文，也不直接执行任务，而是提供运行时治理：编排策略、权限边界、成本控制、安全确认、冲突检测和审计记录。</p>
+<p>把 Harness 放在最高层，不是因为它比 Agent 更聪明，而是因为它处理的是其他所有机制产生的风险的收敛问题。RAG 可能引入错误知识，Memory 可能被污染，Skill 可能过时，MCP 工具可能被滥用，Prompt 可能被注入，Agent 可能规划错误。每一层都有自己的失败模式，而 Harness 是最后一道闸门：它决定哪些动作可以直接执行，哪些必须降级，哪些必须停下来问人。</p>
+<table>
+<thead>
+<tr>
+<th>风险来源</th>
+<th>Harness 的控制手段</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RAG 召回错误或过时</td>
+<td>来源白名单、时效校验、引用回溯、冲突检测</td>
+</tr>
+<tr>
+<td>Memory 被污染</td>
+<td>写入审批、置信度、有效期、可删除与可回滚</td>
+</tr>
+<tr>
+<td>Skill 过时或误用</td>
+<td>版本锁定、适用范围校验、连续失败告警</td>
+</tr>
+<tr>
+<td>MCP 权限过宽</td>
+<td>最小权限、工具白名单、调用配额、沙箱</td>
+</tr>
+<tr>
+<td>Prompt 注入</td>
+<td>指令与数据分离、输入过滤、敏感动作二次确认</td>
+</tr>
+<tr>
+<td>Agent 规划错误</td>
+<td>预算上限、步骤上限、关键节点人工审批</td>
+</tr>
+<tr>
+<td>成本失控</td>
+<td>任务预算、模型档位、熔断与降级</td>
+</tr>
+</tbody></table>
+<p>治理层最容易犯的错误，是把它做成一个只会说「不行」的关卡。过度拦截会让 Agent 失去价值，用户开始绕过系统；规则太旧会让治理与现实脱节；审批太频繁会让人变成橡皮图章。好的 Harness 应该像一套交通规则：大多数时候你感觉不到它，但它决定了出事故时谁先停、谁来处理、如何追溯。</p>
+<p>治理可以按事前、事中、事后拆开。事前做策略与准入：哪些工具可用、哪些数据可读、哪些动作需要审批；事中做运行时控制：预算、步骤上限、冲突检测、敏感动作拦截；事后做审计与复盘：记录决策依据、保留上下文快照、统计拦截与放行比例。三者缺一不可。只有事前规则，系统会在运行时失控；只有事中拦截，规则会越来越臃肿；只有事后审计，问题只能事后发现。</p>
+<p>冲突检测是治理层最容易被忽略、又最该补的能力。它不需要很复杂：同一事实出现多个来源时，比较来源等级、更新时间和适用范围；无法判断时，不要静默选择，而是把冲突暴露给上游或用户。冲突检测的价值不在于自动裁决所有矛盾，而在于让「系统在矛盾信息上做了选择」这件事变得可见。</p>
+<p>治理规则本身也需要被治理。谁有权修改规则、修改后如何评审、如何灰度、如何回滚、出问题谁负责，这些必须有明确归属。通常的做法是：平台团队负责运行时策略与工具权限，业务团队负责验收标准与人工确认点，安全与合规团队负责数据边界与审计要求。规则要版本化，关键决策要有记录，指标要能证明规则有效，而不是只证明规则存在。</p>
+<h2 id="三个边界问题"><a href="#三个边界问题" class="headerlink" title="三个边界问题"></a>三个边界问题</h2><p>分层之后，真正有价值的问题才会浮出来。以下三个边界问题，是这套架构能否落地的关键。</p>
+<p><strong>第一，Memory 与 RAG 冲突时信谁。</strong> 一个实用的原则是：事实归 RAG 和工具，偏好归 Memory。政策、价格、接口、库存这类会变化的事实，应该以权威来源为准；用户的语气偏好、历史决策、项目习惯，才适合放在 Memory。如果 Memory 里存了事实，它就必须带上来源、时间和适用范围，并在冲突时让位给更新、更权威的来源。冲突不能静默处理，系统要标记出来，必要时向用户确认。</p>
+<p>落地时，可以给每条记忆加一个类型字段：事实、偏好、决策。事实型记忆必须带来源和有效期，冲突时让位给权威文档；偏好型记忆可以长期保留，但要有适用范围；决策型记忆要记录当时的理由和被否决的选项，避免下一次只看到结论。这样，Memory 与 RAG 的冲突就从「谁更可信」变成了「这条记忆是什么类型、该不该由它回答」。</p>
+<pre class="mermaid">flowchart TD
+    Q[同一事实出现冲突] --> S{来源等级是否明确}
+    S -->|是| A[采用高权威来源]
+    S -->|否| T{时效是否明确}
+    T -->|是| N[采用更新来源]
+    T -->|否| C[标记冲突并向用户确认]
+    A --> L[记录决策、来源与时间]
+    N --> L
+    C --> L</pre>
+
+<p><strong>第二，Skill 与 Prompt 的边界在哪。</strong> 判断标准不是长度，而是复用性与验收方式。会被反复使用、有明确质量标准的，应该沉淀为 Skill；一次性的、只针对当前任务的，留在 Prompt 里。如果 Skill 越写越厚，正确的做法不是继续加长，而是拆分：流程留在 Skill，模板抽成独立文件，工具调用交给 MCP，判断逻辑交给 Agent。把 Skill 写成超级提示词，等于把可维护的流程重新退化成一坨文本。</p>
+<p>一个可操作的厚度阈值是：当一个 Skill 超过十个步骤、需要三份以上模板、或者开始包含条件分支时，就应该考虑拆分，把流程、模板、工具和判断分别交给不同层。Skill 负责「做什么、按什么顺序」，Prompt 负责「这一次的特别要求」，MCP 负责「怎么访问外部系统」。边界清楚了，三者才不会互相吞噬。</p>
+<p><strong>第三，Harness 的治理规则由谁维护、如何迭代。</strong> 不能让 Agent 自己给自己定规则，也不能让某个业务团队偷偷改权限。治理规则应该像基础设施一样管理：有 owner、有版本、有评审、有灰度、有回滚、有审计。每次线上事故之后，除了修 Prompt 和补测试，还要问一句：这是不是某条治理规则的缺口？如果是，规则要不要更新？更新之后，如何证明它没有把正常任务也拦掉？</p>
+<h2 id="诊断清单：Agent-出错时按什么顺序排查"><a href="#诊断清单：Agent-出错时按什么顺序排查" class="headerlink" title="诊断清单：Agent 出错时按什么顺序排查"></a>诊断清单：Agent 出错时按什么顺序排查</h2><p>分层框架的最终用途，不是画一张好看的图，而是在故障发生时给出排查顺序。下面这份清单按「成本低、频率高、影响大」排序，建议从前向后查，不要一上来就换模型。</p>
+<table>
+<thead>
+<tr>
+<th>顺序</th>
+<th>排查对象</th>
+<th>典型症状</th>
+<th>检查动作</th>
+<th>修复方向</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Memory</td>
+<td>旧规则反复出现、偏好被错误固化</td>
+<td>查写入来源、有效期、最近覆盖记录</td>
+<td>清理污染、加过期与复核</td>
+</tr>
+<tr>
+<td>2</td>
+<td>RAG</td>
+<td>引用过时、答非所问、来源缺失</td>
+<td>查召回文档版本、权威性、相关性</td>
+<td>修索引、加时效与引用</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Skill</td>
+<td>流程步骤缺失、连续同类失败</td>
+<td>查 Skill 版本、适用范围、验收结果</td>
+<td>更新流程、拆分过厚封装</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Prompt</td>
+<td>指令被忽略、数据被当成指令</td>
+<td>查注入痕迹、指令与数据是否分离</td>
+<td>隔离数据、收紧指令</td>
+</tr>
+<tr>
+<td>5</td>
+<td>MCP</td>
+<td>工具报错、权限不足、结果异常</td>
+<td>查 schema、权限、服务状态</td>
+<td>修适配器、收权限、加降级</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Agent</td>
+<td>规划绕路、重复调用、取多或取少</td>
+<td>查任务分解、来源选择、循环次数</td>
+<td>改调度策略、加步骤上限</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Harness</td>
+<td>该拦没拦、该放没放、无法追溯</td>
+<td>查规则覆盖、审批记录、冲突检测</td>
+<td>补策略、加审计、调阈值</td>
+</tr>
+</tbody></table>
+<p>排查顺序的理由很实际：Memory 和 RAG 是最高频的污染源，修复成本也最低；Prompt 和 Skill 次之；Agent 与 Harness 的改动影响面最大，应该放在最后。每次故障复盘后，把新发现的症状补进清单，清单才会越来越贴近真实系统。</p>
+<p>这张清单有一个隐含的判断：大多数「模型变笨了」的问题，其实发生在上游。模型看到的上下文已经错了，换一个更强的模型，只会让它更自信地重复错误。先查 Memory 和 RAG，再查 Skill 和 Prompt，最后才怀疑 Agent 和模型，通常能更快定位问题。</p>
+<p>诊断清单也不是追责清单。它的目的是让团队在面对一个坏结果时，有共同的排查语言：这是生产层的问题、执行层的问题，还是治理层的问题。分层不是为了让责任更分散，而是为了让修复动作更准确。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>七个概念不是七个并列的知识点，而是一条上下文供应链上的不同角色。生产层负责原料的可靠性与时效，执行层负责在正确时机装配正确的来源，治理层负责让前两层产生的风险收敛。Memory 与 RAG 的冲突要靠来源等级和时效规则解决，Skill 与 Prompt 的边界要靠复用性与验收标准划分，Harness 的规则要靠版本化与审计持续迭代。判断一个 Agent 是否成熟，不是看它用了多少概念，而是看它在上下文冲突时有没有明确的裁决机制。先修接缝，再谈能力。</p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents">Effective context engineering for AI agents</a></li>
+<li><a href="https://www.anthropic.com/research/building-effective-agents">Building effective agents</a></li>
+<li><a href="https://www.anthropic.com/news/skills">Agent Skills</a></li>
+<li><a href="https://modelcontextprotocol.io/">Model Context Protocol</a></li>
+<li><a href="https://arxiv.org/abs/2005.11401">Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks</a></li>
+<li><a href="https://arxiv.org/abs/2307.03172">Lost in the Middle: How Language Models Use Long Contexts</a></li>
+<li><a href="https://arxiv.org/abs/2310.08560">MemGPT: Towards LLMs as Operating Systems</a></li>
+<li><a href="https://owasp.org/www-project-top-10-for-large-language-model-applications/">OWASP Top 10 for Large Language Model Applications</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>上下文工程的三层治理模型：从概念清单到分层框架</p><p><a href="https://987763485.github.io/2026/10/11/上下文工程的三层治理模型从概念清单到分层框架/">https://987763485.github.io/2026/10/11/上下文工程的三层治理模型从概念清单到分层框架/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2026-10-11</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-11-15</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="link-muted mr-2" rel="tag" href="/tags/agent/">agent</a><a class="link-muted mr-2" rel="tag" href="/tags/%E4%B8%8A%E4%B8%8B%E6%96%87%E5%B7%A5%E7%A8%8B/">上下文工程</a><a class="link-muted mr-2" rel="tag" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/">架构设计</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/2026/10/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E8%83%BD%E5%8A%9B%E4%B8%8E%E9%80%9F%E5%BA%A6%E7%9A%84%E4%B8%A4%E6%9C%AC%E8%B4%A6%E5%85%AB%E7%A7%8D%E6%89%8B%E6%AE%B5%E7%9A%84%E9%80%82%E7%94%A8%E8%BE%B9%E7%95%8C/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">大模型能力与速度的两本账：八种手段的适用边界</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2026/10/07/%E4%B8%8B%E4%B8%80%E4%BB%A3Harness%E5%A4%9A%E6%A8%A1%E5%9E%8B%E5%BC%82%E6%9E%84Agent%E7%9A%84%E5%BC%80%E6%94%BE%E8%B0%83%E5%BA%A6%E8%AE%BE%E8%AE%A1/"><span class="level-item">下一代 Harness：多模型异构 Agent 的开放调度设计</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1071</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">36</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">141</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-11-15T14:30:47.000Z">2026-11-15</time></p><p class="title"><a href="/2026/11/15/Agent%E5%B7%A5%E7%A8%8B%E4%B8%AD%E7%9A%84%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8E%8B%E7%BC%A9%E8%A7%A6%E5%8F%91%E4%BA%A4%E6%8E%A5%E4%B8%8E%E6%89%BE%E5%9B%9E/">Agent 工程中的上下文压缩：触发、交接与找回</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-11-12T22:29:18.000Z">2026-11-13</time></p><p class="title"><a href="/2026/11/13/%E5%A6%82%E4%BD%95%E6%8A%8AGoogleA2UI%E6%8E%A5%E5%85%A5Harness/">如何把 Google A2UI 接入 Harness：从协议到渲染与动作回传</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-11-02T03:08:35.000Z">2026-11-02</time></p><p class="title"><a href="/2026/11/02/%E5%A4%9AAgent%E5%8D%8F%E4%BD%9C%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%E5%85%B1%E4%BA%AB%E8%AE%B0%E5%BF%86/">多 Agent 协作如何实现共享记忆：四个开源项目的架构拆解</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-10-23T13:56:09.000Z">2026-10-23</time></p><p class="title"><a href="/2026/10/23/%E4%B8%80%E6%96%87%E6%90%9E%E6%87%82Agent%E9%80%9A%E4%BF%A1%E5%8D%8F%E8%AE%AE/">一文搞懂 Agent 通信协议：MCP、A2A 与 ACP</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-10-13T19:17:42.000Z">2026-10-14</time></p><p class="title"><a href="/2026/10/14/%E5%A4%A7%E6%A8%A1%E5%9E%8B%E8%83%BD%E5%8A%9B%E4%B8%8E%E9%80%9F%E5%BA%A6%E7%9A%84%E4%B8%A4%E6%9C%AC%E8%B4%A6%E5%85%AB%E7%A7%8D%E6%89%8B%E6%AE%B5%E7%9A%84%E9%80%82%E7%94%A8%E8%BE%B9%E7%95%8C/">大模型能力与速度的两本账：八种手段的适用边界</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/11/"><span class="level-start"><span class="level-item">十一月 2026</span></span><span class="level-end"><span class="level-item tag">3</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/10/"><span class="level-start"><span class="level-item">十月 2026</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">37</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E4%B8%8A%E4%B8%8B%E6%96%87%E5%B7%A5%E7%A8%8B/"><span class="tag">上下文工程</span><span class="tag">4</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">141</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">25</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">35</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>
