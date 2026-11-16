@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta name="baidu-site-verification" content="&quot;codeva-HE8XOLULr2"><script src="https://unpkg.com/mermaid@12.2.0/dist/mermaid.min.js"></script><title>从 JD 到面试：2027 年 Agent 团队的组建方法 - 类型安全程序员</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="类型安全程序员"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="类型安全程序员"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="2027 年招 Agent 工程师，代价最高的错误是用传统研发的标准筛人。很多 JD 把「熟悉大模型」追加在前后端技能清单后面，面试仍然考八股和算法题。招来的人会调工具，却设计不出一条能交付的工作流。本文从能力模型、JD 重写、面试设计、团队配置到 90 天落地，给出一套可执行的组建方法。"><meta property="og:type" content="blog"><meta property="og:title" content="从 JD 到面试：2027 年 Agent 团队的组建方法"><meta property="og:url" content="https://987763485.github.io/2026/11/16/%E4%BB%8EJD%E5%88%B0%E9%9D%A2%E8%AF%952027%E5%B9%B4Agent%E5%9B%A2%E9%98%9F%E7%9A%84%E7%BB%84%E5%BB%BA%E6%96%B9%E6%B3%95/"><meta property="og:site_name" content="类型安全程序员"><meta property="og:description" content="2027 年招 Agent 工程师，代价最高的错误是用传统研发的标准筛人。很多 JD 把「熟悉大模型」追加在前后端技能清单后面，面试仍然考八股和算法题。招来的人会调工具，却设计不出一条能交付的工作流。本文从能力模型、JD 重写、面试设计、团队配置到 90 天落地，给出一套可执行的组建方法。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://987763485.github.io/img/og_image.png"><meta property="article:published_time" content="2026-11-16T03:20:09.000Z"><meta property="article:modified_time" content="2026-11-16T05:47:24.484Z"><meta property="article:author" content="吴春乐"><meta property="article:tag" content="大模型"><meta property="article:tag" content="agent"><meta property="article:tag" content="架构设计"><meta property="twitter:card" content="summary"><meta property="twitter:image:src" content="https://987763485.github.io/img/og_image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://987763485.github.io/2026/11/16/%E4%BB%8EJD%E5%88%B0%E9%9D%A2%E8%AF%952027%E5%B9%B4Agent%E5%9B%A2%E9%98%9F%E7%9A%84%E7%BB%84%E5%BB%BA%E6%96%B9%E6%B3%95/"},"headline":"从 JD 到面试：2027 年 Agent 团队的组建方法","image":["https://987763485.github.io/img/og_image.png"],"datePublished":"2026-11-16T03:20:09.000Z","dateModified":"2026-11-16T05:47:24.484Z","author":{"@type":"Person","name":"吴春乐"},"publisher":{"@type":"Organization","name":"类型安全程序员","logo":{"@type":"ImageObject","url":"https://987763485.github.io/img/logo.svg"}},"description":"2027 年招 Agent 工程师，代价最高的错误是用传统研发的标准筛人。很多 JD 把「熟悉大模型」追加在前后端技能清单后面，面试仍然考八股和算法题。招来的人会调工具，却设计不出一条能交付的工作流。本文从能力模型、JD 重写、面试设计、团队配置到 90 天落地，给出一套可执行的组建方法。"}</script><link rel="canonical" href="https://987763485.github.io/2026/11/16/%E4%BB%8EJD%E5%88%B0%E9%9D%A2%E8%AF%952027%E5%B9%B4Agent%E5%9B%A2%E9%98%9F%E7%9A%84%E7%BB%84%E5%BB%BA%E6%96%B9%E6%B3%95/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.0.0/css/all.css"><link data-pjax rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><script>var _hmt = _hmt || [];
+        (function() {
+            var hm = document.createElement("script");
+            hm.src = "//hm.baidu.com/hm.js?96433e30ee22a64cb0977a9badd6098f";
+            var s = document.getElementsByTagName("script")[0];
+            s.parentNode.insertBefore(hm, s);
+        })();</script><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><!--!--><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+
+          const id = '#' + CSS.escape(location.hash.substring(1));
+          const $tabMenu = document.querySelector(`.tabs a[href="${id}"]`);
+          if (!$tabMenu) {
+            return;
+          }
+
+          const $tabMenuContainer = $tabMenu.parentElement.parentElement;
+          Array.from($tabMenuContainer.children).forEach($menu => $menu.classList.remove('is-active'));
+          Array.from($tabMenuContainer.querySelectorAll('a'))
+              .map($menu => document.getElementById($menu.getAttribute("href").substring(1)))
+              .forEach($content => $content.classList.add('is-hidden'));
+
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+          const $activeTab = document.querySelector(id);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="类型安全程序员" type="application/atom+xml">
+</head><body class="is-3-column"><nav class="navbar navbar-main"><div class="container navbar-container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/archives">归档</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/series">系列</a><a class="navbar-item" href="/about">关于</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-6-widescreen"><div class="card"><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2026-11-16T03:20:09.000Z" title="11/16/2026, 11:20:09 AM">2026-11-16</time>发表</span><span class="level-item"><a class="link-muted" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/">研发管理</a></span><span class="level-item">1 小时读完 (大约7684个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">从 JD 到面试：2027 年 Agent 团队的组建方法</h1><div class="content"><p>2027 年招 Agent 工程师，代价最高的错误是用传统研发的标准筛人。很多 JD 把「熟悉大模型」追加在前后端技能清单后面，面试仍然考八股和算法题。招来的人会调工具，却设计不出一条能交付的工作流。本文从能力模型、JD 重写、面试设计、团队配置到 90 天落地，给出一套可执行的组建方法。</p>
+<h2 id="招聘误区：把-Agent-团队当传统研发团队招"><a href="#招聘误区：把-Agent-团队当传统研发团队招" class="headerlink" title="招聘误区：把 Agent 团队当传统研发团队招"></a>招聘误区：把 Agent 团队当传统研发团队招</h2><p>第一个误区是把「单领域深度」当成首要标准。传统后端招聘会要求精通 JVM、熟悉 Go 内存模型、能手写并发。Agent 开发也需要工程底子，但日常工作是拆需求、接工具、管上下文、做评测。这些能力横跨前端、后端、数据、模型和产品。单点深度再高，缺了工作流设计，也很难独立交付。</p>
+<p>第二个误区是把工具经验当成能力证明。简历上写「熟练使用 Claude Code、Codex」，不等于会设计研发工作流。工具更新很快，工作流设计、上下文工程、评测方法才能带走。面试只问工具怎么用，招来的是操作员。</p>
+<p>第三个误区是唯算法背景。多数企业不做基础模型训练。Agent 落地需要模型素养、数据工程、评测和成本控制，不需要发论文。招一个只做预训练的研究者做业务 Agent，双方都痛苦。完全不理解模型边界的纯业务开发，也会在 RAG、微调和上下文策略上反复出错。</p>
+<p>第四个误区是 JD 写「全都要」。TypeScript、Python、Go、Rust、Java、K8s、Figma、算法、管理、销售支持，全列成必备。合适的人不敢投，面试官也不知道该考什么。JD 应该用来筛选，不该用来收集愿望。每一项必备能力，都要对应一个面试环节和一条证据。</p>
+<p>第五个误区是只招「能写代码的人」，不设计团队。Agent 交付需要互补角色：能定架构的人、能打通数据和检索的人、能做评测和可观测的人、能理解产品与交互的人。五个人的能力结构一样，同一个问题会重复出现。</p>
+<p>这些误区叠加，招聘周期变长，薪资被抬高，团队却交付不出生产级 Agent。候选人能演示聊天机器人，说不清任务成功率、Token 成本和失败恢复。团队每天改 Prompt，没人建评测集。上线后一出问题，只能靠人盯。问题通常不在候选人太少，而在筛选标准不清楚。</p>
+<pre class="mermaid">flowchart LR
+    A[能力模型] --> B[简历筛选：找证据]
+    B --> C[工作流复盘]
+    C --> D[场景实战：Token 预算]
+    D --> E[调试与代码评审]
+    E --> F[评分卡校准]
+    F --> G[Offer 与 90 天计划]</pre>
+
+<h2 id="能力优先级：广度、工作流与一项专长"><a href="#能力优先级：广度、工作流与一项专长" class="headerlink" title="能力优先级：广度、工作流与一项专长"></a>能力优先级：广度、工作流与一项专长</h2><p>Agent 团队的前几个人需要广度。这里的广度指能在一条完整链路上做判断。每样技术都浅尝一遍，不算广度。可以把能力分成五层。</p>
+<p>第一层是工程基础。TypeScript 和 Python 至少有一门能作为主力，另一门能读能改。Go 与 Rust 至少能读能改，理解适用边界。前端要理解组件化、状态和交互，能配合 React 或 Vue 做 Agent 的调试界面。后端要理解接口、事务、并发和幂等。数据库、Redis、消息队列要懂使用场景和基本运维。Docker 与 Linux 要能独立排查环境问题。CSS 盒模型这类前端基础，考的是能不能和前端对齐，不是能不能手写框架。工程基础的判断标准很朴素：给他一个报错、一条慢查询、一个容器起不来的环境，看他能不能定位到根因，而不是只会重启。</p>
+<p>第二层是模型工程。RAG 要懂切分、召回、重排和评测。LoRA 要懂数据构造、训练配置和效果评估。Memory 要懂写入、检索、遗忘和一致性。上下文压缩要懂摘要、裁剪和分层。上下文工程要能把 Prompt、工具描述、状态和失败恢复放在一个系统里设计。这些能力不需要每项都到专家级，但要知道什么时候该用、代价是什么、怎么验收。模型工程的重点在选型与验收，训练只占一小部分。同一个准确率目标，用 RAG、微调、Prompt 还是工具，成本和迭代速度不同。候选人要能说清楚为什么选这一条。</p>
+<p>第三层是协议与工具。MCP 解决工具与数据接入，A2A 解决 Agent 之间的任务协作，Skill 把流程做成可复用能力。候选人不需要背协议字段，但要能说清楚什么场景该用 MCP，什么场景该用 A2A，Skill 和 Prompt 的边界在哪里，工具权限和审计怎么做。更好的判断标准是让他画一条调用链。用户请求进来，经过哪些 Agent、哪些工具、哪些权限检查，失败在哪一步降级。</p>
+<p>第四层是产品与设计。能分析竞品、能把需求拆成 MVP、能画清楚交互流程，熟悉怎么使用 Figma 或 Pen 等工具处理原型。Agent 的输出经常是一个多步交互，不只是一段文本。不懂交互的人，做出来的 Agent 就是一个只会聊天的输入框。产品能力不要求候选人成为设计师，但要求他能判断这个任务该不该用多步表单，什么时候该展示进度，失败时用户看到什么。这些决定直接影响 Agent 的可用性。</p>
+<p>第五层是工作流与团队。能定义需求、设计、编码、评审、测试、发布的流水线，能把 AI 嵌入每个环节，能建立评测标准和复盘机制。负责人要能定这条流水线，高级工程师要能在一个环节里做深。</p>
+<p>技术面广有三个实际用处。第一，知道怎么指导模型。熟悉前后端、数据、部署和交互，才能判断模型给的方案哪里不对、该补什么上下文、该换什么工具。很多工作还无法全靠模型完成，人的判断仍然是瓶颈。第二，遇到问题知道往哪查。报错、慢查询、容器、检索、协议，能快速定位是模型问题还是工程问题。第三，知道怎么拆解别人的产品。用过足够多的工具和产品，才能把一个竞品拆成可实现的模块，而不是停留在「它有个聊天框」。</p>
+<p>这也是为什么 Agent 工具团队的主栈通常是 TypeScript。Claude Code、OpenCode、WorkBuddy 这类工具以 TypeScript&#x2F;Node 为主，Codex 也保留了 TypeScript 的 CLI 层。插件、协议适配和前端调试界面大多围绕这个生态。招聘 Agent 工具与工作流岗位时，一个只写 Java、不愿碰 TypeScript 的高级工程师，价值有限。Java、Go、Rust 当然有用，但更适合放在高并发后端、基础设施或性能敏感模块。它们替代不了 Agent 工具的主栈。</p>
+<p>团队还需要至少一项明确的专长。广度不等于每项都浅。团队里至少要有一个人能在后端并发、数据一致性、检索质量、评测体系或前端交互中的某一项上做出判断。否则遇到疑难问题，所有人只能一起猜。招聘时可以接受「广度优先、单点中等」，但不能接受「所有点都浅」。让候选人挑一个自己最有把握的领域，连续追问三层「为什么」和「如果失败怎么办」。答得下去，说明确实做过；答不下去，说明只是听过。</p>
+<table>
+<thead>
+<tr>
+<th>能力</th>
+<th>必备证据</th>
+<th>不需要</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>工程基础</td>
+<td>独立交付过一个前后端或全栈服务</td>
+<td>手写 JVM 调优、背 Go 内存模型</td>
+</tr>
+<tr>
+<td>模型工程</td>
+<td>做过 RAG 或 Memory 的完整链路与评测</td>
+<td>从零训练基础模型</td>
+</tr>
+<tr>
+<td>协议工具</td>
+<td>用过 MCP&#x2F;A2A，能解释边界与权限</td>
+<td>背协议全部字段</td>
+</tr>
+<tr>
+<td>产品设计</td>
+<td>能拆 MVP、画流程、分析竞品</td>
+<td>专业产品经理或 UI 设计师的水准</td>
+</tr>
+<tr>
+<td>工作流</td>
+<td>定义过团队研发流程并落地</td>
+<td>只做过个人效率工具</td>
+</tr>
+</tbody></table>
+<h2 id="JD-重写：从技能清单到能力证据"><a href="#JD-重写：从技能清单到能力证据" class="headerlink" title="JD 重写：从技能清单到能力证据"></a>JD 重写：从技能清单到能力证据</h2><p>旧 JD 的通病是以名词为中心：熟悉 RAG、熟悉 MCP、熟悉向量数据库。候选人只能回「熟悉」，面试官只能问定义，双方都在表演。新 JD 要以证据为中心：你做过什么，在什么约束下做的，结果如何，失败时怎么处理。</p>
+<p>一个可用的 JD 结构是四段。第一段写岗位使命，说明这个角色负责什么业务结果，不要只写「负责 Agent 开发」。第二段写必备能力，每项配一条可验证的证据。比如「有 RAG 从 0 到 1 的落地经验，能说明切分、召回、重排和评测的具体取舍」，比「熟悉 RAG」有用。第三段写加分项，明确它不是筛人门槛。第四段写团队与协作方式：代码评审、评测机制、on-call、文档习惯。</p>
+<p>必备能力可以收敛成六类。第一，完整交付过至少一个 Agent 或 LLM 应用，从原型到生产，能讲清楚场景、指标和失败经验。第二，设计过研发工作流，知道 AI 在需求、编码、评审、测试、发布各环节该放在哪里。第三，TypeScript 或 Python 至少一门精通，另一门能协作，有后端或数据工程底子。第四，理解 RAG、Memory、上下文压缩和上下文工程，能设计上下文预算和失败恢复。第五，用过 MCP、A2A 或同类协议，理解工具接入、权限和审计。第六，有评测与可观测意识，能用数据证明效果，不只靠演示。每条必备能力都要绑定一个面试环节：完整交付对工作流复盘，上下文工程对场景实战，工程质量对代码评审，协作对行为面试。JD 上写了却没人考，等于没写。</p>
+<p>加分项可以保留设计规范、视觉规范、K8s、Figma&#x2F;Pen，以及 Java&#x2F;C# 等存量系统语言。它们只影响加分，不影响是否合格。JD 里要明确写「加分项不作为硬性筛选」，否则招聘系统会把合适的人筛掉。</p>
+<p>管理岗的 JD 还要加三条。第一，带过 3 人以上团队，能做目标拆解、任务分配、风险预警。第二，建立过代码规范、评审机制和评测标准，并推动落地。第三，能做跨职能协作，把业务需求翻译成技术方案和排期。只写「有管理经验」不够，要写带团队交付过什么、团队规模、交付周期、人员成长。JD 里不要把学历、年限写成硬门槛。学历和年限说明不了他能不能交付，作品、复盘和现场表现更能说明问题。真要设门槛，就设「能展示一个从原型到生产的项目」。</p>
+<table>
+<thead>
+<tr>
+<th>旧写法</th>
+<th>新写法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>熟悉 RAG</td>
+<td>落地过 RAG 链路，能说明切分、召回、重排与评测取舍</td>
+</tr>
+<tr>
+<td>熟悉 MCP</td>
+<td>用 MCP 接入过工具，设计过权限、审计与失败降级</td>
+</tr>
+<tr>
+<td>精通 TypeScript&#x2F;Python</td>
+<td>一门主力、一门协作，有可展示的生产项目</td>
+</tr>
+<tr>
+<td>有管理经验</td>
+<td>带过 3 人以上团队，交付过从 0 到 1 的 Agent 应用</td>
+</tr>
+<tr>
+<td>熟悉大模型</td>
+<td>理解成本、延迟、准确率三角，能做选型与评测</td>
+</tr>
+</tbody></table>
+<p>JD 也不要太长。超过两屏，候选人会只扫关键词，面试官也会失去重点。把「必须具备」控制在六到八条，每条一句话加一条证据要求。其余放到加分项或团队介绍里。招聘页面要让合适的人判断「我该不该投」，不用写成能力词典。</p>
+<h2 id="面试设计：用场景工作流替代工具经验"><a href="#面试设计：用场景工作流替代工具经验" class="headerlink" title="面试设计：用场景工作流替代工具经验"></a>面试设计：用场景工作流替代工具经验</h2><p>面试从复盘开始，不做题。让候选人挑一个真实的 Agent 项目，从需求、方案、实现、评测讲到上线后的故障。重点听四件事：他如何拆问题，如何选择模型与工具，如何设计上下文，如何证明有效。没有真实项目的人，会在这四问里被看出来。有项目但只是「调用 API」的人，讲不清取舍和失败。</p>
+<p>第二关是场景实战。给一个业务场景、一份数据、一个 Token 预算和两到三小时，让候选人做一条能跑通的流程：定义目标与验收标准，设计上下文与工具，写出关键代码，跑通演示，说明下一步怎么迭代。观察他如何控制范围、做取舍、做验证，代码量不重要。Token 预算会逼他考虑成本，避免无限堆上下文。</p>
+<p>第三关是调试与评审。给一段失败的 Agent 轨迹：检索到错误文档、工具调用参数不对、上下文压缩后约束丢失，或者多 Agent 协作卡住。让候选人定位问题、提出验证方法、说明修复方案。再给一段代码或一个 Skill 定义，让他做 Code Review，重点看可维护性、错误处理和评测接口。</p>
+<p>第四关是产品与协作。让候选人分析一个竞品，或者设计一个多步交互流程。问他会怎么和产品、前端、数据团队分工。Figma 不是硬性要求，但能画出清楚的流程和状态，是明显加分。</p>
+<p>面试里少考四类题：模型内部原理、框架 API、算法题、工具清单。对应要考的是应用判断、工作流、调试能力和做成的项目。这四类题的共同问题，是把可搜索的知识当成能力，把工具经历当成经验。Agent 领域变化快，去年流行的框架今年可能已经换名。判断力和工作流比记住 API 更有用。</p>
+<p>评分卡固定七项：问题定义、工作流设计、上下文工程、工程质量、评测意识、成本意识、沟通协作。每项 1 到 5 分，写清楚 3 分和 5 分的行为标准。面试官先独立打分，再开校准会。分歧超过两分，就回到行为证据。校准两次之后，团队的判断标准会稳定下来。工具名不要放进评分项，它只是候选人的经历。面试官还要提前准备场景包：一份脱敏数据、一段失败轨迹、一个 Token 预算、一张评分卡。所有人用同一套场景和标准，结论才可比。</p>
+<table>
+<thead>
+<tr>
+<th>环节</th>
+<th>观察什么</th>
+<th>红旗</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>工作流复盘</td>
+<td>拆解、取舍、指标、失败恢复</td>
+<td>只会讲工具、讲不出失败</td>
+</tr>
+<tr>
+<td>场景实战</td>
+<td>范围控制、上下文设计、可运行流程</td>
+<td>无限堆功能、没有验收标准</td>
+</tr>
+<tr>
+<td>调试评审</td>
+<td>定位方法、验证意识、代码质量</td>
+<td>靠猜、改 Prompt 了事</td>
+</tr>
+<tr>
+<td>产品协作</td>
+<td>流程、状态、跨职能沟通</td>
+<td>把 Agent 当聊天框</td>
+</tr>
+</tbody></table>
+<h2 id="人才选型：不唯算法博士，看三件事"><a href="#人才选型：不唯算法博士，看三件事" class="headerlink" title="人才选型：不唯算法博士，看三件事"></a>人才选型：不唯算法博士，看三件事</h2><p>不唯算法博士，不等于不看模型能力。应用型 Agent 团队需要懂模型边界的工程师：知道什么该用 RAG，什么该微调，什么该靠工具，什么该直接拒答。重点看三件事。</p>
+<p>第一，成本、延迟、准确率之间的取舍。候选人要能说清楚，同样的任务，用更大模型、更多检索、更长上下文、更多 Agent 回合，分别会把哪个指标推高。反过来，用 Skill 复用、缓存、上下文压缩、模型分级，能省下什么。只会说「换更强的模型」的人，做不了生产。</p>
+<p>第二，多 Agent 的协作能力。理解不同 Agent 的能力差异，知道怎么调度、怎么共享记忆、怎么管理文件与产物、怎么处理冲突和失败。多开几个 Agent 不等于协作。要像搭一个跨角色团队一样，定清楚谁负责什么、交接什么、谁做裁决、什么时候转人工。</p>
+<p>第三，评测能力。能定义任务成功率、首轮接受率、返工率、单位任务成本，能建黄金任务集，能用数据判断一次改动是变好还是变坏。没有评测，Agent 团队只能靠 Demo 和感觉迭代。</p>
+<p>这三条不会因为框架更换而失效。成本意识、协作设计和评测方法，换个模型、换套工具仍然要用。面试时可以这样问。成本取舍给一个具体任务，让他估算 Token、延迟和准确率。多 Agent 让他设计一个「需求、编码、测试」的协作流程，问清楚交接物和失败处理。评测让他现场设计十条验收用例，并说明怎么防止过拟合。</p>
+<h2 id="团队配置：前五个人怎么搭"><a href="#团队配置：前五个人怎么搭" class="headerlink" title="团队配置：前五个人怎么搭"></a>团队配置：前五个人怎么搭</h2><p>第一个角色是 Agent 负责人或架构师。他要能设计工作流、定上下文工程方案、做协议与工具选型、主持评审，还要能写关键代码。早期不要招纯管理者。没有一线判断力，团队会在技术争论里失去方向。</p>
+<p>第二个角色是 Agent 工程师。主力语言 TypeScript 或 Python，能接工具、写 Skill、做 Memory、处理流式与中断，能把一个多步流程跑稳。他不需要会训练模型，但要能和模型侧对齐。</p>
+<p>第三个角色是 RAG 与数据工程师。负责文档解析、切分、索引、召回、重排、评测，理解向量数据库的选型与调优，能处理权限、增量更新和删除。RAG 做不好，Agent 的回答质量就上不去。</p>
+<p>第四个角色是平台与可观测工程师。负责容器化、CI&#x2F;CD、日志、trace、成本核算、评测流水线和告警。Agent 的故障往往跨模型、工具和网络。没有可观测性，排障只能靠猜。</p>
+<p>第五个角色是懂 AI 的产品或设计师。负责场景选择、交互流程、竞品分析、验收标准，能和工程师一起把 Agent 的能力翻译成用户可理解的界面。这个角色可以兼职，但不能缺。</p>
+<p>如果业务需要桌面端或复杂前端，再加一个前端工程师。如果需要高性能网关或基础设施，再加一个 Go&#x2F;Rust 后端。招聘顺序建议先定负责人，再补 Agent 工程与 RAG，最后补平台与产品。负责人到位之前，不要先招一堆执行者，否则工作流没人定，团队会各写各的。人数不用凑，角色要互补。五个「会写 Prompt 的全栈」，不如三个各有专长的人加两个学习者。</p>
+<p>2027 年 Agent 团队的技术栈建议以 TypeScript、Python、Go、Rust 为主。TypeScript 负责 Agent 工具、协议适配、编辑器与前端调试界面。Python 负责模型侧、RAG、数据处理与评测。Go 负责高并发网关、任务调度和服务端基础设施。Rust 负责性能敏感的执行器、沙箱与端侧能力。Java、C#、Kotlin 更适合维护存量系统或作为加分项，不建议作为新团队的主栈。</p>
+<p>团队协作机制比角色名单更重要。建议固定四件事：一个共享的 Skill 仓库，所有可复用流程都进版本管理；一套黄金任务集，每次改动都跑回归；一份架构决策记录，关键选型留痕；一次每周 Demo，展示真实任务，不要用 PPT。缺了这四件事，角色再全，团队也会各写各的。</p>
+<h2 id="90-天落地与验收指标"><a href="#90-天落地与验收指标" class="headerlink" title="90 天落地与验收指标"></a>90 天落地与验收指标</h2><p>前 30 天，选一个高频、低风险、可评测的场景，建黄金任务集，做出一条能跑通的流程，接上日志和成本统计。功能不用多，先把任务成功率、首轮接受率、单位任务成本、p95 延迟这四个数字跑出来。</p>
+<p>第 31 到 60 天，做生产化。补权限、审计、失败恢复、人工确认、上下文压缩、缓存和降级。把 RAG 的召回质量、Memory 的写入策略、工具调用的幂等逐个确认。此时要开始做 on-call 和故障复盘，不能等上线后再补。</p>
+<p>第 61 到 90 天，复制到第二个场景，验证 Skill 复用和团队协作。第二个场景如果能复用第一个场景的 Skill、评测集和可观测设施，说明团队留下了可复用的东西。如果全部重写，说明之前做的是一个项目，还没有形成平台。</p>
+<p>验收指标分四组。交付组看从需求到 MVP 的时间、从 MVP 到生产的时间、版本迭代周期。质量组看任务成功率、首轮接受率、返工率、事故率。成本组看单位任务 Token 成本、人工介入分钟数、缓存命中率。团队组看招聘到岗时间、90 天上手度、评审覆盖率、文档与 Skill 复用率。指标要按场景和版本分组，否则无法判断是模型问题、上下文问题还是人的问题。招聘指标也要看：从 JD 发布到 offer 的时间、面试通过率、offer 接受率、90 天上手度、试用期留存率。面试通过率很高但 90 天上手度很差，说明面试考错了东西。offer 接受率很低，说明 JD 或薪资定位有问题。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>2027 年组建 Agent 团队，难的是判断一个人能不能交付 Agent。会写代码的人并不少。JD 要写能力证据，面试要做场景工作流，选型要看成本、协作和评测能力，不要只看学历。前五个人要角色互补，至少有一项拿得出手的专长。90 天先用四个数字证明流程能跑通，再谈平台化。工具和模型都会换。能把需求、上下文、工具、评测和团队组织起来的人，换一套技术栈仍然能用。</p>
+<hr>
+<h1 id="附录：Agent-开发经理-JD"><a href="#附录：Agent-开发经理-JD" class="headerlink" title="附录：Agent 开发经理 JD"></a>附录：Agent 开发经理 JD</h1><h2 id="岗位定位"><a href="#岗位定位" class="headerlink" title="岗位定位"></a>岗位定位</h2><p>负责 Agent 应用从 0→1 与 1→N 的工程化落地：既能设计软件开发工作流与上下文工程体系，也能带队完成 RAG &#x2F; Memory &#x2F; 工具调用（MCP、A2A）&#x2F; Skill 化的生产级交付。</p>
+<h2 id="必备能力（Must-Have）"><a href="#必备能力（Must-Have）" class="headerlink" title="必备能力（Must-Have）"></a>必备能力（Must-Have）</h2><h3 id="1-工程与工作流设计"><a href="#1-工程与工作流设计" class="headerlink" title="1. 工程与工作流设计"></a>1. 工程与工作流设计</h3><ul>
+<li>具备<strong>设计软件开发工作流</strong>的能力：能定义需求→设计→编码→评审→测试→发布的流水线，并把 AI（Claude Code 等）嵌入为可复用的工程环节。</li>
+<li>熟练 <strong>TypeScript</strong> 与 <strong>Python</strong>，能作为主力语言进行架构设计与代码评审。</li>
+<li>理解 <strong>CSS 盒模型</strong>等前端基础，能与前端协作定义 Agent 交互层与可视化调试界面。</li>
+<li>熟练运用<strong>React&#x2F;vue</strong>进行组件化开发</li>
+</ul>
+<h3 id="2-数据与中间件"><a href="#2-数据与中间件" class="headerlink" title="2. 数据与中间件"></a>2. 数据与中间件</h3><ul>
+<li>熟练使用 <strong>MySQL &#x2F; PostgreSQL</strong>，理解索引、事务、查询优化。</li>
+<li>具备 <strong>Redis</strong>（缓存、会话、限流）与 <strong>MQ</strong>（异步任务、事件驱动）的实战经验。</li>
+<li>熟悉<strong>向量数据库</strong>（如 pgvector &#x2F; Milvus &#x2F; Qdrant 等）的选型、索引与召回调优。</li>
+</ul>
+<h3 id="3-Agent-核心技术"><a href="#3-Agent-核心技术" class="headerlink" title="3. Agent 核心技术"></a>3. Agent 核心技术</h3><ul>
+<li><strong>大模型 RAG</strong>：检索链路设计、切分策略、召回重排、评测闭环。</li>
+<li><strong>LoRA</strong>：微调数据构造、训练配置、效果评估与上线。</li>
+<li><strong>Memory</strong>：短期&#x2F;长期记忆设计，写入、检索、遗忘与一致性。</li>
+<li><strong>上下文压缩</strong>：长对话&#x2F;长文档的摘要、裁剪、分层记忆策略。</li>
+<li><strong>上下文工程</strong>：Prompt 结构、工具描述、状态管理、失败恢复的整体设计。</li>
+<li><strong>MCP</strong>：Model Context Protocol 的工具&#x2F;资源接入与安全边界。</li>
+<li><strong>A2A</strong>：Agent 间协作协议、任务编排与消息契约。</li>
+<li><strong>Skill 开发 + 编排</strong>：将能力沉淀为可复用 Skill（定义、注册、版本、评测）；能让多个原子 Skill 协同工作的工程化方法。</li>
+</ul>
+<h3 id="4-交付与工具链"><a href="#4-交付与工具链" class="headerlink" title="4. 交付与工具链"></a>4. 交付与工具链</h3><ul>
+<li><strong>Docker</strong> 容器化与本地&#x2F;CI 环境一致性。</li>
+<li><strong>Claude Code&#x2F;Codex</strong> 深度使用经验：能将其纳入研发工作流（代码生成、重构、测试、Review）。</li>
+<li>具备<strong>竞品分析</strong>能力：跟踪主流 Agent 产品&#x2F;框架，输出选型与差异化建议。</li>
+</ul>
+<h3 id="5-团队管理能力"><a href="#5-团队管理能力" class="headerlink" title="5. 团队管理能力"></a>5. 团队管理能力</h3><ul>
+<li><strong>带队经验</strong>：有 3 人以上技术团队管理经验，能完成目标拆解、任务分配、进度跟踪与风险预警；能带 5–10 人团队者优先。</li>
+<li><strong>人才建设</strong>：能识别团队成员能力短板，制定培养计划；具备招聘面试、梯队搭建与关键岗位备份意识。</li>
+<li><strong>技术决策与标准制定</strong>：能主持技术选型评审，建立代码规范、Review 机制、文档规范与 Agent 评测标准，并推动团队落地。</li>
+<li><strong>跨职能协作</strong>：能与产品、算法、前端、运维高效对齐，把业务需求翻译成可执行的技术方案与排期。</li>
+<li><strong>绩效与激励</strong>：能设定可量化的团队目标（交付质量、迭代速度、成本与延迟指标），做绩效反馈与激励设计。</li>
+<li><strong>工程文化</strong>：推动可维护、可评测、可观测的工程习惯；能以身作则使用 Claude Code 等工具提升团队整体效率。</li>
+<li><strong>冲突与向上管理</strong>：能处理优先级冲突、资源争夺，向管理层清晰汇报进展与风险。</li>
+</ul>
+<h3 id="6-项目经验"><a href="#6-项目经验" class="headerlink" title="6. 项目经验"></a>6. 项目经验</h3><ul>
+<li><strong>项目经验</strong>：存在 <strong>Agent 相关的项目开发</strong>经历，或<strong>参与过相关开源项目</strong>；能清晰说明自己在项目中的角色、技术方案、遇到的难点与最终效果（如落地场景、性能&#x2F;成本指标、用户规模）。</li>
+<li>有 <strong>Agent 应用从原型到生产</strong>的完整交付经验者优先；有可展示的开源贡献（PR、Issue、文档、维护者身份）者加分。</li>
+</ul>
+<hr>
+<h2 id="加分项（Nice-to-Have）"><a href="#加分项（Nice-to-Have）" class="headerlink" title="加分项（Nice-to-Have）"></a>加分项（Nice-to-Have）</h2><ul>
+<li><strong>设计规范 &#x2F; 视觉规范</strong>：能定义组件与交互规范，提升 Agent 产品一致性。</li>
+<li><strong>Go &#x2F; Rust &#x2F; Java</strong>&#x2F;C#：高性能服务或工具链开发。</li>
+<li><strong>K8S</strong>：Agent 服务的弹性部署与运维。</li>
+<li><strong>Figma &#x2F; Pen</strong>：能快速产出原型与可视化方案。</li>
+</ul>
+<hr>
+<h2 id="我们希望你"><a href="#我们希望你" class="headerlink" title="我们希望你"></a>我们希望你</h2><ul>
+<li>有 Agent &#x2F; LLM 应用从原型到生产的完整落地经验。</li>
+<li>能够深入的前瞻的研究大模型的发展方向。</li>
+<li>能把”上下文工程”当作一等公民来设计系统，而非堆 Prompt。</li>
+<li>具备工程审美：可维护、可评测、可观测。</li>
+<li><strong>既能自己写关键代码，也能带团队打硬仗。</strong></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>从 JD 到面试：2027 年 Agent 团队的组建方法</p><p><a href="https://987763485.github.io/2026/11/16/从JD到面试2027年Agent团队的组建方法/">https://987763485.github.io/2026/11/16/从JD到面试2027年Agent团队的组建方法/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>吴春乐</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2026-11-16</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2026-11-16</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="link-muted mr-2" rel="tag" href="/tags/agent/">agent</a><a class="link-muted mr-2" rel="tag" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/">架构设计</a></div><!--!--></article></div><div class="card"><div class="card-content"><h3 class="menu-label has-text-centered">喜欢这篇文章？打赏一下作者吧</h3><div class="buttons is-centered"><a class="button donate" data-type="alipay"><span class="icon is-small"><i class="fab fa-alipay"></i></span><span>支付宝</span><span class="qrcode"><img src="/img/alipay.jpg" alt="支付宝"></span></a><a class="button donate" data-type="wechat"><span class="icon is-small"><i class="fab fa-weixin"></i></span><span>微信</span><span class="qrcode"><img src="/img/wechat.jpg" alt="微信"></span></a></div></div></div><nav class="post-navigation mt-4 level is-mobile"><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/2026/11/15/Agent%E5%B7%A5%E7%A8%8B%E4%B8%AD%E7%9A%84%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8E%8B%E7%BC%A9%E8%A7%A6%E5%8F%91%E4%BA%A4%E6%8E%A5%E4%B8%8E%E6%89%BE%E5%9B%9E/"><span class="level-item">Agent 工程中的上下文压缩：触发、交接与找回</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><div class="column column-left is-4-tablet is-4-desktop is-3-widescreen  order-1"><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg" alt="吴春乐"></figure><p class="title is-size-4 is-block" style="line-height:inherit;">吴春乐</p><p class="is-size-6 is-block">一个类型安全的人</p><p class="is-size-6 is-flex justify-content-center"><i class="fas fa-map-marker-alt mr-1"></i><span>中国 · 西安</span></p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives/"><p class="title">1072</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories/"><p class="title">11</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags/"><p class="title">36</p></a></div></div></nav><div class="level"><a class="level-item button is-primary is-rounded" href="https://github.com/987763485" target="_blank" rel="me noopener">关注我</a></div><div class="level is-mobile is-multiline"><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="Github" href="https://github.com/987763485"><i class="fab fa-github"></i></a><a class="level-item button is-transparent is-marginless" target="_blank" rel="me noopener" title="RSS" href="/"><i class="fas fa-rss"></i></a></div></div></div><!--!--><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/"><span class="level-start"><span class="level-item">人工智能</span></span><span class="level-end"><span class="level-item tag">141</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%85%A8%E6%A0%88%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">全栈开发</span></span><span class="level-end"><span class="level-item tag">38</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">前端开发</span></span><span class="level-end"><span class="level-item tag">372</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="level-start"><span class="level-item">后端开发</span></span><span class="level-end"><span class="level-item tag">301</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%AE%B9%E5%99%A8%E4%B8%8E%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">容器与运维</span></span><span class="level-end"><span class="level-item tag">81</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%95%88%E7%8E%87%E5%B7%A5%E5%85%B7/"><span class="level-start"><span class="level-item">效率工具</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/"><span class="level-start"><span class="level-item">研发管理</span></span><span class="level-end"><span class="level-item tag">2</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="level-start"><span class="level-item">移动端</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="level-start"><span class="level-item">算法与数据结构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="level-start"><span class="level-item">网络安全</span></span><span class="level-end"><span class="level-item tag">111</span></span></a></li><li><a class="level is-mobile" href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="level-start"><span class="level-item">计算机网络</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li></ul></div></div></div><div class="card widget" data-type="recent-posts"><div class="card-content"><h3 class="menu-label">最新文章</h3><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-11-16T03:20:09.000Z">2026-11-16</time></p><p class="title"><a href="/2026/11/16/%E4%BB%8EJD%E5%88%B0%E9%9D%A2%E8%AF%952027%E5%B9%B4Agent%E5%9B%A2%E9%98%9F%E7%9A%84%E7%BB%84%E5%BB%BA%E6%96%B9%E6%B3%95/">从 JD 到面试：2027 年 Agent 团队的组建方法</a></p><p class="categories"><a href="/categories/%E7%A0%94%E5%8F%91%E7%AE%A1%E7%90%86/">研发管理</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-11-15T14:30:47.000Z">2026-11-15</time></p><p class="title"><a href="/2026/11/15/Agent%E5%B7%A5%E7%A8%8B%E4%B8%AD%E7%9A%84%E4%B8%8A%E4%B8%8B%E6%96%87%E5%8E%8B%E7%BC%A9%E8%A7%A6%E5%8F%91%E4%BA%A4%E6%8E%A5%E4%B8%8E%E6%89%BE%E5%9B%9E/">Agent 工程中的上下文压缩：触发、交接与找回</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-11-12T22:29:18.000Z">2026-11-13</time></p><p class="title"><a href="/2026/11/13/%E5%A6%82%E4%BD%95%E6%8A%8AGoogleA2UI%E6%8E%A5%E5%85%A5Harness/">如何把 Google A2UI 接入 Harness：从协议到渲染与动作回传</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-11-02T03:08:35.000Z">2026-11-02</time></p><p class="title"><a href="/2026/11/02/%E5%A4%9AAgent%E5%8D%8F%E4%BD%9C%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%E5%85%B1%E4%BA%AB%E8%AE%B0%E5%BF%86/">多 Agent 协作如何实现共享记忆：四个开源项目的架构拆解</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article><article class="media"><div class="media-content"><p class="date"><time dateTime="2026-10-23T13:56:09.000Z">2026-10-23</time></p><p class="title"><a href="/2026/10/23/%E4%B8%80%E6%96%87%E6%90%9E%E6%87%82Agent%E9%80%9A%E4%BF%A1%E5%8D%8F%E8%AE%AE/">一文搞懂 Agent 通信协议：MCP、A2A 与 ACP</a></p><p class="categories"><a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/">人工智能</a></p></div></article></div></div><div class="column-right-shadow is-hidden-widescreen"></div></div><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen is-hidden-touch is-hidden-desktop-only order-3"><div class="card widget" data-type="archives"><div class="card-content"><div class="menu"><h3 class="menu-label">归档</h3><ul class="menu-list"><li><a class="level is-mobile" href="/archives/2026/11/"><span class="level-start"><span class="level-item">十一月 2026</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/10/"><span class="level-start"><span class="level-item">十月 2026</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/09/"><span class="level-start"><span class="level-item">九月 2026</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/08/"><span class="level-start"><span class="level-item">八月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/07/"><span class="level-start"><span class="level-item">七月 2026</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/06/"><span class="level-start"><span class="level-item">六月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/05/"><span class="level-start"><span class="level-item">五月 2026</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/04/"><span class="level-start"><span class="level-item">四月 2026</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/03/"><span class="level-start"><span class="level-item">三月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/archives/2026/02/"><span class="level-start"><span class="level-item">二月 2026</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li></ul></div></div></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/agent/"><span class="tag">agent</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/csharp/"><span class="tag">csharp</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/css3/"><span class="tag">css3</span><span class="tag">40</span></a></div><div class="control"><a class="tags has-addons" href="/tags/devops/"><span class="tag">devops</span><span class="tag">49</span></a></div><div class="control"><a class="tags has-addons" href="/tags/docker/"><span class="tag">docker</span><span class="tag">66</span></a></div><div class="control"><a class="tags has-addons" href="/tags/flutter/"><span class="tag">flutter</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/golang/"><span class="tag">golang</span><span class="tag">113</span></a></div><div class="control"><a class="tags has-addons" href="/tags/html5/"><span class="tag">html5</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/java/"><span class="tag">java</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/javascript/"><span class="tag">javascript</span><span class="tag">151</span></a></div><div class="control"><a class="tags has-addons" href="/tags/jquery/"><span class="tag">jquery</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kotlin/"><span class="tag">kotlin</span><span class="tag">38</span></a></div><div class="control"><a class="tags has-addons" href="/tags/kubernetes/"><span class="tag">kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/linux/"><span class="tag">linux</span><span class="tag">53</span></a></div><div class="control"><a class="tags has-addons" href="/tags/nodejs/"><span class="tag">nodejs</span><span class="tag">131</span></a></div><div class="control"><a class="tags has-addons" href="/tags/python/"><span class="tag">python</span><span class="tag">162</span></a></div><div class="control"><a class="tags has-addons" href="/tags/react/"><span class="tag">react</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/rust/"><span class="tag">rust</span><span class="tag">96</span></a></div><div class="control"><a class="tags has-addons" href="/tags/typescript/"><span class="tag">typescript</span><span class="tag">232</span></a></div><div class="control"><a class="tags has-addons" href="/tags/vue/"><span class="tag">vue</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/web%E5%89%8D%E7%AB%AF/"><span class="tag">web前端</span><span class="tag">370</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E4%B8%8A%E4%B8%8B%E6%96%87%E5%B7%A5%E7%A8%8B/"><span class="tag">上下文工程</span><span class="tag">4</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%89%8D%E7%AB%AF%E5%B7%A5%E7%A8%8B%E5%8C%96/"><span class="tag">前端工程化</span><span class="tag">88</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%90%8E%E7%AB%AF%E5%BC%80%E5%8F%91/"><span class="tag">后端开发</span><span class="tag">299</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="tag">大模型</span><span class="tag">142</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF/"><span class="tag">容器技术</span><span class="tag">32</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/"><span class="tag">微服务</span><span class="tag">59</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/"><span class="tag">性能优化</span><span class="tag">25</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/"><span class="tag">数据库</span><span class="tag">19</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/"><span class="tag">架构设计</span><span class="tag">36</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%B5%8F%E8%A7%88%E5%99%A8/"><span class="tag">浏览器</span><span class="tag">56</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%A7%BB%E5%8A%A8%E7%AB%AF/"><span class="tag">移动端</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AD%89%E7%BA%A7%E4%BF%9D%E6%8A%A4/"><span class="tag">等级保护</span><span class="tag">83</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/"><span class="tag">算法与数据结构</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/"><span class="tag">网络安全</span><span class="tag">112</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C/"><span class="tag">计算机网络</span><span class="tag">23</span></a></div></div></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="类型安全程序员" height="28"></a><p class="is-size-7"><span>&copy; 2026 吴春乐</span>  <span>. All rights reserved.</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Download on GitHub" href="https://github.com/987763485"><i class="fab fa-github"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-cn");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script data-pjax src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script data-pjax src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js"></script><script src="/js/pjax.js"></script><!--!--><!--!--><!--!--><script data-pjax src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script data-pjax src="/js/insight.js" defer></script><script data-pjax>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script><script src="/js/init.js"></script></body></html>
